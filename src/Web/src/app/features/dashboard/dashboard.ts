@@ -1,0 +1,206 @@
+import { CommonModule } from '@angular/common';
+import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
+import type { EChartsOption } from 'echarts';
+
+import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTableModule } from '@angular/material/table';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatSortModule, Sort } from '@angular/material/sort';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+
+import { Api } from '../../core/api';
+import { GroupBy, ModelStat, PagedResult, ProjectDto, SummaryResponse, UsageFilter, UsageRecord } from '../../core/models';
+import { ChartComponent } from '../../shared/chart';
+import { CompactPipe } from '../../shared/format';
+
+@Component({
+  selector: 'app-dashboard',
+  imports: [
+    CommonModule, FormsModule, RouterLink,
+    MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule,
+    MatButtonToggleModule, MatSlideToggleModule, MatTableModule, MatPaginatorModule, MatSortModule,
+    MatProgressBarModule, MatIconModule, MatTooltipModule, MatSnackBarModule,
+    ChartComponent, CompactPipe,
+  ],
+  templateUrl: './dashboard.html',
+  styleUrl: './dashboard.scss',
+})
+export class Dashboard {
+  private api = inject(Api);
+  private snack = inject(MatSnackBar);
+
+  // ---- filter + view state ----
+  readonly filter = signal<UsageFilter>({ from: null, to: null, projectIds: [], models: [], includeSidechain: true });
+  readonly groupBy = signal<GroupBy>('day');
+
+  readonly projects = signal<ProjectDto[]>([]);
+  readonly modelStats = signal<ModelStat[]>([]);
+  readonly summary = signal<SummaryResponse | null>(null);
+  readonly records = signal<PagedResult<UsageRecord> | null>(null);
+
+  readonly loading = signal(false);
+  readonly syncing = signal(false);
+
+  // ---- records paging / sorting ----
+  readonly page = signal(1);
+  readonly pageSize = signal(25);
+  readonly sort = signal('timestamp');
+  readonly desc = signal(true);
+
+  readonly displayedColumns = ['localDate', 'model', 'projectName', 'sidechain', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'totalTokens', 'costUsd'];
+
+  constructor() {
+    this.loadOptions();
+    this.reloadAll();
+  }
+
+  private loadOptions(): void {
+    this.api.projects().subscribe(p => this.projects.set(p));
+    this.api.models().subscribe(m => this.modelStats.set(m));
+  }
+
+  // mutate filter helpers (immutability for signal change detection)
+  patch<K extends keyof UsageFilter>(key: K, value: UsageFilter[K]): void {
+    this.filter.update(f => ({ ...f, [key]: value }));
+  }
+
+  applyFilters(): void {
+    this.page.set(1);
+    this.reloadAll();
+  }
+
+  resetFilters(): void {
+    this.filter.set({ from: null, to: null, projectIds: [], models: [], includeSidechain: true });
+    this.page.set(1);
+    this.reloadAll();
+  }
+
+  setGroupBy(g: GroupBy): void {
+    this.groupBy.set(g);
+    this.reloadSummary();
+  }
+
+  private reloadAll(): void {
+    this.loading.set(true);
+    forkJoin({
+      summary: this.api.summary(this.filter(), this.groupBy()),
+      records: this.api.records(this.filter(), this.page(), this.pageSize(), this.sort(), this.desc()),
+    }).subscribe({
+      next: r => { this.summary.set(r.summary); this.records.set(r.records); this.loading.set(false); },
+      error: () => { this.loading.set(false); this.snack.open('Failed to load data — is the API running?', 'Dismiss', { duration: 5000 }); },
+    });
+  }
+
+  private reloadSummary(): void {
+    this.api.summary(this.filter(), this.groupBy()).subscribe(s => this.summary.set(s));
+  }
+
+  private reloadRecords(): void {
+    this.api.records(this.filter(), this.page(), this.pageSize(), this.sort(), this.desc())
+      .subscribe(r => this.records.set(r));
+  }
+
+  onPage(e: PageEvent): void {
+    this.page.set(e.pageIndex + 1);
+    this.pageSize.set(e.pageSize);
+    this.reloadRecords();
+  }
+
+  private static readonly SORT_MAP: Record<string, string> = {
+    localDate: 'timestamp', model: 'model', inputTokens: 'input', outputTokens: 'output', costUsd: 'cost',
+  };
+
+  onSort(e: Sort): void {
+    this.sort.set(e.direction ? (Dashboard.SORT_MAP[e.active] ?? 'timestamp') : 'timestamp');
+    this.desc.set(e.direction !== 'asc');
+    this.page.set(1);
+    this.reloadRecords();
+  }
+
+  sync(): void {
+    this.syncing.set(true);
+    this.api.sync().subscribe({
+      next: r => {
+        this.syncing.set(false);
+        const msg = r.error
+          ? `Sync error: ${r.error}`
+          : `Synced: +${r.newRecords.toLocaleString()} rows from ${r.filesParsed}/${r.filesScanned} files (${(r.durationMs / 1000).toFixed(1)}s)`;
+        this.snack.open(msg, 'OK', { duration: 6000 });
+        this.loadOptions();
+        this.reloadAll();
+      },
+      error: () => { this.syncing.set(false); this.snack.open('Sync failed', 'Dismiss', { duration: 5000 }); },
+    });
+  }
+
+  // ---- chart options ----
+  readonly mainChart = computed<EChartsOption>(() => {
+    const s = this.summary();
+    if (!s || s.buckets.length === 0) return { title: { text: 'No data', left: 'center', top: 'center', textStyle: { color: '#9aa' } } };
+
+    const isTime = s.groupBy === 'day' || s.groupBy === 'month';
+    if (isTime) {
+      const keys = s.buckets.map(b => b.key);
+      return {
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['Cost (USD)', 'Tokens'], top: 0 },
+        grid: { left: 56, right: 60, top: 34, bottom: 48 },
+        xAxis: { type: 'category', data: keys, axisLabel: { rotate: keys.length > 14 ? 45 : 0 } },
+        yAxis: [
+          { type: 'value', name: 'USD', axisLabel: { formatter: '${value}' } },
+          { type: 'value', name: 'Tokens', axisLabel: { formatter: (v: number) => this.shortNum(v) } },
+        ],
+        series: [
+          { name: 'Cost (USD)', type: 'bar', data: s.buckets.map(b => +b.costUsd.toFixed(2)), itemStyle: { color: '#3b82f6' } },
+          { name: 'Tokens', type: 'line', yAxisIndex: 1, smooth: true, data: s.buckets.map(b => b.totalTokens), itemStyle: { color: '#f59e0b' } },
+        ],
+      };
+    }
+
+    const top = s.buckets.slice(0, 15).reverse();
+    return {
+      tooltip: { trigger: 'axis', valueFormatter: (v) => '$' + Number(v).toLocaleString() },
+      grid: { left: 150, right: 28, top: 12, bottom: 32 },
+      xAxis: { type: 'value', axisLabel: { formatter: '${value}' } },
+      yAxis: { type: 'category', data: top.map(b => this.label(b.key)) },
+      series: [{ type: 'bar', data: top.map(b => +b.costUsd.toFixed(2)), itemStyle: { color: '#3b82f6' } }],
+    };
+  });
+
+  readonly hasPlaceholder = computed(() => this.modelStats().some(m => m.isPlaceholderPricing && m.costUsd > 0));
+
+  readonly modelChart = computed<EChartsOption>(() => {
+    const ms = this.modelStats().filter(m => m.costUsd > 0);
+    return {
+      tooltip: { trigger: 'item', formatter: (p: any) => `${p.name}: $${Number(p.value).toLocaleString()} (${p.percent}%)` },
+      legend: { bottom: 0, type: 'scroll' },
+      series: [{
+        type: 'pie', radius: ['45%', '72%'], avoidLabelOverlap: true, label: { show: false },
+        data: ms.map(m => ({ name: m.model, value: +m.costUsd.toFixed(2) })),
+      }],
+    };
+  });
+
+  private shortNum(v: number): string {
+    if (Math.abs(v) >= 1e9) return (v / 1e9).toFixed(1) + 'B';
+    if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+    if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+    return `${v}`;
+  }
+
+  private label(key: string): string {
+    return key.length > 24 ? key.slice(0, 10) + '…' + key.slice(-6) : key;
+  }
+}

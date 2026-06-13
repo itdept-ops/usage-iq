@@ -1,0 +1,160 @@
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+<!-- ───────────────────────── Filter bar ───────────────────────── -->
+<mat-card class="filters" appearance="outlined">
+  <div class="filters-row">
+    <mat-form-field appearance="outline" class="f-date">
+      <mat-label>From</mat-label>
+      <input matInput type="date" [ngModel]="filter().from" (ngModelChange)="patch('from', $event)" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="f-date">
+      <mat-label>To</mat-label>
+      <input matInput type="date" [ngModel]="filter().to" (ngModelChange)="patch('to', $event)" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="f-multi">
+      <mat-label>Projects</mat-label>
+      <mat-select multiple [ngModel]="filter().projectIds" (ngModelChange)="patch('projectIds', $event)">
+        @for (p of projects(); track p.id) {
+          <mat-option [value]="p.id">{{ p.name }} ({{ p.records | number }})</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="f-multi">
+      <mat-label>Models</mat-label>
+      <mat-select multiple [ngModel]="filter().models" (ngModelChange)="patch('models', $event)">
+        @for (m of modelStats(); track m.model) {
+          <mat-option [value]="m.model">{{ m.model }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-slide-toggle class="f-toggle" [ngModel]="filter().includeSidechain"
+                      (ngModelChange)="patch('includeSidechain', $event)">
+      Include subagents
+    </mat-slide-toggle>
+
+    <span class="grow"></span>
+
+    <button mat-stroked-button (click)="resetFilters()"><mat-icon>clear</mat-icon> Reset</button>
+    <button mat-flat-button color="primary" (click)="applyFilters()"><mat-icon>filter_list</mat-icon> Apply</button>
+    <button mat-flat-button class="sync-btn" [disabled]="syncing()" (click)="sync()">
+      <mat-icon>{{ syncing() ? 'hourglass_top' : 'sync' }}</mat-icon>
+      {{ syncing() ? 'Syncing…' : 'Sync' }}
+    </button>
+  </div>
+</mat-card>
+
+<!-- ───────────────────────── Summary cards ───────────────────────── -->
+@if (summary(); as s) {
+  <div class="cards">
+    <mat-card class="kpi" appearance="outlined">
+      <div class="kpi-label">Total cost</div>
+      <div class="kpi-value cost">{{ s.total.costUsd | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
+      <div class="kpi-sub">{{ s.total.records | number }} messages</div>
+    </mat-card>
+
+    <mat-card class="kpi" appearance="outlined">
+      <div class="kpi-label">Total tokens</div>
+      <div class="kpi-value">{{ s.total.totalTokens | compact }}</div>
+      <div class="kpi-sub">{{ s.total.totalTokens | number }}</div>
+    </mat-card>
+
+    <mat-card class="kpi" appearance="outlined">
+      <div class="kpi-label">Input / Output</div>
+      <div class="kpi-value">{{ s.total.inputTokens | compact }} <span class="dim">/</span> {{ s.total.outputTokens | compact }}</div>
+      <div class="kpi-sub">prompt vs completion</div>
+    </mat-card>
+
+    <mat-card class="kpi" appearance="outlined">
+      <div class="kpi-label">Cache (read / write)</div>
+      <div class="kpi-value">{{ s.total.cacheReadTokens | compact }} <span class="dim">/</span>
+        {{ (s.total.cacheCreation5mTokens + s.total.cacheCreation1hTokens) | compact }}</div>
+      <div class="kpi-sub">5m + 1h writes priced separately</div>
+    </mat-card>
+  </div>
+}
+
+<!-- ───────────────────────── Charts ───────────────────────── -->
+<div class="charts">
+  <mat-card class="chart-card wide" appearance="outlined">
+    <div class="chart-head">
+      <h3>{{ groupBy() === 'day' || groupBy() === 'month' ? 'Usage over time' : 'Top by ' + groupBy() }}</h3>
+      <mat-button-toggle-group [value]="groupBy()" (change)="setGroupBy($event.value)" hideSingleSelectionIndicator>
+        <mat-button-toggle value="day">Day</mat-button-toggle>
+        <mat-button-toggle value="month">Month</mat-button-toggle>
+        <mat-button-toggle value="project">Project</mat-button-toggle>
+        <mat-button-toggle value="model">Model</mat-button-toggle>
+        <mat-button-toggle value="session">Session</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+    <app-chart [option]="mainChart()" />
+  </mat-card>
+
+  <mat-card class="chart-card" appearance="outlined">
+    <div class="chart-head"><h3>Cost by model</h3></div>
+    <app-chart [option]="modelChart()" />
+    @if (modelStats().length && hasPlaceholder()) {
+      <p class="placeholder-note"><mat-icon>info</mat-icon> Some models use placeholder pricing — set real rates in <a routerLink="/pricing">Pricing</a>.</p>
+    }
+  </mat-card>
+</div>
+
+<!-- ───────────────────────── Records table ───────────────────────── -->
+<mat-card class="table-card" appearance="outlined">
+  <div class="chart-head"><h3>Messages</h3></div>
+  @if (records(); as r) {
+    <div class="table-scroll">
+      <table mat-table [dataSource]="r.items" matSort (matSortChange)="onSort($event)">
+        <ng-container matColumnDef="localDate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
+          <td mat-cell *matCellDef="let r">{{ r.localDate }}</td>
+        </ng-container>
+        <ng-container matColumnDef="model">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Model</th>
+          <td mat-cell *matCellDef="let r">{{ r.model }}</td>
+        </ng-container>
+        <ng-container matColumnDef="projectName">
+          <th mat-header-cell *matHeaderCellDef>Project</th>
+          <td mat-cell *matCellDef="let r">{{ r.projectName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="sidechain">
+          <th mat-header-cell *matHeaderCellDef>Type</th>
+          <td mat-cell *matCellDef="let r">
+            @if (r.isSidechain) { <span class="tag sub">subagent</span> } @else { <span class="tag main">main</span> }
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="inputTokens">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Input</th>
+          <td mat-cell *matCellDef="let r" class="num">{{ r.inputTokens | number }}</td>
+        </ng-container>
+        <ng-container matColumnDef="outputTokens">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Output</th>
+          <td mat-cell *matCellDef="let r" class="num">{{ r.outputTokens | number }}</td>
+        </ng-container>
+        <ng-container matColumnDef="cacheReadTokens">
+          <th mat-header-cell *matHeaderCellDef class="num">Cache read</th>
+          <td mat-cell *matCellDef="let r" class="num">{{ r.cacheReadTokens | compact }}</td>
+        </ng-container>
+        <ng-container matColumnDef="totalTokens">
+          <th mat-header-cell *matHeaderCellDef class="num">Total</th>
+          <td mat-cell *matCellDef="let r" class="num">{{ r.totalTokens | compact }}</td>
+        </ng-container>
+        <ng-container matColumnDef="costUsd">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Cost</th>
+          <td mat-cell *matCellDef="let r" class="num cost">{{ r.costUsd | currency: 'USD' : 'symbol' : '1.2-4' }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    </div>
+
+    <mat-paginator [length]="r.total" [pageSize]="pageSize()" [pageIndex]="page() - 1"
+                   [pageSizeOptions]="[10, 25, 50, 100]" (page)="onPage($event)" showFirstLastButtons />
+  }
+</mat-card>

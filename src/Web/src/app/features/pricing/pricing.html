@@ -1,0 +1,64 @@
+<div class="head">
+  <div>
+    <h2>Model pricing</h2>
+    <p class="sub">Rates are <strong>USD per million tokens</strong>. Edits are stored in the DB; click
+      <em>Recompute</em> to re-price existing rows. Lookup is exact&nbsp;→&nbsp;longest-prefix&nbsp;→&nbsp;<code>*</code>.</p>
+  </div>
+  <button mat-flat-button color="primary" [disabled]="recomputing()" (click)="recompute()">
+    <mat-icon>calculate</mat-icon> {{ recomputing() ? 'Recomputing…' : 'Recompute costs' }}
+  </button>
+</div>
+
+@if (loading()) { <mat-progress-bar mode="indeterminate" /> }
+
+<div class="grid">
+  @for (row of rows(); track row.id) {
+    <mat-card class="rate-card" appearance="outlined" [class.placeholder]="row.isPlaceholder">
+      <div class="rc-head">
+        <div class="rc-title">
+          <code class="pattern">{{ row.modelPattern }}</code>
+          @if (row.isPlaceholder) { <span class="badge">placeholder</span> }
+        </div>
+      </div>
+
+      <mat-form-field appearance="outline" class="name-field" subscriptSizing="dynamic">
+        <mat-label>Display name</mat-label>
+        <input matInput [(ngModel)]="row.displayName" />
+      </mat-form-field>
+
+      <div class="rates">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Input</mat-label>
+          <input matInput type="number" min="0" step="0.01" [(ngModel)]="row.inputPerMTok" />
+          <span matTextSuffix>/M</span>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Output</mat-label>
+          <input matInput type="number" min="0" step="0.01" [(ngModel)]="row.outputPerMTok" />
+          <span matTextSuffix>/M</span>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Cache write 5m</mat-label>
+          <input matInput type="number" min="0" step="0.01" [(ngModel)]="row.cacheWrite5mPerMTok" />
+          <span matTextSuffix>/M</span>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Cache write 1h</mat-label>
+          <input matInput type="number" min="0" step="0.01" [(ngModel)]="row.cacheWrite1hPerMTok" />
+          <span matTextSuffix>/M</span>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Cache read</mat-label>
+          <input matInput type="number" min="0" step="0.01" [(ngModel)]="row.cacheReadPerMTok" />
+          <span matTextSuffix>/M</span>
+        </mat-form-field>
+      </div>
+
+      <div class="rc-actions">
+        <button mat-stroked-button [disabled]="savingId() === row.id" (click)="save(row)">
+          <mat-icon>save</mat-icon> {{ savingId() === row.id ? 'Saving…' : 'Save' }}
+        </button>
+      </div>
+    </mat-card>
+  }
+</div>

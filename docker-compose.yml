@@ -1,0 +1,58 @@
+# ccusage-dashboard — local stack
+#
+#   Dev (default):   docker compose up -d db      # just Postgres; run API + Angular on the host
+#   Full stack:      docker compose --profile full up --build
+#
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ccusage-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ccusage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ccusage_dev_pw}
+      POSTGRES_DB: ${POSTGRES_DB:-ccusage}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - ccusage_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ccusage} -d ${POSTGRES_DB:-ccusage}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    profiles: ["full"]
+    build:
+      context: ./src/Api
+    container_name: ccusage-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-ccusage};Username=${POSTGRES_USER:-ccusage};Password=${POSTGRES_PASSWORD:-ccusage_dev_pw}"
+      Ingestion__ClaudeProjectsPath: "/data/claude"
+      Ingestion__DisplayTimeZone: "${Ingestion__DisplayTimeZone:-America/New_York}"
+      Cors__AllowedOrigin: "http://localhost:${WEB_PORT:-4200}"
+      ASPNETCORE_URLS: "http://+:8080"
+    ports:
+      - "${API_PORT:-5180}:8080"
+    volumes:
+      # Read-only mount of your Claude Code logs so the containerized API can ingest them.
+      - "${CLAUDE_PROJECTS_PATH:-${HOME}/.claude/projects}:/data/claude:ro"
+
+  web:
+    profiles: ["full"]
+    build:
+      context: ./src/Web
+    container_name: ccusage-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-4200}:80"
+
+volumes:
+  ccusage_pgdata:

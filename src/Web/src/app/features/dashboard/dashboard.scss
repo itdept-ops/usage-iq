@@ -1,0 +1,84 @@
+:host { display: block; }
+
+mat-progress-bar { margin-bottom: 12px; }
+
+.filters {
+  padding: 10px 14px;
+  margin-bottom: 16px;
+
+  .filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+
+  mat-form-field { margin-bottom: -1.25em; } // collapse the subscript space
+  .f-date { width: 150px; }
+  .f-multi { width: 230px; }
+  .f-toggle { margin: 0 4px; }
+  .grow { flex: 1 1 auto; }
+  .sync-btn { background: var(--mat-sys-tertiary-container); color: var(--mat-sys-on-tertiary-container); }
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+
+  .kpi {
+    padding: 14px 16px;
+    .kpi-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; }
+    .kpi-value { font-size: 1.7rem; font-weight: 600; margin-top: 4px; line-height: 1.2; }
+    .kpi-value.cost { color: var(--mat-sys-primary); }
+    .kpi-value .dim { opacity: 0.35; font-weight: 300; }
+    .kpi-sub { font-size: 0.78rem; opacity: 0.6; margin-top: 4px; }
+  }
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+
+  @media (max-width: 980px) { grid-template-columns: 1fr; }
+
+  .chart-card { padding: 12px 14px 6px; }
+  app-chart { display: block; height: 320px; }
+}
+
+.chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+}
+
+.placeholder-note {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.78rem; opacity: 0.75; margin: 6px 4px 8px;
+  mat-icon { font-size: 18px; height: 18px; width: 18px; }
+}
+
+.table-card { padding: 12px 14px; }
+
+.table-scroll { overflow-x: auto; }
+
+table { width: 100%; }
+
+th.num, td.num { text-align: right; }
+td.cost { font-variant-numeric: tabular-nums; color: var(--mat-sys-primary); }
+td.num { font-variant-numeric: tabular-nums; }
+
+.tag {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.tag.main { background: color-mix(in srgb, var(--mat-sys-primary) 16%, transparent); }
+.tag.sub { background: color-mix(in srgb, var(--mat-sys-tertiary) 22%, transparent); }

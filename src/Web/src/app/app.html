@@ -1,0 +1,23 @@
+<mat-toolbar class="topbar">
+  <span class="brand">
+    <mat-icon>insights</mat-icon>
+    <span>ccusage</span><small>dashboard</small>
+  </span>
+
+  <nav class="nav">
+    <a mat-button routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+    <a mat-button routerLink="/pricing" routerLinkActive="active">Pricing</a>
+    <a mat-button routerLink="/settings" routerLinkActive="active">Settings</a>
+  </nav>
+
+  <span class="spacer"></span>
+
+  <a mat-icon-button href="https://github.com/itdept-ops/ccusage-dashboard" target="_blank" rel="noopener"
+     matTooltip="View on GitHub" aria-label="GitHub repository">
+    <mat-icon>code</mat-icon>
+  </a>
+</mat-toolbar>
+
+<main class="content">
+  <router-outlet />
+</main>

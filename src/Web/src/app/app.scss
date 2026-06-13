@@ -1,0 +1,45 @@
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 1.15rem;
+
+    small {
+      opacity: 0.6;
+      font-weight: 400;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+  }
+
+  .nav {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: 18px;
+
+    a.active {
+      background: color-mix(in srgb, var(--mat-sys-primary) 16%, transparent);
+    }
+  }
+
+  .spacer {
+    flex: 1 1 auto;
+  }
+}
+
+.content {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 20px 20px 56px;
+}

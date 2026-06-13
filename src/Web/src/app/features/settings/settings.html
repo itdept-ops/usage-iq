@@ -1,0 +1,47 @@
+<h2>Settings</h2>
+
+@if (loading()) { <mat-progress-bar mode="indeterminate" /> }
+
+@if (model(); as m) {
+  <mat-card appearance="outlined" class="panel">
+    <h3>Ingestion</h3>
+    <p class="hint">The API reads Claude Code's <code>*.jsonl</code> transcripts from this directory. The display
+      timezone controls how events are bucketed into days and months.</p>
+
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>Display timezone (IANA)</mat-label>
+      <mat-select [(ngModel)]="m.displayTimeZone">
+        @for (z of zones(); track z) { <mat-option [value]="z">{{ z }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>Claude projects path</mat-label>
+      <input matInput [(ngModel)]="m.claudeProjectsPath" />
+      <mat-hint>e.g. C:\Users\you\.claude\projects</mat-hint>
+    </mat-form-field>
+
+    <div class="actions">
+      <button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">
+        <mat-icon>save</mat-icon> {{ saving() ? 'Saving…' : 'Save settings' }}
+      </button>
+      <button mat-stroked-button [disabled]="syncing()" (click)="sync()">
+        <mat-icon>{{ syncing() ? 'hourglass_top' : 'sync' }}</mat-icon> {{ syncing() ? 'Syncing…' : 'Run sync now' }}
+      </button>
+    </div>
+  </mat-card>
+
+  @if (lastSync(); as r) {
+    <mat-card appearance="outlined" class="panel result">
+      <h3>Last sync</h3>
+      <div class="kv"><span>Files parsed / scanned</span><b>{{ r.filesParsed | number }} / {{ r.filesScanned | number }}</b></div>
+      <div class="kv"><span>Lines read</span><b>{{ r.totalLines | number }}</b></div>
+      <div class="kv"><span>New rows</span><b>{{ r.newRecords | number }}</b></div>
+      <div class="kv"><span>Duration</span><b>{{ (r.durationMs / 1000).toFixed(1) }}s</b></div>
+      @if (r.unpricedModels.length) {
+        <div class="kv warn"><span>Unpriced models</span><b>{{ r.unpricedModels.join(', ') }}</b></div>
+      }
+      @if (r.warning) { <div class="kv warn"><span>Warning</span><b>{{ r.warning }}</b></div> }
+    </mat-card>
+  }
+}
