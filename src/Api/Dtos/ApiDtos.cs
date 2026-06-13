@@ -108,3 +108,16 @@ public sealed class SourceDto
     public bool Enabled { get; set; }
     public int Records { get; set; }
 }
+
+public sealed class SyncStatusDto
+{
+    public DateTime? LastSyncUtc { get; set; }
+    public int LastNewRecords { get; set; }
+    public long LastDurationMs { get; set; }
+    public int LastFilesParsed { get; set; }
+    public int LastFilesScanned { get; set; }
+    public string? LastError { get; set; }
+    public bool IsRunning { get; set; }
+    public bool AutoSyncEnabled { get; set; }
+    public int IntervalSeconds { get; set; }
+}

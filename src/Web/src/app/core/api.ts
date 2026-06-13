@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   GroupBy, IngestionSource, ModelStat, PagedResult, Pricing, ProjectDto,
-  Settings, SummaryResponse, SyncResult, UsageFilter, UsageRecord,
+  Settings, SummaryResponse, SyncResult, SyncStatus, UsageFilter, UsageRecord,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -72,5 +72,9 @@ export class Api {
 
   sync(): Observable<SyncResult> {
     return this.http.post<SyncResult>(`${this.base}/sync`, {});
+  }
+
+  syncStatus(): Observable<SyncStatus> {
+    return this.http.get<SyncStatus>(`${this.base}/sync/status`);
   }
 }

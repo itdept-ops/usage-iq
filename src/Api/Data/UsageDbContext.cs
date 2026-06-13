@@ -11,6 +11,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<IngestedFile> IngestedFiles => Set<IngestedFile>();
     public DbSet<AppConfig> AppConfigs => Set<AppConfig>();
     public DbSet<IngestionSource> IngestionSources => Set<IngestionSource>();
+    public DbSet<SyncStatus> SyncStatuses => Set<SyncStatus>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -83,6 +84,12 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.Kind).HasMaxLength(32);
             e.Property(x => x.RootPath).HasMaxLength(1024);
             e.HasIndex(x => x.Name).IsUnique();
+        });
+
+        b.Entity<SyncStatus>(e =>
+        {
+            e.Property(x => x.LastSyncUtc).HasColumnType("timestamp with time zone");
+            e.HasData(new SyncStatus { Id = 1 });
         });
     }
 }

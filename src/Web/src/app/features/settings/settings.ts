@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { timer, switchMap, catchError, of } from 'rxjs';
 
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,7 +16,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { Api } from '../../core/api';
-import { IngestionSource, Settings as SettingsModel, SyncResult } from '../../core/models';
+import { IngestionSource, Settings as SettingsModel, SyncResult, SyncStatus } from '../../core/models';
+import { timeAgo, humanizeInterval } from '../../shared/format';
 
 @Component({
   selector: 'app-settings',
@@ -37,8 +40,33 @@ export class Settings {
   readonly syncing = signal(false);
   readonly lastSync = signal<SyncResult | null>(null);
 
+  readonly status = signal<SyncStatus | null>(null);
+  private readonly now = signal(Date.now());
+
   /** newRecordsBySource as [name, count] pairs for the template. */
   readonly lastSyncBySource = computed(() => Object.entries(this.lastSync()?.newRecordsBySource ?? {}));
+
+  readonly lastSyncedLabel = computed(() => {
+    const s = this.status();
+    const n = this.now();
+    if (!s) return '—';
+    if (s.isRunning) return 'syncing now…';
+    return s.lastSyncUtc ? `${timeAgo(s.lastSyncUtc, n)} · +${s.lastNewRecords.toLocaleString()} rows` : 'never';
+  });
+
+  readonly autoSyncLabel = computed(() => {
+    const s = this.status();
+    if (!s) return '';
+    return s.autoSyncEnabled ? `Auto-sync every ${humanizeInterval(s.intervalSeconds)}` : 'Auto-sync off';
+  });
+
+  readonly syncState = computed(() => {
+    const s = this.status();
+    if (!s) return 'idle';
+    if (s.isRunning) return 'running';
+    if (s.lastError) return 'error';
+    return s.lastSyncUtc ? 'ok' : 'idle';
+  });
 
   private readonly commonZones = [
     'America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles',
@@ -51,7 +79,16 @@ export class Settings {
     return cur && !this.commonZones.includes(cur) ? [cur, ...this.commonZones] : this.commonZones;
   });
 
-  constructor() { this.load(); }
+  constructor() {
+    this.load();
+    // Poll sync status (also fed by the API's background auto-sync); "now" keeps the relative label fresh.
+    timer(0, 15000)
+      .pipe(
+        switchMap(() => this.api.syncStatus().pipe(catchError(() => of(null)))),
+        takeUntilDestroyed(),
+      )
+      .subscribe(s => { this.now.set(Date.now()); if (s) this.status.set(s); });
+  }
 
   private load(): void {
     this.loading.set(true);
@@ -86,7 +123,9 @@ export class Settings {
       next: r => {
         this.syncing.set(false);
         this.lastSync.set(r);
+        this.now.set(Date.now());
         this.api.sources().subscribe(s => this.sources.set(s));
+        this.api.syncStatus().subscribe(st => this.status.set(st));
         this.snack.open(r.error ? `Sync error: ${r.error}` : `Synced +${r.newRecords.toLocaleString()} rows`, 'OK', { duration: 5000 });
       },
       error: () => { this.syncing.set(false); this.snack.open('Sync failed', 'Dismiss', { duration: 4000 }); },

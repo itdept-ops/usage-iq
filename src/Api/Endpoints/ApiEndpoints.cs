@@ -15,8 +15,25 @@ public static class ApiEndpoints
         api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
         // ---- Sync ----
-        api.MapPost("/sync", async (JsonlIngestionService svc, CancellationToken ct) =>
-            Results.Ok(await svc.SyncAsync(ct)));
+        api.MapPost("/sync", async (SyncCoordinator coordinator, CancellationToken ct) =>
+            Results.Ok(await coordinator.TriggerAsync(waitIfBusy: true, ct)));
+
+        api.MapGet("/sync/status", async (UsageDbContext db, SyncCoordinator coordinator, IConfiguration cfg, CancellationToken ct) =>
+        {
+            var s = await db.SyncStatuses.AsNoTracking().FirstOrDefaultAsync(ct);
+            return Results.Ok(new SyncStatusDto
+            {
+                LastSyncUtc = s?.LastSyncUtc,
+                LastNewRecords = s?.LastNewRecords ?? 0,
+                LastDurationMs = s?.LastDurationMs ?? 0,
+                LastFilesParsed = s?.LastFilesParsed ?? 0,
+                LastFilesScanned = s?.LastFilesScanned ?? 0,
+                LastError = s?.LastError,
+                IsRunning = coordinator.IsRunning,
+                AutoSyncEnabled = cfg.GetValue("AutoSync:Enabled", true),
+                IntervalSeconds = Math.Max(30, cfg.GetValue("AutoSync:IntervalSeconds", 300)),
+            });
+        });
 
         // ---- Usage ----
         api.MapGet("/usage/summary", async (

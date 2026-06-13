@@ -33,6 +33,7 @@ Each source is enable/disable-able with an editable path on the **Settings** pag
 - **Charts**: usage-over-time (cost + tokens), top-N by dimension, and a cost-by-model donut (ECharts).
 - **Sortable, paged message table** with project, model, token breakdown, and cost.
 - **One-click Sync** that incrementally re-reads only changed files.
+- **Background auto-sync** on a timer (a .NET hosted service) + a live **"Synced Xm ago"** status in the command bar.
 
 ## How it handles the data correctly
 
@@ -104,6 +105,7 @@ The API container mounts `${CLAUDE_PROJECTS_PATH}` (from `.env`) read-only at `/
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `POST` | `/api/sync` | Ingest new/changed JSONL files; returns counts + timing. |
+| `GET` | `/api/sync/status` | Last-sync time + counts, whether a sync is running, and the auto-sync cadence. |
 | `GET` | `/api/usage/summary` | Aggregates; params: `from,to,projectId[],model[],includeSidechain,groupBy`. |
 | `GET` | `/api/usage/records` | Paged, sortable messages (same filters). |
 | `GET` | `/api/projects`, `/api/models`, `/api/sources` | Filter options with totals. |
@@ -122,6 +124,8 @@ Set via `.env`, environment variables, or `src/Api/appsettings.json`:
 | `Ingestion__ClaudeProjectsPath` | `<UserProfile>/.claude/projects` | Claude Code logs (editable in Settings). |
 | `Ingestion__CodexPath` | `<UserProfile>/.codex` | Codex logs (editable in Settings). |
 | `Ingestion__DisplayTimeZone` | `America/New_York` | IANA zone for day/month bucketing. |
+| `AutoSync__Enabled` | `true` | Run the background incremental sync on a timer. |
+| `AutoSync__IntervalSeconds` | `300` | Auto-sync cadence (min 30s). |
 | `Cors__AllowedOrigin` | `http://localhost:4200` | Angular dev origin. |
 
 ## A note on `claude-fable-5` pricing

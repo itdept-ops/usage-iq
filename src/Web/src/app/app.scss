@@ -185,6 +185,22 @@
   50% { opacity: 0.55; box-shadow: 0 0 4px 0 rgba(61, 214, 140, 0.4); }
 }
 
+/* Sync-state dot coloring (default green = ok/synced) */
+.status[data-state='running'] {
+  .status__dot { background: var(--tech-accent-cyan, #3fd8d0); box-shadow: 0 0 8px 0 rgba(63, 216, 208, 0.7); }
+  .status__text { color: var(--tech-accent-cyan, #3fd8d0); }
+}
+.status[data-state='error'] .status__dot {
+  background: var(--tech-error, #ff5c6c);
+  box-shadow: 0 0 8px 0 rgba(255, 92, 108, 0.6);
+  animation: none;
+}
+.status[data-state='idle'] .status__dot {
+  background: var(--tech-text-tertiary, #5e6c82);
+  box-shadow: none;
+  animation: none;
+}
+
 .gh.mat-mdc-icon-button {
   color: var(--tech-text-secondary);
   transition: color var(--tech-t-control, 140ms) ease;

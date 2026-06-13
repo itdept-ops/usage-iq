@@ -101,6 +101,18 @@ export interface SyncResult {
   warning: string | null;
 }
 
+export interface SyncStatus {
+  lastSyncUtc: string | null;
+  lastNewRecords: number;
+  lastDurationMs: number;
+  lastFilesParsed: number;
+  lastFilesScanned: number;
+  lastError: string | null;
+  isRunning: boolean;
+  autoSyncEnabled: boolean;
+  intervalSeconds: number;
+}
+
 /** Client-side filter state shared by the dashboard. */
 export interface UsageFilter {
   from: string | null;

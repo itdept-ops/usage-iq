@@ -14,6 +14,8 @@ builder.Services.AddDbContext<UsageDbContext>(o => o.UseNpgsql(conn));
 builder.Services.AddScoped<JsonlIngestionService>();
 builder.Services.AddScoped<CostRecomputeService>();
 builder.Services.AddScoped<UsageQueries>();
+builder.Services.AddSingleton<SyncCoordinator>();
+builder.Services.AddHostedService<AutoSyncBackgroundService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

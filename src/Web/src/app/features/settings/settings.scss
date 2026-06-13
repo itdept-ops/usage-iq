@@ -265,3 +265,39 @@ mat-slide-toggle {
   --mat-switch-selected-pressed-track-color: var(--tech-accent-bright);
   font-size: var(--tech-fs-label);
 }
+
+/* ───────────────────────── Live sync status pill ───────────────────────── */
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding: 4px 11px;
+  border-radius: var(--tech-r-pill, 999px);
+  background: var(--tech-input);
+  border: 1px solid var(--tech-border-subtle);
+  color: var(--tech-text-secondary);
+  white-space: nowrap;
+
+  .sync-pill__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--tech-success, #3dd68c);
+    box-shadow: 0 0 8px 0 rgba(61, 214, 140, 0.6);
+  }
+  .sync-pill__sep { opacity: 0.4; }
+
+  &[data-state='running'] .sync-pill__dot {
+    background: var(--tech-accent-cyan, #3fd8d0);
+    box-shadow: 0 0 8px 0 rgba(63, 216, 208, 0.6);
+    animation: axon-sync-pulse 1.4s ease-in-out infinite;
+  }
+  &[data-state='error'] .sync-pill__dot { background: var(--tech-error, #ff5c6c); box-shadow: none; }
+  &[data-state='idle'] .sync-pill__dot { background: var(--tech-text-tertiary, #5e6c82); box-shadow: none; }
+}
+
+@keyframes axon-sync-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

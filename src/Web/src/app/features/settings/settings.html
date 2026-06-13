@@ -12,9 +12,14 @@
   <mat-card appearance="outlined" class="panel s-panel">
     <div class="s-panel-head">
       <span class="panel-header">Ingestion</span>
+      <span class="sync-pill" [attr.data-state]="syncState()">
+        <span class="sync-pill__dot"></span>
+        <span class="micro-label">Synced {{ lastSyncedLabel() }}</span>
+        @if (autoSyncLabel()) { <span class="sync-pill__sep">·</span><span class="micro-label">{{ autoSyncLabel() }}</span> }
+      </span>
     </div>
     <p class="hint">The API reads Claude Code's <code>*.jsonl</code> transcripts from this directory. The display
-      timezone controls how events are bucketed into days and months.</p>
+      timezone controls how events are bucketed into days and months. A background process re-syncs incrementally on a timer.</p>
 
     <div class="field-grid">
       <mat-form-field appearance="outline" class="full">
