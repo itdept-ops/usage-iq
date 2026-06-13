@@ -11,29 +11,427 @@ html {
     (
       color: (
         primary: mat.$azure-palette,
-        tertiary: mat.$blue-palette,
+        tertiary: mat.$violet-palette,
       ),
-      typography: Roboto,
+      typography: Inter,
       density: 0,
     )
   );
 }
 
+/* =========================================================================
+   AXON — Token Usage Command Center · Global Design Foundation
+   Disciplined observability console: deep slate canvas, electric blue +
+   violet vendor identity, mono numeric core, surgical neon accents.
+   Dark theme only.
+   ========================================================================= */
+
+:root {
+  /* ---- Background layers (deepest -> highest) ---- */
+  --tech-bg-void: #06080e;          /* page root / modal base */
+  --tech-bg: #0a0e14;               /* app canvas (grid + mesh) */
+  --tech-bg-base: #0a0e14;          /* alias of canvas */
+  --tech-bg-sunken: #0c1118;        /* inset wells, table body, chart wells */
+  --tech-panel: #111722;            /* default panel / card surface */
+  --tech-panel-raised: #161d2a;     /* hover/elevated panel, popover, active row */
+  --tech-input: #0e141d;            /* inputs, selects, search, inline editors */
+
+  /* ---- Glass (floating chrome only) ---- */
+  --tech-glass-chrome: rgba(10, 14, 20, 0.78);   /* top bar / sticky filter bar */
+  --tech-glass-popover: rgba(16, 21, 32, 0.86);  /* menus, tooltips, popovers */
+  --tech-glass-scrim: rgba(6, 9, 14, 0.72);      /* modal scrim */
+  --tech-glass-inset-hi: rgba(255, 255, 255, 0.05); /* 1px inner highlight on glass */
+
+  /* ---- Borders ---- */
+  --tech-border-subtle: #1c2533;    /* default hairline, zebra dividers */
+  --tech-border: #26303f;           /* card border, cell dividers (default) */
+  --tech-border-strong: #33425a;    /* hover border, focused container, crosshair */
+  --tech-border-neon: linear-gradient(100deg, #3d8bff 0%, #8b7cff 52%, #3fd8d0 100%);
+
+  /* ---- Accents ---- */
+  --tech-accent: #3d8bff;           /* primary accent / links / Claude Code series */
+  --tech-accent-bright: #5ba3ff;    /* hover/lit blue */
+  --tech-accent-2: #8b7cff;         /* secondary accent / Codex series */
+  --tech-accent-2-bright: #a99bff;  /* hover/lit violet */
+  --tech-accent-cyan: #3fd8d0;      /* tertiary data accent (sparklines, deltas, cache) */
+  --tech-accent-magenta: #f472b6;   /* cost emphasis only */
+
+  /* ---- Vendor identity (1:1, never swap) ---- */
+  --tech-vendor-claude: #3d8bff;    /* Claude Code = blue */
+  --tech-vendor-codex: #8b7cff;     /* Codex = violet */
+
+  /* ---- Semantic ---- */
+  --tech-success: #3dd68c;
+  --tech-success-tint: rgba(61, 214, 140, 0.12);
+  --tech-warn: #f2b340;
+  --tech-warn-tint: rgba(242, 179, 64, 0.12);
+  --tech-error: #ff5c6c;
+  --tech-error-tint: rgba(255, 92, 108, 0.12);
+  --tech-info: #3d8bff;
+  --tech-info-tint: rgba(61, 139, 255, 0.12);
+
+  /* ---- Text ---- */
+  --tech-text: #e6edf6;             /* primary: headings, KPI values, cells */
+  --tech-text-secondary: #9ba9bd;   /* labels, secondary cells, axis text */
+  --tech-text-tertiary: #5e6c82;    /* hints, units, disabled */
+  --tech-text-accent: #8fc0ff;      /* inline emphasized / accented links */
+  --tech-text-on-accent: #06090e;   /* text on solid blue/violet/cyan fills */
+
+  /* ---- Typography ---- */
+  --tech-font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --tech-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+  --tech-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace; /* alias */
+
+  /* Type scale (size / line-height) */
+  --tech-fs-display: 26px;
+  --tech-fs-h1: 18px;
+  --tech-fs-kpi: 32px;
+  --tech-fs-kpi-sm: 24px;
+  --tech-fs-panel-hd: 13px;
+  --tech-fs-body: 13px;
+  --tech-fs-num: 13px;
+  --tech-fs-label: 11px;
+  --tech-fs-micro: 10.5px;
+
+  /* ---- Radii ---- */
+  --tech-r-pill: 999px;
+  --tech-r-chip: 6px;
+  --tech-r-control: 8px;   /* inputs / buttons */
+  --tech-radius: 12px;     /* cards / tables / charts (panel default) */
+  --tech-r-panel: 12px;    /* alias */
+  --tech-r-chrome: 0;      /* top bar full-bleed */
+
+  /* ---- Shadows / glow recipes ---- */
+  --tech-shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --tech-shadow-raised: 0 12px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--tech-border);
+  --tech-shadow-popover: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+
+  --tech-glow: 0 0 0 1px rgba(61, 139, 255, 0.5), 0 0 18px -2px rgba(61, 139, 255, 0.35); /* blue (default) */
+  --tech-glow-blue: 0 0 0 1px rgba(61, 139, 255, 0.5), 0 0 18px -2px rgba(61, 139, 255, 0.35);
+  --tech-glow-violet: 0 0 0 1px rgba(139, 124, 255, 0.5), 0 0 18px -2px rgba(139, 124, 255, 0.35);
+  --tech-glow-cyan: 0 0 0 1px rgba(63, 216, 208, 0.5), 0 0 18px -2px rgba(63, 216, 208, 0.35);
+  --tech-glow-success: 0 0 0 1px rgba(61, 214, 140, 0.45), 0 0 16px -4px rgba(61, 214, 140, 0.4);
+  --tech-glow-error: 0 0 0 1px rgba(255, 92, 108, 0.45), 0 0 16px -4px rgba(255, 92, 108, 0.4);
+
+  --tech-focus-ring: 0 0 0 2px var(--tech-bg), 0 0 0 4px rgba(61, 139, 255, 0.55);
+  --tech-text-glow: 0 0 16px rgba(61, 139, 255, 0.2); /* KPI hero numbers only */
+
+  /* ---- Motion ---- */
+  --tech-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tech-t-control: 140ms;
+  --tech-t-panel: 200ms;
+
+  /* ---- Spacing scale (4px base) ---- */
+  --tech-space-1: 4px;
+  --tech-space-2: 8px;
+  --tech-space-3: 12px;
+  --tech-space-4: 16px;
+  --tech-space-6: 24px;
+  --tech-space-8: 32px;
+  --tech-space-12: 48px;
+
+  /* ---- Layout ---- */
+  --tech-max-width: 1440px;
+  --tech-page-gutter: 24px;
+
+  /* =====================================================================
+     Angular Material 3 system-token overrides — make ALL Material
+     components adopt the AXON dark/neon look.
+     ===================================================================== */
+  color-scheme: dark;
+
+  /* Surfaces */
+  --mat-sys-background: #0a0e14;
+  --mat-sys-surface: #111722;
+  --mat-sys-surface-dim: #0a0e14;
+  --mat-sys-surface-bright: #161d2a;
+  --mat-sys-surface-container-lowest: #06080e;
+  --mat-sys-surface-container-low: #0c1118;
+  --mat-sys-surface-container: #111722;
+  --mat-sys-surface-container-high: #161d2a;
+  --mat-sys-surface-container-highest: #1c2533;
+  --mat-sys-surface-variant: #161d2a;
+  --mat-sys-inverse-surface: #e6edf6;
+  --mat-sys-inverse-on-surface: #0a0e14;
+
+  /* Primary / secondary / tertiary roles */
+  --mat-sys-primary: #3d8bff;
+  --mat-sys-on-primary: #06090e;
+  --mat-sys-primary-container: #16263f;
+  --mat-sys-on-primary-container: #cfe2ff;
+  --mat-sys-inverse-primary: #16263f;
+  --mat-sys-secondary: #8b7cff;
+  --mat-sys-on-secondary: #06090e;
+  --mat-sys-secondary-container: #221f3d;
+  --mat-sys-on-secondary-container: #e0daff;
+  --mat-sys-tertiary: #3fd8d0;
+  --mat-sys-on-tertiary: #06090e;
+  --mat-sys-tertiary-container: #103230;
+  --mat-sys-on-tertiary-container: #c6f5f1;
+
+  /* Error */
+  --mat-sys-error: #ff5c6c;
+  --mat-sys-on-error: #06090e;
+  --mat-sys-error-container: #3a1318;
+  --mat-sys-on-error-container: #ffd6da;
+
+  /* On-surface text */
+  --mat-sys-on-background: #e6edf6;
+  --mat-sys-on-surface: #e6edf6;
+  --mat-sys-on-surface-variant: #9ba9bd;
+
+  /* Outlines */
+  --mat-sys-outline: #26303f;
+  --mat-sys-outline-variant: #1c2533;
+
+  /* Shape */
+  --mat-sys-corner-extra-small: 6px;
+  --mat-sys-corner-small: 8px;
+  --mat-sys-corner-medium: 12px;
+  --mat-sys-corner-large: 12px;
+
+  /* Scrim */
+  --mat-sys-scrim: #06080e;
+}
+
+/* =========================================================================
+   Base / canvas
+   ========================================================================= */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background-color: var(--tech-bg-void);
+}
+
 body {
-  // Default the application to a light color theme. This can be changed to
-  // `dark` to enable the dark color theme, or to `light dark` to defer to the
-  // user's system settings.
-  color-scheme: light;
+  // Dark theme only.
+  color-scheme: dark;
 
-  // Set a default background, font and text colors for the application using
-  // Angular Material's system-level CSS variables. Learn more about these
-  // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
-  font: var(--mat-sys-body-medium);
-
-  // Reset the user agent margin.
   margin: 0;
   height: 100%;
+  min-height: 100%;
+
+  font-family: var(--tech-font-ui);
+  font-size: var(--tech-fs-body);
+  font-feature-settings: 'cv05', 'cv08', 'ss03';
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  color: var(--tech-text);
+  background-color: var(--tech-bg);
+
+  /* Techy atmosphere: two corner mesh glows + faint 32px grid. Canvas only. */
+  background-image:
+    radial-gradient(1100px 560px at 78% -12%, rgba(61, 139, 255, 0.07), transparent 60%),
+    radial-gradient(900px 520px at 8% 112%, rgba(139, 124, 255, 0.06), transparent 60%),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 32px, 32px 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+  background-attachment: fixed;
 }
+
+/* =========================================================================
+   Typography helpers
+   ========================================================================= */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--tech-font-ui);
+  color: var(--tech-text);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+a {
+  color: var(--tech-accent);
+  text-decoration: none;
+  transition: color var(--tech-t-control) ease;
+}
+a:hover {
+  color: var(--tech-accent-bright);
+}
+
+code, pre, kbd, samp {
+  font-family: var(--tech-font-mono);
+}
+
+/* =========================================================================
+   Global utility classes (reused by components)
+   ========================================================================= */
+
+/* Opaque data surface — cards, tables, chart wells. */
+.panel {
+  background-color: var(--tech-panel);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius);
+  box-shadow: var(--tech-shadow-panel);
+}
+
+/* Frosted floating chrome only — top bar, filter bar, popovers, menus. */
+.glass {
+  background-color: var(--tech-glass-chrome);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--tech-border);
+  box-shadow: inset 0 1px 0 var(--tech-glass-inset-hi);
+}
+
+/* Restrained focus/active glow (blue by default). */
+.glow {
+  box-shadow: var(--tech-glow);
+}
+.glow-violet { box-shadow: var(--tech-glow-violet); }
+.glow-cyan { box-shadow: var(--tech-glow-cyan); }
+.glow-success { box-shadow: var(--tech-glow-success); }
+.glow-error { box-shadow: var(--tech-glow-error); }
+
+/* Mono, tabular numbers — every number a user reads. */
+.mono-num {
+  font-family: var(--tech-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* The single sanctioned gradient-border technique — active/featured only. */
+.neon-edge {
+  position: relative;
+}
+.neon-edge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.25px;
+  background: var(--tech-border-neon);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.55;
+  transition: opacity 0.22s ease;
+  pointer-events: none;
+}
+.neon-edge:hover::before,
+.neon-edge[data-active='true']::before {
+  opacity: 1;
+}
+
+/* Inline accented value / link emphasis. */
+.accent {
+  color: var(--tech-accent);
+}
+.accent-2 { color: var(--tech-accent-2); }
+.accent-cyan { color: var(--tech-accent-cyan); }
+.accent-magenta { color: var(--tech-accent-magenta); }
+
+/* Pill chip — active filters, badges, status. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tech-space-2);
+  padding: 2px 10px;
+  border-radius: var(--tech-r-pill);
+  border: 1px solid var(--tech-border-strong);
+  background-color: var(--tech-panel-raised);
+  font-size: var(--tech-fs-label);
+  line-height: 1.3;
+  color: var(--tech-text-secondary);
+}
+
+/* Uppercase mono micro / overline label. */
+.micro-label {
+  font-family: var(--tech-font-mono);
+  font-size: var(--tech-fs-micro);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tech-text-secondary);
+}
+
+/* Uppercase UI panel header. */
+.panel-header {
+  font-family: var(--tech-font-ui);
+  font-size: var(--tech-fs-panel-hd);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tech-text-secondary);
+}
+
+/* 2px inset left-bar selection language (vendor-tintable). */
+.selected-bar {
+  box-shadow: inset 2px 0 0 var(--tech-accent);
+}
+
+/* =========================================================================
+   Material component retoning (numeric cells go mono)
+   ========================================================================= */
+.mat-mdc-table .mat-mdc-cell.numeric,
+.mat-mdc-table .mono,
+.mat-mdc-paginator-range-label,
+.mat-mdc-paginator {
+  font-family: var(--tech-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================================
+   Scrollbars
+   ========================================================================= */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tech-border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--tech-border-strong);
+  border: 2px solid transparent;
+  border-radius: var(--tech-r-pill);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--tech-accent);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* =========================================================================
+   Selection
+   ========================================================================= */
+::selection {
+  background-color: rgba(61, 139, 255, 0.28);
+  color: var(--tech-text);
+}
+
+/* =========================================================================
+   Focus visibility (accessible, no layout shift)
+   ========================================================================= */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--tech-focus-ring);
+}
+
+/* =========================================================================
+   Reduced motion
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* You can add global styles to this file, and also import other style files */

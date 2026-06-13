@@ -1,18 +1,25 @@
-<mat-toolbar class="topbar">
-  <span class="brand">
-    <mat-icon>insights</mat-icon>
-    <span>ccusage</span><small>dashboard</small>
-  </span>
+<mat-toolbar class="topbar glass">
+  <a class="brand" routerLink="/" aria-label="AXON home">
+    <span class="brand__mark neon-edge" data-active="true" aria-hidden="true"></span>
+    <span class="brand__word">AXON</span>
+    <span class="brand__prompt">~/token-usage&nbsp;$<i class="caret" aria-hidden="true"></i></span>
+  </a>
 
-  <nav class="nav">
-    <a mat-button routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
-    <a mat-button routerLink="/pricing" routerLinkActive="active">Pricing</a>
-    <a mat-button routerLink="/settings" routerLinkActive="active">Settings</a>
+  <nav class="nav" aria-label="Primary">
+    <a mat-button class="nav__item" routerLink="/" routerLinkActive="active"
+       [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+    <a mat-button class="nav__item" routerLink="/pricing" routerLinkActive="active">Pricing</a>
+    <a mat-button class="nav__item" routerLink="/settings" routerLinkActive="active">Settings</a>
   </nav>
 
   <span class="spacer"></span>
 
-  <a mat-icon-button href="https://github.com/itdept-ops/ccusage-dashboard" target="_blank" rel="noopener"
+  <span class="status" aria-label="Sync status">
+    <span class="status__dot" aria-hidden="true"></span>
+    <span class="status__text mono-num">SYNCED</span>
+  </span>
+
+  <a mat-icon-button class="gh" href="https://github.com/itdept-ops/ccusage-dashboard" target="_blank" rel="noopener"
      matTooltip="View on GitHub" aria-label="GitHub repository">
     <mat-icon>code</mat-icon>
   </a>

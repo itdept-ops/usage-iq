@@ -1,45 +1,241 @@
+/* ============================================================
+   AXON — App shell / command-center top bar
+   Uses ONLY foundation tokens from styles.scss
+   ============================================================ */
+
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 50;
+  height: 56px;
+  min-height: 56px;
+  padding: 0 var(--tech-page-gutter, 24px);
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
 
-  .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    font-size: 1.15rem;
+  /* Floating chrome: glass + blur (the .glass utility already applies
+     --tech-glass-chrome + blur + inset highlight). Full-bleed, no radius. */
+  border-radius: var(--tech-r-chrome, 0);
+  border-bottom: 1px solid var(--tech-border, #26303f);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 var(--tech-glass-inset-hi, rgba(255, 255, 255, 0.05));
+}
 
-    small {
-      opacity: 0.6;
-      font-weight: 400;
-      font-size: 0.7rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-    }
-  }
+/* ---- Brand / wordmark + terminal prompt ---------------------------- */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--tech-text);
+  -webkit-tap-highlight-color: transparent;
 
-  .nav {
-    display: inline-flex;
-    gap: 2px;
-    margin-left: 18px;
-
-    a.active {
-      background: color-mix(in srgb, var(--mat-sys-primary) 16%, transparent);
-    }
-  }
-
-  .spacer {
-    flex: 1 1 auto;
+  &:hover,
+  &:focus-visible {
+    color: var(--tech-text);
+    text-decoration: none;
+    outline: none;
   }
 }
 
+.brand__mark {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--tech-r-chip, 6px);
+  background:
+    radial-gradient(120% 120% at 30% 20%, rgba(255, 255, 255, 0.22), transparent 55%),
+    var(--tech-border-neon, linear-gradient(100deg, #3d8bff, #8b7cff 52%, #3fd8d0));
+  box-shadow: 0 0 14px -2px rgba(61, 139, 255, 0.5);
+  flex: 0 0 auto;
+}
+
+.brand__word {
+  font-family: var(--tech-font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: var(--tech-text);
+  line-height: 1;
+}
+
+.brand__prompt {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--tech-font-mono);
+  font-size: var(--tech-fs-label, 11px);
+  letter-spacing: 0.02em;
+  color: var(--tech-text-accent);
+  padding-left: 10px;
+  margin-left: 2px;
+  border-left: 1px solid var(--tech-border-subtle, #1c2533);
+  line-height: 1;
+
+  .caret {
+    display: inline-block;
+    width: 7px;
+    height: 13px;
+    margin-left: 2px;
+    background: var(--tech-accent);
+    box-shadow: 0 0 8px -1px rgba(61, 139, 255, 0.6);
+    animation: axon-caret 1s step-end infinite;
+  }
+}
+
+@keyframes axon-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ---- Primary nav --------------------------------------------------- */
+.nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 20px;
+}
+
+.nav__item.mat-mdc-button {
+  position: relative;
+  height: 36px;
+  min-width: 0;
+  padding: 0 14px;
+  border-radius: var(--tech-r-control, 8px);
+  font-family: var(--tech-font-ui);
+  font-size: var(--tech-fs-body, 13px);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--tech-text-secondary);
+  transition:
+    color var(--tech-t-control, 140ms) ease,
+    background-color var(--tech-t-control, 140ms) ease;
+
+  /* neutralize Material's default ripple/overlay tint */
+  --mat-text-button-state-layer-color: var(--tech-accent);
+
+  &:hover {
+    color: var(--tech-text);
+    background-color: color-mix(in srgb, var(--tech-panel-raised) 70%, transparent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--tech-focus-ring);
+  }
+
+  /* Active-state: 2px neon-gradient underline + faint glow */
+  &.active {
+    color: var(--tech-text);
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 2px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--tech-border-neon, linear-gradient(100deg, #3d8bff, #8b7cff 52%, #3fd8d0));
+      box-shadow: 0 0 12px -1px rgba(61, 139, 255, 0.55);
+      animation: axon-underline 160ms var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1));
+    }
+  }
+}
+
+@keyframes axon-underline {
+  from { transform: scaleX(0); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+/* ---- Right cluster: status + GitHub -------------------------------- */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: var(--tech-r-pill, 999px);
+  background: var(--tech-input);
+  border: 1px solid var(--tech-border-subtle, #1c2533);
+
+  &__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--tech-success);
+    box-shadow: 0 0 8px 0 rgba(61, 214, 140, 0.7);
+    animation: axon-pulse 2s ease-in-out infinite;
+  }
+
+  &__text {
+    font-size: var(--tech-fs-micro, 10.5px);
+    letter-spacing: 0.08em;
+    color: var(--tech-text-secondary);
+    line-height: 1;
+  }
+}
+
+@keyframes axon-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px 0 rgba(61, 214, 140, 0.7); }
+  50% { opacity: 0.55; box-shadow: 0 0 4px 0 rgba(61, 214, 140, 0.4); }
+}
+
+.gh.mat-mdc-icon-button {
+  color: var(--tech-text-secondary);
+  transition: color var(--tech-t-control, 140ms) ease;
+
+  &:hover {
+    color: var(--tech-accent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--tech-focus-ring);
+  }
+}
+
+/* ---- Content shell ------------------------------------------------- */
 .content {
-  max-width: 1320px;
+  max-width: var(--tech-max-width, 1440px);
   margin: 0 auto;
-  padding: 20px 20px 56px;
+  padding: var(--tech-page-gutter, 24px) var(--tech-page-gutter, 24px) 56px;
+}
+
+/* ---- Responsive ---------------------------------------------------- */
+@media (max-width: 720px) {
+  .brand__prompt {
+    display: none;
+  }
+  .nav {
+    margin-left: 10px;
+  }
+  .status__text {
+    display: none;
+  }
+  .status {
+    padding: 6px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .topbar {
+    padding: 0 32px;
+  }
+  .content {
+    padding: 32px 32px 56px;
+  }
+}
+
+/* ---- Reduced motion ------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .caret,
+  .status__dot,
+  .nav__item.mat-mdc-button.active::after {
+    animation: none;
+  }
 }

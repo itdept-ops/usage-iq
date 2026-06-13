@@ -1,57 +1,72 @@
-<h2>Settings</h2>
+<div class="head">
+  <div>
+    <h2>Settings</h2>
+    <p class="sub">Configure how transcripts are ingested, manage the sources that feed the sync, and review the result
+      of the last run.</p>
+  </div>
+</div>
 
 @if (loading()) { <mat-progress-bar mode="indeterminate" /> }
 
 @if (model(); as m) {
-  <mat-card appearance="outlined" class="panel">
-    <h3>Ingestion</h3>
+  <mat-card appearance="outlined" class="panel s-panel">
+    <div class="s-panel-head">
+      <span class="panel-header">Ingestion</span>
+    </div>
     <p class="hint">The API reads Claude Code's <code>*.jsonl</code> transcripts from this directory. The display
       timezone controls how events are bucketed into days and months.</p>
 
-    <mat-form-field appearance="outline" class="full">
-      <mat-label>Display timezone (IANA)</mat-label>
-      <mat-select [(ngModel)]="m.displayTimeZone">
-        @for (z of zones(); track z) { <mat-option [value]="z">{{ z }}</mat-option> }
-      </mat-select>
-    </mat-form-field>
+    <div class="field-grid">
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Display timezone (IANA)</mat-label>
+        <mat-select [(ngModel)]="m.displayTimeZone">
+          @for (z of zones(); track z) { <mat-option [value]="z">{{ z }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="full">
-      <mat-label>Claude projects path</mat-label>
-      <input matInput [(ngModel)]="m.claudeProjectsPath" />
-      <mat-hint>e.g. C:\Users\you\.claude\projects</mat-hint>
-    </mat-form-field>
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Claude projects path</mat-label>
+        <input matInput class="mono-input" [(ngModel)]="m.claudeProjectsPath" />
+        <mat-hint>e.g. C:\Users\you\.claude\projects</mat-hint>
+      </mat-form-field>
+    </div>
 
     <div class="actions">
-      <button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">
+      <button mat-flat-button color="primary" class="act-save" [disabled]="saving()" (click)="save()">
         <mat-icon>save</mat-icon> {{ saving() ? 'Saving…' : 'Save settings' }}
       </button>
-      <button mat-stroked-button [disabled]="syncing()" (click)="sync()">
+      <button mat-stroked-button class="act-sync" [disabled]="syncing()" (click)="sync()">
         <mat-icon>{{ syncing() ? 'hourglass_top' : 'sync' }}</mat-icon> {{ syncing() ? 'Syncing…' : 'Run sync now' }}
       </button>
     </div>
   </mat-card>
 
-  <mat-card appearance="outlined" class="panel">
-    <h3>Sources</h3>
+  <mat-card appearance="outlined" class="panel s-panel">
+    <div class="s-panel-head">
+      <span class="panel-header">Sources</span>
+      <span class="src-total micro-label">{{ sources().length }} configured</span>
+    </div>
     <p class="hint">Each source is a tool whose JSONL logs are scanned. Toggle one off to exclude it from the next sync;
       edit its path if your logs live elsewhere.</p>
 
     @for (s of sources(); track s.id) {
-      <div class="source-row">
+      <div class="source-row" [class.disabled]="!s.enabled">
         <div class="source-head">
+          <span class="src-dot" [class.codex]="s.kind === 'Codex'" [class.off]="!s.enabled"></span>
           <span class="src-name">{{ s.name }}</span>
-          <span class="src-kind">{{ s.kind }}</span>
-          <span class="src-count">{{ s.records | number }} rows</span>
+          <span class="src-kind pill" [class.codex]="s.kind === 'Codex'">{{ s.kind }}</span>
+          <span class="src-count mono-num">{{ s.records | number }}</span>
+          <span class="src-count-unit micro-label">rows</span>
           <span class="grow"></span>
           <mat-slide-toggle [(ngModel)]="s.enabled">Enabled</mat-slide-toggle>
         </div>
         <div class="source-edit">
           <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
             <mat-label>Root path</mat-label>
-            <input matInput [(ngModel)]="s.rootPath" />
+            <input matInput class="mono-input" [(ngModel)]="s.rootPath" />
           </mat-form-field>
-          <button mat-stroked-button [disabled]="savingSourceId() === s.id" (click)="saveSource(s)">
-            <mat-icon>save</mat-icon> Save
+          <button mat-stroked-button class="src-save" [disabled]="savingSourceId() === s.id" (click)="saveSource(s)">
+            <mat-icon>{{ savingSourceId() === s.id ? 'hourglass_top' : 'save' }}</mat-icon> Save
           </button>
         </div>
       </div>
@@ -59,16 +74,21 @@
   </mat-card>
 
   @if (lastSync(); as r) {
-    <mat-card appearance="outlined" class="panel result">
-      <h3>Last sync</h3>
-      <div class="kv"><span>Files parsed / scanned</span><b>{{ r.filesParsed | number }} / {{ r.filesScanned | number }}</b></div>
-      <div class="kv"><span>New rows</span><b>{{ r.newRecords | number }}</b></div>
+    <mat-card appearance="outlined" class="panel s-panel result" [class.has-warn]="r.unpricedModels.length || r.sourceWarnings.length || r.warning">
+      <div class="s-panel-head">
+        <span class="panel-header">Last sync</span>
+        <span class="sync-status micro-label" [class.warn]="r.unpricedModels.length || r.sourceWarnings.length || r.warning">
+          <span class="status-dot"></span>{{ (r.unpricedModels.length || r.sourceWarnings.length || r.warning) ? 'completed with notes' : 'completed' }}
+        </span>
+      </div>
+      <div class="kv"><span>Files parsed / scanned</span><b class="mono-num">{{ r.filesParsed | number }} / {{ r.filesScanned | number }}</b></div>
+      <div class="kv"><span>New rows</span><b class="mono-num accent">{{ r.newRecords | number }}</b></div>
       @for (pair of lastSyncBySource(); track pair[0]) {
-        <div class="kv"><span>&nbsp;&nbsp;↳ {{ pair[0] }}</span><b>+{{ pair[1] | number }}</b></div>
+        <div class="kv sub-kv"><span>↳ {{ pair[0] }}</span><b class="mono-num accent-cyan">+{{ pair[1] | number }}</b></div>
       }
-      <div class="kv"><span>Duration</span><b>{{ (r.durationMs / 1000).toFixed(1) }}s</b></div>
+      <div class="kv"><span>Duration</span><b class="mono-num">{{ (r.durationMs / 1000).toFixed(1) }}s</b></div>
       @if (r.unpricedModels.length) {
-        <div class="kv warn"><span>Unpriced models</span><b>{{ r.unpricedModels.join(', ') }}</b></div>
+        <div class="kv warn"><span>Unpriced models</span><b class="mono-num">{{ r.unpricedModels.join(', ') }}</b></div>
       }
       @for (w of r.sourceWarnings; track w) { <div class="kv warn"><span>Source</span><b>{{ w }}</b></div> }
       @if (r.warning) { <div class="kv warn"><span>Warning</span><b>{{ r.warning }}</b></div> }

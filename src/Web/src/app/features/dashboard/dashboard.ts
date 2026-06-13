@@ -150,7 +150,7 @@ export class Dashboard {
   // ---- chart options ----
   readonly mainChart = computed<EChartsOption>(() => {
     const s = this.summary();
-    if (!s || s.buckets.length === 0) return { title: { text: 'No data', left: 'center', top: 'center', textStyle: { color: '#9aa' } } };
+    if (!s || s.buckets.length === 0) return { title: { text: 'No data', left: 'center', top: 'center', textStyle: { color: '#5e6c82' } } };
 
     const isTime = s.groupBy === 'day' || s.groupBy === 'month';
     if (isTime) {
@@ -165,8 +165,8 @@ export class Dashboard {
           { type: 'value', name: 'Tokens', axisLabel: { formatter: (v: number) => this.shortNum(v) } },
         ],
         series: [
-          { name: 'Cost (USD)', type: 'bar', data: s.buckets.map(b => +b.costUsd.toFixed(2)), itemStyle: { color: '#3b82f6' } },
-          { name: 'Tokens', type: 'line', yAxisIndex: 1, smooth: true, data: s.buckets.map(b => b.totalTokens), itemStyle: { color: '#f59e0b' } },
+          { name: 'Cost (USD)', type: 'bar', data: s.buckets.map(b => +b.costUsd.toFixed(2)), itemStyle: { color: '#f472b6', borderRadius: [4, 4, 0, 0] } },
+          { name: 'Tokens', type: 'line', yAxisIndex: 1, smooth: true, symbol: 'none', data: s.buckets.map(b => b.totalTokens), itemStyle: { color: '#3fd8d0' }, lineStyle: { width: 2, color: '#3fd8d0', shadowColor: 'rgba(63,216,208,0.4)', shadowBlur: 10 } },
         ],
       };
     }
@@ -177,7 +177,7 @@ export class Dashboard {
       grid: { left: 150, right: 28, top: 12, bottom: 32 },
       xAxis: { type: 'value', axisLabel: { formatter: '${value}' } },
       yAxis: { type: 'category', data: top.map(b => this.label(b.key)) },
-      series: [{ type: 'bar', data: top.map(b => +b.costUsd.toFixed(2)), itemStyle: { color: '#3b82f6' } }],
+      series: [{ type: 'bar', data: top.map(b => +b.costUsd.toFixed(2)), itemStyle: { color: '#f472b6', borderRadius: [0, 4, 4, 0] } }],
     };
   });
 
@@ -190,6 +190,7 @@ export class Dashboard {
       legend: { bottom: 0, type: 'scroll' },
       series: [{
         type: 'pie', radius: ['45%', '72%'], avoidLabelOverlap: true, label: { show: false },
+        itemStyle: { borderColor: '#111722', borderWidth: 2 },
         data: ms.map(m => ({ name: m.model, value: +m.costUsd.toFixed(2) })),
       }],
     };
