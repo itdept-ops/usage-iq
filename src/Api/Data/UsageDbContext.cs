@@ -76,6 +76,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
         {
             e.Property(x => x.DisplayTimeZone).HasMaxLength(64);
             e.Property(x => x.ClaudeProjectsPath).HasMaxLength(1024);
+            e.Property(x => x.AutoSyncEnabled).HasDefaultValue(true);
+            e.Property(x => x.AutoSyncIntervalSeconds).HasDefaultValue(300);
         });
 
         b.Entity<IngestionSource>(e =>

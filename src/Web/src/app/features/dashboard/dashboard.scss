@@ -23,14 +23,17 @@ mat-progress-bar {
 
   .filters-row {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 2px;
   }
 
   /* grouped clusters with an overline label */
   .filter-cluster {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 10px;
     position: relative;
@@ -49,11 +52,13 @@ mat-progress-bar {
 
   /* collapse the Material subscript space so controls align tightly */
   mat-form-field { margin-bottom: -1.25em; }
-  .f-date { width: 148px; }
-  .f-multi { width: 218px; }
+  .f-date { width: 120px; flex: 0 0 auto; }
+  .f-multi { width: 150px; flex: 0 0 auto; }
 
   .f-toggle {
+    flex: 0 0 auto;
     margin: 0 2px;
+    white-space: nowrap;
     --mdc-switch-selected-track-color: var(--tech-accent);
     --mdc-switch-selected-hover-track-color: var(--tech-accent-bright);
     font-size: var(--tech-fs-body);
@@ -63,6 +68,7 @@ mat-progress-bar {
 
   .filter-actions {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 8px;
 

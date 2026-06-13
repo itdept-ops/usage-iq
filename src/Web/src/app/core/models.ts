@@ -76,6 +76,8 @@ export interface Pricing {
 export interface Settings {
   displayTimeZone: string;
   claudeProjectsPath: string;
+  autoSyncEnabled: boolean;
+  autoSyncIntervalSeconds: number;
 }
 
 export interface IngestionSource {

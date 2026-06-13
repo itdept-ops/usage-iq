@@ -97,6 +97,8 @@ public sealed class SettingsDto
 {
     public string DisplayTimeZone { get; set; } = "";
     public string ClaudeProjectsPath { get; set; } = "";
+    public bool AutoSyncEnabled { get; set; }
+    public int AutoSyncIntervalSeconds { get; set; }
 }
 
 public sealed class SourceDto

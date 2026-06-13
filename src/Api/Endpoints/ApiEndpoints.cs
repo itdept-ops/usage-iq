@@ -18,9 +18,10 @@ public static class ApiEndpoints
         api.MapPost("/sync", async (SyncCoordinator coordinator, CancellationToken ct) =>
             Results.Ok(await coordinator.TriggerAsync(waitIfBusy: true, ct)));
 
-        api.MapGet("/sync/status", async (UsageDbContext db, SyncCoordinator coordinator, IConfiguration cfg, CancellationToken ct) =>
+        api.MapGet("/sync/status", async (UsageDbContext db, SyncCoordinator coordinator, CancellationToken ct) =>
         {
             var s = await db.SyncStatuses.AsNoTracking().FirstOrDefaultAsync(ct);
+            var cfg = await db.AppConfigs.AsNoTracking().FirstOrDefaultAsync(ct);
             return Results.Ok(new SyncStatusDto
             {
                 LastSyncUtc = s?.LastSyncUtc,
@@ -30,8 +31,8 @@ public static class ApiEndpoints
                 LastFilesScanned = s?.LastFilesScanned ?? 0,
                 LastError = s?.LastError,
                 IsRunning = coordinator.IsRunning,
-                AutoSyncEnabled = cfg.GetValue("AutoSync:Enabled", true),
-                IntervalSeconds = Math.Max(30, cfg.GetValue("AutoSync:IntervalSeconds", 300)),
+                AutoSyncEnabled = cfg?.AutoSyncEnabled ?? true,
+                IntervalSeconds = cfg?.AutoSyncIntervalSeconds ?? 300,
             });
         });
 
@@ -126,7 +127,13 @@ public static class ApiEndpoints
         api.MapGet("/settings", async (UsageDbContext db, CancellationToken ct) =>
         {
             var cfg = await db.AppConfigs.AsNoTracking().FirstAsync(ct);
-            return Results.Ok(new SettingsDto { DisplayTimeZone = cfg.DisplayTimeZone, ClaudeProjectsPath = cfg.ClaudeProjectsPath });
+            return Results.Ok(new SettingsDto
+            {
+                DisplayTimeZone = cfg.DisplayTimeZone,
+                ClaudeProjectsPath = cfg.ClaudeProjectsPath,
+                AutoSyncEnabled = cfg.AutoSyncEnabled,
+                AutoSyncIntervalSeconds = cfg.AutoSyncIntervalSeconds,
+            });
         });
 
         api.MapPut("/settings", async (SettingsDto dto, UsageDbContext db, CostRecomputeService recompute, CancellationToken ct) =>
@@ -138,11 +145,13 @@ public static class ApiEndpoints
             var tzChanged = !string.Equals(cfg.DisplayTimeZone, dto.DisplayTimeZone, StringComparison.Ordinal);
             cfg.DisplayTimeZone = dto.DisplayTimeZone;
             cfg.ClaudeProjectsPath = dto.ClaudeProjectsPath;
+            cfg.AutoSyncEnabled = dto.AutoSyncEnabled;
+            cfg.AutoSyncIntervalSeconds = Math.Max(30, dto.AutoSyncIntervalSeconds);
             await db.SaveChangesAsync(ct);
 
             var rebucketed = 0;
             if (tzChanged) rebucketed = await recompute.RecomputeLocalDatesAsync(dto.DisplayTimeZone, ct);
-            return Results.Ok(new { dto.DisplayTimeZone, dto.ClaudeProjectsPath, localDatesRebucketed = rebucketed });
+            return Results.Ok(new { localDatesRebucketed = rebucketed });
         });
     }
 }

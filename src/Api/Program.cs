@@ -44,6 +44,8 @@ using (var scope = app.Services.CreateScope())
             Id = 1,
             DisplayTimeZone = builder.Configuration["Ingestion:DisplayTimeZone"] ?? "America/New_York",
             ClaudeProjectsPath = string.IsNullOrWhiteSpace(claudePath) ? Path.Combine(home, ".claude", "projects") : claudePath,
+            AutoSyncEnabled = builder.Configuration.GetValue("AutoSync:Enabled", true),
+            AutoSyncIntervalSeconds = Math.Max(30, builder.Configuration.GetValue("AutoSync:IntervalSeconds", 300)),
         });
         await db.SaveChangesAsync();
     }

@@ -266,6 +266,11 @@ mat-slide-toggle {
   font-size: var(--tech-fs-label);
 }
 
+.auto-toggle {
+  display: inline-flex;
+  margin: 4px 2px 2px;
+}
+
 /* ───────────────────────── Live sync status pill ───────────────────────── */
 .sync-pill {
   display: inline-flex;

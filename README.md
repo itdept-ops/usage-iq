@@ -1,8 +1,8 @@
-# ccusage-dashboard
+# Usage IQ
 
 A self-hosted dashboard for **filtering and visualizing your AI coding-agent token usage** — your "ccusage", across **multiple tools** (Claude Code + OpenAI Codex), with charts, cost, and drill-down. It reads each tool's local `*.jsonl` logs directly, de-duplicates and prices every message, stores it in **PostgreSQL**, and serves a filterable **Angular** dashboard from a **.NET 9** API.
 
-[![CI](https://github.com/itdept-ops/ccusage-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/itdept-ops/ccusage-dashboard/actions/workflows/ci.yml)
+[![CI](https://github.com/itdept-ops/usage-iq/actions/workflows/ci.yml/badge.svg)](https://github.com/itdept-ops/usage-iq/actions/workflows/ci.yml)
 
 > Built with Angular 21 · .NET 9 · EF Core · PostgreSQL · Docker · ECharts.
 
@@ -71,8 +71,8 @@ These are the traps the ingestion pipeline is built around (validated against a 
 ## Quick start (dev)
 
 ```bash
-git clone https://github.com/itdept-ops/ccusage-dashboard.git
-cd ccusage-dashboard
+git clone https://github.com/itdept-ops/usage-iq.git
+cd usage-iq
 cp .env.example .env            # adjust if needed
 
 # 1. Database
@@ -135,7 +135,7 @@ Set via `.env`, environment variables, or `src/Api/appsettings.json`:
 ## Project structure
 
 ```
-ccusage-dashboard/
+usage-iq/
 ├─ docker-compose.yml        # db (default) + api/web (--profile full)
 ├─ .github/workflows/ci.yml  # build API + Angular
 └─ src/
