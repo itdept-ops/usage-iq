@@ -21,7 +21,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
-import { GroupBy, IngestionSource, ModelStat, PagedResult, ProjectDto, SummaryResponse, UsageFilter, UsageRecord } from '../../core/models';
+import { AuthService } from '../../core/auth';
+import { GroupBy, IngestionSource, ModelStat, PagedResult, ProjectDto, SummaryResponse, UsageFilter, UsageRecord, PERM } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
 import { CompactPipe } from '../../shared/format';
 
@@ -40,6 +41,8 @@ import { CompactPipe } from '../../shared/format';
 export class Dashboard {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
+  readonly auth = inject(AuthService);
+  readonly PERM = PERM;
 
   // ---- filter + view state ----
   readonly filter = signal<UsageFilter>({ from: null, to: null, projectIds: [], models: [], sources: [], includeSidechain: true });

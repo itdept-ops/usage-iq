@@ -16,7 +16,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { Api } from '../../core/api';
-import { IngestionSource, Settings as SettingsModel, SyncResult, SyncStatus } from '../../core/models';
+import { AuthService } from '../../core/auth';
+import { IngestionSource, Settings as SettingsModel, SyncResult, SyncStatus, PERM } from '../../core/models';
 import { timeAgo, humanizeInterval } from '../../shared/format';
 
 @Component({
@@ -31,6 +32,8 @@ import { timeAgo, humanizeInterval } from '../../shared/format';
 export class Settings {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
+  readonly auth = inject(AuthService);
+  readonly PERM = PERM;
 
   readonly model = signal<SettingsModel | null>(null);
   readonly sources = signal<IngestionSource[]>([]);

@@ -11,7 +11,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
-import { Pricing as PricingRow } from '../../core/models';
+import { Pricing as PricingRow, PERM } from '../../core/models';
+import { AuthService } from '../../core/auth';
 
 @Component({
   selector: 'app-pricing',
@@ -25,6 +26,8 @@ import { Pricing as PricingRow } from '../../core/models';
 export class Pricing {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
+  readonly auth = inject(AuthService);
+  readonly PERM = PERM;
 
   readonly rows = signal<PricingRow[]>([]);
   readonly loading = signal(true);

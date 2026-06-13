@@ -58,10 +58,12 @@
     <div class="filter-actions">
       <button mat-stroked-button class="btn-reset" (click)="resetFilters()"><mat-icon>clear</mat-icon> Reset</button>
       <button mat-flat-button color="primary" class="btn-apply" (click)="applyFilters()"><mat-icon>filter_list</mat-icon> Apply</button>
-      <button mat-flat-button class="sync-btn" [disabled]="syncing()" (click)="sync()">
-        <mat-icon>{{ syncing() ? 'hourglass_top' : 'sync' }}</mat-icon>
-        {{ syncing() ? 'Syncing…' : 'Sync' }}
-      </button>
+      @if (auth.hasPermission(PERM.syncRun)) {
+        <button mat-flat-button class="sync-btn" [disabled]="syncing()" (click)="sync()">
+          <mat-icon>{{ syncing() ? 'hourglass_top' : 'sync' }}</mat-icon>
+          {{ syncing() ? 'Syncing…' : 'Sync' }}
+        </button>
+      }
     </div>
   </div>
 </section>

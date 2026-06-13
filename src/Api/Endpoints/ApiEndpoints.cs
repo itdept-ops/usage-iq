@@ -1,3 +1,4 @@
+using Ccusage.Api.Auth;
 using Ccusage.Api.Data;
 using Ccusage.Api.Dtos;
 using Ccusage.Api.Ingestion;
@@ -10,13 +11,16 @@ public static class ApiEndpoints
 {
     public static void MapApiEndpoints(this WebApplication app)
     {
-        var api = app.MapGroup("/api");
+        // All data endpoints require a valid app JWT; each also requires a specific permission,
+        // re-checked against the DB on every request (see PermissionFilter).
+        var api = app.MapGroup("/api").RequireAuthorization();
 
-        api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+        api.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 
         // ---- Sync ----
         api.MapPost("/sync", async (SyncCoordinator coordinator, CancellationToken ct) =>
-            Results.Ok(await coordinator.TriggerAsync(waitIfBusy: true, ct)));
+            Results.Ok(await coordinator.TriggerAsync(waitIfBusy: true, ct)))
+            .RequirePermission(Permissions.SyncRun);
 
         api.MapGet("/sync/status", async (UsageDbContext db, SyncCoordinator coordinator, CancellationToken ct) =>
         {
@@ -34,25 +38,29 @@ public static class ApiEndpoints
                 AutoSyncEnabled = cfg?.AutoSyncEnabled ?? true,
                 IntervalSeconds = cfg?.AutoSyncIntervalSeconds ?? 300,
             });
-        });
+        }).RequirePermission(Permissions.DashboardView);
 
         // ---- Usage ----
         api.MapGet("/usage/summary", async (
             [AsParameters] UsageFilterQuery filter, string? groupBy, UsageQueries q, CancellationToken ct) =>
-            Results.Ok(await q.SummaryAsync(filter, groupBy ?? "day", ct)));
+            Results.Ok(await q.SummaryAsync(filter, groupBy ?? "day", ct)))
+            .RequirePermission(Permissions.DashboardView);
 
         api.MapGet("/usage/records", async (
             [AsParameters] UsageFilterQuery filter,
             int? page, int? pageSize, string? sort, bool? desc,
             UsageQueries q, CancellationToken ct) =>
-            Results.Ok(await q.RecordsAsync(filter, page ?? 1, pageSize ?? 50, sort ?? "timestamp", desc ?? true, ct)));
+            Results.Ok(await q.RecordsAsync(filter, page ?? 1, pageSize ?? 50, sort ?? "timestamp", desc ?? true, ct)))
+            .RequirePermission(Permissions.DashboardView);
 
         // ---- Filter options ----
         api.MapGet("/projects", async (UsageQueries q, CancellationToken ct) =>
-            Results.Ok(await q.ProjectsAsync(ct)));
+            Results.Ok(await q.ProjectsAsync(ct)))
+            .RequirePermission(Permissions.DashboardView);
 
         api.MapGet("/models", async (UsageQueries q, CancellationToken ct) =>
-            Results.Ok(await q.ModelsAsync(ct)));
+            Results.Ok(await q.ModelsAsync(ct)))
+            .RequirePermission(Permissions.DashboardView);
 
         // ---- Pricing ----
         api.MapGet("/pricing", async (UsageDbContext db, CancellationToken ct) =>
@@ -64,7 +72,8 @@ public static class ApiEndpoints
                     InputPerMTok = p.InputPerMTok, OutputPerMTok = p.OutputPerMTok,
                     CacheWrite5mPerMTok = p.CacheWrite5mPerMTok, CacheWrite1hPerMTok = p.CacheWrite1hPerMTok,
                     CacheReadPerMTok = p.CacheReadPerMTok, IsPlaceholder = p.IsPlaceholder,
-                }).ToListAsync(ct)));
+                }).ToListAsync(ct)))
+            .RequirePermission(Permissions.DashboardView);
 
         api.MapPut("/pricing/{id:int}", async (int id, PricingDto dto, UsageDbContext db, CancellationToken ct) =>
         {
@@ -79,7 +88,7 @@ public static class ApiEndpoints
             row.IsPlaceholder = dto.IsPlaceholder;
             await db.SaveChangesAsync(ct);
             return Results.Ok(dto);
-        });
+        }).RequirePermission(Permissions.PricingManage);
 
         api.MapPost("/pricing", async (PricingDto dto, UsageDbContext db, CancellationToken ct) =>
         {
@@ -94,10 +103,11 @@ public static class ApiEndpoints
             db.ModelPricings.Add(row);
             await db.SaveChangesAsync(ct);
             return Results.Created($"/api/pricing/{row.Id}", new { row.Id });
-        });
+        }).RequirePermission(Permissions.PricingManage);
 
         api.MapPost("/pricing/recompute", async (CostRecomputeService svc, CancellationToken ct) =>
-            Results.Ok(await svc.RecomputeCostsAsync(ct)));
+            Results.Ok(await svc.RecomputeCostsAsync(ct)))
+            .RequirePermission(Permissions.PricingManage);
 
         // ---- Sources ----
         api.MapGet("/sources", async (UsageDbContext db, CancellationToken ct) =>
@@ -111,7 +121,7 @@ public static class ApiEndpoints
                 Id = s.Id, Name = s.Name, Kind = s.Kind, RootPath = s.RootPath, Enabled = s.Enabled,
                 Records = counts.GetValueOrDefault(s.Name),
             }));
-        });
+        }).RequirePermission(Permissions.DashboardView);
 
         api.MapPut("/sources/{id:int}", async (int id, SourceDto dto, UsageDbContext db, CancellationToken ct) =>
         {
@@ -121,7 +131,7 @@ public static class ApiEndpoints
             s.Enabled = dto.Enabled;
             await db.SaveChangesAsync(ct);
             return Results.Ok(dto);
-        });
+        }).RequirePermission(Permissions.SettingsManage);
 
         // ---- Settings ----
         api.MapGet("/settings", async (UsageDbContext db, CancellationToken ct) =>
@@ -134,7 +144,7 @@ public static class ApiEndpoints
                 AutoSyncEnabled = cfg.AutoSyncEnabled,
                 AutoSyncIntervalSeconds = cfg.AutoSyncIntervalSeconds,
             });
-        });
+        }).RequirePermission(Permissions.DashboardView);
 
         api.MapPut("/settings", async (SettingsDto dto, UsageDbContext db, CostRecomputeService recompute, CancellationToken ct) =>
         {
@@ -152,6 +162,6 @@ public static class ApiEndpoints
             var rebucketed = 0;
             if (tzChanged) rebucketed = await recompute.RecomputeLocalDatesAsync(dto.DisplayTimeZone, ct);
             return Results.Ok(new { localDatesRebucketed = rebucketed });
-        });
+        }).RequirePermission(Permissions.SettingsManage);
     }
 }

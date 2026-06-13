@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  GroupBy, IngestionSource, ModelStat, PagedResult, Pricing, ProjectDto,
+  GroupBy, IngestionSource, ManagedUser, ModelStat, PagedResult, PermissionItem, Pricing, ProjectDto,
   Settings, SummaryResponse, SyncResult, SyncStatus, UsageFilter, UsageRecord,
 } from './models';
 
@@ -76,5 +76,26 @@ export class Api {
 
   syncStatus(): Observable<SyncStatus> {
     return this.http.get<SyncStatus>(`${this.base}/sync/status`);
+  }
+
+  // ---- User management (requires users.manage) ----
+  permissionCatalog(): Observable<PermissionItem[]> {
+    return this.http.get<PermissionItem[]>(`${this.base}/permissions`);
+  }
+
+  users(): Observable<ManagedUser[]> {
+    return this.http.get<ManagedUser[]>(`${this.base}/users`);
+  }
+
+  createUser(body: { email: string; name?: string; isEnabled: boolean; permissions: string[] }): Observable<ManagedUser> {
+    return this.http.post<ManagedUser>(`${this.base}/users`, body);
+  }
+
+  updateUser(id: number, body: { name?: string; isEnabled: boolean; permissions: string[] }): Observable<ManagedUser> {
+    return this.http.put<ManagedUser>(`${this.base}/users/${id}`, body);
+  }
+
+  deleteUser(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/users/${id}`);
   }
 }

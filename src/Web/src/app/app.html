@@ -17,25 +17,51 @@
     <span class="brand__prompt">~/token-usage&nbsp;$<i class="caret" aria-hidden="true"></i></span>
   </a>
 
-  <nav class="nav" aria-label="Primary">
-    <a mat-button class="nav__item" routerLink="/" routerLinkActive="active"
-       [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
-    <a mat-button class="nav__item" routerLink="/pricing" routerLinkActive="active">Pricing</a>
-    <a mat-button class="nav__item" routerLink="/settings" routerLinkActive="active">Settings</a>
-  </nav>
+  @if (auth.isAuthenticated()) {
+    <nav class="nav" aria-label="Primary">
+      <a mat-button class="nav__item" routerLink="/" routerLinkActive="active"
+         [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+      <a mat-button class="nav__item" routerLink="/pricing" routerLinkActive="active">Pricing</a>
+      <a mat-button class="nav__item" routerLink="/settings" routerLinkActive="active">Settings</a>
+      @if (auth.hasPermission('users.manage')) {
+        <a mat-button class="nav__item" routerLink="/users" routerLinkActive="active">Users</a>
+      }
+    </nav>
+  }
 
   <span class="spacer"></span>
 
-  <span class="status" [attr.data-state]="state()" [matTooltip]="tooltip()" matTooltipClass="axon-tip"
-        aria-label="Sync status">
-    <span class="status__dot" aria-hidden="true"></span>
-    <span class="status__text mono-num">{{ label() }}</span>
-  </span>
+  @if (auth.isAuthenticated()) {
+    <span class="status" [attr.data-state]="state()" [matTooltip]="tooltip()" matTooltipClass="axon-tip"
+          aria-label="Sync status">
+      <span class="status__dot" aria-hidden="true"></span>
+      <span class="status__text mono-num">{{ label() }}</span>
+    </span>
+  }
 
   <a mat-icon-button class="gh" href="https://github.com/itdept-ops/usage-iq" target="_blank" rel="noopener"
      matTooltip="View on GitHub" aria-label="GitHub repository">
     <mat-icon>code</mat-icon>
   </a>
+
+  @if (auth.isAuthenticated() && auth.session(); as u) {
+    <button mat-button class="user" [matMenuTriggerFor]="userMenu" aria-label="Account menu">
+      @if (u.picture) {
+        <img class="user__avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
+      } @else {
+        <span class="user__avatar user__avatar--init">{{ initials() }}</span>
+      }
+      <span class="user__name">{{ u.name }}</span>
+      <mat-icon class="user__chev">expand_more</mat-icon>
+    </button>
+    <mat-menu #userMenu="matMenu" xPosition="before">
+      <div class="user-menu-head">
+        <div class="user-menu-name">{{ u.name }}</div>
+        <div class="user-menu-email">{{ u.email }}</div>
+      </div>
+      <button mat-menu-item (click)="logout()"><mat-icon>logout</mat-icon> Sign out</button>
+    </mat-menu>
+  }
 </mat-toolbar>
 
 <main class="content">

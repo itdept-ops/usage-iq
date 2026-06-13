@@ -103,6 +103,41 @@ export interface SyncResult {
   warning: string | null;
 }
 
+export interface AuthSession {
+  token: string;
+  email: string;
+  name: string;
+  picture: string | null;
+  expiresAtUtc: string;
+  permissions: string[];
+}
+
+export interface ManagedUser {
+  id: number;
+  email: string;
+  name: string;
+  picture: string | null;
+  isEnabled: boolean;
+  permissions: string[];
+  createdUtc: string;
+  lastLoginUtc: string | null;
+}
+
+export interface PermissionItem {
+  key: string;
+  label: string;
+  description: string;
+}
+
+/** Canonical permission keys (mirror of the backend catalog). */
+export const PERM = {
+  dashboardView: 'dashboard.view',
+  syncRun: 'sync.run',
+  pricingManage: 'pricing.manage',
+  settingsManage: 'settings.manage',
+  usersManage: 'users.manage',
+} as const;
+
 export interface SyncStatus {
   lastSyncUtc: string | null;
   lastNewRecords: number;

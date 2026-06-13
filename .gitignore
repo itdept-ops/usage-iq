@@ -2,6 +2,9 @@
 .env
 *.env
 !.env.example
+# Google OAuth client secret + JWT signing key + allowlist live here (never commit):
+appsettings.Local.json
+!appsettings.Local.example.json
 
 # ---------- .NET ----------
 [Bb]in/

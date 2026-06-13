@@ -5,9 +5,11 @@
     <p class="sub">Rates are <strong>USD per million tokens</strong>. Edits are stored in the DB; click
       <em>Recompute</em> to re-price existing rows. Lookup is exact&nbsp;→&nbsp;longest-prefix&nbsp;→&nbsp;<code>*</code>.</p>
   </div>
-  <button mat-flat-button color="primary" class="recompute-btn" [disabled]="recomputing()" (click)="recompute()">
-    <mat-icon>calculate</mat-icon> {{ recomputing() ? 'Recomputing…' : 'Recompute costs' }}
-  </button>
+  @if (auth.hasPermission(PERM.pricingManage)) {
+    <button mat-flat-button color="primary" class="recompute-btn" [disabled]="recomputing()" (click)="recompute()">
+      <mat-icon>calculate</mat-icon> {{ recomputing() ? 'Recomputing…' : 'Recompute costs' }}
+    </button>
+  }
 </div>
 
 @if (loading()) { <mat-progress-bar mode="indeterminate" /> }
@@ -61,9 +63,13 @@
       </div>
 
       <div class="rc-actions">
-        <button mat-stroked-button class="save-btn" [disabled]="savingId() === row.id" (click)="save(row)">
-          <mat-icon>save</mat-icon> {{ savingId() === row.id ? 'Saving…' : 'Save' }}
-        </button>
+        @if (auth.hasPermission(PERM.pricingManage)) {
+          <button mat-stroked-button class="save-btn" [disabled]="savingId() === row.id" (click)="save(row)">
+            <mat-icon>save</mat-icon> {{ savingId() === row.id ? 'Saving…' : 'Save' }}
+          </button>
+        } @else {
+          <span class="micro-label">read-only</span>
+        }
       </div>
     </mat-card>
   }

@@ -12,6 +12,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<AppConfig> AppConfigs => Set<AppConfig>();
     public DbSet<IngestionSource> IngestionSources => Set<IngestionSource>();
     public DbSet<SyncStatus> SyncStatuses => Set<SyncStatus>();
+    public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -92,6 +94,24 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
         {
             e.Property(x => x.LastSyncUtc).HasColumnType("timestamp with time zone");
             e.HasData(new SyncStatus { Id = 1 });
+        });
+
+        b.Entity<AppUser>(e =>
+        {
+            e.Property(x => x.Email).HasMaxLength(256);
+            e.Property(x => x.Name).HasMaxLength(256);
+            e.Property(x => x.Picture).HasMaxLength(1024);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.LastLoginUtc).HasColumnType("timestamp with time zone");
+            e.HasIndex(x => x.Email).IsUnique();
+            e.HasMany(x => x.Permissions).WithOne(p => p.User!)
+                .HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<UserPermission>(e =>
+        {
+            e.Property(x => x.Permission).HasMaxLength(64);
+            e.HasIndex(x => new { x.UserId, x.Permission }).IsUnique();
         });
     }
 }

@@ -49,6 +49,16 @@ These are the traps the ingestion pipeline is built around (validated against a 
 | Timestamps are **UTC** | Bucketed into days/months in a configurable display timezone (default `America/New_York`). |
 | Re-running sync | Incremental: unchanged files (same size + mtime) are skipped; only grown/rotated files are reparsed; inserts are idempotent. |
 
+## Authentication & access control
+
+Sign-in is **Google** (Google Identity Services, with the "Continue as…" One-Tap). Authorization is a **per-user permission set**, enforced **on every request**: the app JWT only proves *who* you are; the server re-loads your user row from the DB on each call and checks `IsEnabled` + the required permission. Disabling a user or removing a permission takes effect on their **next request** — no waiting for a token to expire.
+
+Permission catalog: `dashboard.view`, `sync.run`, `pricing.manage`, `settings.manage`, `users.manage`. Admins manage everyone from the **Users** page (a user × permission matrix, enable toggles, add/remove) — gated by `users.manage`, with last-admin lockout protection.
+
+**Secrets stay out of the repo.** The Google client id/secret, the JWT signing key, and the bootstrap admin/allow lists live in `src/Api/appsettings.Local.json` (git-ignored; copy from `appsettings.Local.example.json`). The API **refuses to start** without a strong `Jwt:Key`. Bootstrap: `Auth:AdminEmails` are seeded once as full admins; `Auth:AllowedEmails` as dashboard viewers.
+
+> Google setup: in the OAuth client (Web application), add your origin (e.g. `http://localhost:4200`) to **Authorized JavaScript origins**, and make sure each user is allowed by the consent screen (test users / internal).
+
 ## Architecture
 
 ```
@@ -104,6 +114,9 @@ The API container mounts `${CLAUDE_PROJECTS_PATH}` (from `.env`) read-only at `/
 
 | Method | Route | Purpose |
 | --- | --- | --- |
+| `POST` | `/api/auth/google` | Exchange a Google ID token for an app JWT (allowlist enforced). |
+| `GET` | `/api/auth/me`, `/api/auth/config` | Current user + live permissions / public Google client id. |
+| `GET`/`POST`/`PUT`/`DELETE` | `/api/users`, `/api/permissions` | User management (requires `users.manage`). |
 | `POST` | `/api/sync` | Ingest new/changed JSONL files; returns counts + timing. |
 | `GET` | `/api/sync/status` | Last-sync time + counts, whether a sync is running, and the auto-sync cadence. |
 | `GET` | `/api/usage/summary` | Aggregates; params: `from,to,projectId[],model[],includeSidechain,groupBy`. |

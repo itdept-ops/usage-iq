@@ -111,6 +111,62 @@ public sealed class SourceDto
     public int Records { get; set; }
 }
 
+public sealed class GoogleLoginRequest
+{
+    public string IdToken { get; set; } = "";
+}
+
+public sealed class AuthResultDto
+{
+    public string Token { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Picture { get; set; }
+    public DateTime ExpiresAtUtc { get; set; }
+    public string[] Permissions { get; set; } = Array.Empty<string>();
+}
+
+public sealed class AuthConfigDto
+{
+    public string GoogleClientId { get; set; } = "";
+}
+
+public sealed class MeDto
+{
+    public string Email { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Picture { get; set; }
+    public bool IsEnabled { get; set; }
+    public string[] Permissions { get; set; } = Array.Empty<string>();
+}
+
+public sealed class UserDto
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Picture { get; set; }
+    public bool IsEnabled { get; set; }
+    public string[] Permissions { get; set; } = Array.Empty<string>();
+    public DateTime CreatedUtc { get; set; }
+    public DateTime? LastLoginUtc { get; set; }
+}
+
+public sealed class UserUpsertRequest
+{
+    public string Email { get; set; } = "";
+    public string? Name { get; set; }
+    public bool IsEnabled { get; set; } = true;
+    public string[] Permissions { get; set; } = Array.Empty<string>();
+}
+
+public sealed class PermissionItemDto
+{
+    public string Key { get; set; } = "";
+    public string Label { get; set; } = "";
+    public string Description { get; set; } = "";
+}
+
 public sealed class SyncStatusDto
 {
     public DateTime? LastSyncUtc { get; set; }

@@ -40,12 +40,16 @@
     <mat-slide-toggle class="auto-toggle" [(ngModel)]="m.autoSyncEnabled">Enable background auto-sync</mat-slide-toggle>
 
     <div class="actions">
-      <button mat-flat-button color="primary" class="act-save" [disabled]="saving()" (click)="save()">
-        <mat-icon>save</mat-icon> {{ saving() ? 'Saving…' : 'Save settings' }}
-      </button>
-      <button mat-stroked-button class="act-sync" [disabled]="syncing()" (click)="sync()">
-        <mat-icon>{{ syncing() ? 'hourglass_top' : 'sync' }}</mat-icon> {{ syncing() ? 'Syncing…' : 'Run sync now' }}
-      </button>
+      @if (auth.hasPermission(PERM.settingsManage)) {
+        <button mat-flat-button color="primary" class="act-save" [disabled]="saving()" (click)="save()">
+          <mat-icon>save</mat-icon> {{ saving() ? 'Saving…' : 'Save settings' }}
+        </button>
+      }
+      @if (auth.hasPermission(PERM.syncRun)) {
+        <button mat-stroked-button class="act-sync" [disabled]="syncing()" (click)="sync()">
+          <mat-icon>{{ syncing() ? 'hourglass_top' : 'sync' }}</mat-icon> {{ syncing() ? 'Syncing…' : 'Run sync now' }}
+        </button>
+      }
     </div>
   </mat-card>
 
@@ -73,9 +77,11 @@
             <mat-label>Root path</mat-label>
             <input matInput class="mono-input" [(ngModel)]="s.rootPath" />
           </mat-form-field>
-          <button mat-stroked-button class="src-save" [disabled]="savingSourceId() === s.id" (click)="saveSource(s)">
-            <mat-icon>{{ savingSourceId() === s.id ? 'hourglass_top' : 'save' }}</mat-icon> Save
-          </button>
+          @if (auth.hasPermission(PERM.settingsManage)) {
+            <button mat-stroked-button class="src-save" [disabled]="savingSourceId() === s.id" (click)="saveSource(s)">
+              <mat-icon>{{ savingSourceId() === s.id ? 'hourglass_top' : 'save' }}</mat-icon> Save
+            </button>
+          }
         </div>
       </div>
     }

@@ -1,0 +1,90 @@
+<div class="head">
+  <div class="head-text">
+    <span class="micro-label head-eyebrow">~/users — access control</span>
+    <h2>Users &amp; permissions</h2>
+    <p class="sub">Grant per-capability access. Changes apply <strong>immediately</strong> — the server re-checks
+      permissions on every request, so removing access takes effect on a user's next action.</p>
+  </div>
+</div>
+
+@if (loading()) { <mat-progress-bar mode="indeterminate" /> }
+
+<!-- Add user -->
+<mat-card appearance="outlined" class="panel add-card">
+  <div class="panel-header">Add a user</div>
+  <div class="add-row">
+    <mat-form-field appearance="outline" class="add-email" subscriptSizing="dynamic">
+      <mat-label>Google account email</mat-label>
+      <input matInput class="mono-input" type="email" placeholder="name@example.com"
+             [ngModel]="newEmail()" (ngModelChange)="newEmail.set($event)" />
+    </mat-form-field>
+
+    <mat-slide-toggle [ngModel]="newEnabled()" (ngModelChange)="newEnabled.set($event)">Enabled</mat-slide-toggle>
+
+    <div class="add-perms">
+      @for (p of perms(); track p.key) {
+        <mat-checkbox [checked]="newHasPerm(p.key)" (change)="toggleNewPerm(p.key, $event.checked)"
+                      [matTooltip]="p.description">{{ p.label }}</mat-checkbox>
+      }
+    </div>
+
+    <button mat-flat-button color="primary" class="add-btn" [disabled]="adding()" (click)="addUser()">
+      <mat-icon>person_add</mat-icon> {{ adding() ? 'Adding…' : 'Add' }}
+    </button>
+  </div>
+</mat-card>
+
+<!-- Permission matrix -->
+<mat-card appearance="outlined" class="panel table-card">
+  <div class="panel-header">{{ users().length }} users</div>
+  <div class="table-scroll">
+    <table class="perm-table">
+      <thead>
+        <tr>
+          <th class="col-user">User</th>
+          <th class="col-enabled">Enabled</th>
+          @for (p of perms(); track p.key) {
+            <th class="col-perm" [matTooltip]="p.description">{{ p.label }}</th>
+          }
+          <th class="col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (u of users(); track u.id) {
+          <tr [class.disabled]="!u.isEnabled">
+            <td class="col-user">
+              <div class="u-cell">
+                @if (u.picture) {
+                  <img class="u-avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
+                } @else {
+                  <span class="u-avatar u-avatar--init">{{ (u.name || u.email).charAt(0).toUpperCase() }}</span>
+                }
+                <div class="u-id">
+                  <span class="u-email mono-num">{{ u.email }}</span>
+                  @if (u.name) { <span class="u-name">{{ u.name }}</span> }
+                  <span class="u-last micro-label">{{ u.lastLoginUtc ? 'last in ' + (u.lastLoginUtc | date: 'MMM d, HH:mm') : 'never signed in' }}</span>
+                </div>
+              </div>
+            </td>
+            <td class="col-enabled">
+              <mat-slide-toggle [ngModel]="u.isEnabled" (ngModelChange)="u.isEnabled = $event"></mat-slide-toggle>
+            </td>
+            @for (p of perms(); track p.key) {
+              <td class="col-perm">
+                <mat-checkbox [checked]="hasPerm(u, p.key)" (change)="togglePerm(u, p.key, $event.checked)"></mat-checkbox>
+              </td>
+            }
+            <td class="col-actions">
+              <button mat-stroked-button class="save-btn" [disabled]="savingId() === u.id" (click)="save(u)">
+                <mat-icon>save</mat-icon> Save
+              </button>
+              <button mat-icon-button class="del-btn" matTooltip="Remove user" (click)="remove(u)">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</mat-card>

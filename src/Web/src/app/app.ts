@@ -1,24 +1,31 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
-import { timer, switchMap, catchError, of } from 'rxjs';
+import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { timer, switchMap, catchError, of, filter } from 'rxjs';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
 
 import { Api } from './core/api';
+import { AuthService } from './core/auth';
 import { SyncStatus } from './core/models';
 import { timeAgo, humanizeInterval } from './shared/format';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatToolbarModule, MatButtonModule, MatIconModule, MatTooltipModule],
+  imports: [
+    RouterOutlet, RouterLink, RouterLinkActive,
+    MatToolbarModule, MatButtonModule, MatIconModule, MatTooltipModule, MatMenuModule,
+  ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
   private api = inject(Api);
+  private router = inject(Router);
+  readonly auth = inject(AuthService);
 
   readonly status = signal<SyncStatus | null>(null);
   private readonly now = signal(Date.now());
@@ -51,16 +58,45 @@ export class App {
     return `${last}\n${auto}`;
   });
 
+  readonly initials = computed(() => {
+    const s = this.auth.session();
+    const name = s?.name || s?.email || '';
+    const parts = name.split(/[\s@.]+/).filter(Boolean);
+    return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U';
+  });
+
   constructor() {
-    // Poll sync status every 15s; the "now" tick keeps the relative label fresh.
+    // Poll sync status only when signed in; "now" keeps the relative label fresh.
     timer(0, 15000)
       .pipe(
-        switchMap(() => this.api.syncStatus().pipe(catchError(() => of(null)))),
+        switchMap(() => this.auth.isAuthenticated()
+          ? this.api.syncStatus().pipe(catchError(() => of(null)))
+          : of(null)),
         takeUntilDestroyed(),
       )
-      .subscribe(s => {
-        this.now.set(Date.now());
-        if (s) this.status.set(s);
-      });
+      .subscribe(s => { this.now.set(Date.now()); if (s) this.status.set(s); });
+
+    // Re-check identity + permissions; bounce to login if the account was disabled/removed.
+    timer(800, 20000)
+      .pipe(
+        filter(() => this.auth.isAuthenticated()),
+        switchMap(() => this.auth.me().pipe(catchError(err => { this.onMeError(err); return of(null); }))),
+        takeUntilDestroyed(),
+      )
+      .subscribe(me => { if (me) this.auth.applyMe(me); });
+  }
+
+  private onMeError(err: { status?: number }): void {
+    if (err?.status === 401 || err?.status === 403) {
+      this.auth.logout();
+      this.status.set(null);
+      this.router.navigate(['/login']);
+    }
+  }
+
+  logout(): void {
+    this.auth.logout();
+    this.status.set(null);
+    this.router.navigate(['/login']);
   }
 }

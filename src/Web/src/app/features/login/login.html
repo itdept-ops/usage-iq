@@ -1,0 +1,31 @@
+<div class="login-wrap">
+  <div class="login-card">
+    <svg class="login-logo" width="52" height="52" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="uiq-login-grad" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#3D8BFF" /><stop offset="0.52" stop-color="#8B7CFF" /><stop offset="1" stop-color="#3FD8D0" />
+        </linearGradient>
+      </defs>
+      <rect x="1.25" y="1.25" width="29.5" height="29.5" rx="7.5" fill="#0B1019" stroke="url(#uiq-login-grad)" stroke-width="1.5" />
+      <rect x="7" y="18" width="3.6" height="7" rx="1.3" fill="url(#uiq-login-grad)" />
+      <rect x="14.2" y="13" width="3.6" height="12" rx="1.3" fill="url(#uiq-login-grad)" />
+      <rect x="21.4" y="8" width="3.6" height="17" rx="1.3" fill="url(#uiq-login-grad)" />
+      <path d="M8.8 15.5 L16 11 L23.2 6.4" stroke="#E6EDF6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" />
+      <circle cx="23.2" cy="6.4" r="2" fill="#3FD8D0" />
+    </svg>
+
+    <h1 class="login-title">Usage IQ</h1>
+    <p class="login-sub">AI coding-agent token usage — command center</p>
+
+    <div #gbtn class="gbtn"></div>
+
+    @if (busy()) {
+      <p class="login-msg">Signing in…</p>
+    }
+    @if (error()) {
+      <p class="login-error">{{ error() }}</p>
+    }
+
+    <p class="login-foot">Access is restricted to approved accounts.</p>
+  </div>
+</div>
