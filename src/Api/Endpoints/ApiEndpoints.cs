@@ -53,6 +53,11 @@ public static class ApiEndpoints
             Results.Ok(await q.RecordsAsync(filter, page ?? 1, pageSize ?? 50, sort ?? "timestamp", desc ?? true, ct)))
             .RequirePermission(Permissions.DashboardView);
 
+        api.MapGet("/usage/calendar", async (
+            [AsParameters] UsageFilterQuery filter, int? idleGapMinutes, UsageQueries q, CancellationToken ct) =>
+            Results.Ok(await q.CalendarAsync(filter, Math.Clamp(idleGapMinutes ?? 30, 5, 240), ct)))
+            .RequirePermission(Permissions.DashboardView);
+
         api.MapGet("/usage/records.csv", async (
             [AsParameters] UsageFilterQuery filter, HttpContext http, UsageQueries q, CancellationToken ct) =>
         {

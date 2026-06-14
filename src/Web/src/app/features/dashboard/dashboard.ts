@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import type { EChartsOption } from 'echarts';
@@ -41,6 +41,8 @@ import { CompactPipe } from '../../shared/format';
 export class Dashboard {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
   readonly auth = inject(AuthService);
   readonly PERM = PERM;
 
@@ -72,8 +74,55 @@ export class Dashboard {
   readonly displayedColumns = ['localDate', 'source', 'model', 'projectName', 'sidechain', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'totalTokens', 'costUsd'];
 
   constructor() {
+    this.hydrateFromUrl();
     this.loadOptions();
     this.reloadAll();
+  }
+
+  /** Restore filter/groupBy/preset from the URL query params so a shared link reopens the same view. */
+  private hydrateFromUrl(): void {
+    const p = this.route.snapshot.queryParamMap;
+    if (![...p.keys].length) return;
+    const list = (k: string) => (p.get(k)?.split(',').filter(Boolean) ?? []);
+    this.filter.set({
+      from: p.get('from') || null,
+      to: p.get('to') || null,
+      projectIds: list('p').map(Number).filter(n => !Number.isNaN(n)),
+      models: list('m'),
+      sources: list('s'),
+      includeSidechain: p.get('sc') !== '0',
+    });
+    if (p.get('g')) this.groupBy.set(p.get('g') as GroupBy);
+    this.activePreset.set(p.get('preset') ?? '');
+  }
+
+  private shareParams(): Record<string, string> {
+    const f = this.filter();
+    const q: Record<string, string> = {};
+    if (f.from) q['from'] = f.from;
+    if (f.to) q['to'] = f.to;
+    if (f.projectIds.length) q['p'] = f.projectIds.join(',');
+    if (f.models.length) q['m'] = f.models.join(',');
+    if (f.sources.length) q['s'] = f.sources.join(',');
+    if (!f.includeSidechain) q['sc'] = '0';
+    if (this.groupBy() !== 'day') q['g'] = this.groupBy();
+    if (this.activePreset() && this.activePreset() !== 'all') q['preset'] = this.activePreset();
+    return q;
+  }
+
+  /** Mirror the current view into the URL (replace, so it doesn't spam history). */
+  private syncUrl(): void {
+    this.router.navigate([], { relativeTo: this.route, queryParams: this.shareParams(), replaceUrl: true });
+  }
+
+  copyShareLink(): void {
+    this.syncUrl();
+    const tree = this.router.createUrlTree([], { relativeTo: this.route, queryParams: this.shareParams() });
+    const url = window.location.origin + this.router.serializeUrl(tree);
+    navigator.clipboard?.writeText(url).then(
+      () => this.snack.open('Shareable link copied to clipboard', 'OK', { duration: 3000 }),
+      () => this.snack.open('Could not copy link', 'Dismiss', { duration: 3000 }),
+    );
   }
 
   private loadOptions(): void {
@@ -89,6 +138,7 @@ export class Dashboard {
 
   applyFilters(): void {
     this.page.set(1);
+    this.syncUrl();
     this.reloadAll();
   }
 
@@ -128,12 +178,15 @@ export class Dashboard {
 
   resetFilters(): void {
     this.filter.set({ from: null, to: null, projectIds: [], models: [], sources: [], includeSidechain: true });
+    this.activePreset.set('all');
     this.page.set(1);
+    this.syncUrl();
     this.reloadAll();
   }
 
   setGroupBy(g: GroupBy): void {
     this.groupBy.set(g);
+    this.syncUrl();
     this.reloadSummary();
   }
 

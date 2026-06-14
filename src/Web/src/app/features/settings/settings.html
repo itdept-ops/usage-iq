@@ -87,6 +87,71 @@
     }
   </mat-card>
 
+  @if (auth.hasPermission(PERM.settingsManage) && notif(); as n) {
+    <mat-card appearance="outlined" class="panel s-panel">
+      <div class="s-panel-head">
+        <span class="panel-header">Discord notifications</span>
+        <mat-slide-toggle [ngModel]="n.enabled" (ngModelChange)="patchNotif('enabled', $event)">Enabled</mat-slide-toggle>
+      </div>
+      <p class="hint">Post usage digests and spend alerts to a Discord channel via an
+        <strong>incoming webhook</strong> (Server&nbsp;Settings → Integrations → Webhooks → Copy URL). The URL is a
+        secret — it's stored masked and never shown in full or written to the action log.</p>
+
+      <div class="field-grid">
+        <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
+          <mat-label>Discord webhook URL</mat-label>
+          <input matInput class="mono-input" type="password" autocomplete="off"
+                 placeholder="https://discord.com/api/webhooks/…"
+                 [ngModel]="webhookInput()" (ngModelChange)="webhookInput.set($event)" />
+          <mat-hint>{{ n.webhookConfigured ? 'Configured (' + n.webhookMasked + ') — paste a new URL to replace it.' : 'Paste your channel webhook URL.' }}</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <div class="notif-row">
+        <mat-slide-toggle [ngModel]="n.dailyDigest" (ngModelChange)="patchNotif('dailyDigest', $event)">Daily digest</mat-slide-toggle>
+        <mat-slide-toggle [ngModel]="n.weeklyDigest" (ngModelChange)="patchNotif('weeklyDigest', $event)">Weekly digest</mat-slide-toggle>
+      </div>
+
+      <div class="field-grid">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Digest hour (local)</mat-label>
+          <input matInput class="mono-input" type="number" min="0" max="23"
+                 [ngModel]="n.digestHourLocal" (ngModelChange)="patchNotif('digestHourLocal', +$event)" />
+          <mat-hint>0–23, in your display timezone</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Weekly digest day</mat-label>
+          <mat-select [ngModel]="n.weeklyDay" (ngModelChange)="patchNotif('weeklyDay', $event)" [disabled]="!n.weeklyDigest">
+            @for (d of weekdays; track $index) { <mat-option [value]="$index">{{ d }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="notif-row">
+        <mat-slide-toggle [ngModel]="n.thresholdEnabled" (ngModelChange)="patchNotif('thresholdEnabled', $event)">Daily spend alert</mat-slide-toggle>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="threshold">
+          <mat-label>Alert at ($ / day)</mat-label>
+          <input matInput class="mono-input" type="number" min="0" step="10"
+                 [ngModel]="n.thresholdUsd" (ngModelChange)="patchNotif('thresholdUsd', +$event)" [disabled]="!n.thresholdEnabled" />
+        </mat-form-field>
+      </div>
+
+      <div class="actions">
+        <button mat-flat-button color="primary" [disabled]="savingNotif()" (click)="saveNotif()">
+          <mat-icon>save</mat-icon> {{ savingNotif() ? 'Saving…' : 'Save' }}
+        </button>
+        <button mat-stroked-button [disabled]="testingNotif() || !n.webhookConfigured" (click)="testNotif()">
+          <mat-icon>send</mat-icon> {{ testingNotif() ? 'Sending…' : 'Send test' }}
+        </button>
+        @if (n.webhookConfigured) {
+          <button mat-button class="danger-btn" [disabled]="savingNotif()" (click)="removeWebhook()">
+            <mat-icon>link_off</mat-icon> Remove
+          </button>
+        }
+      </div>
+    </mat-card>
+  }
+
   @if (lastSync(); as r) {
     <mat-card appearance="outlined" class="panel s-panel result" [class.has-warn]="r.unpricedModels.length || r.sourceWarnings.length || r.warning">
       <div class="s-panel-head">

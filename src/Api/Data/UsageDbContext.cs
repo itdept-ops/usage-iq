@@ -16,6 +16,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<RequestLog> RequestLogs => Set<RequestLog>();
+    public DbSet<NotificationSetting> NotificationSettings => Set<NotificationSetting>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -139,6 +140,13 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.ClientIp).HasMaxLength(64);
             // Bodies are already truncated by the middleware; store as unbounded text.
             e.HasIndex(x => x.Id).IsDescending(); // newest-first reads
+        });
+
+        b.Entity<NotificationSetting>(e =>
+        {
+            e.Property(x => x.DiscordWebhookUrl).HasMaxLength(512);
+            e.Property(x => x.ThresholdUsd).HasPrecision(18, 2);
+            e.HasData(new NotificationSetting { Id = 1 });
         });
     }
 }

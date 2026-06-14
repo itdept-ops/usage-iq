@@ -138,6 +138,40 @@ export interface AuditEntry {
   detail: string | null;
 }
 
+export interface NotificationSettings {
+  webhookConfigured: boolean;
+  webhookMasked: string | null;
+  enabled: boolean;
+  digestHourLocal: number;
+  dailyDigest: boolean;
+  weeklyDigest: boolean;
+  weeklyDay: number;
+  thresholdEnabled: boolean;
+  thresholdUsd: number;
+}
+
+export interface NotificationUpdate {
+  discordWebhookUrl?: string | null;
+  enabled: boolean;
+  digestHourLocal: number;
+  dailyDigest: boolean;
+  weeklyDigest: boolean;
+  weeklyDay: number;
+  thresholdEnabled: boolean;
+  thresholdUsd: number;
+}
+
+export interface CalendarDay {
+  date: string;
+  costUsd: number;
+  tokens: number;
+  messages: number;
+  sessions: number;
+  activeMinutes: number;
+  firstUtc: string | null;
+  lastUtc: string | null;
+}
+
 export interface RequestLogEntry {
   id: number;
   whenUtc: string;

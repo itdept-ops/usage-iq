@@ -1,0 +1,48 @@
+<div class="head">
+  <div class="head-text">
+    <span class="micro-label head-eyebrow">~/calendar — activity over time</span>
+    <h2>Usage calendar</h2>
+    <p class="sub">Daily spend, volume, and how much time you actually spend working with AI — estimated from
+      message timing (gaps over 30&nbsp;min count as idle).</p>
+  </div>
+  <mat-button-toggle-group class="metric-toggle" [value]="metric()" (change)="metric.set($event.value)" hideSingleSelectionIndicator>
+    <mat-button-toggle value="cost">Cost</mat-button-toggle>
+    <mat-button-toggle value="tokens">Tokens</mat-button-toggle>
+    <mat-button-toggle value="hours">Active hours</mat-button-toggle>
+  </mat-button-toggle-group>
+</div>
+
+@if (loading()) { <mat-progress-bar mode="indeterminate" /> }
+
+<!-- Summary cards -->
+<div class="stat-grid">
+  <mat-card appearance="outlined" class="stat">
+    <span class="stat-label">Total active time</span>
+    <span class="stat-value">{{ stats().totalHours | number: '1.0-0' }}<span class="unit">h</span></span>
+    <span class="stat-sub">across {{ stats().activeDays }} active days</span>
+  </mat-card>
+  <mat-card appearance="outlined" class="stat">
+    <span class="stat-label">Avg / active day</span>
+    <span class="stat-value">{{ stats().avgHoursPerDay | number: '1.1-1' }}<span class="unit">h</span></span>
+    <span class="stat-sub">busiest {{ stats().maxDayHours | number: '1.1-1' }}h</span>
+  </mat-card>
+  <mat-card appearance="outlined" class="stat">
+    <span class="stat-label">Sessions</span>
+    <span class="stat-value">{{ stats().totalSessions | number }}</span>
+    <span class="stat-sub">{{ stats().totalMsgs | number }} messages</span>
+  </mat-card>
+  <mat-card appearance="outlined" class="stat">
+    <span class="stat-label">Total spend</span>
+    <span class="stat-value">${{ stats().totalCost | number: '1.0-0' }}</span>
+    @if (stats().busiest; as b) {
+      <span class="stat-sub">peak {{ b.date }}</span>
+    }
+  </mat-card>
+</div>
+
+<!-- Heatmap -->
+<mat-card appearance="outlined" class="panel">
+  <div class="cal-wrap" [style.height.px]="wrapHeight()">
+    <app-chart [option]="chart()" />
+  </div>
+</mat-card>

@@ -16,8 +16,8 @@ A self-hosted dashboard for **filtering and visualizing your AI coding-agent tok
 | ![Landing](docs/screenshots/landing.png) | ![Users](docs/screenshots/users.png) |
 | **Pricing** — editable per-model rates | **Settings** — sources, timezone, auto-sync |
 | ![Pricing](docs/screenshots/pricing.png) | ![Settings](docs/screenshots/settings.png) |
-| **Activity** — request/response action log |  |
-| ![Activity](docs/screenshots/activity.png) |  |
+| **Activity** — request/response action log | **Calendar** — daily heatmap + active hours |
+| ![Activity](docs/screenshots/activity.png) | ![Calendar](docs/screenshots/calendar.png) |
 
 ---
 
@@ -42,6 +42,8 @@ Each source is enable/disable-able with an editable path on the **Settings** pag
 
 - **Filter** by date range, project, model, **source**, and main-vs-subagent (sidechain) usage.
 - **Quick date presets** — last 7 / 30 / 90 days, month-to-date, or all-time — alongside explicit from/to.
+- **Shareable views** — the active filters are encoded in the URL (deep-linkable, restored on load) with a one-click **Copy link**.
+- **Usage calendar** — a GitHub-style heatmap (cost / tokens / **active hours**) with estimated time-spent-with-AI per day (gap-based sessionization), busiest-day and session stats.
 - **Group** the time series by day, month, project, model, source, or session.
 - **Cost in USD** from an **editable per-model pricing table** (5m / 1h cache-write and cache-read tiers priced separately).
 - **Charts**: usage-over-time (cost + tokens), top-N by dimension, and a cost-by-model donut (ECharts).
@@ -51,6 +53,7 @@ Each source is enable/disable-able with an editable path on the **Settings** pag
 - **Background auto-sync** on a timer (a .NET hosted service) + a live **"Synced Xm ago"** status in the command bar.
 - **Audit log** of every user-management change — who did what, to whom, and when — on the Users page.
 - **Action log** — every API request & response captured by middleware (truncated, with auth routes / secret fields / query-string tokens redacted; health and polling skipped), browsable and filterable on an admin **Activity** page.
+- **Discord notifications** — post daily/weekly spend digests and a daily spend-threshold alert to a channel via an incoming webhook (configured in Settings; URL validated to genuine Discord hosts, stored masked, redacted from the action log).
 
 ## How it handles the data correctly
 
@@ -147,6 +150,8 @@ The API container mounts `${CLAUDE_PROJECTS_PATH}` (from `.env`) read-only at `/
 | `GET` | `/api/usage/summary` | Aggregates; params: `from,to,projectId[],model[],includeSidechain,groupBy`. |
 | `GET` | `/api/usage/records` | Paged, sortable messages (same filters). |
 | `GET` | `/api/usage/records.csv` | Streamed CSV of the filtered rows (requires `dashboard.view`). |
+| `GET` | `/api/usage/calendar` | Per-day cost/tokens/messages + estimated active minutes & sessions. |
+| `GET` / `PUT` / `POST` | `/api/notifications`, `/api/notifications/test` | Discord webhook config + test (requires `settings.manage`). |
 | `GET` | `/api/audit` | Recent user-management audit entries (requires `users.manage`). |
 | `GET` | `/api/logs` | Recent request/response action log; filter by `method`/`status`/`q` (requires `users.manage`). |
 | `GET` | `/api/projects`, `/api/models`, `/api/sources` | Filter options with totals. |
@@ -186,12 +191,12 @@ usage-iq/
    ├─ Api/                   # .NET 9 minimal API
    │  ├─ Data/               # EF entities, DbContext, pricing seed
    │  ├─ Ingestion/          # JSONL parse, dedup, cost, project/timezone resolve
-   │  ├─ Services/           # queries, recompute, sync coordinator, audit
+   │  ├─ Services/           # queries, recompute, sync coordinator, audit, Discord notifier
    │  ├─ Auth/               # JWT, per-request permission filter
    │  ├─ Infrastructure/     # global exception handler, request-logging middleware
    │  └─ Endpoints/          # API surface
    └─ Web/                   # Angular 21 (standalone + signals, ECharts)
-      └─ src/app/{features/{dashboard,pricing,settings,users,login},core,shared}
+      └─ src/app/{features/{dashboard,calendar,pricing,settings,users,logs,login},core,shared}
 ```
 
 ## License

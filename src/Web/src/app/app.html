@@ -21,6 +21,7 @@
     <nav class="nav" aria-label="Primary">
       <a mat-button class="nav__item" routerLink="/" routerLinkActive="active"
          [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+      <a mat-button class="nav__item" routerLink="/calendar" routerLinkActive="active">Calendar</a>
       <a mat-button class="nav__item" routerLink="/pricing" routerLinkActive="active">Pricing</a>
       <a mat-button class="nav__item" routerLink="/settings" routerLinkActive="active">Settings</a>
       @if (auth.hasPermission('users.manage')) {

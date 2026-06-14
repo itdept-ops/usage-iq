@@ -15,9 +15,10 @@ public class LogRedactionTests
     [Theory]
     [InlineData("/api/auth/google")]
     [InlineData("/api/auth/refresh")]
-    [InlineData("/api/auth/anything")]
-    public void Auth_routes_are_fully_redacted(string path)
-        => LogRedaction.Redact("{\"idToken\":\"super-secret\"}", path).Should().Be("[redacted: auth route]");
+    [InlineData("/api/notifications")]
+    public void Sensitive_routes_are_fully_redacted(string path)
+        => LogRedaction.Redact("{\"idToken\":\"super-secret\",\"discordWebhookUrl\":\"https://discord.com/x\"}", path)
+            .Should().Be("[redacted]");
 
     [Fact]
     public void Secret_fields_are_redacted_on_other_routes()
@@ -77,7 +78,7 @@ public class LogRedactionTests
 
     [Fact]
     public void Query_string_on_an_auth_route_is_fully_redacted()
-        => LogRedaction.RedactQuery("?code=abc", "/api/auth/google").Should().Be("[redacted: auth route]");
+        => LogRedaction.RedactQuery("?code=abc", "/api/auth/google").Should().Be("[redacted]");
 
     [Fact]
     public void Clean_query_string_passes_through()

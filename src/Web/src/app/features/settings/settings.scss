@@ -306,3 +306,18 @@ mat-slide-toggle {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+/* ---- Discord notifications ---- */
+.notif-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  margin: 10px 0 14px;
+
+  .threshold { width: 180px; }
+}
+.danger-btn {
+  color: var(--tech-text-tertiary);
+  &:hover { color: var(--tech-error, #ff5c6c); }
+}

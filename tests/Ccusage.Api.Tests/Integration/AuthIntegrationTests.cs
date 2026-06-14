@@ -216,7 +216,7 @@ public class AuthIntegrationTests(WebAppFactory factory) : IClassFixture<WebAppF
         await Client().PostAsJsonAsync("/api/auth/google", new { idToken = "should-not-be-stored" });
 
         var entry = await WaitForLog(admin, e => e.GetProperty("path").GetString() == "/api/auth/google");
-        entry.GetProperty("requestBody").GetString().Should().Be("[redacted: auth route]");
+        entry.GetProperty("requestBody").GetString().Should().Be("[redacted]");
         // and the raw token must never appear anywhere in the entry
         entry.GetRawText().Should().NotContain("should-not-be-stored");
     }
@@ -262,5 +262,65 @@ public class AuthIntegrationTests(WebAppFactory factory) : IClassFixture<WebAppF
         var qs = entry.GetProperty("queryString").GetString()!;
         qs.Should().NotContain("QSECRET123");
         qs.Should().Contain("access_token=[redacted]");
+    }
+
+    // ---- Discord notifications ----
+
+    private static object NotifBody(string? url, bool enabled = false) => new
+    {
+        discordWebhookUrl = url, enabled, digestHourLocal = 9, dailyDigest = false,
+        weeklyDigest = false, weeklyDay = 1, thresholdEnabled = false, thresholdUsd = 0,
+    };
+
+    [Fact]
+    public async Task Notifications_require_settings_manage()
+    {
+        var email = $"viewer-notif-{Guid.NewGuid():N}@test.local";
+        await Client(WebAppFactory.AdminEmail).PostAsJsonAsync("/api/users",
+            new { email, isEnabled = true, permissions = new[] { "dashboard.view" } });
+
+        (await Client(email).GetAsync("/api/notifications")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await Client().GetAsync("/api/notifications")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Saving_a_discord_webhook_masks_it_on_read()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        var res = await admin.PutAsJsonAsync("/api/notifications",
+            NotifBody("https://discord.com/api/webhooks/123456/abcdefSECRETtoken", enabled: true));
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await res.Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("webhookConfigured").GetBoolean().Should().BeTrue();
+        dto.GetRawText().Should().NotContain("abcdefSECRETtoken"); // raw URL never returned
+        dto.GetProperty("webhookMasked").GetString().Should().Contain("…");
+    }
+
+    [Fact]
+    public async Task Invalid_webhook_url_is_rejected()
+        => (await Client(WebAppFactory.AdminEmail).PutAsJsonAsync("/api/notifications",
+                NotifBody("https://evil.example.com/api/webhooks/1/2")))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+    [Fact]
+    public async Task Discord_webhook_url_is_redacted_in_the_action_log()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        await admin.PutAsJsonAsync("/api/notifications",
+            NotifBody("https://discord.com/api/webhooks/999/REDACTME_TOKEN"));
+
+        var entry = await WaitForLog(admin, e =>
+            e.GetProperty("path").GetString() == "/api/notifications" && e.GetProperty("method").GetString() == "PUT");
+        entry.GetProperty("requestBody").GetString().Should().Be("[redacted]");
+        entry.GetRawText().Should().NotContain("REDACTME_TOKEN");
+    }
+
+    [Fact]
+    public async Task Test_requires_a_configured_webhook()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        await admin.PutAsJsonAsync("/api/notifications", NotifBody("")); // clear
+        (await admin.PostAsync("/api/notifications/test", null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }

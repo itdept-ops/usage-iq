@@ -75,6 +75,9 @@
     <button mat-button class="qr-chip" [class.active]="activePreset() === p.key" (click)="setDatePreset(p.key)">{{ p.label }}</button>
   }
   <span class="qr-grow"></span>
+  <button mat-stroked-button class="qr-export" matTooltip="Copy a shareable link to this filtered view" (click)="copyShareLink()">
+    <mat-icon>link</mat-icon> Copy link
+  </button>
   <button mat-stroked-button class="qr-export" [disabled]="exporting()" (click)="exportCsv()">
     <mat-icon>download</mat-icon> {{ exporting() ? 'Exporting…' : 'Export CSV' }}
   </button>

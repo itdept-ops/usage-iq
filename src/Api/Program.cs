@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Text;
 using System.Threading.RateLimiting;
 using Ccusage.Api.Auth;
@@ -49,6 +50,15 @@ builder.Services.AddHostedService<AutoSyncBackgroundService>();
 builder.Services.AddSingleton<RequestLogQueue>();
 builder.Services.AddHostedService<RequestLogWriter>();
 
+// Discord notifications: digest/alert sender + a minute-tick scheduler.
+builder.Services.AddHttpClient();
+// The "discord" client must NOT follow redirects — otherwise an allowlisted host could 3xx the
+// request onward to an internal address, defeating the SSRF allowlist in DiscordNotifier.
+builder.Services.AddHttpClient("discord").ConfigurePrimaryHttpMessageHandler(() =>
+    new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(5) });
+builder.Services.AddScoped<DiscordNotifier>();
+builder.Services.AddHostedService<NotificationBackgroundService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -93,6 +103,10 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("auth", http => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 20, QueueLimit = 0 }));
+    // The "send test" button pokes Discord; cap it so it can't be used to spam the channel.
+    o.AddPolicy("notif-test", http => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: http.User.FindFirst("email")?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 5, QueueLimit = 0 }));
 });
 
 var app = builder.Build();
@@ -197,6 +211,7 @@ app.MapAuthEndpoints();
 app.MapUsersEndpoints();
 app.MapApiEndpoints();
 app.MapObservabilityEndpoints();
+app.MapNotificationsEndpoints();
 app.MapGet("/", () => app.Environment.IsDevelopment()
     ? Results.Redirect("/swagger")
     : Results.Ok(new { service = "Usage IQ API" }));

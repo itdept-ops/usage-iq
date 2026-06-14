@@ -16,6 +16,12 @@ export const routes: Routes = [
     title: 'Usage IQ · Dashboard',
   },
   {
+    path: 'calendar',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/calendar/calendar').then(m => m.Calendar),
+    title: 'Usage IQ · Calendar',
+  },
+  {
     path: 'pricing',
     canActivate: [authGuard],
     loadComponent: () => import('./features/pricing/pricing').then(m => m.Pricing),

@@ -15,9 +15,13 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
+import { HttpErrorResponse } from '@angular/common/http';
+
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
-import { IngestionSource, Settings as SettingsModel, SyncResult, SyncStatus, PERM } from '../../core/models';
+import {
+  IngestionSource, NotificationSettings, NotificationUpdate, Settings as SettingsModel, SyncResult, SyncStatus, PERM,
+} from '../../core/models';
 import { timeAgo, humanizeInterval } from '../../shared/format';
 
 @Component({
@@ -45,6 +49,13 @@ export class Settings {
 
   readonly status = signal<SyncStatus | null>(null);
   private readonly now = signal(Date.now());
+
+  // ---- Discord notifications ----
+  readonly notif = signal<NotificationSettings | null>(null);
+  readonly webhookInput = signal('');
+  readonly savingNotif = signal(false);
+  readonly testingNotif = signal(false);
+  readonly weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   /** newRecordsBySource as [name, count] pairs for the template. */
   readonly lastSyncBySource = computed(() => Object.entries(this.lastSync()?.newRecordsBySource ?? {}));
@@ -100,6 +111,58 @@ export class Settings {
       error: () => { this.loading.set(false); this.snack.open('Failed to load settings', 'Dismiss', { duration: 4000 }); },
     });
     this.api.sources().subscribe(s => this.sources.set(s));
+    if (this.auth.hasPermission(PERM.settingsManage)) {
+      this.api.notifications().subscribe({ next: n => this.notif.set(n), error: () => { /* non-critical */ } });
+    }
+  }
+
+  patchNotif<K extends keyof NotificationSettings>(key: K, value: NotificationSettings[K]): void {
+    this.notif.update(n => n ? { ...n, [key]: value } : n);
+  }
+
+  private notifBody(over: Partial<NotificationUpdate> = {}): NotificationUpdate {
+    const n = this.notif()!;
+    return {
+      enabled: n.enabled, digestHourLocal: n.digestHourLocal, dailyDigest: n.dailyDigest,
+      weeklyDigest: n.weeklyDigest, weeklyDay: n.weeklyDay,
+      thresholdEnabled: n.thresholdEnabled, thresholdUsd: n.thresholdUsd, ...over,
+    };
+  }
+
+  saveNotif(): void {
+    if (!this.notif()) return;
+    this.savingNotif.set(true);
+    const url = this.webhookInput().trim();
+    this.api.saveNotifications(this.notifBody(url ? { discordWebhookUrl: url } : {})).subscribe({
+      next: n => {
+        this.notif.set(n); this.webhookInput.set(''); this.savingNotif.set(false);
+        this.snack.open('Notification settings saved', 'OK', { duration: 2500 });
+      },
+      error: (e: HttpErrorResponse) => {
+        this.savingNotif.set(false);
+        this.snack.open(e.error?.message ?? 'Save failed', 'Dismiss', { duration: 5000 });
+      },
+    });
+  }
+
+  removeWebhook(): void {
+    if (!this.notif()) return;
+    this.savingNotif.set(true);
+    this.api.saveNotifications(this.notifBody({ discordWebhookUrl: '' })).subscribe({
+      next: n => { this.notif.set(n); this.savingNotif.set(false); this.snack.open('Webhook removed', 'OK', { duration: 2500 }); },
+      error: () => { this.savingNotif.set(false); this.snack.open('Could not remove webhook', 'Dismiss', { duration: 4000 }); },
+    });
+  }
+
+  testNotif(): void {
+    this.testingNotif.set(true);
+    this.api.testNotification().subscribe({
+      next: r => { this.testingNotif.set(false); this.snack.open(r.message, 'OK', { duration: 4000 }); },
+      error: (e: HttpErrorResponse) => {
+        this.testingNotif.set(false);
+        this.snack.open(e.error?.message ?? 'Test failed', 'Dismiss', { duration: 5000 });
+      },
+    });
   }
 
   saveSource(s: IngestionSource): void {

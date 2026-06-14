@@ -22,15 +22,18 @@ public static partial class LogRedaction
     [GeneratedRegex("(?<k>" + SecretKeys + ")=(?<v>[^&]*)", RegexOptions.IgnoreCase)]
     private static partial Regex SecretPairRegex();
 
-    /// <summary>True for paths whose request/response must never be stored verbatim.</summary>
+    private const string SensitiveMarker = "[redacted]";
+
+    /// <summary>True for paths whose request/response carry a secret and must never be stored verbatim.</summary>
     public static bool IsSensitivePath(string path) =>
-        path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase);
+        path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase)          // Google token in, JWT out
+        || path.StartsWith("/api/notifications", StringComparison.OrdinalIgnoreCase); // Discord webhook URL
 
     /// <summary>Redact a captured request/response body (JSON or urlencoded), then truncate.</summary>
     public static string? Redact(string? body, string path)
     {
         if (string.IsNullOrEmpty(body)) return body;
-        if (IsSensitivePath(path)) return "[redacted: auth route]";
+        if (IsSensitivePath(path)) return SensitiveMarker;
 
         var cleaned = SecretJsonFieldRegex().Replace(body, m => $"\"{m.Groups["k"].Value}\":\"[redacted]\"");
         cleaned = SecretPairRegex().Replace(cleaned, m => $"{m.Groups["k"].Value}=[redacted]");
@@ -41,7 +44,7 @@ public static partial class LogRedaction
     public static string? RedactQuery(string? query, string path)
     {
         if (string.IsNullOrEmpty(query)) return query;
-        if (IsSensitivePath(path)) return "[redacted: auth route]";
+        if (IsSensitivePath(path)) return SensitiveMarker;
 
         var cleaned = SecretPairRegex().Replace(query, m => $"{m.Groups["k"].Value}=[redacted]");
         return cleaned.Length <= MaxQueryChars ? cleaned : cleaned[..MaxQueryChars];

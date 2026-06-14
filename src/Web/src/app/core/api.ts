@@ -2,8 +2,9 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AuditEntry, GroupBy, IngestionSource, ManagedUser, ModelStat, PagedResult, PermissionItem, Pricing, ProjectDto,
-  RequestLogEntry, Settings, SummaryResponse, SyncResult, SyncStatus, UsageFilter, UsageRecord,
+  AuditEntry, CalendarDay, GroupBy, IngestionSource, ManagedUser, ModelStat, NotificationSettings, NotificationUpdate,
+  PagedResult, PermissionItem, Pricing, ProjectDto, RequestLogEntry, Settings, SummaryResponse, SyncResult, SyncStatus,
+  UsageFilter, UsageRecord,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -32,6 +33,10 @@ export class Api {
     const params = this.filterParams(f)
       .set('page', page).set('pageSize', pageSize).set('sort', sort).set('desc', desc);
     return this.http.get<PagedResult<UsageRecord>>(`${this.base}/usage/records`, { params });
+  }
+
+  calendar(f?: UsageFilter): Observable<CalendarDay[]> {
+    return this.http.get<CalendarDay[]>(`${this.base}/usage/calendar`, { params: f ? this.filterParams(f) : undefined });
   }
 
   recordsCsv(f: UsageFilter): Observable<Blob> {
@@ -85,6 +90,18 @@ export class Api {
 
   saveSettings(dto: Settings): Observable<unknown> {
     return this.http.put(`${this.base}/settings`, dto);
+  }
+
+  notifications(): Observable<NotificationSettings> {
+    return this.http.get<NotificationSettings>(`${this.base}/notifications`);
+  }
+
+  saveNotifications(body: NotificationUpdate): Observable<NotificationSettings> {
+    return this.http.put<NotificationSettings>(`${this.base}/notifications`, body);
+  }
+
+  testNotification(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.base}/notifications/test`, {});
   }
 
   sync(): Observable<SyncResult> {

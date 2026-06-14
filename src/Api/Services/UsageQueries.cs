@@ -21,6 +21,59 @@ public sealed class UsageQueries(UsageDbContext db)
         return q;
     }
 
+    /// <summary>
+    /// Per-day spend/volume plus an estimate of active engagement time. "Active minutes" sums the
+    /// gaps between consecutive messages on a day, ignoring any gap longer than <paramref name="idleGapMinutes"/>
+    /// (treated as idle); a gap over the threshold also starts a new session.
+    /// </summary>
+    public async Task<List<CalendarDayDto>> CalendarAsync(UsageFilterQuery f, int idleGapMinutes, CancellationToken ct)
+    {
+        var q = Filtered(f);
+
+        var agg = await q.GroupBy(r => r.LocalDate).Select(g => new
+        {
+            Date = g.Key,
+            Cost = g.Sum(x => x.CostUsd),
+            Tokens = g.Sum(x => (long)x.InputTokens + x.OutputTokens + x.CacheReadTokens
+                                 + x.CacheCreation5mTokens + x.CacheCreation1hTokens),
+            Messages = g.Count(),
+        }).ToListAsync(ct);
+
+        // Pull just the timestamps (two columns) to compute active time + sessions per day.
+        var stamps = await q.Select(r => new { r.LocalDate, r.TimestampUtc }).ToListAsync(ct);
+        var gap = TimeSpan.FromMinutes(idleGapMinutes);
+
+        var byDay = stamps.GroupBy(s => s.LocalDate).ToDictionary(g => g.Key, g =>
+        {
+            var times = g.Select(x => x.TimestampUtc).OrderBy(t => t).ToList();
+            double minutes = 0;
+            var sessions = times.Count > 0 ? 1 : 0;
+            for (var i = 1; i < times.Count; i++)
+            {
+                var d = times[i] - times[i - 1];
+                if (d <= gap) minutes += d.TotalMinutes;
+                else sessions++;
+            }
+            return (Minutes: minutes, Sessions: sessions, First: times[0], Last: times[^1]);
+        });
+
+        return agg.Select(a =>
+        {
+            byDay.TryGetValue(a.Date, out var v);
+            return new CalendarDayDto
+            {
+                Date = a.Date.ToString("yyyy-MM-dd"),
+                CostUsd = a.Cost,
+                Tokens = a.Tokens,
+                Messages = a.Messages,
+                Sessions = v.Sessions,
+                ActiveMinutes = (int)Math.Round(v.Minutes),
+                FirstUtc = v.First == default ? null : v.First,
+                LastUtc = v.Last == default ? null : v.Last,
+            };
+        }).OrderBy(d => d.Date).ToList();
+    }
+
     private sealed record Agg(string Key, long Input, long Output, long Read, long W5, long W1, decimal Cost, int Count);
 
     private static SummaryBucket ToBucket(Agg a) => new()

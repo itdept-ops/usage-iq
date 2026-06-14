@@ -9,6 +9,45 @@ public readonly record struct UsageFilterQuery(
     string[]? source,
     bool? includeSidechain);
 
+public sealed class NotificationSettingDto
+{
+    public bool WebhookConfigured { get; set; }
+    public string? WebhookMasked { get; set; }
+    public bool Enabled { get; set; }
+    public int DigestHourLocal { get; set; }
+    public bool DailyDigest { get; set; }
+    public bool WeeklyDigest { get; set; }
+    public int WeeklyDay { get; set; }
+    public bool ThresholdEnabled { get; set; }
+    public decimal ThresholdUsd { get; set; }
+}
+
+public sealed class NotificationUpdateRequest
+{
+    /// <summary>null = leave unchanged · "" = clear · value = set (must be a valid Discord webhook).</summary>
+    public string? DiscordWebhookUrl { get; set; }
+    public bool Enabled { get; set; }
+    public int DigestHourLocal { get; set; }
+    public bool DailyDigest { get; set; }
+    public bool WeeklyDigest { get; set; }
+    public int WeeklyDay { get; set; }
+    public bool ThresholdEnabled { get; set; }
+    public decimal ThresholdUsd { get; set; }
+}
+
+/// <summary>One day in the usage calendar: spend, volume, and estimated active engagement time.</summary>
+public sealed class CalendarDayDto
+{
+    public string Date { get; set; } = "";        // yyyy-MM-dd (display timezone)
+    public decimal CostUsd { get; set; }
+    public long Tokens { get; set; }
+    public int Messages { get; set; }
+    public int Sessions { get; set; }
+    public int ActiveMinutes { get; set; }         // gap-based engaged time
+    public DateTime? FirstUtc { get; set; }
+    public DateTime? LastUtc { get; set; }
+}
+
 public class TokenTotals
 {
     public long InputTokens { get; set; }
