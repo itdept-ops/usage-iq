@@ -106,26 +106,34 @@ public class ProjectResolverTests
         name.Should().Be("src");
     }
 
+    // TopFolder uses System.IO.Path APIs, so it follows the running platform's path semantics.
+    // Build inputs off an absolute base with Path.Combine so these hold on both Windows and Linux CI
+    // (hardcoded "C:\..." backslash literals are not valid rooted paths on Linux).
+    private static readonly string Base = Path.GetTempPath();
+
     [Fact]
     public void TopFolder_returns_first_segment_relative_to_root()
     {
-        ProjectResolver.TopFolder(@"C:\root\projA\sub\file.jsonl", @"C:\root")
-            .Should().Be("projA");
+        var root = Path.Combine(Base, "root");
+        var file = Path.Combine(root, "projA", "sub", "file.jsonl");
+        ProjectResolver.TopFolder(file, root).Should().Be("projA");
     }
 
     [Fact]
     public void TopFolder_returns_file_name_when_directly_under_root()
     {
-        ProjectResolver.TopFolder(@"C:\root\file.jsonl", @"C:\root")
-            .Should().Be("file.jsonl");
+        var root = Path.Combine(Base, "root");
+        var file = Path.Combine(root, "file.jsonl");
+        ProjectResolver.TopFolder(file, root).Should().Be("file.jsonl");
     }
 
     [Fact]
     public void TopFolder_skips_parent_dot_dot_segments()
     {
-        // The file is outside the root, so GetRelativePath yields "..\..\other\projB\file.jsonl".
+        // The file is outside the root, so GetRelativePath yields a "../../other/projB/..." path.
         // Only ".." segments are skipped; the first real segment ("other") wins, not "projB".
-        ProjectResolver.TopFolder(@"C:\other\projB\file.jsonl", @"C:\root\nested")
-            .Should().Be("other");
+        var root = Path.Combine(Base, "root", "nested");
+        var file = Path.Combine(Base, "other", "projB", "file.jsonl");
+        ProjectResolver.TopFolder(file, root).Should().Be("other");
     }
 }
