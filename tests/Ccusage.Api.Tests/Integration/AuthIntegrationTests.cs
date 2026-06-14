@@ -166,4 +166,101 @@ public class AuthIntegrationTests(WebAppFactory factory) : IClassFixture<WebAppF
         // A different Google account presenting the same (now-bound) email is rejected.
         (await GoogleLogin($"{email}|sub-B")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
+
+    // ---- Request/response action log (middleware) ----
+
+    /// <summary>Polls /api/logs (logging is async) until an entry matches, or fails after a timeout.</summary>
+    private async Task<JsonElement> WaitForLog(HttpClient admin, Func<JsonElement, bool> match)
+    {
+        for (var i = 0; i < 50; i++) // ~7.5s
+        {
+            var logs = await (await admin.GetAsync("/api/logs?take=500")).Content.ReadFromJsonAsync<JsonElement>();
+            foreach (var e in logs.EnumerateArray())
+                if (match(e)) return e;
+            await Task.Delay(150);
+        }
+        throw new Xunit.Sdk.XunitException("Expected log entry did not appear in time.");
+    }
+
+    [Fact]
+    public async Task Requests_are_captured_in_the_action_log()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        await admin.GetAsync("/api/usage/summary?groupBy=day&marker=logcap");
+
+        var entry = await WaitForLog(admin, e =>
+            e.GetProperty("path").GetString() == "/api/usage/summary" &&
+            (e.GetProperty("queryString").GetString() ?? "").Contains("logcap"));
+
+        entry.GetProperty("method").GetString().Should().Be("GET");
+        entry.GetProperty("statusCode").GetInt32().Should().Be(200);
+        entry.GetProperty("userEmail").GetString().Should().Be(WebAppFactory.AdminEmail);
+        entry.GetProperty("durationMs").GetInt32().Should().BeGreaterThanOrEqualTo(0);
+    }
+
+    [Fact]
+    public async Task Action_log_is_gated_by_users_manage()
+    {
+        var email = $"viewer-logs-{Guid.NewGuid():N}@test.local";
+        await Client(WebAppFactory.AdminEmail).PostAsJsonAsync("/api/users",
+            new { email, isEnabled = true, permissions = new[] { "dashboard.view" } });
+
+        (await Client(email).GetAsync("/api/logs")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await Client().GetAsync("/api/logs")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Auth_route_bodies_are_redacted_in_the_log()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        await Client().PostAsJsonAsync("/api/auth/google", new { idToken = "should-not-be-stored" });
+
+        var entry = await WaitForLog(admin, e => e.GetProperty("path").GetString() == "/api/auth/google");
+        entry.GetProperty("requestBody").GetString().Should().Be("[redacted: auth route]");
+        // and the raw token must never appear anywhere in the entry
+        entry.GetRawText().Should().NotContain("should-not-be-stored");
+    }
+
+    [Fact]
+    public async Task Health_and_polling_routes_are_not_logged()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        await admin.GetAsync("/api/auth/me");
+        await admin.GetAsync("/api/sync/status");
+        await admin.GetAsync("/api/health");
+        await admin.GetAsync("/api/usage/summary?groupBy=day&marker=exclsync");
+
+        await WaitForLog(admin, e => (e.GetProperty("queryString").GetString() ?? "").Contains("exclsync"));
+
+        var logs = await (await admin.GetAsync("/api/logs?take=1000")).Content.ReadFromJsonAsync<JsonElement>();
+        var paths = logs.EnumerateArray().Select(e => e.GetProperty("path").GetString()).ToList();
+        paths.Should().NotContain("/api/auth/me");
+        paths.Should().NotContain("/api/sync/status");
+        paths.Should().NotContain("/api/health");
+        paths.Should().NotContain("/api/logs");
+    }
+
+    [Fact]
+    public async Task Response_bodies_are_captured()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        await admin.GetAsync("/api/permissions"); // returns the permission catalog JSON
+
+        var entry = await WaitForLog(admin, e => e.GetProperty("path").GetString() == "/api/permissions");
+        var body = entry.GetProperty("responseBody").GetString();
+        body.Should().NotBeNullOrEmpty();
+        body.Should().Contain("dashboard.view");
+    }
+
+    [Fact]
+    public async Task Query_string_secrets_are_redacted_in_the_log()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        await admin.GetAsync("/api/usage/summary?groupBy=day&access_token=QSECRET123&marker=qredact");
+
+        var entry = await WaitForLog(admin, e => (e.GetProperty("queryString").GetString() ?? "").Contains("qredact"));
+        var qs = entry.GetProperty("queryString").GetString()!;
+        qs.Should().NotContain("QSECRET123");
+        qs.Should().Contain("access_token=[redacted]");
+    }
 }

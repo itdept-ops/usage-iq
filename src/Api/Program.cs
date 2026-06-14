@@ -45,6 +45,10 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<SyncCoordinator>();
 builder.Services.AddHostedService<AutoSyncBackgroundService>();
 
+// Request/response action log: a bounded queue fed by middleware, drained by a background writer.
+builder.Services.AddSingleton<RequestLogQueue>();
+builder.Services.AddHostedService<RequestLogWriter>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -172,6 +176,9 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Outermost so the status it records is the final one (after the exception handler runs).
+app.UseMiddleware<RequestLoggingMiddleware>();
+
 app.UseExceptionHandler();
 
 // Swagger (full API schema) is dev-only — don't expose the API surface to anonymous callers in prod.
@@ -189,6 +196,7 @@ app.MapHealthChecks("/health/ready");
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
 app.MapApiEndpoints();
+app.MapObservabilityEndpoints();
 app.MapGet("/", () => app.Environment.IsDevelopment()
     ? Results.Redirect("/swagger")
     : Results.Ok(new { service = "Usage IQ API" }));

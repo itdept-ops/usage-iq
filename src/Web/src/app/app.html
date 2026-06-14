@@ -25,6 +25,7 @@
       <a mat-button class="nav__item" routerLink="/settings" routerLinkActive="active">Settings</a>
       @if (auth.hasPermission('users.manage')) {
         <a mat-button class="nav__item" routerLink="/users" routerLinkActive="active">Users</a>
+        <a mat-button class="nav__item" routerLink="/activity" routerLinkActive="active">Activity</a>
       }
     </nav>
   }

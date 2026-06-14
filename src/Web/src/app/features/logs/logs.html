@@ -1,0 +1,101 @@
+<div class="head">
+  <div class="head-text">
+    <span class="micro-label head-eyebrow">~/activity — request log</span>
+    <h2>Activity</h2>
+    <p class="sub">Every API request and response, captured by middleware. Bodies are truncated and
+      secrets/auth routes redacted; health and polling calls are skipped, and the newest ~10k are kept.</p>
+  </div>
+</div>
+
+<mat-card appearance="outlined" class="panel filter-card">
+  <div class="filter-row">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="f-method">
+      <mat-label>Method</mat-label>
+      <mat-select [ngModel]="method()" (ngModelChange)="method.set($event); load()">
+        <mat-option value="">All</mat-option>
+        @for (m of methods; track m) { <mat-option [value]="m">{{ m }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="f-status">
+      <mat-label>Status</mat-label>
+      <mat-select [ngModel]="status()" (ngModelChange)="status.set($event); load()">
+        @for (s of statuses; track s.v) { <mat-option [value]="s.v">{{ s.l }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="f-search">
+      <mat-label>Path contains</mat-label>
+      <input matInput class="mono-input" [ngModel]="q()" (ngModelChange)="q.set($event)"
+             (keyup.enter)="load()" placeholder="/api/usage" />
+    </mat-form-field>
+
+    <button mat-stroked-button class="f-refresh" (click)="load()">
+      <mat-icon>refresh</mat-icon> Refresh
+    </button>
+  </div>
+</mat-card>
+
+@if (loading()) { <mat-progress-bar mode="indeterminate" /> }
+
+<mat-card appearance="outlined" class="panel table-card">
+  <div class="panel-header">{{ logs().length }} requests</div>
+  <div class="table-scroll">
+    <table class="log-table">
+      <thead>
+        <tr>
+          <th class="c-when">Time</th>
+          <th class="c-method">Method</th>
+          <th class="c-path">Path</th>
+          <th class="c-status">Status</th>
+          <th class="c-dur">Duration</th>
+          <th class="c-user">User</th>
+          <th class="c-ip">IP</th>
+          <th class="c-exp"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of logs(); track r.id) {
+          <tr class="log-row" [class.open]="expandedId() === r.id" (click)="toggle(r.id)">
+            <td class="c-when mono-num">{{ r.whenUtc | date: 'HH:mm:ss' }}</td>
+            <td class="c-method"><span class="method-badge" [attr.data-m]="r.method">{{ r.method }}</span></td>
+            <td class="c-path mono-num">
+              <span class="path-txt">{{ r.path }}</span>
+              @if (r.queryString) { <span class="qs">{{ r.queryString }}</span> }
+            </td>
+            <td class="c-status"><span class="status-badge" [class]="statusClass(r.statusCode)">{{ r.statusCode }}</span></td>
+            <td class="c-dur mono-num">{{ r.durationMs }} ms</td>
+            <td class="c-user mono-num">{{ r.userEmail || '—' }}</td>
+            <td class="c-ip mono-num">{{ r.clientIp || '—' }}</td>
+            <td class="c-exp"><mat-icon>{{ expandedId() === r.id ? 'expand_less' : 'expand_more' }}</mat-icon></td>
+          </tr>
+          @if (expandedId() === r.id) {
+            <tr class="detail-row">
+              <td colspan="8">
+                <div class="detail">
+                  <div class="detail-meta mono-num">
+                    {{ r.whenUtc | date: 'MMM d, y HH:mm:ss' }} · {{ fmtBytes(r.requestBytes) }} in /
+                    {{ fmtBytes(r.responseBytes) }} out
+                  </div>
+                  <div class="bodies">
+                    <div class="body-col">
+                      <div class="body-label">Request body</div>
+                      <pre class="body">{{ pretty(r.requestBody) || '— none —' }}</pre>
+                    </div>
+                    <div class="body-col">
+                      <div class="body-label">Response body</div>
+                      <pre class="body">{{ pretty(r.responseBody) || '— none —' }}</pre>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          }
+        }
+        @if (!logs().length && !loading()) {
+          <tr><td colspan="8" class="empty">No requests logged yet — interact with the app, then refresh.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</mat-card>

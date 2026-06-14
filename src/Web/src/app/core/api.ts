@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AuditEntry, GroupBy, IngestionSource, ManagedUser, ModelStat, PagedResult, PermissionItem, Pricing, ProjectDto,
-  Settings, SummaryResponse, SyncResult, SyncStatus, UsageFilter, UsageRecord,
+  RequestLogEntry, Settings, SummaryResponse, SyncResult, SyncStatus, UsageFilter, UsageRecord,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -40,6 +40,15 @@ export class Api {
 
   auditLog(): Observable<AuditEntry[]> {
     return this.http.get<AuditEntry[]>(`${this.base}/audit`);
+  }
+
+  requestLogs(opts: { method?: string; status?: string; q?: string; take?: number } = {}): Observable<RequestLogEntry[]> {
+    let p = new HttpParams();
+    if (opts.method) p = p.set('method', opts.method);
+    if (opts.status) p = p.set('status', opts.status);
+    if (opts.q) p = p.set('q', opts.q);
+    p = p.set('take', opts.take ?? 200);
+    return this.http.get<RequestLogEntry[]>(`${this.base}/logs`, { params: p });
   }
 
   projects(): Observable<ProjectDto[]> {

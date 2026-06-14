@@ -138,6 +138,22 @@ export interface AuditEntry {
   detail: string | null;
 }
 
+export interface RequestLogEntry {
+  id: number;
+  whenUtc: string;
+  method: string;
+  path: string;
+  queryString: string | null;
+  statusCode: number;
+  durationMs: number;
+  userEmail: string | null;
+  clientIp: string | null;
+  requestBytes: number | null;
+  responseBytes: number | null;
+  requestBody: string | null;
+  responseBody: string | null;
+}
+
 /** Canonical permission keys (mirror of the backend catalog). */
 export const PERM = {
   dashboardView: 'dashboard.view',

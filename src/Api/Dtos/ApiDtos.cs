@@ -177,6 +177,23 @@ public sealed class AuditEntryDto
     public string? Detail { get; set; }
 }
 
+public sealed class RequestLogDto
+{
+    public long Id { get; set; }
+    public DateTime WhenUtc { get; set; }
+    public string Method { get; set; } = "";
+    public string Path { get; set; } = "";
+    public string? QueryString { get; set; }
+    public int StatusCode { get; set; }
+    public int DurationMs { get; set; }
+    public string? UserEmail { get; set; }
+    public string? ClientIp { get; set; }
+    public long? RequestBytes { get; set; }
+    public long? ResponseBytes { get; set; }
+    public string? RequestBody { get; set; }
+    public string? ResponseBody { get; set; }
+}
+
 public sealed class SyncStatusDto
 {
     public DateTime? LastSyncUtc { get; set; }

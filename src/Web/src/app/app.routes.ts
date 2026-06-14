@@ -33,5 +33,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/users/users').then(m => m.Users),
     title: 'Usage IQ · Users',
   },
+  {
+    path: 'activity',
+    canActivate: [permissionGuard(PERM.usersManage)],
+    loadComponent: () => import('./features/logs/logs').then(m => m.Logs),
+    title: 'Usage IQ · Activity',
+  },
   { path: '**', redirectTo: '' },
 ];

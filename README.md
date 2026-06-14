@@ -16,6 +16,8 @@ A self-hosted dashboard for **filtering and visualizing your AI coding-agent tok
 | ![Landing](docs/screenshots/landing.png) | ![Users](docs/screenshots/users.png) |
 | **Pricing** — editable per-model rates | **Settings** — sources, timezone, auto-sync |
 | ![Pricing](docs/screenshots/pricing.png) | ![Settings](docs/screenshots/settings.png) |
+| **Activity** — request/response action log |  |
+| ![Activity](docs/screenshots/activity.png) |  |
 
 ---
 
@@ -48,6 +50,7 @@ Each source is enable/disable-able with an editable path on the **Settings** pag
 - **One-click Sync** that incrementally re-reads only changed files.
 - **Background auto-sync** on a timer (a .NET hosted service) + a live **"Synced Xm ago"** status in the command bar.
 - **Audit log** of every user-management change — who did what, to whom, and when — on the Users page.
+- **Action log** — every API request & response captured by middleware (truncated, with auth routes / secret fields / query-string tokens redacted; health and polling skipped), browsable and filterable on an admin **Activity** page.
 
 ## How it handles the data correctly
 
@@ -145,6 +148,7 @@ The API container mounts `${CLAUDE_PROJECTS_PATH}` (from `.env`) read-only at `/
 | `GET` | `/api/usage/records` | Paged, sortable messages (same filters). |
 | `GET` | `/api/usage/records.csv` | Streamed CSV of the filtered rows (requires `dashboard.view`). |
 | `GET` | `/api/audit` | Recent user-management audit entries (requires `users.manage`). |
+| `GET` | `/api/logs` | Recent request/response action log; filter by `method`/`status`/`q` (requires `users.manage`). |
 | `GET` | `/api/projects`, `/api/models`, `/api/sources` | Filter options with totals. |
 | `GET` | `/api/health`, `/health/ready` | Liveness (anonymous) and readiness (DB connectivity) probes. |
 | `PUT` | `/api/sources/{id}` | Edit a source's path / enabled flag. |
@@ -184,7 +188,7 @@ usage-iq/
    │  ├─ Ingestion/          # JSONL parse, dedup, cost, project/timezone resolve
    │  ├─ Services/           # queries, recompute, sync coordinator, audit
    │  ├─ Auth/               # JWT, per-request permission filter
-   │  ├─ Infrastructure/     # global exception handler
+   │  ├─ Infrastructure/     # global exception handler, request-logging middleware
    │  └─ Endpoints/          # API surface
    └─ Web/                   # Angular 21 (standalone + signals, ECharts)
       └─ src/app/{features/{dashboard,pricing,settings,users,login},core,shared}

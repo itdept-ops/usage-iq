@@ -15,6 +15,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<RequestLog> RequestLogs => Set<RequestLog>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -126,6 +127,18 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.TargetEmail).HasMaxLength(256);
             e.Property(x => x.Detail).HasMaxLength(1024);
             e.HasIndex(x => x.WhenUtc);
+        });
+
+        b.Entity<RequestLog>(e =>
+        {
+            e.Property(x => x.WhenUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.Method).HasMaxLength(16);
+            e.Property(x => x.Path).HasMaxLength(2048);
+            e.Property(x => x.QueryString).HasMaxLength(4096);
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.ClientIp).HasMaxLength(64);
+            // Bodies are already truncated by the middleware; store as unbounded text.
+            e.HasIndex(x => x.Id).IsDescending(); // newest-first reads
         });
     }
 }
