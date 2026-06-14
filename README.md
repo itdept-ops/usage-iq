@@ -6,6 +6,17 @@ A self-hosted dashboard for **filtering and visualizing your AI coding-agent tok
 
 > Built with Angular 21 · .NET 9 · EF Core · PostgreSQL · Docker · ECharts.
 
+![Usage IQ dashboard](docs/screenshots/dashboard.png)
+
+## Screenshots
+
+|  |  |
+| --- | --- |
+| **Landing** — Google sign-in | **Users & permissions** — per-user matrix |
+| ![Landing](docs/screenshots/landing.png) | ![Users](docs/screenshots/users.png) |
+| **Pricing** — editable per-model rates | **Settings** — sources, timezone, auto-sync |
+| ![Pricing](docs/screenshots/pricing.png) | ![Settings](docs/screenshots/settings.png) |
+
 ---
 
 ## Why

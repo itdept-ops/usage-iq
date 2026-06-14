@@ -1,14 +1,17 @@
 import { Component, ElementRef, NgZone, afterNextRender, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { MatIconModule } from '@angular/material/icon';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/auth';
 
 declare const google: any;
 
+interface Feature { icon: string; title: string; text: string; }
+
 @Component({
   selector: 'app-login',
-  imports: [],
+  imports: [MatIconModule],
   templateUrl: './login.html',
   styleUrl: './login.scss',
 })
@@ -22,8 +25,14 @@ export class Login {
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
 
+  readonly features: Feature[] = [
+    { icon: 'hub', title: 'Multi-source', text: 'Claude Code and OpenAI Codex usage, de-duplicated and unified into one view.' },
+    { icon: 'insights', title: 'Cost & tokens', text: 'Break spend down by day, project, model, or session — with an editable pricing table.' },
+    { icon: 'shield_person', title: 'Role-based access', text: 'Google sign-in with per-user permissions, re-checked on every request.' },
+    { icon: 'sync', title: 'Always fresh', text: 'A background timer keeps usage in sync — the bar shows when it last ran.' },
+  ];
+
   constructor() {
-    // Already signed in? Skip the login page.
     if (this.auth.isAuthenticated()) {
       this.router.navigateByUrl(this.returnUrl());
       return;
