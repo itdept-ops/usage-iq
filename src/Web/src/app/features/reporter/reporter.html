@@ -1,0 +1,186 @@
+<div class="head">
+  <div class="head-text">
+    <span class="micro-label head-eyebrow">~/reporter — push usage from any machine</span>
+    <h2>Reporter</h2>
+    <p class="sub">Host this dashboard's API &amp; database anywhere, and stream usage from the machines where your
+      AI coding agents actually run. A small reporter parses the logs locally and pushes only token counts &amp;
+      metadata — never prompts or responses.</p>
+  </div>
+</div>
+
+<!-- Flow diagram -->
+<mat-card appearance="outlined" class="panel flow">
+  <div class="flow-row">
+    <div class="flow-node">
+      <mat-icon>computer</mat-icon>
+      <div class="flow-node-title">Your machine</div>
+      <div class="flow-node-sub">~/.claude · ~/.codex</div>
+    </div>
+    <div class="flow-arrow">
+      <span class="flow-arrow-line"></span>
+      <span class="flow-arrow-label">reporter · parses locally</span>
+      <mat-icon>arrow_forward</mat-icon>
+    </div>
+    <div class="flow-node">
+      <mat-icon>vpn_key</mat-icon>
+      <div class="flow-node-title">POST /api/ingest</div>
+      <div class="flow-node-sub">X-Ingest-Key · HTTPS</div>
+    </div>
+    <div class="flow-arrow">
+      <span class="flow-arrow-line"></span>
+      <span class="flow-arrow-label">prices · resolves · de-dupes</span>
+      <mat-icon>arrow_forward</mat-icon>
+    </div>
+    <div class="flow-node">
+      <mat-icon>cloud</mat-icon>
+      <div class="flow-node-title">Usage IQ</div>
+      <div class="flow-node-sub">API + Postgres</div>
+    </div>
+  </div>
+  <p class="flow-note">
+    <mat-icon>lock</mat-icon>
+    Only parsed usage (timestamps, model, token counts, project from <code>cwd</code>) leaves the machine.
+    The server stays authoritative — it prices, resolves the project and de-dupes — so re-runs are idempotent.
+  </p>
+</mat-card>
+
+<!-- Step 1 — key -->
+<mat-card appearance="outlined" class="panel step">
+  <div class="step-head"><span class="step-num">1</span><span class="panel-header">Generate an ingest key</span></div>
+  <p class="hint">A key authenticates one reporter. It's shown <strong>once</strong> and stored only as a hash —
+    copy it now. Revoke anytime; revocation takes effect on the reporter's next request.</p>
+
+  <div class="keygen">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="keygen-name">
+      <mat-label>Label (e.g. laptop, build-server)</mat-label>
+      <input matInput maxlength="64" placeholder="my-machine"
+             [ngModel]="newKeyName()" (ngModelChange)="newKeyName.set($event)" (keyup.enter)="generateKey()" />
+    </mat-form-field>
+    <button mat-flat-button color="primary" [disabled]="generatingKey()" (click)="generateKey()">
+      <mat-icon>vpn_key</mat-icon> {{ generatingKey() ? 'Generating…' : 'Generate key' }}
+    </button>
+  </div>
+
+  @if (freshKey(); as fk) {
+    <div class="fresh-key">
+      <div class="fk-head">
+        <mat-icon class="fk-icon">check_circle</mat-icon>
+        <span class="fk-title">New key “{{ fk.name }}” — copy it now, it won't be shown again.</span>
+        <span class="grow"></span>
+        <button mat-icon-button class="fk-x" aria-label="Dismiss" (click)="dismissFreshKey()"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="fk-row">
+        <code class="fk-value mono">{{ fk.key }}</code>
+        <button mat-stroked-button class="fk-copy" (click)="copyKey()">
+          <mat-icon>{{ copied() ? 'done' : 'content_copy' }}</mat-icon> {{ copied() ? 'Copied' : 'Copy' }}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (ingestKeys().length) {
+    <div class="key-list">
+      @for (k of ingestKeys(); track k.id) {
+        <div class="key-row" [class.revoked]="k.revoked">
+          <span class="key-dot" [class.off]="k.revoked"></span>
+          <span class="key-name">{{ k.name }}</span>
+          <code class="key-prefix mono">{{ k.prefix }}</code>
+          @if (k.revoked) { <span class="key-badge revoked">revoked</span> }
+          <span class="grow"></span>
+          <span class="key-meta micro-label">
+            @if (k.lastUsedUtc) {
+              used {{ k.lastUsedUtc | date: 'MMM d, HH:mm' }}@if (k.lastUsedIp) { · {{ k.lastUsedIp }}}
+            } @else {
+              never used
+            }
+          </span>
+          @if (!k.revoked) {
+            <button mat-button class="danger-btn key-revoke" (click)="revokeKey(k)">
+              <mat-icon>block</mat-icon> Revoke
+            </button>
+          }
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="key-empty micro-label">No ingest keys yet. Generate one above to connect a reporter.</div>
+  }
+</mat-card>
+
+<!-- Step 2 — get the reporter -->
+<mat-card appearance="outlined" class="panel step">
+  <div class="step-head"><span class="step-num">2</span><span class="panel-header">Get the reporter</span></div>
+  <p class="hint">The reporter is a small .NET 9 console app in the repo (<code>src/Reporter</code>). Build a release
+    binary, or run it straight from source — on the machine that has the Claude&nbsp;Code / Codex logs.</p>
+  <div class="cmd">
+    <code class="mono">git clone https://github.com/itdept-ops/usage-iq &amp;&amp; cd usage-iq
+dotnet build src/Reporter -c Release</code>
+    <button mat-icon-button class="cmd-copy" aria-label="Copy"
+            (click)="copy('git clone https://github.com/itdept-ops/usage-iq && cd usage-iq\ndotnet build src/Reporter -c Release', 'Commands copied')">
+      <mat-icon>content_copy</mat-icon>
+    </button>
+  </div>
+</mat-card>
+
+<!-- Step 3 — run it -->
+<mat-card appearance="outlined" class="panel step">
+  <div class="step-head"><span class="step-num">3</span><span class="panel-header">Run it</span></div>
+  <p class="hint">Point it at this server with the key from step&nbsp;1. By default it <strong>watches</strong> the
+    logs and pushes new usage continuously; pass <code>--once</code> for a single pass (e.g. from cron).</p>
+
+  <div class="cmd">
+    <code class="mono">{{ runCommand() }}</code>
+    <button mat-icon-button class="cmd-copy" aria-label="Copy" (click)="copy(runCommand(), 'Command copied')">
+      <mat-icon>content_copy</mat-icon>
+    </button>
+  </div>
+  <div class="cmd-alt micro-label">…or straight from source:</div>
+  <div class="cmd">
+    <code class="mono">{{ dotnetRunCommand() }}</code>
+    <button mat-icon-button class="cmd-copy" aria-label="Copy" (click)="copy(dotnetRunCommand(), 'Command copied')">
+      <mat-icon>content_copy</mat-icon>
+    </button>
+  </div>
+  @if (!freshKey()) {
+    <div class="cmd-tip micro-label"><mat-icon>info</mat-icon> Generate a key above to drop it straight into these commands.</div>
+  }
+
+  <div class="opts">
+    <div class="opt"><code class="mono">-u, --url</code><span>This server: <b class="mono">{{ serverUrl() }}</b> (required)</span></div>
+    <div class="opt"><code class="mono">-k, --key</code><span>Ingest key from step&nbsp;1 (required, secret)</span></div>
+    <div class="opt"><code class="mono">-m, --machine</code><span>Label this machine reports under (default: hostname)</span></div>
+    <div class="opt"><code class="mono">--claude-path</code><span>Claude logs dir (default <code>~/.claude/projects</code>)</span></div>
+    <div class="opt"><code class="mono">--codex-path</code><span>Codex logs dir (default <code>~/.codex</code>)</span></div>
+    <div class="opt"><code class="mono">--once</code><span>Single pass then exit (otherwise watches)</span></div>
+    <div class="opt"><code class="mono">--interval</code><span>Watch poll seconds, 5–3600 (default 60)</span></div>
+    <div class="opt"><code class="mono">--batch</code><span>Rows per request, 1–5000 (default 500)</span></div>
+  </div>
+</mat-card>
+
+<!-- Run as a service -->
+<mat-card appearance="outlined" class="panel step">
+  <div class="step-head"><span class="panel-header">Keep it running</span></div>
+  <p class="hint">Run the watcher under your OS service manager so it survives reboots, or schedule
+    <code>--once</code> on a timer. Config can also come from <code>REPORTER_*</code> env vars or an
+    <code>appsettings.json</code> next to the executable.</p>
+  <div class="svc-grid">
+    <div class="svc">
+      <div class="svc-title"><mat-icon>terminal</mat-icon> Linux (systemd)</div>
+      <code class="mono">[Service]
+Environment=REPORTER_URL={{ serverUrl() }}
+Environment=REPORTER_KEY=uiq_…
+ExecStart=/opt/usage-iq/usage-iq-reporter
+Restart=always</code>
+    </div>
+    <div class="svc">
+      <div class="svc-title"><mat-icon>schedule</mat-icon> Windows (Task Scheduler)</div>
+      <code class="mono">schtasks /create /tn "UsageIQ Reporter" /sc onlogon ^
+  /tr "usage-iq-reporter.exe --url {{ serverUrl() }} --key uiq_…"</code>
+    </div>
+    <div class="svc">
+      <div class="svc-title"><mat-icon>event_repeat</mat-icon> cron (hourly --once)</div>
+      <code class="mono">0 * * * * usage-iq-reporter \
+  --url {{ serverUrl() }} --key uiq_… --once</code>
+    </div>
+  </div>
+</mat-card>

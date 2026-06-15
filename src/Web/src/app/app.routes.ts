@@ -34,6 +34,12 @@ export const routes: Routes = [
     title: 'Usage IQ · Settings',
   },
   {
+    path: 'reporter',
+    canActivate: [permissionGuard(PERM.settingsManage)],
+    loadComponent: () => import('./features/reporter/reporter').then(m => m.ReporterPage),
+    title: 'Usage IQ · Reporter',
+  },
+  {
     path: 'users',
     canActivate: [permissionGuard(PERM.usersManage)],
     loadComponent: () => import('./features/users/users').then(m => m.Users),
