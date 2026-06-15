@@ -323,4 +323,87 @@ public class AuthIntegrationTests(WebAppFactory factory) : IClassFixture<WebAppF
         await admin.PutAsJsonAsync("/api/notifications", NotifBody("")); // clear
         (await admin.PostAsync("/api/notifications/test", null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
+
+    [Fact]
+    public async Task Snapshot_requires_a_configured_webhook()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        await admin.PutAsJsonAsync("/api/notifications", NotifBody("")); // clear
+        (await admin.PostAsync("/api/notifications/snapshot", null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Snapshot_requires_settings_manage()
+    {
+        var email = $"viewer-snap-{Guid.NewGuid():N}@test.local";
+        await Client(WebAppFactory.AdminEmail).PostAsJsonAsync("/api/users",
+            new { email, isEnabled = true, permissions = new[] { "dashboard.view" } });
+
+        (await Client(email).PostAsync("/api/notifications/snapshot", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Security_alerts_and_mention_round_trip()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        await admin.PutAsJsonAsync("/api/notifications", new
+        {
+            discordWebhookUrl = "https://discord.com/api/webhooks/55/sometoken",
+            enabled = true, digestHourLocal = 9, dailyDigest = false, weeklyDigest = false,
+            weeklyDay = 1, thresholdEnabled = false, thresholdUsd = 0,
+            securityAlerts = true, mentionOnAlert = "@here",
+        });
+
+        var dto = await (await admin.GetAsync("/api/notifications")).Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("securityAlerts").GetBoolean().Should().BeTrue();
+        dto.GetProperty("mentionOnAlert").GetString().Should().Be("@here");
+    }
+
+    [Fact]
+    public async Task Unprovisioned_google_login_is_not_audited()
+    {
+        // Reachable by any Google account (open self-signup), so it must NOT create audit rows.
+        var admin = Client(WebAppFactory.AdminEmail);
+        var email = $"ghost-audit-{Guid.NewGuid():N}@test.local";
+        (await GoogleLogin($"{email}|sub-x")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var audit = await (await admin.GetAsync("/api/audit")).Content.ReadFromJsonAsync<JsonElement>();
+        audit.EnumerateArray().ToList().Should().NotContain(e =>
+            e.GetProperty("action").GetString() == "auth.denied" &&
+            e.GetProperty("targetEmail").GetString() == email);
+    }
+
+    [Fact]
+    public async Task Disabled_user_google_login_is_audited()
+    {
+        var admin = Client(WebAppFactory.AdminEmail);
+        var email = $"disabled-audit-{Guid.NewGuid():N}@test.local";
+        var created = await admin.PostAsJsonAsync("/api/users",
+            new { email, isEnabled = true, permissions = new[] { "dashboard.view" } });
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        await admin.PutAsJsonAsync($"/api/users/{id}",
+            new { isEnabled = false, permissions = new[] { "dashboard.view" } });
+
+        (await GoogleLogin($"{email}|sub-d")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var audit = await (await admin.GetAsync("/api/audit")).Content.ReadFromJsonAsync<JsonElement>();
+        audit.EnumerateArray().ToList().Should().Contain(e =>
+            e.GetProperty("action").GetString() == "auth.denied" &&
+            e.GetProperty("targetEmail").GetString() == email);
+    }
+
+    [Fact]
+    public async Task Overlong_mention_is_clamped_not_500()
+    {
+        var res = await Client(WebAppFactory.AdminEmail).PutAsJsonAsync("/api/notifications", new
+        {
+            discordWebhookUrl = (string?)null, enabled = false, digestHourLocal = 9, dailyDigest = false,
+            weeklyDigest = false, weeklyDay = 1, thresholdEnabled = false, thresholdUsd = 0,
+            securityAlerts = false, mentionOnAlert = new string('x', 200),
+        });
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await res.Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("mentionOnAlert").GetString()!.Length.Should().BeLessThanOrEqualTo(64);
+    }
 }

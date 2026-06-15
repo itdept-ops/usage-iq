@@ -104,6 +104,10 @@ export class Api {
     return this.http.post<{ message: string }>(`${this.base}/notifications/test`, {});
   }
 
+  sendUsageSnapshot(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.base}/notifications/snapshot`, {});
+  }
+
   sync(): Observable<SyncResult> {
     return this.http.post<SyncResult>(`${this.base}/sync`, {});
   }

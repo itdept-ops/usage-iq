@@ -321,3 +321,6 @@ mat-slide-toggle {
   color: var(--tech-text-tertiary);
   &:hover { color: var(--tech-error, #ff5c6c); }
 }
+
+.notif-row .mention { width: 220px; }
+.notif-row .notif-hint { color: var(--tech-text-tertiary); }

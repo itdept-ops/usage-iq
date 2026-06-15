@@ -55,6 +55,7 @@ export class Settings {
   readonly webhookInput = signal('');
   readonly savingNotif = signal(false);
   readonly testingNotif = signal(false);
+  readonly sendingSnapshot = signal(false);
   readonly weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   /** newRecordsBySource as [name, count] pairs for the template. */
@@ -125,7 +126,8 @@ export class Settings {
     return {
       enabled: n.enabled, digestHourLocal: n.digestHourLocal, dailyDigest: n.dailyDigest,
       weeklyDigest: n.weeklyDigest, weeklyDay: n.weeklyDay,
-      thresholdEnabled: n.thresholdEnabled, thresholdUsd: n.thresholdUsd, ...over,
+      thresholdEnabled: n.thresholdEnabled, thresholdUsd: n.thresholdUsd,
+      securityAlerts: n.securityAlerts, mentionOnAlert: n.mentionOnAlert, ...over,
     };
   }
 
@@ -161,6 +163,17 @@ export class Settings {
       error: (e: HttpErrorResponse) => {
         this.testingNotif.set(false);
         this.snack.open(e.error?.message ?? 'Test failed', 'Dismiss', { duration: 5000 });
+      },
+    });
+  }
+
+  sendSnapshot(): void {
+    this.sendingSnapshot.set(true);
+    this.api.sendUsageSnapshot().subscribe({
+      next: r => { this.sendingSnapshot.set(false); this.snack.open(r.message, 'OK', { duration: 4000 }); },
+      error: (e: HttpErrorResponse) => {
+        this.sendingSnapshot.set(false);
+        this.snack.open(e.error?.message ?? 'Could not send snapshot', 'Dismiss', { duration: 5000 });
       },
     });
   }

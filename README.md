@@ -53,7 +53,7 @@ Each source is enable/disable-able with an editable path on the **Settings** pag
 - **Background auto-sync** on a timer (a .NET hosted service) + a live **"Synced Xm ago"** status in the command bar.
 - **Audit log** of every user-management change — who did what, to whom, and when — on the Users page.
 - **Action log** — every API request & response captured by middleware (truncated, with auth routes / secret fields / query-string tokens redacted; health and polling skipped), browsable and filterable on an admin **Activity** page.
-- **Discord notifications** — post daily/weekly spend digests and a daily spend-threshold alert to a channel via an incoming webhook (configured in Settings; URL validated to genuine Discord hosts, stored masked, redacted from the action log).
+- **Discord notifications** — daily/weekly spend digests (with **trend ▲▼** vs the previous period and a **top project/model breakdown**), a daily spend-threshold alert, **security alerts** (user changes + denied sign-ins), an on-demand **"send usage now"** snapshot (today / 7d / month / all-time), and optional **@here/role mentions** on critical alerts — all via an incoming webhook (validated to genuine Discord hosts, redirects refused, stored masked, redacted from the action log).
 
 ## How it handles the data correctly
 
@@ -151,7 +151,7 @@ The API container mounts `${CLAUDE_PROJECTS_PATH}` (from `.env`) read-only at `/
 | `GET` | `/api/usage/records` | Paged, sortable messages (same filters). |
 | `GET` | `/api/usage/records.csv` | Streamed CSV of the filtered rows (requires `dashboard.view`). |
 | `GET` | `/api/usage/calendar` | Per-day cost/tokens/messages + estimated active minutes & sessions. |
-| `GET` / `PUT` / `POST` | `/api/notifications`, `/api/notifications/test` | Discord webhook config + test (requires `settings.manage`). |
+| `GET` / `PUT` / `POST` | `/api/notifications`, `/api/notifications/test`, `/api/notifications/snapshot` | Discord webhook config + test + send-now snapshot (requires `settings.manage`). |
 | `GET` | `/api/audit` | Recent user-management audit entries (requires `users.manage`). |
 | `GET` | `/api/logs` | Recent request/response action log; filter by `method`/`status`/`q` (requires `users.manage`). |
 | `GET` | `/api/projects`, `/api/models`, `/api/sources` | Filter options with totals. |

@@ -136,12 +136,26 @@
         </mat-form-field>
       </div>
 
+      <div class="notif-row">
+        <mat-slide-toggle [ngModel]="n.securityAlerts" (ngModelChange)="patchNotif('securityAlerts', $event)">Security alerts</mat-slide-toggle>
+        <span class="notif-hint micro-label">User changes &amp; denied sign-ins → Discord</span>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mention">
+          <mat-label>Mention on alerts</mat-label>
+          <input matInput class="mono-input" placeholder="@here or <@&roleId>" maxlength="64"
+                 [ngModel]="n.mentionOnAlert" (ngModelChange)="patchNotif('mentionOnAlert', $event)" />
+          <mat-hint>Pings on threshold/security alerts only.</mat-hint>
+        </mat-form-field>
+      </div>
+
       <div class="actions">
         <button mat-flat-button color="primary" [disabled]="savingNotif()" (click)="saveNotif()">
           <mat-icon>save</mat-icon> {{ savingNotif() ? 'Saving…' : 'Save' }}
         </button>
         <button mat-stroked-button [disabled]="testingNotif() || !n.webhookConfigured" (click)="testNotif()">
           <mat-icon>send</mat-icon> {{ testingNotif() ? 'Sending…' : 'Send test' }}
+        </button>
+        <button mat-stroked-button [disabled]="sendingSnapshot() || !n.webhookConfigured" (click)="sendSnapshot()">
+          <mat-icon>insights</mat-icon> {{ sendingSnapshot() ? 'Sending…' : 'Send usage now' }}
         </button>
         @if (n.webhookConfigured) {
           <button mat-button class="danger-btn" [disabled]="savingNotif()" (click)="removeWebhook()">

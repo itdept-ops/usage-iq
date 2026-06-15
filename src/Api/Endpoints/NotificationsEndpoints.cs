@@ -40,6 +40,13 @@ public static class NotificationsEndpoints
             s.WeeklyDay = Math.Clamp(req.WeeklyDay, 0, 6);
             s.ThresholdEnabled = req.ThresholdEnabled;
             s.ThresholdUsd = Math.Max(0, req.ThresholdUsd);
+            var mention = req.MentionOnAlert?.Trim();
+            s.MentionOnAlert = string.IsNullOrEmpty(mention) ? null : (mention.Length > 64 ? mention[..64] : mention);
+
+            // When security alerts are turned ON, baseline to the newest audit id so existing history isn't replayed.
+            if (req.SecurityAlerts && !s.SecurityAlerts)
+                s.LastAuditAlertId = await db.AuditEntries.MaxAsync(a => (long?)a.Id, ct) ?? 0;
+            s.SecurityAlerts = req.SecurityAlerts;
 
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToDto(s));
@@ -56,6 +63,23 @@ public static class NotificationsEndpoints
                 : Results.Json(new { message = "Discord rejected the message — double-check the webhook URL." },
                     statusCode: StatusCodes.Status502BadGateway);
         }).RequireRateLimiting("notif-test");
+
+        // Post a current-usage snapshot (today / 7d / month / all-time) to Discord on demand.
+        g.MapPost("/snapshot", async (UsageDbContext db, DiscordNotifier notifier, CancellationToken ct) =>
+        {
+            var s = await db.NotificationSettings.AsNoTracking().FirstOrDefaultAsync(ct);
+            if (s is null || !DiscordNotifier.IsValidWebhook(s.DiscordWebhookUrl))
+                return Results.BadRequest(new { message = "Save a valid Discord webhook URL first." });
+
+            var tzId = (await db.AppConfigs.AsNoTracking().FirstOrDefaultAsync(ct))?.DisplayTimeZone;
+            var tz = ResolveTz(tzId);
+            var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, tz).DateTime);
+
+            return await notifier.SendSnapshotAsync(s.DiscordWebhookUrl!, today, ct)
+                ? Results.Ok(new { message = "Usage snapshot sent to Discord." })
+                : Results.Json(new { message = "Discord rejected the message — double-check the webhook URL." },
+                    statusCode: StatusCodes.Status502BadGateway);
+        }).RequireRateLimiting("notif-test");
     }
 
     private static NotificationSettingDto ToDto(NotificationSetting s) => new()
@@ -69,6 +93,8 @@ public static class NotificationsEndpoints
         WeeklyDay = s.WeeklyDay,
         ThresholdEnabled = s.ThresholdEnabled,
         ThresholdUsd = s.ThresholdUsd,
+        SecurityAlerts = s.SecurityAlerts,
+        MentionOnAlert = s.MentionOnAlert,
     };
 
     private static string? Mask(string? url)
@@ -76,5 +102,12 @@ public static class NotificationsEndpoints
         if (string.IsNullOrEmpty(url)) return null;
         var tail = url.Length <= 4 ? url : url[^4..];
         return $"discord.com/api/webhooks/…{tail}";
+    }
+
+    private static TimeZoneInfo ResolveTz(string? tzId)
+    {
+        if (string.IsNullOrWhiteSpace(tzId)) return TimeZoneInfo.Utc;
+        try { return TimeZoneInfo.FindSystemTimeZoneById(tzId); }
+        catch { return TimeZoneInfo.Utc; }
     }
 }

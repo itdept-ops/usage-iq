@@ -148,6 +148,8 @@ export interface NotificationSettings {
   weeklyDay: number;
   thresholdEnabled: boolean;
   thresholdUsd: number;
+  securityAlerts: boolean;
+  mentionOnAlert: string | null;
 }
 
 export interface NotificationUpdate {
@@ -159,6 +161,8 @@ export interface NotificationUpdate {
   weeklyDay: number;
   thresholdEnabled: boolean;
   thresholdUsd: number;
+  securityAlerts: boolean;
+  mentionOnAlert: string | null;
 }
 
 export interface CalendarDay {

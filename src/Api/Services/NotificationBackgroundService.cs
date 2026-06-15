@@ -1,4 +1,5 @@
 using Ccusage.Api.Data;
+using Ccusage.Api.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ccusage.Api.Services;
@@ -40,24 +41,23 @@ public sealed class NotificationBackgroundService(
         // that day rather than dropping the digest forever; this also makes a non-existent DST hour harmless.
         // The guard only advances on a *successful* send, so a transient Discord/DB failure retries next tick.
 
-        // Daily digest → the previous full day, at most once per day.
+        // Daily digest → the previous full day, with a trend vs the day before.
         if (s.DailyDigest && s.LastDailySent != today && nowLocal.Hour >= s.DigestHourLocal)
         {
             var day = today.AddDays(-1);
-            var sum = await notifier.SummarizeAsync(day, day, ct);
-            // No activity → nothing to post, but still mark done so we don't re-summarize every minute.
-            var done = sum.Messages == 0 || await notifier.SendDigestAsync(url, $"Daily usage — {day:MMM d}", sum, ct);
+            var d = await notifier.BuildDigestAsync(day, day, day.AddDays(-1), day.AddDays(-1), ct);
+            var done = d.Messages == 0 || await notifier.SendDigestAsync(url, $"Daily usage — {day:MMM d}", d, ct);
             if (done) { s.LastDailySent = today; await db.SaveChangesAsync(ct); }
         }
 
-        // Weekly digest → previous 7 days, on the configured weekday, at most once that day.
+        // Weekly digest → previous 7 days, with a trend vs the 7 days before that.
         if (s.WeeklyDigest && (int)nowLocal.DayOfWeek == s.WeeklyDay
             && s.LastWeeklySent != today && nowLocal.Hour >= s.DigestHourLocal)
         {
             var from = today.AddDays(-7);
             var to = today.AddDays(-1);
-            var sum = await notifier.SummarizeAsync(from, to, ct);
-            var done = sum.Messages == 0 || await notifier.SendDigestAsync(url, $"Weekly usage — {from:MMM d}–{to:MMM d}", sum, ct);
+            var d = await notifier.BuildDigestAsync(from, to, from.AddDays(-7), from.AddDays(-1), ct);
+            var done = d.Messages == 0 || await notifier.SendDigestAsync(url, $"Weekly usage — {from:MMM d}–{to:MMM d}", d, ct);
             if (done) { s.LastWeeklySent = today; await db.SaveChangesAsync(ct); }
         }
 
@@ -66,12 +66,36 @@ public sealed class NotificationBackgroundService(
         {
             var sum = await notifier.SummarizeAsync(today, today, ct);
             if (sum.Cost >= s.ThresholdUsd
-                && await notifier.SendThresholdAsync(url, today, sum.Cost, s.ThresholdUsd, ct))
+                && await notifier.SendThresholdAsync(url, today, sum.Cost, s.ThresholdUsd, s.MentionOnAlert, ct))
             {
                 s.LastThresholdSent = today;
                 await db.SaveChangesAsync(ct);
             }
         }
+
+        // Security alerts → forward audit entries created since the last forwarded id.
+        if (s.SecurityAlerts)
+            await ForwardSecurityAsync(db, notifier, s, url, ct);
+    }
+
+    private static async Task ForwardSecurityAsync(
+        UsageDbContext db, DiscordNotifier notifier, NotificationSetting s, string url, CancellationToken ct)
+    {
+        // The baseline (LastAuditAlertId) is set when security alerts are turned on, so history isn't replayed.
+        var newEntries = await db.AuditEntries.AsNoTracking()
+            .Where(a => a.Id > s.LastAuditAlertId).OrderBy(a => a.Id).Take(20).ToListAsync(ct);
+        if (newEntries.Count == 0) return;
+
+        foreach (var e in newEntries)
+        {
+            // Never let an auth.* event carry the @everyone/@here mention — those can be triggered by
+            // outside parties; reserve pings for admin-initiated user.* management changes.
+            var mention = e.Action.StartsWith("auth.", StringComparison.Ordinal) ? null : s.MentionOnAlert;
+            if (!await notifier.SendSecurityAsync(url, e.Action, e.ActorEmail, e.TargetEmail, e.Detail, mention, ct))
+                break; // stop on failure; retry from here next tick
+            s.LastAuditAlertId = e.Id;
+        }
+        await db.SaveChangesAsync(ct);
     }
 
     private static async Task<TimeZoneInfo> ResolveTzAsync(UsageDbContext db, CancellationToken ct)

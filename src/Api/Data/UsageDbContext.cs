@@ -145,6 +145,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
         b.Entity<NotificationSetting>(e =>
         {
             e.Property(x => x.DiscordWebhookUrl).HasMaxLength(512);
+            e.Property(x => x.MentionOnAlert).HasMaxLength(64);
             e.Property(x => x.ThresholdUsd).HasPrecision(18, 2);
             e.HasData(new NotificationSetting { Id = 1 });
         });

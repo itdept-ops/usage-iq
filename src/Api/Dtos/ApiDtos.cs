@@ -20,6 +20,8 @@ public sealed class NotificationSettingDto
     public int WeeklyDay { get; set; }
     public bool ThresholdEnabled { get; set; }
     public decimal ThresholdUsd { get; set; }
+    public bool SecurityAlerts { get; set; }
+    public string? MentionOnAlert { get; set; }
 }
 
 public sealed class NotificationUpdateRequest
@@ -33,6 +35,8 @@ public sealed class NotificationUpdateRequest
     public int WeeklyDay { get; set; }
     public bool ThresholdEnabled { get; set; }
     public decimal ThresholdUsd { get; set; }
+    public bool SecurityAlerts { get; set; }
+    public string? MentionOnAlert { get; set; }
 }
 
 /// <summary>One day in the usage calendar: spend, volume, and estimated active engagement time.</summary>

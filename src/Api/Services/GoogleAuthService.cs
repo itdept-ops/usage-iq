@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Ccusage.Api.Data;
+using Ccusage.Api.Data.Entities;
 using Ccusage.Api.Dtos;
 using Google.Apis.Auth;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +51,11 @@ public sealed class GoogleAuthService(
         if (user is null || !user.IsEnabled)
         {
             logger.LogWarning("Sign-in denied for {Email} (not provisioned or disabled).", email);
+            // Only audit denials for KNOWN accounts (a disabled user). "Not provisioned" attempts are
+            // reachable by ANY Google account (open self-signup), so auditing them would let an outside
+            // party flood the log (and any forwarded security alert).
+            if (user is not null)
+                await AuditDenialAsync(email, "account disabled", ct);
             return new SignInResult(SignInStatus.Forbidden, null, email, payload.Name);
         }
 
@@ -64,6 +70,7 @@ public sealed class GoogleAuthService(
         {
             logger.LogWarning(
                 "Sign-in denied for {Email}: Google subject mismatch (account is bound to a different Google id).", email);
+            await AuditDenialAsync(email, "Google id mismatch", ct);
             return new SignInResult(SignInStatus.Forbidden, null, email, payload.Name);
         }
 
@@ -84,6 +91,20 @@ public sealed class GoogleAuthService(
             ExpiresAtUtc = expires,
             Permissions = permissions,
         }, email, user.Name);
+    }
+
+    /// <summary>Record a denied sign-in in the audit log (a security signal; also forwarded to Discord if enabled).</summary>
+    private async Task AuditDenialAsync(string email, string reason, CancellationToken ct)
+    {
+        db.AuditEntries.Add(new AuditEntry
+        {
+            WhenUtc = DateTime.UtcNow,
+            ActorEmail = email,
+            Action = "auth.denied",
+            TargetEmail = email,
+            Detail = reason,
+        });
+        await db.SaveChangesAsync(ct);
     }
 
     private (string Jwt, DateTime Expires) IssueToken(string? subject, string email, string name, string? picture)
