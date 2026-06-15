@@ -75,6 +75,20 @@
     <button mat-button class="qr-chip" [class.active]="activePreset() === p.key" (click)="setDatePreset(p.key)">{{ p.label }}</button>
   }
   <span class="qr-grow"></span>
+  @if (sources().length) {
+    <button mat-stroked-button class="qr-export" matTooltip="Open a small live stats window to screen-share or capture"
+            [matMenuTriggerFor]="popMenu">
+      <mat-icon>open_in_new</mat-icon> Pop-out
+    </button>
+    <mat-menu #popMenu="matMenu">
+      @for (s of sources(); track s.id) {
+        <button mat-menu-item (click)="popOut(s.name)">
+          <mat-icon>{{ s.kind === 'codex' ? 'terminal' : 'auto_awesome' }}</mat-icon>
+          <span>{{ s.kind === 'codex' ? 'Codex' : (s.kind === 'claude' ? 'Claude' : s.name) }}</span>
+        </button>
+      }
+    </mat-menu>
+  }
   <button mat-stroked-button class="qr-export" matTooltip="Copy a shareable link to this filtered view" (click)="copyShareLink()">
     <mat-icon>link</mat-icon> Copy link
   </button>

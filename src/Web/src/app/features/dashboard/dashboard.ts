@@ -10,6 +10,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTableModule } from '@angular/material/table';
@@ -30,7 +31,7 @@ import { CompactPipe } from '../../shared/format';
   selector: 'app-dashboard',
   imports: [
     CommonModule, FormsModule, RouterLink,
-    MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule,
+    MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatMenuModule,
     MatButtonToggleModule, MatSlideToggleModule, MatTableModule, MatPaginatorModule, MatSortModule,
     MatProgressBarModule, MatIconModule, MatTooltipModule, MatSnackBarModule,
     ChartComponent, CompactPipe,
@@ -113,6 +114,11 @@ export class Dashboard {
   /** Mirror the current view into the URL (replace, so it doesn't spam history). */
   private syncUrl(): void {
     this.router.navigate([], { relativeTo: this.route, queryParams: this.shareParams(), replaceUrl: true });
+  }
+
+  /** Open a small, chrome-less stats window for one source — sized for screen-share/capture. */
+  popOut(source: string): void {
+    window.open(`/widget/${encodeURIComponent(source)}`, `uiq-widget-${source}`, 'popup,width=440,height=360');
   }
 
   copyShareLink(): void {

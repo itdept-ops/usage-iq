@@ -266,6 +266,13 @@
   padding: var(--tech-page-gutter, 24px) var(--tech-page-gutter, 24px) 56px;
 }
 
+/* Pop-out widget windows render edge-to-edge with no page chrome. */
+.content--bare {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 /* ---- Responsive ---------------------------------------------------- */
 @media (max-width: 720px) {
   .brand__prompt {

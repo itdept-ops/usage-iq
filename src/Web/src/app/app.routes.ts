@@ -45,5 +45,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/logs/logs').then(m => m.Logs),
     title: 'Usage IQ · Activity',
   },
+  {
+    path: 'widget/:source',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/widget/widget').then(m => m.Widget),
+    title: 'Usage IQ · Widget',
+  },
   { path: '**', redirectTo: '' },
 ];

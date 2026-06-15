@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { timer, switchMap, catchError, of, filter } from 'rxjs';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -29,6 +29,9 @@ export class App {
 
   readonly status = signal<SyncStatus | null>(null);
   private readonly now = signal(Date.now());
+
+  /** Pop-out widget routes render bare (no toolbar / page chrome) so they capture cleanly. */
+  readonly isWidget = signal(this.router.url.startsWith('/widget'));
 
   readonly state = computed(() => {
     const s = this.status();
@@ -66,6 +69,10 @@ export class App {
   });
 
   constructor() {
+    this.router.events
+      .pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed())
+      .subscribe(() => this.isWidget.set(this.router.url.startsWith('/widget')));
+
     // Poll sync status only when signed in; "now" keeps the relative label fresh.
     timer(0, 15000)
       .pipe(

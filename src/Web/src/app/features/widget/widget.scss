@@ -1,0 +1,65 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 10px;
+  background: var(--tech-bg, #0b0f17);
+  color: var(--tech-text, #e6edf6);
+  font-family: var(--tech-font-ui, system-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: var(--tech-font-mono, ui-monospace, monospace); }
+
+.w-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 10px;
+
+  .w-dot { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+  .w-title { font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; font-size: 13px; }
+  .w-grow { flex: 1 1 auto; }
+  .w-total { font-weight: 700; font-size: 14px; color: var(--tech-text); }
+}
+
+.w-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.w-card {
+  flex: 1 1 150px;
+  min-width: 148px;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  background: var(--tech-panel-raised, #141a24);
+  border: 1px solid var(--tech-border, #26303f);
+  border-left: 3px solid var(--tech-border, #26303f);
+  border-radius: 10px;
+}
+
+.w-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+
+  .w-mdot { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; }
+  .w-model {
+    font-weight: 700; font-size: 11.5px; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--tech-text); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .w-cost { margin-left: auto; font-weight: 700; font-size: 13px; color: var(--tech-text); }
+}
+
+.w-row {
+  display: flex; align-items: baseline; justify-content: space-between; line-height: 1.4;
+
+  .w-k { font-size: 10px; letter-spacing: 0.1em; color: var(--tech-text-tertiary, #5e6c82); }
+  .w-v { font-size: 15px; font-weight: 600; color: var(--tech-text); }
+}
+
+.w-foot { margin-top: 6px; font-size: 11px; color: var(--tech-text-secondary, #9ba9bd); }
+
+.w-sync { margin-top: 10px; padding-right: 4px; text-align: right; font-size: 10px; color: var(--tech-text-tertiary, #5e6c82); }
+
+.w-empty { padding: 28px 12px; text-align: center; color: var(--tech-text-tertiary, #5e6c82); font-size: 13px; }

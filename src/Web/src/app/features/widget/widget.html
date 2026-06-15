@@ -1,0 +1,31 @@
+<div class="w-head">
+  <span class="w-dot" [style.background]="companyColor()"></span>
+  <span class="w-title">{{ label() }}</span>
+  <span class="w-grow"></span>
+  @if (total(); as t) {
+    <span class="w-total mono">{{ t.costUsd | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
+  }
+</div>
+
+@if (loading()) {
+  <div class="w-empty">Loading…</div>
+} @else if (!models().length) {
+  <div class="w-empty">No usage yet for {{ label() }}.</div>
+} @else {
+  <div class="w-grid">
+    @for (m of models(); track m.key) {
+      <div class="w-card" [style.border-left-color]="modelColor(m.key)">
+        <div class="w-card-head">
+          <span class="w-mdot" [style.background]="modelColor(m.key)"></span>
+          <span class="w-model">{{ prettyModel(m.key) }}</span>
+          <span class="w-cost mono">{{ m.costUsd | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
+        </div>
+        <div class="w-row"><span class="w-k">IN</span><span class="w-v mono">{{ inTokens(m) | number }}</span></div>
+        <div class="w-row"><span class="w-k">OUT</span><span class="w-v mono">{{ m.outputTokens | number }}</span></div>
+        <div class="w-foot mono">{{ m.records | number }} calls</div>
+      </div>
+    }
+  </div>
+}
+
+<div class="w-sync mono">{{ syncLabel() }}</div>

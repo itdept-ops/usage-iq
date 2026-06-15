@@ -18,6 +18,8 @@ A self-hosted dashboard for **filtering and visualizing your AI coding-agent tok
 | ![Pricing](docs/screenshots/pricing.png) | ![Settings](docs/screenshots/settings.png) |
 | **Activity** — request/response action log | **Calendar** — daily heatmap + active hours |
 | ![Activity](docs/screenshots/activity.png) | ![Calendar](docs/screenshots/calendar.png) |
+| **Pop-out widget** — Claude | **Pop-out widget** — Codex |
+| ![Claude widget](docs/screenshots/widget-claude.png) | ![Codex widget](docs/screenshots/widget-codex.png) |
 
 ---
 
@@ -44,6 +46,7 @@ Each source is enable/disable-able with an editable path on the **Settings** pag
 - **Quick date presets** — last 7 / 30 / 90 days, month-to-date, or all-time — alongside explicit from/to.
 - **Shareable views** — the active filters are encoded in the URL (deep-linkable, restored on load) with a one-click **Copy link**.
 - **Usage calendar** — a GitHub-style heatmap (cost / tokens / **active hours**) with estimated time-spent-with-AI per day (gap-based sessionization), busiest-day and session stats.
+- **Pop-out stat widgets** — small, chrome-less per-company windows (Claude / Codex) showing each model's cost + IN/OUT tokens + calls, auto-refreshing on sync — sized for screen-share or capture.
 - **Group** the time series by day, month, project, model, source, or session.
 - **Cost in USD** from an **editable per-model pricing table** (5m / 1h cache-write and cache-read tiers priced separately).
 - **Charts**: usage-over-time (cost + tokens), top-N by dimension, and a cost-by-model donut (ECharts).
