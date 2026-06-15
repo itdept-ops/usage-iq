@@ -135,31 +135,7 @@ public sealed class JsonlIngestionService(UsageDbContext db, ILogger<JsonlIngest
                 projectIdByRoot[repoRoot] = projectId;
             }
 
-            var tsUtc = DateTime.SpecifyKind(pu.TimestampUtc, DateTimeKind.Utc);
-            pending.Add(new UsageRecord
-            {
-                Source = source.Name,
-                MessageId = pu.DedupKey.Length > 128 ? pu.DedupKey[..128] : pu.DedupKey,
-                RequestId = null,
-                DedupKey = pu.DedupKey,
-                TimestampUtc = tsUtc,
-                LocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(tsUtc, tz)),
-                Model = pu.Model,
-                InputTokens = ToInt(pu.Input),
-                OutputTokens = ToInt(pu.Output),
-                CacheReadTokens = pu.CacheRead,
-                CacheCreation5mTokens = ToInt(pu.Cache5m),
-                CacheCreation1hTokens = ToInt(pu.Cache1h),
-                SessionId = pu.SessionId,
-                ProjectId = projectId,
-                Cwd = cwd,
-                GitBranch = pu.GitBranch,
-                IsSidechain = pu.IsSidechain,
-                AgentId = pu.AgentId,
-                Version = pu.Version,
-                CostUsd = pricing.Cost(pu.Model, pu.Input, pu.Output, pu.CacheRead, pu.Cache5m, pu.Cache1h),
-                IngestedFileId = fileId,
-            });
+            pending.Add(UsageRecordMapper.Map(pu, source.Name, cwd, projectId, fileId, tz, pricing));
             result.NewRecordsBySource[source.Name] = result.NewRecordsBySource.GetValueOrDefault(source.Name) + 1;
 
             if (pending.Count >= BatchSize) await FlushAsync(pending, result, ct);
@@ -180,8 +156,6 @@ public sealed class JsonlIngestionService(UsageDbContext db, ILogger<JsonlIngest
 
     private static bool ShouldSkip(string path) =>
         SkipSegments.Any(seg => path.Contains(seg, StringComparison.OrdinalIgnoreCase));
-
-    private static int ToInt(long v) => (int)Math.Clamp(v, 0, int.MaxValue);
 
     private TimeZoneInfo ResolveTimeZone(string id, SyncResult result)
     {

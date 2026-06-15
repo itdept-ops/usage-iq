@@ -39,6 +39,7 @@ builder.Services.AddDbContext<UsageDbContext>(o => o
         CoreEventId.FirstWithoutOrderByAndFilterWarning,
         CoreEventId.RowLimitingOperationWithoutOrderByWarning)));
 builder.Services.AddScoped<JsonlIngestionService>();
+builder.Services.AddScoped<IngestWriteService>();
 builder.Services.AddScoped<CostRecomputeService>();
 builder.Services.AddScoped<UsageQueries>();
 builder.Services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
@@ -126,6 +127,12 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("share", http => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 60, QueueLimit = 0 }));
+    // Reporter ingest is key-authenticated but anonymous at the HTTP layer; cap per-IP generously so a
+    // first-run backfill (the reporter coalesces rows across files into ~rows/batchSize requests) sails
+    // through, while brute-forcing a 256-bit key stays futile.
+    o.AddPolicy("ingest", http => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 600, QueueLimit = 0 }));
 });
 
 var app = builder.Build();
@@ -229,6 +236,20 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
+// Cap the ingest request body BEFORE it is buffered/deserialized (model binding runs before the
+// ingest-key endpoint filter, so without this an unauthenticated caller could force a large parse).
+// Sized to a max 5000-row batch with headroom; every other route keeps Kestrel's default limit.
+app.Use(async (ctx, next) =>
+{
+    if (HttpMethods.IsPost(ctx.Request.Method)
+        && string.Equals(ctx.Request.Path.Value, "/api/ingest", StringComparison.OrdinalIgnoreCase))
+    {
+        var feat = ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+        if (feat is { IsReadOnly: false }) feat.MaxRequestBodySize = 4 * 1024 * 1024;
+    }
+    await next();
+});
+
 app.MapHealthChecks("/health/ready");
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
@@ -236,6 +257,7 @@ app.MapApiEndpoints();
 app.MapObservabilityEndpoints();
 app.MapNotificationsEndpoints();
 app.MapShareEndpoints();
+app.MapIngestEndpoints();
 app.MapGet("/", () => app.Environment.IsDevelopment()
     ? Results.Redirect("/swagger")
     : Results.Ok(new { service = "Usage IQ API" }));

@@ -20,7 +20,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
-  IngestionSource, NotificationSettings, NotificationUpdate, Settings as SettingsModel, SyncResult, SyncStatus, PERM,
+  IngestionSource, IngestKey, IngestKeyCreated, NotificationSettings, NotificationUpdate,
+  Settings as SettingsModel, SyncResult, SyncStatus, PERM,
 } from '../../core/models';
 import { timeAgo, humanizeInterval } from '../../shared/format';
 
@@ -57,6 +58,14 @@ export class Settings {
   readonly testingNotif = signal(false);
   readonly sendingSnapshot = signal(false);
   readonly weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  // ---- Ingest keys (reporter credentials) ----
+  readonly ingestKeys = signal<IngestKey[]>([]);
+  readonly newKeyName = signal('');
+  readonly generatingKey = signal(false);
+  /** The most recently generated key — shown once, then dismissed (never re-fetchable). */
+  readonly freshKey = signal<IngestKeyCreated | null>(null);
+  readonly copied = signal(false);
 
   /** newRecordsBySource as [name, count] pairs for the template. */
   readonly lastSyncBySource = computed(() => Object.entries(this.lastSync()?.newRecordsBySource ?? {}));
@@ -114,7 +123,51 @@ export class Settings {
     this.api.sources().subscribe(s => this.sources.set(s));
     if (this.auth.hasPermission(PERM.settingsManage)) {
       this.api.notifications().subscribe({ next: n => this.notif.set(n), error: () => { /* non-critical */ } });
+      this.loadIngestKeys();
     }
+  }
+
+  private loadIngestKeys(): void {
+    this.api.ingestKeys().subscribe({ next: k => this.ingestKeys.set(k), error: () => { /* non-critical */ } });
+  }
+
+  generateKey(): void {
+    if (this.generatingKey()) return;
+    this.generatingKey.set(true);
+    this.api.createIngestKey(this.newKeyName().trim()).subscribe({
+      next: k => {
+        this.generatingKey.set(false);
+        this.freshKey.set(k);
+        this.copied.set(false);
+        this.newKeyName.set('');
+        this.loadIngestKeys();
+      },
+      error: (e: HttpErrorResponse) => {
+        this.generatingKey.set(false);
+        this.snack.open(e.error?.message ?? 'Could not generate key', 'Dismiss', { duration: 5000 });
+      },
+    });
+  }
+
+  copyKey(): void {
+    const k = this.freshKey();
+    if (!k) return;
+    navigator.clipboard?.writeText(k.key).then(
+      () => { this.copied.set(true); this.snack.open('Key copied to clipboard', 'OK', { duration: 2500 }); },
+      () => this.snack.open('Copy failed — select and copy manually', 'Dismiss', { duration: 4000 }),
+    );
+  }
+
+  dismissFreshKey(): void {
+    this.freshKey.set(null);
+    this.copied.set(false);
+  }
+
+  revokeKey(k: IngestKey): void {
+    this.api.revokeIngestKey(k.id).subscribe({
+      next: () => { this.snack.open(`Revoked "${k.name}"`, 'OK', { duration: 2500 }); this.loadIngestKeys(); },
+      error: () => this.snack.open('Revoke failed', 'Dismiss', { duration: 4000 }),
+    });
   }
 
   patchNotif<K extends keyof NotificationSettings>(key: K, value: NotificationSettings[K]): void {

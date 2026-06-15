@@ -25,7 +25,9 @@ services:
   api:
     profiles: ["full"]
     build:
-      context: ./src/Api
+      # Context is ./src so the build can see the shared Ccusage.Ingestion project the API references.
+      context: ./src
+      dockerfile: Api/Dockerfile
     container_name: ccusage-api
     restart: unless-stopped
     depends_on:

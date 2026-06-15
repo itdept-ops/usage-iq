@@ -20,7 +20,7 @@ public sealed record ParsedUsage(
 /// <summary>Parses one tool's JSONL transcript format into <see cref="ParsedUsage"/> rows.</summary>
 public interface ISourceParser
 {
-    /// <summary>The <see cref="Data.Entities.IngestionSource.Kind"/> this parser handles.</summary>
+    /// <summary>The ingestion source kind this parser handles (e.g. "claude", "codex").</summary>
     string Kind { get; }
 
     /// <summary>True if a file (by name) belongs to this source.</summary>

@@ -21,6 +21,16 @@ jobs:
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
 
+  reporter:
+    name: Build reporter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet build src/Reporter/Ccusage.Reporter.csproj -c Release
+
   test:
     name: Test .NET API
     runs-on: ubuntu-latest

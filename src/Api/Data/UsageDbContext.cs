@@ -19,6 +19,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<NotificationSetting> NotificationSettings => Set<NotificationSetting>();
     public DbSet<ShareLink> ShareLinks => Set<ShareLink>();
     public DbSet<ShareAccess> ShareAccesses => Set<ShareAccess>();
+    public DbSet<IngestKey> IngestKeys => Set<IngestKey>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -172,6 +173,19 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => new { x.ShareLinkId, x.WhenUtc });
             e.HasOne(x => x.ShareLink).WithMany()
                 .HasForeignKey(x => x.ShareLinkId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<IngestKey>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(64);
+            e.Property(x => x.KeyHash).HasMaxLength(64);
+            e.Property(x => x.Prefix).HasMaxLength(24);
+            e.Property(x => x.CreatedByEmail).HasMaxLength(256);
+            e.Property(x => x.LastUsedIp).HasMaxLength(64);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.LastUsedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.RevokedUtc).HasColumnType("timestamp with time zone");
+            e.HasIndex(x => x.KeyHash).IsUnique();
         });
     }
 }

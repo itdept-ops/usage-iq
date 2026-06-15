@@ -22,6 +22,7 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next, RequestLogQue
     private static readonly string[] Excluded =
     {
         "/api/health", "/api/auth/me", "/api/auth/config", "/api/sync/status", "/api/logs", "/api/share",
+        "/api/ingest", // high-volume reporter pushes; the IngestKey LastUsed stamp is the activity trail
     };
 
     public async Task Invoke(HttpContext ctx)

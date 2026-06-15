@@ -151,6 +151,47 @@ docker compose --profile full up --build
 
 The API container mounts `${CLAUDE_PROJECTS_PATH}` (from `.env`) read-only at `/data/claude`.
 
+## Remote reporter (host the API + DB in the cloud)
+
+By default the API reads the JSONL logs off local disk. If you'd rather **host the API and database in the cloud**, the logs live on your workstation — so a small **reporter** runs there instead, parses the logs locally, and pushes only the parsed usage (token counts + metadata, **never** prompt/response text) to the server over HTTPS.
+
+```
+┌─────────────── your machine ───────────────┐         ┌──────────── cloud ────────────┐
+│  ~/.claude/projects   ~/.codex              │         │                               │
+│        └──► usage-iq-reporter ──HTTPS──────────POST /api/ingest──►  API  ──►  Postgres │
+│             (parses locally,    X-Ingest-Key │         │  (prices, resolves projects,  │
+│              tracks file state)              │         │   de-dupes, stores)           │
+└─────────────────────────────────────────────┘         └───────────────────────────────┘
+```
+
+The server stays authoritative: it prices each row from the editable pricing table, resolves the project from `cwd`, and de-dupes on the unique key — so re-running the reporter is idempotent, and remote rows merge with any local sync.
+
+**1. Create an ingest key.** In the app: **Settings → Ingest keys → Generate key**. Copy it now — it's shown once and stored only as a hash. Revoke it anytime; revocation takes effect on the next request.
+
+**2. Run the reporter** on the machine that has the logs:
+
+```bash
+# from a build of src/Reporter (dotnet build -c Release), or `dotnet run --project src/Reporter --`
+usage-iq-reporter --url https://usage.example.com --key uiq_xxxxxxxx…
+
+# one-shot (e.g. from cron / Task Scheduler) instead of the default watch loop
+usage-iq-reporter --url https://usage.example.com --key uiq_… --once
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `-u, --url` | — | **Required.** Usage IQ API base URL. |
+| `-k, --key` | — | **Required.** Ingest key from Settings. Treat as a secret. |
+| `-m, --machine` | OS machine name | Label this machine reports under. |
+| `--claude-path` | `~/.claude/projects` | Claude Code logs directory. |
+| `--codex-path` | `~/.codex` | Codex logs directory. |
+| `--state` | `~/.usage-iq/reporter-state.json` | Per-file sync state (so only changed files are re-read). |
+| `--batch` | `500` | Rows per request (server caps at 5000). |
+| `--interval` | `60` | Watch poll interval, seconds. |
+| `--once` | — | Single pass then exit (otherwise watches continuously). |
+
+Config can also come from `REPORTER_*` environment variables or an `appsettings.json` beside the executable. Only `dashboard.view` users ever see the data; the ingest key grants *write-only* access to `/api/ingest` and nothing else.
+
 ## API reference
 
 | Method | Route | Purpose |
@@ -159,6 +200,8 @@ The API container mounts `${CLAUDE_PROJECTS_PATH}` (from `.env`) read-only at `/
 | `GET` | `/api/auth/me`, `/api/auth/config` | Current user + live permissions / public Google client id. |
 | `GET`/`POST`/`PUT`/`DELETE` | `/api/users`, `/api/permissions` | User management (requires `users.manage`). |
 | `POST` | `/api/sync` | Ingest new/changed JSONL files; returns counts + timing. |
+| `POST` | `/api/ingest` | **Ingest-key authenticated** push of parsed usage from a remote reporter (anonymous to user auth; rate-limited). |
+| `GET`/`POST`/`DELETE` | `/api/ingest-keys` | Manage reporter ingest keys (requires `settings.manage`; raw key shown once). |
 | `GET` | `/api/sync/status` | Last-sync time + counts, whether a sync is running, and the auto-sync cadence. |
 | `GET` | `/api/usage/summary` | Aggregates; params: `from,to,projectId[],model[],includeSidechain,groupBy`. |
 | `GET` | `/api/usage/records` | Paged, sortable messages (same filters). |
@@ -203,13 +246,15 @@ usage-iq/
 ├─ tests/
 │  └─ Ccusage.Api.Tests/     # xUnit: unit + Testcontainers integration tests
 └─ src/
+   ├─ Ingestion/            # shared parser library (Claude + Codex JSONL → ParsedUsage)
    ├─ Api/                   # .NET 9 minimal API
    │  ├─ Data/               # EF entities, DbContext, pricing seed
-   │  ├─ Ingestion/          # JSONL parse, dedup, cost, project/timezone resolve
+   │  ├─ Ingestion/          # sync, dedup, cost, project/timezone resolve, HTTP ingest write path
    │  ├─ Services/           # queries, recompute, sync coordinator, audit, Discord notifier
-   │  ├─ Auth/               # JWT, per-request permission filter
+   │  ├─ Auth/               # JWT, per-request permission filter, ingest-key filter
    │  ├─ Infrastructure/     # global exception handler, request-logging middleware
    │  └─ Endpoints/          # API surface
+   ├─ Reporter/              # console app: parse local logs, push to /api/ingest (cloud hosting)
    └─ Web/                   # Angular 21 (standalone + signals, ECharts)
       └─ src/app/{features/{dashboard,calendar,pricing,settings,users,logs,login},core,shared}
 ```

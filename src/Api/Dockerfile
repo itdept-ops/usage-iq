@@ -1,10 +1,18 @@
 # --- build ---
+# NOTE: the build context is ./src (see docker-compose.yml) so the shared Ccusage.Ingestion
+# project the API references is available alongside Api/.
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
-COPY *.csproj ./
-RUN dotnet restore
-COPY . ./
-RUN dotnet publish -c Release -o /app --no-restore
+
+# Restore against just the project files first so the layer caches across source-only changes.
+COPY Ingestion/Ccusage.Ingestion.csproj Ingestion/
+COPY Api/Ccusage.Api.csproj Api/
+RUN dotnet restore Api/Ccusage.Api.csproj
+
+# Then the sources.
+COPY Ingestion/ Ingestion/
+COPY Api/ Api/
+RUN dotnet publish Api/Ccusage.Api.csproj -c Release -o /app --no-restore
 
 # --- runtime ---
 FROM mcr.microsoft.com/dotnet/aspnet:9.0

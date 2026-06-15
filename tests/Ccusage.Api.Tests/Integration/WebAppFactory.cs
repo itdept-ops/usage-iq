@@ -9,6 +9,19 @@ using Testcontainers.PostgreSql;
 namespace Ccusage.Api.Tests.Integration;
 
 /// <summary>
+/// Shares a single <see cref="WebAppFactory"/> across all integration test classes and serializes
+/// them into one xUnit collection. Required because <see cref="WebAppFactory"/> configures the app
+/// through <em>process-global environment variables</em> (Program.cs reads config eagerly): two
+/// factories booting in parallel would clobber each other's connection string / JWT key, pointing
+/// one app at the other's database. One shared factory ⇒ one container, env vars set once.
+/// </summary>
+[CollectionDefinition(Name)]
+public sealed class IntegrationCollection : ICollectionFixture<WebAppFactory>
+{
+    public const string Name = "integration";
+}
+
+/// <summary>
 /// Boots the real API against a throwaway PostgreSQL container (Testcontainers).
 ///
 /// Program.cs reads its config (connection string, JWT key) <em>eagerly</em>, before the host

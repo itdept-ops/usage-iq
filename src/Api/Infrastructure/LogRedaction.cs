@@ -28,7 +28,8 @@ public static partial class LogRedaction
     public static bool IsSensitivePath(string path) =>
         path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase)            // Google token in, JWT out
         || path.StartsWith("/api/notifications", StringComparison.OrdinalIgnoreCase) // Discord webhook URL
-        || path.StartsWith("/api/shares", StringComparison.OrdinalIgnoreCase);       // share tokens travel in create/list bodies
+        || path.StartsWith("/api/shares", StringComparison.OrdinalIgnoreCase)        // share tokens travel in create/list bodies
+        || path.StartsWith("/api/ingest-keys", StringComparison.OrdinalIgnoreCase);  // create response carries the raw ingest key
 
     /// <summary>Redact a captured request/response body (JSON or urlencoded), then truncate.</summary>
     public static string? Redact(string? body, string path)

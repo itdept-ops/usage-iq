@@ -1,0 +1,8 @@
+# Build context for the API image is ./src — keep it lean: the API build only needs Api/ + Ingestion/.
+Web/
+Reporter/
+**/bin/
+**/obj/
+**/*.user
+**/Dockerfile
+**/.dockerignore

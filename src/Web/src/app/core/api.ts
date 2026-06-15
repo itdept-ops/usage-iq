@@ -2,10 +2,10 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AuditEntry, CalendarDay, CreateShareRequest, GroupBy, HeatmapCell, IngestionSource, ManagedUser, ModelStat,
-  NotificationSettings, NotificationUpdate, PagedResult, PermissionItem, Pricing, ProjectDto, PublicShare,
-  RequestLogEntry, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SummaryResponse, SyncResult,
-  SyncStatus, UsageFilter, UsageRecord, UsageStats,
+  AuditEntry, CalendarDay, CreateShareRequest, GroupBy, HeatmapCell, IngestionSource, IngestKey, IngestKeyCreated,
+  ManagedUser, ModelStat, NotificationSettings, NotificationUpdate, PagedResult, PermissionItem, Pricing, ProjectDto,
+  PublicShare, RequestLogEntry, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SummaryResponse,
+  SyncResult, SyncStatus, UsageFilter, UsageRecord, UsageStats,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -145,6 +145,19 @@ export class Api {
 
   sendUsageSnapshot(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.base}/notifications/snapshot`, {});
+  }
+
+  // ---- Ingest keys (reporter credentials; requires settings.manage) ----
+  ingestKeys(): Observable<IngestKey[]> {
+    return this.http.get<IngestKey[]>(`${this.base}/ingest-keys`);
+  }
+
+  createIngestKey(name: string): Observable<IngestKeyCreated> {
+    return this.http.post<IngestKeyCreated>(`${this.base}/ingest-keys`, { name });
+  }
+
+  revokeIngestKey(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/ingest-keys/${id}`);
   }
 
   sync(): Observable<SyncResult> {

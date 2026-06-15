@@ -137,6 +137,25 @@ export interface IngestionSource {
   records: number;
 }
 
+export interface IngestKey {
+  id: number;
+  name: string;
+  prefix: string;
+  createdUtc: string;
+  createdByEmail: string;
+  lastUsedUtc: string | null;
+  lastUsedIp: string | null;
+  revoked: boolean;
+}
+
+/** Returned once on creation — carries the full raw key. */
+export interface IngestKeyCreated {
+  id: number;
+  name: string;
+  prefix: string;
+  key: string;
+}
+
 export interface SyncResult {
   timeZone: string;
   filesScanned: number;

@@ -9,7 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Ccusage.Api.Tests.Integration;
 
-public class AuthIntegrationTests(WebAppFactory factory) : IClassFixture<WebAppFactory>
+[Collection(IntegrationCollection.Name)]
+public class AuthIntegrationTests(WebAppFactory factory)
 {
     private const string Summary = "/api/usage/summary?groupBy=day";
 
