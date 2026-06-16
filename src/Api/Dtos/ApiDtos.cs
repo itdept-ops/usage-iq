@@ -190,6 +190,35 @@ public sealed class SummaryResponse
     public TokenTotals Total { get; set; } = new();
 }
 
+/// <summary>One reporting machine in the fleet view: spend/volume plus the users who reported from it.</summary>
+public sealed class FleetMachineDto
+{
+    public string Name { get; set; } = "";          // "local" for the file-sync path
+    public DateTime? LastSeenUtc { get; set; }       // max TimestampUtc in the bucket
+    public int Records { get; set; }
+    public long Tokens { get; set; }                 // combined total across all tiers
+    public decimal CostUsd { get; set; }
+    public string[] Users { get; set; } = Array.Empty<string>();
+}
+
+/// <summary>One reporting user in the fleet view: spend/volume plus the machines they reported from.</summary>
+public sealed class FleetUserDto
+{
+    public string Email { get; set; } = "";          // "local" for the file-sync path
+    public DateTime? LastSeenUtc { get; set; }
+    public int Records { get; set; }
+    public long Tokens { get; set; }
+    public decimal CostUsd { get; set; }
+    public string[] Machines { get; set; } = Array.Empty<string>();
+}
+
+/// <summary>The fleet rollup: per-machine and per-user buckets for the filtered range.</summary>
+public sealed class FleetDto
+{
+    public List<FleetMachineDto> Machines { get; set; } = new();
+    public List<FleetUserDto> Users { get; set; } = new();
+}
+
 public sealed class UsageRecordDto
 {
     public long Id { get; set; }

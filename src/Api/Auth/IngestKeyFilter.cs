@@ -15,6 +15,10 @@ public sealed class IngestKeyFilter : IEndpointFilter
 {
     public const string HeaderName = "X-Ingest-Key";
 
+    /// <summary>HttpContext.Items keys the ingest handler reads to drive server-side attribution.</summary>
+    public const string OwnerEmailItem = "ingest.ownerEmail";
+    public const string KeyIdItem = "ingest.keyId";
+
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var http = context.HttpContext;
@@ -26,11 +30,18 @@ public sealed class IngestKeyFilter : IEndpointFilter
 
         var hash = Hash(provided);
         var db = http.RequestServices.GetRequiredService<UsageDbContext>();
-        var keyId = await db.IngestKeys.AsNoTracking()
+        // Resolve the key plus its owner's email in one round-trip so the handler can attribute the
+        // rows to the owning user (server-derived). A legacy key with no linked user yields a null email.
+        var match = await db.IngestKeys.AsNoTracking()
             .Where(k => k.KeyHash == hash && k.RevokedUtc == null)
-            .Select(k => (int?)k.Id).FirstOrDefaultAsync(ct);
-        if (keyId is null)
+            .Select(k => new { k.Id, OwnerEmail = k.User != null ? k.User.Email : null })
+            .FirstOrDefaultAsync(ct);
+        if (match is null)
             return Unauthorized("Invalid or revoked ingest key.");
+
+        var keyId = match.Id;
+        http.Items[KeyIdItem] = keyId;
+        http.Items[OwnerEmailItem] = match.OwnerEmail;
 
         // Best-effort last-used stamp; ingest must never fail because this side-write failed.
         try

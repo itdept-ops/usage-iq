@@ -36,6 +36,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.AgentId).HasMaxLength(128);
             e.Property(x => x.GitBranch).HasMaxLength(256);
             e.Property(x => x.Version).HasMaxLength(64);
+            e.Property(x => x.MachineName).HasMaxLength(200).HasDefaultValue("");
+            e.Property(x => x.ReportedByUser).HasMaxLength(256).HasDefaultValue("");
 
             e.HasIndex(x => x.DedupKey).IsUnique();
             e.HasIndex(x => x.LocalDate);
@@ -44,6 +46,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => x.SessionId);
             e.HasIndex(x => x.IsSidechain);
             e.HasIndex(x => x.Source);
+            e.HasIndex(x => x.MachineName);
+            e.HasIndex(x => x.ReportedByUser);
 
             e.HasOne(x => x.Project).WithMany(p => p.Records)
                 .HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
@@ -188,6 +192,10 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.LastUsedUtc).HasColumnType("timestamp with time zone");
             e.Property(x => x.RevokedUtc).HasColumnType("timestamp with time zone");
             e.HasIndex(x => x.KeyHash).IsUnique();
+            e.HasIndex(x => x.UserId);
+            // A deleted user must not cascade-delete usage-bearing keys: orphan them instead.
+            e.HasOne(x => x.User).WithMany()
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

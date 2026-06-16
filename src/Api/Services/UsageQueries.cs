@@ -279,6 +279,32 @@ public sealed class UsageQueries(UsageDbContext db)
                 buckets = rows.Select(ToBucket).OrderByDescending(b => b.CostUsd).ToList();
                 break;
             }
+            case "machine":
+            {
+                var rows = await q.GroupBy(r => r.MachineName).Select(g => new Agg(
+                    g.Key,
+                    g.Sum(x => (long)x.InputTokens), g.Sum(x => (long)x.OutputTokens),
+                    g.Sum(x => x.CacheReadTokens),
+                    g.Sum(x => (long)x.CacheCreation5mTokens), g.Sum(x => (long)x.CacheCreation1hTokens),
+                    g.Sum(x => x.CostUsd), g.Count())).ToListAsync(ct);
+                // Empty MachineName == the local file-sync path; surface it as "local".
+                buckets = rows.Select(a => ToBucket(a with { Key = string.IsNullOrEmpty(a.Key) ? "local" : a.Key }))
+                    .OrderByDescending(b => b.CostUsd).ToList();
+                break;
+            }
+            case "user":
+            {
+                var rows = await q.GroupBy(r => r.ReportedByUser).Select(g => new Agg(
+                    g.Key,
+                    g.Sum(x => (long)x.InputTokens), g.Sum(x => (long)x.OutputTokens),
+                    g.Sum(x => x.CacheReadTokens),
+                    g.Sum(x => (long)x.CacheCreation5mTokens), g.Sum(x => (long)x.CacheCreation1hTokens),
+                    g.Sum(x => x.CostUsd), g.Count())).ToListAsync(ct);
+                // Empty ReportedByUser == local/unknown; surface it as "local".
+                buckets = rows.Select(a => ToBucket(a with { Key = string.IsNullOrEmpty(a.Key) ? "local" : a.Key }))
+                    .OrderByDescending(b => b.CostUsd).ToList();
+                break;
+            }
             case "session":
             {
                 var rows = await q.GroupBy(r => r.SessionId).Select(g => new Agg(
@@ -316,6 +342,52 @@ public sealed class UsageQueries(UsageDbContext db)
         };
 
         return new SummaryResponse { GroupBy = groupBy, Buckets = buckets, Total = total };
+    }
+
+    /// <summary>
+    /// Fleet rollup: per-machine and per-user buckets for the filtered range. Each machine lists the
+    /// distinct users that reported from it (and vice-versa). Empty machine/user is surfaced as "local"
+    /// (the local file-sync path). Both lists are sorted by cost desc.
+    /// </summary>
+    public async Task<FleetDto> FleetAsync(UsageFilterQuery f, CancellationToken ct)
+    {
+        var q = Filtered(f);
+
+        // One grouped pass over (machine, user) gives every cell we need; roll up to each axis in memory.
+        var cells = await q.GroupBy(r => new { r.MachineName, r.ReportedByUser }).Select(g => new
+        {
+            g.Key.MachineName,
+            g.Key.ReportedByUser,
+            LastSeenUtc = g.Max(x => x.TimestampUtc),
+            Records = g.Count(),
+            Tokens = g.Sum(x => (long)x.InputTokens + x.OutputTokens + x.CacheReadTokens
+                                 + x.CacheCreation5mTokens + x.CacheCreation1hTokens),
+            Cost = g.Sum(x => x.CostUsd),
+        }).ToListAsync(ct);
+
+        static string Label(string s) => string.IsNullOrEmpty(s) ? "local" : s;
+
+        var machines = cells.GroupBy(c => Label(c.MachineName)).Select(g => new FleetMachineDto
+        {
+            Name = g.Key,
+            LastSeenUtc = g.Max(x => x.LastSeenUtc),
+            Records = g.Sum(x => x.Records),
+            Tokens = g.Sum(x => x.Tokens),
+            CostUsd = g.Sum(x => x.Cost),
+            Users = g.Select(x => Label(x.ReportedByUser)).Distinct().OrderBy(u => u).ToArray(),
+        }).OrderByDescending(m => m.CostUsd).ToList();
+
+        var users = cells.GroupBy(c => Label(c.ReportedByUser)).Select(g => new FleetUserDto
+        {
+            Email = g.Key,
+            LastSeenUtc = g.Max(x => x.LastSeenUtc),
+            Records = g.Sum(x => x.Records),
+            Tokens = g.Sum(x => x.Tokens),
+            CostUsd = g.Sum(x => x.Cost),
+            Machines = g.Select(x => Label(x.MachineName)).Distinct().OrderBy(m => m).ToArray(),
+        }).OrderByDescending(u => u.CostUsd).ToList();
+
+        return new FleetDto { Machines = machines, Users = users };
     }
 
     public async Task<PagedResult<UsageRecordDto>> RecordsAsync(

@@ -12,12 +12,16 @@ public static class UsageRecordMapper
 {
     public static UsageRecord Map(
         ParsedUsage pu, string source, string cwd, int projectId, int fileId,
-        TimeZoneInfo tz, PricingMatcher pricing)
+        TimeZoneInfo tz, PricingMatcher pricing, string machineName = "", string reportedByUser = "")
     {
         var tsUtc = DateTime.SpecifyKind(pu.TimestampUtc, DateTimeKind.Utc);
         return new UsageRecord
         {
             Source = source,
+            // Fleet attribution. Both blank for the local file-sync path (treated as local/unknown);
+            // for remote ingest the caller supplies the sanitized machine + the key owner's email.
+            MachineName = machineName,
+            ReportedByUser = reportedByUser,
             MessageId = pu.DedupKey.Length > 128 ? pu.DedupKey[..128] : pu.DedupKey,
             RequestId = null,
             DedupKey = pu.DedupKey,

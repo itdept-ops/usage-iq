@@ -42,6 +42,8 @@ public sealed class IngestKeyDto
     public string Prefix { get; set; } = "";
     public DateTime CreatedUtc { get; set; }
     public string CreatedByEmail { get; set; } = "";
+    /// <summary>Email of the owning user; null for orphaned legacy keys (no linked user).</summary>
+    public string? OwnerEmail { get; set; }
     public DateTime? LastUsedUtc { get; set; }
     public string? LastUsedIp { get; set; }
     public bool Revoked { get; set; }

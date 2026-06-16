@@ -81,6 +81,12 @@ public static class ApiEndpoints
             await q.WriteRecordsCsvAsync(filter, http.Response.Body, ct);
         }).RequirePermission(Permissions.DashboardExport);
 
+        // ---- Fleet (per-machine + per-user attribution) ----
+        api.MapGet("/fleet", async (
+            [AsParameters] UsageFilterQuery filter, UsageQueries q, CancellationToken ct) =>
+            Results.Ok(await q.FleetAsync(filter, ct)))
+            .RequireAnyPermission(Permissions.DashboardView, Permissions.ReporterView, Permissions.ReporterManage);
+
         // ---- Filter options ----
         api.MapGet("/projects", async (UsageQueries q, CancellationToken ct) =>
             Results.Ok(await q.ProjectsAsync(ct)))

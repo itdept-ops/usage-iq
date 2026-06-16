@@ -35,6 +35,26 @@ public class IngestIntegrationTests(WebAppFactory factory)
         return (j.GetProperty("id").GetInt32(), j.GetProperty("key").GetString()!);
     }
 
+    /// <summary>Provisions a user with an exact permission set and returns (email, client).</summary>
+    private async Task<(string email, HttpClient client)> ProvisionUser(params string[] permissions)
+    {
+        var email = $"u-{Guid.NewGuid():N}@test.local";
+        var res = await Admin().PostAsJsonAsync("/api/users", new { email, isEnabled = true, permissions });
+        res.StatusCode.Should().Be(HttpStatusCode.Created);
+        var c = factory.CreateClient();
+        c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestJwt.For(email));
+        return (email, c);
+    }
+
+    /// <summary>Creates an ingest key as the given (non-admin) client and returns (id, raw key).</summary>
+    private static async Task<(int id, string key)> CreateKeyAs(HttpClient client, string name = "self-reporter")
+    {
+        var resp = await client.PostAsJsonAsync("/api/ingest-keys", new { name });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var j = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        return (j.GetProperty("id").GetInt32(), j.GetProperty("key").GetString()!);
+    }
+
     private static object Row(string dedupKey, string model = "claude-opus-4-8", string cwd = @"C:\work\ingest-repo") => new
     {
         dedupKey,
@@ -203,5 +223,161 @@ public class IngestIntegrationTests(WebAppFactory factory)
         // The dashboard's "Synced X ago" chip reads /api/sync/status — ingest must move it.
         var status = await (await Admin().GetAsync("/api/sync/status")).Content.ReadFromJsonAsync<JsonElement>();
         status.GetProperty("lastSyncUtc").GetDateTime().Should().BeAfter(before);
+    }
+
+    // ---- Phase 1: attribution + fleet + user-scoped keys ----
+
+    [Fact]
+    public async Task Remote_ingest_persists_machine_and_owner_email_attribution()
+    {
+        // The key is owned by a provisioned reporter; attribution must use that owner, not any client value.
+        var (owner, ownerClient) = await ProvisionUser("reporter.self");
+        var (_, key) = await CreateKeyAs(ownerClient, "attrib");
+        var dedup = Guid.NewGuid().ToString("N");
+
+        var resp = await WithKey(key).PostAsJsonAsync("/api/ingest",
+            new { source = "claude", machine = "lab-box-01", rows = new[] { Row(dedup) } });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var row = await db.UsageRecords.AsNoTracking().FirstAsync(r => r.DedupKey == dedup);
+        row.MachineName.Should().Be("lab-box-01");
+        row.ReportedByUser.Should().Be(owner); // server-derived from the key owner
+    }
+
+    [Fact]
+    public async Task GroupBy_machine_and_user_aggregate_remote_rows()
+    {
+        var (owner, ownerClient) = await ProvisionUser("reporter.self", "dashboard.view");
+        var (_, key) = await CreateKeyAs(ownerClient, "agg");
+        var machine = "agg-machine-" + Guid.NewGuid().ToString("N")[..6];
+        var k1 = Guid.NewGuid().ToString("N");
+        var k2 = Guid.NewGuid().ToString("N");
+
+        await WithKey(key).PostAsJsonAsync("/api/ingest",
+            new { source = "claude", machine, rows = new[] { Row(k1), Row(k2) } });
+
+        var byMachine = await (await ownerClient.GetAsync("/api/usage/summary?groupBy=machine"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        byMachine.GetProperty("groupBy").GetString().Should().Be("machine");
+        var mBucket = byMachine.GetProperty("buckets").EnumerateArray()
+            .First(b => b.GetProperty("key").GetString() == machine);
+        mBucket.GetProperty("records").GetInt32().Should().Be(2);
+
+        var byUser = await (await ownerClient.GetAsync("/api/usage/summary?groupBy=user"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        byUser.GetProperty("groupBy").GetString().Should().Be("user");
+        var uBucket = byUser.GetProperty("buckets").EnumerateArray()
+            .First(b => b.GetProperty("key").GetString() == owner);
+        uBucket.GetProperty("records").GetInt32().Should().BeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task Fleet_endpoint_returns_per_machine_and_per_user_buckets()
+    {
+        var (owner, ownerClient) = await ProvisionUser("reporter.self", "dashboard.view");
+        var (_, key) = await CreateKeyAs(ownerClient, "fleet");
+        var machine = "fleet-box-" + Guid.NewGuid().ToString("N")[..6];
+
+        await WithKey(key).PostAsJsonAsync("/api/ingest",
+            new { source = "claude", machine, rows = new[] { Row(Guid.NewGuid().ToString("N")) } });
+
+        var fleet = await (await ownerClient.GetAsync("/api/fleet")).Content.ReadFromJsonAsync<JsonElement>();
+
+        var m = fleet.GetProperty("machines").EnumerateArray()
+            .First(x => x.GetProperty("name").GetString() == machine);
+        m.GetProperty("records").GetInt32().Should().BeGreaterThanOrEqualTo(1);
+        m.GetProperty("tokens").GetInt64().Should().BeGreaterThan(0);
+        m.TryGetProperty("lastSeenUtc", out _).Should().BeTrue();
+        m.GetProperty("users").EnumerateArray().Select(e => e.GetString()).Should().Contain(owner);
+
+        var u = fleet.GetProperty("users").EnumerateArray()
+            .First(x => x.GetProperty("email").GetString() == owner);
+        u.GetProperty("machines").EnumerateArray().Select(e => e.GetString()).Should().Contain(machine);
+    }
+
+    [Fact]
+    public async Task Fleet_endpoint_requires_a_qualifying_permission()
+    {
+        var (_, noPerm) = await ProvisionUser("calendar.view"); // none of dashboard/reporter view|manage
+        (await noPerm.GetAsync("/api/fleet")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var (_, reporterViewer) = await ProvisionUser("reporter.view");
+        (await reporterViewer.GetAsync("/api/fleet")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Reporter_self_sees_and_deletes_only_their_own_keys()
+    {
+        var (emailA, a) = await ProvisionUser("reporter.self");
+        var (_, b) = await ProvisionUser("reporter.self");
+
+        // A creates a key owned by A; B creates a key owned by B.
+        var (aKeyId, _) = await CreateKeyAs(a, "owned-by-a");
+        var (bKeyId, _) = await CreateKeyAs(b, "owned-by-b");
+
+        // A's list shows only A's key, with A's owner email.
+        var list = await (await a.GetAsync("/api/ingest-keys")).Content.ReadFromJsonAsync<JsonElement>();
+        var ids = list.EnumerateArray().Select(e => e.GetProperty("id").GetInt32()).ToList();
+        ids.Should().Contain(aKeyId);
+        ids.Should().NotContain(bKeyId);
+        list.EnumerateArray().First(e => e.GetProperty("id").GetInt32() == aKeyId)
+            .GetProperty("ownerEmail").GetString().Should().Be(emailA);
+
+        // A cannot delete B's key (403) but can delete their own (204).
+        (await a.DeleteAsync($"/api/ingest-keys/{bKeyId}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await a.DeleteAsync($"/api/ingest-keys/{aKeyId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Reporter_self_created_key_is_owned_by_the_creator()
+    {
+        var (email, c) = await ProvisionUser("reporter.self");
+        var (id, _) = await CreateKeyAs(c, "mine");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var key = await db.IngestKeys.AsNoTracking().FirstAsync(k => k.Id == id);
+        key.CreatedByEmail.Should().Be(email);
+        var user = await db.Users.AsNoTracking().FirstAsync(u => u.Email == email);
+        key.UserId.Should().Be(user.Id);
+    }
+
+    [Fact]
+    public async Task Reporter_manage_sees_and_deletes_all_keys()
+    {
+        var (_, self) = await ProvisionUser("reporter.self");
+        var (selfKeyId, _) = await CreateKeyAs(self, "manage-target");
+
+        var (_, manager) = await ProvisionUser("reporter.manage");
+        // The manager's list includes a key owned by someone else.
+        var list = await (await manager.GetAsync("/api/ingest-keys")).Content.ReadFromJsonAsync<JsonElement>();
+        list.EnumerateArray().Select(e => e.GetProperty("id").GetInt32()).Should().Contain(selfKeyId);
+
+        // And the manager can delete it.
+        (await manager.DeleteAsync($"/api/ingest-keys/{selfKeyId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Anonymous_ingest_still_works_and_key_owner_drives_attribution()
+    {
+        // End-to-end: a self-service user mints a key, the anonymous machine path authenticates with it,
+        // and the persisted row is attributed to that user — proving the unchanged ingest auth model plus
+        // server-derived attribution.
+        var (owner, ownerClient) = await ProvisionUser("reporter.self");
+        var (_, key) = await CreateKeyAs(ownerClient, "e2e");
+        var dedup = Guid.NewGuid().ToString("N");
+
+        var resp = await WithKey(key).PostAsJsonAsync("/api/ingest",
+            new { source = "claude", machine = "e2e-host", rows = new[] { Row(dedup) } });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("inserted").GetInt32().Should().Be(1);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var row = await db.UsageRecords.AsNoTracking().FirstAsync(r => r.DedupKey == dedup);
+        row.ReportedByUser.Should().Be(owner);
+        row.MachineName.Should().Be("e2e-host");
     }
 }

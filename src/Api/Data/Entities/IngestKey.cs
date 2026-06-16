@@ -20,7 +20,19 @@ public class IngestKey
     public string Prefix { get; set; } = "";
 
     public DateTime CreatedUtc { get; set; }
+
+    /// <summary>
+    /// Email of the user who created the key (kept for display/legacy). With user-scoped keys this
+    /// equals the owner's email at creation; <see cref="UserId"/> is the authoritative ownership link.
+    /// </summary>
     public string CreatedByEmail { get; set; } = "";
+
+    /// <summary>
+    /// The owning <see cref="AppUser"/>. Nullable so a deleted user (FK ON DELETE SET NULL) leaves the
+    /// usage-bearing key intact but orphaned, and so legacy keys with no email match stay unowned.
+    /// </summary>
+    public int? UserId { get; set; }
+    public AppUser? User { get; set; }
 
     /// <summary>When the key was last accepted on an ingest request (best-effort).</summary>
     public DateTime? LastUsedUtc { get; set; }

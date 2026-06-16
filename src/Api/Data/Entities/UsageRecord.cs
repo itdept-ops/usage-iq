@@ -59,6 +59,19 @@ public class UsageRecord
     /// <summary>Computed USD cost (denormalized; recomputed when pricing changes).</summary>
     public decimal CostUsd { get; set; }
 
+    /// <summary>
+    /// The reporting machine/host this row was pushed from (sanitized <c>batch.Machine</c>). Empty
+    /// for the local file-sync path (treated as "local" in fleet rollups). Indexed for grouping.
+    /// </summary>
+    public string MachineName { get; set; } = "";
+
+    /// <summary>
+    /// The email of the ingest-key owner that authenticated the remote push (server-derived — never
+    /// from the client payload, so attribution can't be spoofed). Empty for local/file ingestion
+    /// (treated as "unknown"/"local"). Indexed for grouping.
+    /// </summary>
+    public string ReportedByUser { get; set; } = "";
+
     /// <summary>The file this row was first ingested from (informational).</summary>
     public int IngestedFileId { get; set; }
     public IngestedFile? IngestedFile { get; set; }

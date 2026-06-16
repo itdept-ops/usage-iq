@@ -29,9 +29,16 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
     public static bool IsKnownSource(string? kind) => kind is not null && KindToSource.ContainsKey(kind);
 
     public async Task<IngestResultDto> WriteAsync(
-        string sourceKind, string? machine, IReadOnlyList<ParsedUsage> rows, CancellationToken ct)
+        string sourceKind, string? machine, IReadOnlyList<ParsedUsage> rows, CancellationToken ct,
+        string? reportedByUser = null)
     {
         var source = KindToSource[sourceKind]; // caller validated via IsKnownSource
+
+        // Attribution columns set on every row from this remote push. The machine is the same
+        // sanitized value that names the synthetic remote file; the user is the key owner's email
+        // (server-derived by the ingest filter — never the client payload), "" when the key is orphaned.
+        var machineName = SanitizeMachine(machine);
+        var ownerEmail = reportedByUser ?? "";
 
         var cfg = await db.AppConfigs.AsNoTracking().FirstAsync(ct);
         var tz = ResolveTimeZone(cfg.DisplayTimeZone);
@@ -72,7 +79,7 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
 
             var cwd = pu.Cwd ?? "(unknown)";
             var projectId = await GetOrCreateProjectAsync(cwd, projectIdByRoot, ct);
-            pending.Add(UsageRecordMapper.Map(pu, source, cwd, projectId, fileId, tz, pricing));
+            pending.Add(UsageRecordMapper.Map(pu, source, cwd, projectId, fileId, tz, pricing, machineName, ownerEmail));
         }
 
         var (inserted, insertedTokens) = await InsertNewAsync(pending, ct);

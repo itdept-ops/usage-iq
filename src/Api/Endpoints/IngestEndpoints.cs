@@ -14,7 +14,7 @@ public static class IngestEndpoints
     public static void MapIngestEndpoints(this WebApplication app)
     {
         // ---- Public ingest (machine-authenticated by an ingest key, not a user JWT) ----
-        app.MapPost("/api/ingest", async (IngestBatchDto batch, IngestWriteService writer, CancellationToken ct) =>
+        app.MapPost("/api/ingest", async (IngestBatchDto batch, HttpContext http, IngestWriteService writer, CancellationToken ct) =>
         {
             if (!IngestWriteService.IsKnownSource(batch.Source))
                 return Results.BadRequest(new { message = "Unknown source. Expected 'claude' or 'codex'." });
@@ -23,40 +23,56 @@ public static class IngestEndpoints
             if (batch.Rows.Count > IngestWriteService.MaxRowsPerBatch)
                 return Results.BadRequest(new { message = $"Batch too large. Max {IngestWriteService.MaxRowsPerBatch} rows per request." });
 
-            return Results.Ok(await writer.WriteAsync(batch.Source, batch.Machine, batch.Rows, ct));
+            // Attribute the rows to the key owner the filter resolved — never a client-supplied user.
+            var ownerEmail = http.Items[IngestKeyFilter.OwnerEmailItem] as string;
+            return Results.Ok(await writer.WriteAsync(batch.Source, batch.Machine, batch.Rows, ct, ownerEmail));
         })
         .AllowAnonymous()
         .AddEndpointFilter(new IngestKeyFilter())
         .RequireRateLimiting("ingest");
 
         // ---- Ingest key management (reporter.*) ----
+        // Ownership is enforced in-handler: reporter.manage sees/acts on every key; reporter.self
+        // (and reporter.view, read-only) is scoped to keys the caller owns (key.UserId == caller.Id).
         var keys = app.MapGroup("/api/ingest-keys").RequireAuthorization();
 
-        keys.MapGet("/", async (UsageDbContext db, CancellationToken ct) =>
-            Results.Ok(await db.IngestKeys.AsNoTracking().OrderByDescending(k => k.Id)
-                .Select(k => new IngestKeyDto
-                {
-                    Id = k.Id, Name = k.Name, Prefix = k.Prefix,
-                    CreatedUtc = k.CreatedUtc, CreatedByEmail = k.CreatedByEmail,
-                    LastUsedUtc = k.LastUsedUtc, LastUsedIp = k.LastUsedIp,
-                    Revoked = k.RevokedUtc != null,
-                }).ToListAsync(ct)))
-            .RequireAnyPermission(Permissions.ReporterView, Permissions.ReporterManage);
+        keys.MapGet("/", async (UsageDbContext db, CurrentUserAccessor me, CancellationToken ct) =>
+        {
+            var caller = await me.GetUserAsync(ct);
+            if (caller is null) return Results.Forbid();
+            var canManage = caller.Permissions.Contains(Permissions.ReporterManage);
+
+            var q = db.IngestKeys.AsNoTracking().OrderByDescending(k => k.Id).AsQueryable();
+            if (!canManage) q = q.Where(k => k.UserId == caller.Id); // self/view: only my keys
+
+            return Results.Ok(await q.Select(k => new IngestKeyDto
+            {
+                Id = k.Id, Name = k.Name, Prefix = k.Prefix,
+                CreatedUtc = k.CreatedUtc, CreatedByEmail = k.CreatedByEmail,
+                OwnerEmail = k.User != null ? k.User.Email : null,
+                LastUsedUtc = k.LastUsedUtc, LastUsedIp = k.LastUsedIp,
+                Revoked = k.RevokedUtc != null,
+            }).ToListAsync(ct));
+        }).RequireAnyPermission(Permissions.ReporterView, Permissions.ReporterManage, Permissions.ReporterSelf);
 
         keys.MapPost("/", async (CreateIngestKeyRequest req, UsageDbContext db, CurrentUserAccessor me, AuditLogger audit, CancellationToken ct) =>
         {
+            var caller = await me.GetUserAsync(ct);
+            if (caller is null) return Results.Forbid();
+
             var raw = GenerateKey();
             var name = req.Name?.Trim();
             name = string.IsNullOrEmpty(name) ? "reporter" : (name.Length > 64 ? name[..64] : name);
-            var user = await me.GetUserAsync(ct);
 
+            // A key is always owned by its creator — both the link and the display email.
             var key = new IngestKey
             {
                 Name = name,
                 KeyHash = IngestKeyFilter.Hash(raw),
                 Prefix = raw[..12] + "…",
                 CreatedUtc = DateTime.UtcNow,
-                CreatedByEmail = user?.Email ?? "",
+                CreatedByEmail = caller.Email,
+                UserId = caller.Id,
             };
             db.IngestKeys.Add(key);
             await db.SaveChangesAsync(ct);
@@ -64,12 +80,20 @@ public static class IngestEndpoints
 
             // The raw key is returned exactly once — only its hash is stored.
             return Results.Ok(new IngestKeyCreatedDto { Id = key.Id, Name = key.Name, Prefix = key.Prefix, Key = raw });
-        }).RequirePermission(Permissions.ReporterManage);
+        }).RequireAnyPermission(Permissions.ReporterManage, Permissions.ReporterSelf);
 
-        keys.MapDelete("/{id:int}", async (int id, UsageDbContext db, AuditLogger audit, CancellationToken ct) =>
+        keys.MapDelete("/{id:int}", async (int id, UsageDbContext db, CurrentUserAccessor me, AuditLogger audit, CancellationToken ct) =>
         {
+            var caller = await me.GetUserAsync(ct);
+            if (caller is null) return Results.Forbid();
+
             var key = await db.IngestKeys.FirstOrDefaultAsync(k => k.Id == id, ct);
             if (key is null) return Results.NotFound();
+
+            // reporter.manage may revoke any key; otherwise only the caller's own.
+            var canManage = caller.Permissions.Contains(Permissions.ReporterManage);
+            if (!canManage && key.UserId != caller.Id) return Results.Forbid();
+
             if (key.RevokedUtc is null)
             {
                 key.RevokedUtc = DateTime.UtcNow;
@@ -77,7 +101,7 @@ public static class IngestEndpoints
                 await audit.LogAsync("ingestkey.revoke", null, $"{key.Name} ({key.Prefix})", ct);
             }
             return Results.NoContent();
-        }).RequirePermission(Permissions.ReporterManage);
+        }).RequireAnyPermission(Permissions.ReporterManage, Permissions.ReporterSelf);
     }
 
     // uiq_<43 base64url chars of 32 random bytes> — recognizable prefix, 256 bits of entropy.

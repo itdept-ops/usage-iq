@@ -25,6 +25,7 @@ public static class Permissions
     // ---- Reporter ----
     public const string ReporterView = "reporter.view";
     public const string ReporterManage = "reporter.manage";
+    public const string ReporterSelf = "reporter.self";
 
     // ---- Notifications ----
     public const string NotificationsView = "notifications.view";
@@ -56,6 +57,7 @@ public static class Permissions
 
         new PermissionInfo(ReporterView, "Reporter", "View reporter", "View ingest keys and reporter docs."),
         new PermissionInfo(ReporterManage, "Reporter", "Manage reporter", "Create and revoke ingest keys."),
+        new PermissionInfo(ReporterSelf, "Reporter", "Manage own reporter keys", "Create and revoke your own ingest keys to report your own usage."),
 
         new PermissionInfo(NotificationsView, "Notifications", "View notifications", "View the Discord/notification config."),
         new PermissionInfo(NotificationsManage, "Notifications", "Manage notifications", "Edit notifications and send a test."),

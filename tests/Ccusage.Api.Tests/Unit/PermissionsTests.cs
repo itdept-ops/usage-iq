@@ -5,14 +5,14 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 18 keys.
+    // The full catalog of 19 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
         "calendar.view",
         "pricing.view", "pricing.manage",
         "settings.view", "settings.manage", "sources.manage",
-        "reporter.view", "reporter.manage",
+        "reporter.view", "reporter.manage", "reporter.self",
         "notifications.view", "notifications.manage",
         "shares.view", "shares.manage",
         "users.view", "users.manage", "activity.view",
@@ -30,6 +30,7 @@ public class PermissionsTests
     [InlineData("sources.manage")]
     [InlineData("reporter.view")]
     [InlineData("reporter.manage")]
+    [InlineData("reporter.self")]
     [InlineData("notifications.view")]
     [InlineData("notifications.manage")]
     [InlineData("shares.view")]
@@ -66,6 +67,7 @@ public class PermissionsTests
         Permissions.SourcesManage.Should().Be("sources.manage");
         Permissions.ReporterView.Should().Be("reporter.view");
         Permissions.ReporterManage.Should().Be("reporter.manage");
+        Permissions.ReporterSelf.Should().Be("reporter.self");
         Permissions.NotificationsView.Should().Be("notifications.view");
         Permissions.NotificationsManage.Should().Be("notifications.manage");
         Permissions.SharesView.Should().Be("shares.view");
@@ -76,9 +78,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_eighteen_known_keys()
+    public void All_contains_exactly_the_nineteen_known_keys()
     {
-        Permissions.All.Should().HaveCount(18);
+        Permissions.All.Should().HaveCount(19);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -89,9 +91,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_eighteen_entries()
+    public void Catalog_has_nineteen_entries()
     {
-        Permissions.Catalog.Should().HaveCount(18);
+        Permissions.Catalog.Should().HaveCount(19);
     }
 
     [Fact]
