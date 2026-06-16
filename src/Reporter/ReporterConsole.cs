@@ -19,9 +19,9 @@ public sealed class ReporterConsole : IDisposable
     private nint _stdout;
     private uint _origMode;
 
-    public ReporterConsole()
+    public ReporterConsole(bool enableHud = true)
     {
-        if (_plain) return;
+        if (_plain || !enableHud) return;
         try { StartHud(); } catch { _hud = false; }
     }
 
@@ -39,6 +39,9 @@ public sealed class ReporterConsole : IDisposable
         try { h = Console.WindowHeight; } catch { return; }
         if (h < 6) return; // too short to spare a status row
 
+        // Clear the screen first — otherwise our output draws OVER whatever was there (build output, a
+        // prior run) and shorter lines leave stale tails. After this the reserved row stays clean.
+        Console.Write("\x1b[3J\x1b[2J\x1b[H");
         Console.Write($"\x1b[2;{h}r"); // reserve row 1: scroll region becomes rows 2..h
         Console.Write("\x1b[2;1H");    // move below the status row so all output scrolls under it
         _hud = true;

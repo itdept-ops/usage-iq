@@ -11,6 +11,7 @@ const string Version = "v1.0";
 // ---- flags (separated so the valued-option parser below never sees a bare flag) ----
 var flagSet = new HashSet<string>(args, StringComparer.OrdinalIgnoreCase);
 var once = flagSet.Contains("--once");
+var noHud = flagSet.Contains("--no-hud");
 var wantsHelp = flagSet.Contains("--help") || flagSet.Contains("-h") || args.Length == 0;
 
 if (wantsHelp)
@@ -19,7 +20,7 @@ if (wantsHelp)
     return args.Length == 0 ? 1 : 0;
 }
 
-var valued = args.Where(a => a is not ("--once" or "--watch" or "--help" or "-h")).ToArray();
+var valued = args.Where(a => a is not ("--once" or "--watch" or "--help" or "-h" or "--no-hud")).ToArray();
 
 var switchMappings = new Dictionary<string, string>
 {
@@ -58,7 +59,7 @@ if (invalid is not null)
     return 2;
 }
 
-using var ui = new ReporterConsole(); // disposing releases the reserved HUD row + restores the console
+using var ui = new ReporterConsole(enableHud: !noHud); // disposing releases the reserved HUD row + restores the console
 
 ui.Banner(Version);
 ui.Config("Server", opt.Url!);
@@ -159,6 +160,7 @@ static void PrintUsage()
               --batch <n>        Rows per request, 1-5000 (default: 500)
               --interval <s>     Watch poll interval seconds, 5-3600 (default: 60)
               --once             Run a single pass and exit (default: watch continuously)
+              --no-hud           Disable the top-right token counter (live count stays in the window title)
           -h, --help             Show this help
 
         Config may also come from REPORTER_*-prefixed env vars or an appsettings.json beside the exe.
