@@ -920,3 +920,32 @@ mat-paginator {
     row-gap: 4px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Mobile overflow hardening — belt-and-suspenders so no panel can push
+   the page past the viewport. Grid/flex children default to min-width:auto
+   (their content's min size), which is exactly what lets a wide chart,
+   table, toggle group, or paginator overhang; min-width:0 + contained
+   scrolling + a host-level clip fix it at the root.
+   ═══════════════════════════════════════════════════════════════ */
+:host { overflow-x: clip; }                         /* hard guard: the dashboard never exceeds the viewport */
+
+.charts > .chart-card,
+.charts > .side-stack { min-width: 0; }             /* both grid children must be allowed to shrink */
+.chart-card, .cache-card, .table-card { max-width: 100%; }
+.chart-well { min-width: 0; }
+
+@media (max-width: 960px) {
+  /* Scroll the 6-segment group-by control from tablet down (not only ≤640)
+     so it can never force the card — and thus the page — wider. */
+  .chart-head { flex-wrap: wrap; min-width: 0; }
+  .chart-head mat-button-toggle-group { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+@media (max-width: 640px) {
+  /* The items-per-page selector is the widest, least-essential paginator
+     part — drop it on phones so the range + nav buttons fit one row. */
+  ::ng-deep .mat-mdc-paginator-page-size { display: none; }
+  ::ng-deep .mat-mdc-paginator-container { padding: 0 4px; }
+  ::ng-deep .mat-mdc-paginator { font-size: 12px; }
+}
