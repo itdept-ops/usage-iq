@@ -44,7 +44,28 @@
   </p>
 </mat-card>
 
+<!-- Self-service explainer — only for callers who manage just their own keys -->
+@if (selfServiceOnly()) {
+  <mat-card appearance="outlined" class="panel self-explainer">
+    <div class="se-head">
+      <mat-icon class="se-icon">badge</mat-icon>
+      <div>
+        <div class="se-title">Get your own reporter token</div>
+        <p class="se-sub">You can mint and revoke ingest keys for <strong>your own</strong> usage. Each key is tied
+          to your account — anything it reports shows up under <b class="mono">{{ auth.session()?.email }}</b> in the fleet view.</p>
+      </div>
+    </div>
+    <ol class="se-steps">
+      <li><strong>Generate a key below</strong> and copy it (it's shown only once).</li>
+      <li><strong>Install the reporter</strong> on the machine where your AI coding agent runs (step&nbsp;2).</li>
+      <li><strong>Run it</strong> with this server's URL and your key (step&nbsp;3) — it parses the logs locally and
+        pushes only token counts &amp; metadata, never prompts or responses.</li>
+    </ol>
+  </mat-card>
+}
+
 <!-- Step 1 — key -->
+@if (canCreate()) {
 <mat-card appearance="outlined" class="panel step">
   <div class="step-head"><span class="step-num">1</span><span class="panel-header">Generate an ingest key</span></div>
   <p class="hint">A key authenticates one reporter. It's shown <strong>once</strong> and stored only as a hash —
@@ -79,12 +100,22 @@
   }
 
   @if (ingestKeys().length) {
+    @if (canManage()) {
+      <div class="key-listhead micro-label">
+        <span>{{ ingestKeys().length }} key{{ ingestKeys().length === 1 ? '' : 's' }} across the fleet — you manage all of them.</span>
+      </div>
+    }
     <div class="key-list">
       @for (k of ingestKeys(); track k.id) {
         <div class="key-row" [class.revoked]="k.revoked">
           <span class="key-dot" [class.off]="k.revoked"></span>
           <span class="key-name">{{ k.name }}</span>
           <code class="key-prefix mono">{{ k.prefix }}</code>
+          <span class="key-owner" [class.mine]="isMine(k)" [title]="k.ownerEmail || 'unlinked legacy key'">
+            <mat-icon>person</mat-icon>
+            {{ k.ownerEmail || 'unlinked' }}
+            @if (isMine(k)) { <span class="you-badge">you</span> }
+          </span>
           @if (k.revoked) { <span class="key-badge revoked">revoked</span> }
           <span class="grow"></span>
           <span class="key-meta micro-label">
@@ -94,7 +125,7 @@
               never used
             }
           </span>
-          @if (!k.revoked) {
+          @if (!k.revoked && (canManage() || isMine(k))) {
             <button mat-button class="danger-btn key-revoke" (click)="revokeKey(k)">
               <mat-icon>block</mat-icon> Revoke
             </button>
@@ -103,9 +134,12 @@
       }
     </div>
   } @else {
-    <div class="key-empty micro-label">No ingest keys yet. Generate one above to connect a reporter.</div>
+    <div class="key-empty micro-label">
+      {{ canManage() ? 'No ingest keys yet anywhere.' : 'You have no ingest keys yet.' }} Generate one above to connect a reporter.
+    </div>
   }
 </mat-card>
+}
 
 <!-- Step 2 — get the reporter -->
 <mat-card appearance="outlined" class="panel step">

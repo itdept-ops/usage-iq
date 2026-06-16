@@ -67,6 +67,82 @@ export interface PublicShare {
   models: SummaryResponse;
 }
 
+/** One reporting machine in the fleet view: spend/volume plus the users who reported from it. */
+export interface FleetMachine {
+  name: string;
+  lastSeenUtc: string | null;
+  records: number;
+  tokens: number;
+  costUsd: number;
+  users: string[];
+}
+
+/** One reporting user in the fleet view: spend/volume plus the machines they reported from. */
+export interface FleetUser {
+  email: string;
+  lastSeenUtc: string | null;
+  records: number;
+  tokens: number;
+  costUsd: number;
+  machines: string[];
+}
+
+/** The fleet rollup: per-machine and per-user leaderboards for the filtered range. */
+export interface Fleet {
+  machines: FleetMachine[];
+  users: FleetUser[];
+}
+
+/**
+ * Cache-efficiency rollup for the filtered range (GET /api/usage/cache-efficiency):
+ * how much prompt input was served from the cheap cache, what cache-writes cost,
+ * and the dollars saved by reading from cache instead of paying the full input rate.
+ * Mirrors CacheEfficiencyDto on the API.
+ */
+export interface CacheEfficiency {
+  cacheReadTokens: number;
+  cacheWrite5mTokens: number;
+  cacheWrite1hTokens: number;
+  /** 5m + 1h cache-creation tokens. */
+  cacheWriteTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  recordCount: number;
+  /** Share of prompt input served from cache: cacheRead / (cacheRead + input), 0..1. */
+  cacheReadRatio: number;
+  /** Dollars saved by cache reads vs paying the full input rate (never negative). */
+  savingsUsd: number;
+  /** Cost of the 5m + 1h cache-creation tokens. */
+  cacheWriteCostUsd: number;
+}
+
+/** A personal saved dashboard view (filter payload + groupBy) owned by the caller. Mirrors SavedViewDto. */
+export interface SavedView {
+  id: number;
+  name: string;
+  from: string | null;
+  to: string | null;
+  projectId: number[];
+  model: string[];
+  source: string[];
+  includeSidechain: boolean;
+  groupBy: string;
+  createdUtc: string;
+  lastUsedUtc: string | null;
+}
+
+/** Create/update payload for a saved view (name + dashboard filter + groupBy). Mirrors SavedViewUpsertRequest. */
+export interface SavedViewUpsertRequest {
+  name: string;
+  from: string | null;
+  to: string | null;
+  projectId: number[];
+  model: string[];
+  source: string[];
+  includeSidechain: boolean;
+  groupBy: string;
+}
+
 export interface UsageRecord {
   id: number;
   source: string;
@@ -143,6 +219,8 @@ export interface IngestKey {
   prefix: string;
   createdUtc: string;
   createdByEmail: string;
+  /** Email of the owning user; null for orphaned legacy keys (no linked user). */
+  ownerEmail: string | null;
   lastUsedUtc: string | null;
   lastUsedIp: string | null;
   revoked: boolean;
@@ -299,7 +377,7 @@ export interface RequestLogEntry {
   responseBody: string | null;
 }
 
-/** Canonical permission keys (mirror of the backend catalog — all 18 keys). */
+/** Canonical permission keys (mirror of the backend catalog — all 19 keys). */
 export const PERM = {
   dashboardView: 'dashboard.view',
   dashboardExport: 'dashboard.export',
@@ -312,6 +390,7 @@ export const PERM = {
   sourcesManage: 'sources.manage',
   reporterView: 'reporter.view',
   reporterManage: 'reporter.manage',
+  reporterSelf: 'reporter.self',
   notificationsView: 'notifications.view',
   notificationsManage: 'notifications.manage',
   sharesView: 'shares.view',
@@ -344,6 +423,7 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   [PERM.sourcesManage]: 'Settings',
   [PERM.reporterView]: 'Reporter',
   [PERM.reporterManage]: 'Reporter',
+  [PERM.reporterSelf]: 'Reporter',
   [PERM.notificationsView]: 'Notifications',
   [PERM.notificationsManage]: 'Notifications',
   [PERM.sharesView]: 'Shares',

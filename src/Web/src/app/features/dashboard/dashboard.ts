@@ -25,7 +25,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { ShareDialog } from '../share/share-dialog';
 import { AuthService } from '../../core/auth';
-import { CalendarDay, GroupBy, IngestionSource, ModelStat, PagedResult, ProjectDto, SummaryResponse, UsageFilter, UsageRecord, PERM } from '../../core/models';
+import { CacheEfficiency, CalendarDay, GroupBy, IngestionSource, ModelStat, PagedResult, ProjectDto, SavedView, SummaryResponse, UsageFilter, UsageRecord, PERM } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
 import { CompactPipe } from '../../shared/format';
 
@@ -66,6 +66,16 @@ export class Dashboard {
   readonly summary = signal<SummaryResponse | null>(null);
   readonly records = signal<PagedResult<UsageRecord> | null>(null);
 
+  // Cache-efficiency rollup — reactive to the current filter (refetched on every Apply/reload).
+  readonly cacheEff = signal<CacheEfficiency | null>(null);
+
+  // ---- saved views (per-user) ----
+  readonly savedViews = signal<SavedView[]>([]);
+  readonly savingView = signal(false);
+  // Inline rename state for the views menu.
+  readonly renamingViewId = signal<number | null>(null);
+  readonly renameDraft = signal('');
+
   readonly loading = signal(false);
   readonly syncing = signal(false);
 
@@ -80,6 +90,13 @@ export class Dashboard {
   // Estimated active engagement time (gap-based) for the current filter — per-day, from the calendar.
   readonly calendarDays = signal<CalendarDay[]>([]);
   readonly activeHours = computed(() => this.calendarDays().reduce((a, d) => a + d.activeMinutes, 0) / 60);
+
+  // Cache-efficiency derived figures. Empty state = no input and no cache reads in the range.
+  readonly cachePct = computed(() => Math.round((this.cacheEff()?.cacheReadRatio ?? 0) * 100));
+  readonly cacheEmpty = computed(() => {
+    const c = this.cacheEff();
+    return !c || (c.cacheReadTokens === 0 && c.inputTokens === 0 && c.cacheWriteTokens === 0);
+  });
 
   constructor() {
     this.hydrateFromUrl();
@@ -148,10 +165,99 @@ export class Dashboard {
   }
 
 
+  /** Build the upsert payload from the CURRENT dashboard state (filter + groupBy). */
+  private viewPayload(name: string) {
+    const f = this.filter();
+    return {
+      name,
+      from: f.from, to: f.to,
+      projectId: f.projectIds, model: f.models, source: f.sources,
+      includeSidechain: f.includeSidechain, groupBy: this.groupBy(),
+    };
+  }
+
+  /** Save the current filter set as a named view (upsert-by-name on the server). */
+  saveCurrentView(): void {
+    const name = (prompt('Save current filters as a view named:') ?? '').trim();
+    if (!name) return;
+    this.savingView.set(true);
+    this.api.saveView(this.viewPayload(name)).subscribe({
+      next: v => {
+        this.savingView.set(false);
+        // Upsert-by-name: replace if it already exists, else append; keep sorted by name.
+        this.savedViews.update(list => {
+          const rest = list.filter(x => x.id !== v.id && x.name.toLowerCase() !== v.name.toLowerCase());
+          return [...rest, v].sort((a, b) => a.name.localeCompare(b.name));
+        });
+        this.snack.open(`Saved view “${v.name}”`, 'OK', { duration: 2500 });
+      },
+      error: () => { this.savingView.set(false); this.snack.open('Could not save view', 'Dismiss', { duration: 4000 }); },
+    });
+  }
+
+  /** Load a saved view's filters + groupBy into dashboard state and apply through the normal path. */
+  applyView(v: SavedView): void {
+    this.filter.set({
+      from: v.from, to: v.to,
+      projectIds: [...v.projectId], models: [...v.model], sources: [...v.source],
+      includeSidechain: v.includeSidechain,
+    });
+    this.groupBy.set((v.groupBy || 'day') as GroupBy);
+    // A saved view carries an explicit range, so it's no longer the all-time quick-range.
+    this.activePreset.set(v.from || v.to ? '' : 'all');
+    this.applyFilters();
+    this.snack.open(`Applied “${v.name}”`, 'OK', { duration: 2000 });
+  }
+
+  startRename(v: SavedView, ev: Event): void {
+    ev.stopPropagation();
+    this.renamingViewId.set(v.id);
+    this.renameDraft.set(v.name);
+  }
+
+  cancelRename(ev?: Event): void {
+    ev?.stopPropagation();
+    this.renamingViewId.set(null);
+  }
+
+  /** Commit a rename — reuses the view's stored filter payload, only the name changes. */
+  commitRename(v: SavedView, ev?: Event): void {
+    ev?.stopPropagation();
+    const name = this.renameDraft().trim();
+    if (!name || name === v.name) { this.renamingViewId.set(null); return; }
+    this.api.updateView(v.id, {
+      name,
+      from: v.from, to: v.to,
+      projectId: v.projectId, model: v.model, source: v.source,
+      includeSidechain: v.includeSidechain, groupBy: v.groupBy,
+    }).subscribe({
+      next: updated => {
+        this.renamingViewId.set(null);
+        this.savedViews.update(list =>
+          list.map(x => x.id === updated.id ? updated : x).sort((a, b) => a.name.localeCompare(b.name)));
+      },
+      error: () => this.snack.open('Rename failed', 'Dismiss', { duration: 4000 }),
+    });
+  }
+
+  deleteView(v: SavedView, ev: Event): void {
+    ev.stopPropagation();
+    if (!confirm(`Delete the saved view “${v.name}”?`)) return;
+    this.api.deleteView(v.id).subscribe({
+      next: () => this.savedViews.update(list => list.filter(x => x.id !== v.id)),
+      error: () => this.snack.open('Could not delete view', 'Dismiss', { duration: 4000 }),
+    });
+  }
+
   private loadOptions(): void {
     this.api.projects().subscribe(p => this.projects.set(p));
     this.api.models().subscribe(m => this.modelStats.set(m));
     this.api.sources().subscribe(s => this.sources.set(s));
+    this.loadSavedViews();
+  }
+
+  private loadSavedViews(): void {
+    this.api.savedViews().subscribe({ next: v => this.savedViews.set(v), error: () => { /* non-critical */ } });
   }
 
   // mutate filter helpers (immutability for signal change detection)
@@ -219,11 +325,13 @@ export class Dashboard {
       summary: this.api.summary(this.filter(), this.groupBy()),
       records: this.api.records(this.filter(), this.page(), this.pageSize(), this.sort(), this.desc()),
       calendar: this.api.calendar(this.filter()),
+      cacheEff: this.api.cacheEfficiency(this.filter()),
     }).subscribe({
       next: r => {
         this.summary.set(r.summary);
         this.records.set(r.records);
         this.calendarDays.set(r.calendar);
+        this.cacheEff.set(r.cacheEff);
         this.loading.set(false);
       },
       error: () => { this.loading.set(false); this.snack.open('Failed to load data — is the API running?', 'Dismiss', { duration: 5000 }); },

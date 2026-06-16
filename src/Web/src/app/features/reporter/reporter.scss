@@ -302,7 +302,75 @@
   .key-revoke { flex: 0 0 auto; mat-icon { font-size: 17px; height: 17px; width: 17px; margin-right: 3px; } }
 }
 
+.key-listhead {
+  color: var(--tech-text-tertiary);
+  padding: 0 0 var(--tech-space-2) 2px;
+}
+
+.key-owner {
+  display: inline-flex; align-items: center; gap: 4px;
+  max-width: 220px; min-width: 0;
+  padding: 2px 8px;
+  border-radius: var(--tech-r-chip);
+  border: 1px solid var(--tech-border-subtle);
+  background: var(--tech-bg-sunken);
+  font-size: var(--tech-fs-micro, 11px);
+  color: var(--tech-text-secondary);
+  white-space: nowrap; overflow: hidden;
+
+  mat-icon { flex: 0 0 auto; font-size: 13px; width: 13px; height: 13px; color: var(--tech-text-tertiary); }
+  &.mine {
+    border-color: color-mix(in srgb, var(--tech-accent) 45%, transparent);
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    color: var(--tech-text-accent);
+    mat-icon { color: var(--tech-accent); }
+  }
+
+  .you-badge {
+    flex: 0 0 auto;
+    padding: 0 6px;
+    border-radius: var(--tech-r-pill);
+    background: var(--tech-accent);
+    color: var(--tech-text-on-accent, #fff);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 9px;
+  }
+}
+
 .key-empty { color: var(--tech-text-tertiary); padding: var(--tech-space-2) 0; }
+
+/* ───────────────────────── Self-service explainer ───────────────────────── */
+.self-explainer {
+  .se-head {
+    display: flex; align-items: flex-start; gap: var(--tech-space-3);
+    .se-icon {
+      flex: 0 0 auto; font-size: 24px; width: 24px; height: 24px;
+      color: var(--tech-accent); margin-top: 2px;
+    }
+    .se-title {
+      font-family: var(--tech-font-ui);
+      font-size: var(--tech-fs-body); font-weight: 700;
+      color: var(--tech-text); margin-bottom: 4px;
+    }
+    .se-sub {
+      margin: 0; max-width: 640px;
+      font-size: var(--tech-fs-label); line-height: 1.55;
+      color: var(--tech-text-secondary);
+      b.mono { color: var(--tech-text-accent); }
+    }
+  }
+  .se-steps {
+    margin: var(--tech-space-3) 0 0;
+    padding-left: 22px;
+    font-size: var(--tech-fs-label); line-height: 1.6;
+    color: var(--tech-text-secondary);
+    li { margin-bottom: 4px; }
+    li::marker { color: var(--tech-accent); font-weight: 700; }
+    strong { color: var(--tech-text); }
+  }
+}
 
 .danger-btn { color: var(--tech-text-tertiary); &:hover { color: var(--tech-error, #ff5c6c); } }
 

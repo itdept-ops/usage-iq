@@ -17,3 +17,19 @@ export function permissionGuard(permission: string): CanActivateFn {
     return auth.hasPermission(permission) ? true : router.createUrlTree(['/welcome']);
   };
 }
+
+/**
+ * Guard factory: requires authentication + ANY of the given permissions (logical OR). Used for
+ * pages reachable by more than one capability — e.g. Reporter (self-service OR full management) or
+ * Fleet (dashboard OR reporter viewers). Same redirect rules as {@link permissionGuard}.
+ */
+export function anyPermissionGuard(...permissions: string[]): CanActivateFn {
+  return (_route, state) => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
+    if (!auth.isAuthenticated()) {
+      return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+    }
+    return auth.hasAnyPermission(...permissions) ? true : router.createUrlTree(['/welcome']);
+  };
+}

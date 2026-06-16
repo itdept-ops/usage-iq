@@ -22,6 +22,13 @@ export class AuthService {
     return this.isAuthenticated() && (this._session()?.permissions?.includes(key) ?? false);
   }
 
+  /** True if the (non-expired) session grants ANY of the given permissions (logical OR). */
+  hasAnyPermission(...keys: string[]): boolean {
+    if (!this.isAuthenticated()) return false;
+    const perms = this._session()?.permissions ?? [];
+    return keys.some(k => perms.includes(k));
+  }
+
   /**
    * The first page route the user can actually view, in nav order. Used as the post-login
    * landing target and the "home" of the app. Falls back to '/welcome' for a user with no
@@ -34,6 +41,8 @@ export class AuthService {
       [PERM.pricingView, '/pricing'],
       [PERM.settingsView, '/settings'],
       [PERM.reporterView, '/reporter'],
+      [PERM.reporterManage, '/reporter'],
+      [PERM.reporterSelf, '/reporter'],
       [PERM.usersView, '/users'],
       [PERM.activityView, '/activity'],
     ];

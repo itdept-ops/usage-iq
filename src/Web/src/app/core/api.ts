@@ -2,10 +2,11 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AccessPolicy, AuditEntry, CalendarDay, CreateShareRequest, GroupBy, HeatmapCell, IngestionSource, IngestKey,
-  IngestKeyCreated, ManagedUser, ModelStat, NotificationSettings, NotificationUpdate, PagedResult, PermissionItem,
-  Pricing, ProjectDto, PublicShare, RequestLogEntry, SessionDetail, Settings, ShareAccessItem, ShareCreated,
-  ShareListItem, SummaryResponse, SyncResult, SyncStatus, UsageFilter, UsageRecord, UsageStats,
+  AccessPolicy, AuditEntry, CacheEfficiency, CalendarDay, CreateShareRequest, Fleet, GroupBy, HeatmapCell,
+  IngestionSource, IngestKey, IngestKeyCreated, ManagedUser, ModelStat, NotificationSettings, NotificationUpdate,
+  PagedResult, PermissionItem, Pricing, ProjectDto, PublicShare, RequestLogEntry, SavedView, SavedViewUpsertRequest,
+  SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SummaryResponse, SyncResult, SyncStatus,
+  UsageFilter, UsageRecord, UsageStats,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -40,8 +41,18 @@ export class Api {
     return this.http.get<CalendarDay[]>(`${this.base}/usage/calendar`, { params: f ? this.filterParams(f) : undefined });
   }
 
+  /** Fleet rollup: per-machine and per-user leaderboards for the filtered range. */
+  fleet(f?: UsageFilter): Observable<Fleet> {
+    return this.http.get<Fleet>(`${this.base}/fleet`, { params: f ? this.filterParams(f) : undefined });
+  }
+
   heatmap(f?: UsageFilter): Observable<HeatmapCell[]> {
     return this.http.get<HeatmapCell[]>(`${this.base}/usage/heatmap`, { params: f ? this.filterParams(f) : undefined });
+  }
+
+  /** Cache-efficiency rollup for the filtered range (same filters as the summary). */
+  cacheEfficiency(f: UsageFilter): Observable<CacheEfficiency> {
+    return this.http.get<CacheEfficiency>(`${this.base}/usage/cache-efficiency`, { params: this.filterParams(f) });
   }
 
   stats(f?: UsageFilter): Observable<UsageStats> {
@@ -147,7 +158,9 @@ export class Api {
     return this.http.post<{ message: string }>(`${this.base}/notifications/snapshot`, {});
   }
 
-  // ---- Ingest keys (reporter credentials; requires settings.manage) ----
+  // ---- Ingest keys (reporter credentials) ----
+  // GET requires reporter.view|manage|self (manage sees all keys; self/view see only own).
+  // POST/DELETE require reporter.manage|self (self acts on own keys only).
   ingestKeys(): Observable<IngestKey[]> {
     return this.http.get<IngestKey[]>(`${this.base}/ingest-keys`);
   }
@@ -158,6 +171,24 @@ export class Api {
 
   revokeIngestKey(id: number): Observable<unknown> {
     return this.http.delete(`${this.base}/ingest-keys/${id}`);
+  }
+
+  // ---- Saved dashboard views (per-user; gated by dashboard.view OR calendar.view) ----
+  savedViews(): Observable<SavedView[]> {
+    return this.http.get<SavedView[]>(`${this.base}/saved-views`);
+  }
+
+  // Upsert-by-name: POSTing a name that already exists updates that view.
+  saveView(body: SavedViewUpsertRequest): Observable<SavedView> {
+    return this.http.post<SavedView>(`${this.base}/saved-views`, body);
+  }
+
+  updateView(id: number, body: SavedViewUpsertRequest): Observable<SavedView> {
+    return this.http.put<SavedView>(`${this.base}/saved-views/${id}`, body);
+  }
+
+  deleteView(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/saved-views/${id}`);
   }
 
   sync(): Observable<SyncResult> {

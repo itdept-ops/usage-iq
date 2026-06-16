@@ -1,0 +1,163 @@
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+<!-- ───────────────────────── Header ───────────────────────── -->
+<div class="head">
+  <div class="head-text">
+    <span class="micro-label head-eyebrow">~/fleet — who &amp; what is reporting</span>
+    <h2>Fleet</h2>
+    <p class="sub">Spend and volume rolled up by the machine that reported it and by the user who owns it. Each row
+      expands to show the linked users (for a machine) or machines (for a user). Ranked by cost.</p>
+  </div>
+</div>
+
+<!-- ───────────────────────── Filter / quick range ───────────────────────── -->
+<section class="filters glass" aria-label="Range">
+  <div class="filters-row">
+    <div class="filter-cluster dates">
+      <span class="micro-label cluster-label">Range</span>
+      <mat-form-field appearance="outline" class="f-date">
+        <mat-label>From</mat-label>
+        <input matInput type="date" [ngModel]="filter().from" (ngModelChange)="patch('from', $event)" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="f-date">
+        <mat-label>To</mat-label>
+        <input matInput type="date" [ngModel]="filter().to" (ngModelChange)="patch('to', $event)" />
+      </mat-form-field>
+    </div>
+
+    <div class="quick-chips">
+      @for (p of presets; track p.key) {
+        <button mat-button class="qr-chip" [class.active]="activePreset() === p.key" (click)="setDatePreset(p.key)">{{ p.label }}</button>
+      }
+    </div>
+
+    <span class="grow"></span>
+
+    <div class="filter-actions">
+      <button mat-stroked-button class="btn-reset" (click)="resetFilters()"><mat-icon>clear</mat-icon> Reset</button>
+      <button mat-flat-button color="primary" class="btn-apply" (click)="applyFilters()"><mat-icon>filter_list</mat-icon> Apply</button>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── Totals ───────────────────────── -->
+<div class="cards">
+  <article class="kpi panel">
+    <div class="kpi-top"><span class="kpi-label">Machines</span><span class="kpi-icon"><mat-icon>dns</mat-icon></span></div>
+    <div class="kpi-value mono-num">{{ totals().machineCount | number }}</div>
+    <div class="kpi-sub">reporting hosts</div>
+  </article>
+  <article class="kpi panel">
+    <div class="kpi-top"><span class="kpi-label">Users</span><span class="kpi-icon"><mat-icon>group</mat-icon></span></div>
+    <div class="kpi-value mono-num">{{ totals().userCount | number }}</div>
+    <div class="kpi-sub">reporting accounts</div>
+  </article>
+  <article class="kpi panel kpi-tokens">
+    <div class="kpi-top"><span class="kpi-label">Total tokens</span><span class="kpi-icon"><mat-icon>data_usage</mat-icon></span></div>
+    <div class="kpi-value mono-num">{{ totals().tokens | compact }}</div>
+    <div class="kpi-sub"><span class="mono-num">{{ totals().records | number }}</span> records</div>
+  </article>
+  <article class="kpi panel kpi-cost">
+    <div class="kpi-top"><span class="kpi-label">Total cost</span><span class="kpi-icon"><mat-icon>payments</mat-icon></span></div>
+    <div class="kpi-value mono-num cost">{{ totals().cost | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
+    <div class="kpi-sub">across the fleet</div>
+  </article>
+</div>
+
+<!-- ───────────────────────── Leaderboard ───────────────────────── -->
+<section class="board-card panel">
+  <div class="board-head">
+    <h3 class="panel-header">{{ board() === 'machines' ? 'Machines' : 'Users' }} · by cost</h3>
+    <mat-button-toggle-group [value]="board()" (change)="board.set($event.value)" hideSingleSelectionIndicator>
+      <mat-button-toggle value="machines"><mat-icon>dns</mat-icon> Machines</mat-button-toggle>
+      <mat-button-toggle value="users"><mat-icon>group</mat-icon> Users</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <div class="lb-head">
+    <span class="lb-rank">#</span>
+    <span class="lb-name">{{ board() === 'machines' ? 'Machine' : 'User' }}</span>
+    <span class="lb-seen">Last seen</span>
+    <span class="lb-num">Records</span>
+    <span class="lb-num">Tokens</span>
+    <span class="lb-num">Cost</span>
+  </div>
+
+  @if (board() === 'machines') {
+    @for (m of machines(); track m.name; let i = $index) {
+      <div class="lb-row" [class.open]="isExpanded(m.name)">
+        <button class="lb-main" (click)="toggle(m.name)" [attr.aria-expanded]="isExpanded(m.name)">
+          <span class="lb-rank mono-num">{{ i + 1 }}</span>
+          <span class="lb-name">
+            <mat-icon class="lb-chev">{{ isExpanded(m.name) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+            <mat-icon class="lb-kind">{{ isLocal(m.name) ? 'home' : 'dns' }}</mat-icon>
+            <span class="lb-label" [title]="m.name">{{ isLocal(m.name) ? 'local (file sync)' : m.name }}</span>
+            <span class="lb-tag micro-label">{{ m.users.length }} user{{ m.users.length === 1 ? '' : 's' }}</span>
+          </span>
+          <span class="lb-seen mono-num" [title]="(m.lastSeenUtc | date: 'medium') || 'never'">{{ seen(m.lastSeenUtc) }}</span>
+          <span class="lb-num mono-num">{{ m.records | number }}</span>
+          <span class="lb-num mono-num">{{ m.tokens | compact }}</span>
+          <span class="lb-num mono-num cost">
+            {{ m.costUsd | currency: 'USD' : 'symbol' : '1.2-2' }}
+            <span class="lb-bar" aria-hidden="true"><i [style.width.%]="costPct(m.costUsd)"></i></span>
+          </span>
+        </button>
+        @if (isExpanded(m.name)) {
+          <div class="lb-detail">
+            <span class="lb-detail-lbl micro-label">Users on this machine</span>
+            @if (m.users.length) {
+              <div class="chips">
+                @for (u of m.users; track u) {
+                  <span class="ent-chip"><mat-icon>person</mat-icon>{{ u }}</span>
+                }
+              </div>
+            } @else {
+              <span class="lb-detail-empty">No linked users.</span>
+            }
+          </div>
+        }
+      </div>
+    } @empty {
+      <div class="lb-empty">No machines have reported in this range.</div>
+    }
+  } @else {
+    @for (u of users(); track u.email; let i = $index) {
+      <div class="lb-row" [class.open]="isExpanded(u.email)">
+        <button class="lb-main" (click)="toggle(u.email)" [attr.aria-expanded]="isExpanded(u.email)">
+          <span class="lb-rank mono-num">{{ i + 1 }}</span>
+          <span class="lb-name">
+            <mat-icon class="lb-chev">{{ isExpanded(u.email) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+            <mat-icon class="lb-kind">{{ isLocal(u.email) ? 'home' : 'person' }}</mat-icon>
+            <span class="lb-label" [title]="u.email">{{ isLocal(u.email) ? 'local (file sync)' : u.email }}</span>
+            <span class="lb-tag micro-label">{{ u.machines.length }} machine{{ u.machines.length === 1 ? '' : 's' }}</span>
+          </span>
+          <span class="lb-seen mono-num" [title]="(u.lastSeenUtc | date: 'medium') || 'never'">{{ seen(u.lastSeenUtc) }}</span>
+          <span class="lb-num mono-num">{{ u.records | number }}</span>
+          <span class="lb-num mono-num">{{ u.tokens | compact }}</span>
+          <span class="lb-num mono-num cost">
+            {{ u.costUsd | currency: 'USD' : 'symbol' : '1.2-2' }}
+            <span class="lb-bar" aria-hidden="true"><i [style.width.%]="costPct(u.costUsd)"></i></span>
+          </span>
+        </button>
+        @if (isExpanded(u.email)) {
+          <div class="lb-detail">
+            <span class="lb-detail-lbl micro-label">Machines this user reported from</span>
+            @if (u.machines.length) {
+              <div class="chips">
+                @for (mname of u.machines; track mname) {
+                  <span class="ent-chip"><mat-icon>dns</mat-icon>{{ isLocal(mname) ? 'local' : mname }}</span>
+                }
+              </div>
+            } @else {
+              <span class="lb-detail-empty">No linked machines.</span>
+            }
+          </div>
+        }
+      </div>
+    } @empty {
+      <div class="lb-empty">No users have reported in this range.</div>
+    }
+  }
+</section>

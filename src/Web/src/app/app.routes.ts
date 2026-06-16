@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth.guard';
-import { permissionGuard } from './core/permission.guard';
+import { permissionGuard, anyPermissionGuard } from './core/permission.guard';
 import { PERM } from './core/models';
 
 export const routes: Routes = [
@@ -63,9 +63,15 @@ export const routes: Routes = [
   },
   {
     path: 'reporter',
-    canActivate: [permissionGuard(PERM.reporterView)],
+    canActivate: [anyPermissionGuard(PERM.reporterView, PERM.reporterManage, PERM.reporterSelf)],
     loadComponent: () => import('./features/reporter/reporter').then(m => m.ReporterPage),
     title: 'Usage IQ · Reporter',
+  },
+  {
+    path: 'fleet',
+    canActivate: [anyPermissionGuard(PERM.dashboardView, PERM.reporterView, PERM.reporterManage)],
+    loadComponent: () => import('./features/fleet/fleet').then(m => m.Fleet),
+    title: 'Usage IQ · Fleet',
   },
   {
     path: 'users',

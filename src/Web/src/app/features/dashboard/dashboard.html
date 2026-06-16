@@ -74,6 +74,44 @@
   @for (p of presets; track p.key) {
     <button mat-button class="qr-chip" [class.active]="activePreset() === p.key" (click)="setDatePreset(p.key)">{{ p.label }}</button>
   }
+  <span class="qr-divider"></span>
+
+  <!-- Saved views: save the current filter set, or apply/rename/delete an existing one. -->
+  <button mat-button class="qr-chip views-trigger" [matMenuTriggerFor]="viewsMenu"
+          matTooltip="Save or apply a named filter view">
+    <mat-icon>bookmarks</mat-icon> Views
+    @if (savedViews().length) { <span class="views-count">{{ savedViews().length }}</span> }
+  </button>
+  <mat-menu #viewsMenu="matMenu" class="views-menu">
+    <button mat-menu-item [disabled]="savingView()" (click)="saveCurrentView()">
+      <mat-icon>bookmark_add</mat-icon>
+      <span>Save current filters…</span>
+    </button>
+    @if (savedViews().length) {
+      <div class="views-list-head">Saved views</div>
+      @for (v of savedViews(); track v.id) {
+        @if (renamingViewId() === v.id) {
+          <div class="view-rename" (click)="$event.stopPropagation()">
+            <input class="view-rename-input" [ngModel]="renameDraft()" (ngModelChange)="renameDraft.set($event)"
+                   (keydown.enter)="commitRename(v, $event)" (keydown.escape)="cancelRename($event)"
+                   placeholder="View name" autofocus />
+            <button mat-icon-button class="rn-ok" matTooltip="Save name" (click)="commitRename(v, $event)"><mat-icon>check</mat-icon></button>
+            <button mat-icon-button class="rn-cancel" matTooltip="Cancel" (click)="cancelRename($event)"><mat-icon>close</mat-icon></button>
+          </div>
+        } @else {
+          <div class="view-item" (click)="applyView(v)">
+            <mat-icon class="view-ico">filter_alt</mat-icon>
+            <span class="view-name" [matTooltip]="'Apply ' + v.name">{{ v.name }}</span>
+            <button mat-icon-button class="view-act" matTooltip="Rename" (click)="startRename(v, $event)"><mat-icon>edit</mat-icon></button>
+            <button mat-icon-button class="view-act danger" matTooltip="Delete" (click)="deleteView(v, $event)"><mat-icon>delete</mat-icon></button>
+          </div>
+        }
+      }
+    } @else {
+      <div class="views-empty">No saved views yet — save your current filters to reuse them later.</div>
+    }
+  </mat-menu>
+
   <span class="qr-grow"></span>
   @if (sources().length) {
     <button mat-stroked-button class="qr-export" matTooltip="Open a small live stats window to screen-share or capture"
@@ -157,15 +195,58 @@
     </div>
   </section>
 
-  <section class="chart-card panel">
-    <div class="chart-head"><h3 class="panel-header">Cost by model</h3></div>
-    <div class="chart-well">
-      <app-chart [option]="modelChart()" />
-    </div>
-    @if (modelStats().length && hasPlaceholder()) {
-      <p class="placeholder-note"><mat-icon>info</mat-icon> Some models use placeholder pricing — set real rates in <a routerLink="/pricing">Pricing</a>.</p>
-    }
-  </section>
+  <div class="side-stack">
+    <section class="chart-card panel">
+      <div class="chart-head"><h3 class="panel-header">Cost by model</h3></div>
+      <div class="chart-well">
+        <app-chart [option]="modelChart()" />
+      </div>
+      @if (modelStats().length && hasPlaceholder()) {
+        <p class="placeholder-note"><mat-icon>info</mat-icon> Some models use placeholder pricing — set real rates in <a routerLink="/pricing">Pricing</a>.</p>
+      }
+    </section>
+
+    <!-- Cache efficiency — how much input was served from the cheap cache, and what that saved. -->
+    <section class="cache-card panel" aria-label="Cache efficiency">
+      <div class="chart-head">
+        <h3 class="panel-header"><mat-icon class="hd-ico">bolt</mat-icon> Cache efficiency</h3>
+      </div>
+      @if (cacheEmpty()) {
+        <div class="cache-empty">
+          <mat-icon>cached</mat-icon>
+          <p>No cache activity in this range yet. Once prompts reuse cached context, your savings show up here.</p>
+        </div>
+      } @else {
+        <div class="cache-headline">
+          <span class="cache-pct mono-num">{{ cachePct() }}<span class="dim">%</span></span>
+          <span class="cache-headline-label">of input served from cache</span>
+        </div>
+        <div class="cache-bar" role="img" [attr.aria-label]="cachePct() + ' percent of input served from cache'">
+          <span class="cache-bar-fill" [style.width.%]="cachePct()"></span>
+        </div>
+
+        <div class="cache-insight">
+          <mat-icon>savings</mat-icon>
+          <span>~<strong>{{ cacheEff()!.savingsUsd | currency: 'USD' : 'symbol' : '1.2-2' }}</strong> saved by caching</span>
+        </div>
+
+        <div class="cache-stats">
+          <div class="cache-stat">
+            <span class="cs-label">Cache reads</span>
+            <span class="cs-value mono-num">{{ cacheEff()!.cacheReadTokens | compact }}</span>
+          </div>
+          <div class="cache-stat">
+            <span class="cs-label">Cache writes</span>
+            <span class="cs-value mono-num">{{ cacheEff()!.cacheWriteTokens | compact }}</span>
+          </div>
+          <div class="cache-stat">
+            <span class="cs-label">Write cost</span>
+            <span class="cs-value mono-num cost">{{ cacheEff()!.cacheWriteCostUsd | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
+          </div>
+        </div>
+      }
+    </section>
+  </div>
 </div>
 
 <!-- ───────────────────────── Records table ───────────────────────── -->

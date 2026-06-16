@@ -15,9 +15,11 @@ import { AuthService } from '../../core/auth';
 import { IngestKey, IngestKeyCreated, PERM } from '../../core/models';
 
 /**
- * Setup guide + ingest-key management for the remote reporter (cloud-hosting flow). The whole page
- * is gated by `settings.manage` (route guard + nav link); the ingest endpoints it documents are
- * themselves gated (key-authenticated ingest, settings.manage key CRUD).
+ * Setup guide + ingest-key management for the remote reporter (cloud-hosting flow). Reachable by any
+ * of reporter.view / reporter.manage / reporter.self (route guard + nav link). A `reporter.manage`
+ * caller sees and acts on every key (with an owner column); a `reporter.self` caller manages only
+ * their own keys and gets a short "get your own token" explainer. The ingest endpoints enforce the
+ * same ownership rules server-side.
  */
 @Component({
   selector: 'app-reporter',
@@ -33,6 +35,13 @@ export class ReporterPage {
   private snack = inject(MatSnackBar);
   readonly auth = inject(AuthService);
   readonly PERM = PERM;
+
+  /** Full-fleet management (can see/revoke every key and the owner column). */
+  readonly canManage = computed(() => this.auth.hasPermission(PERM.reporterManage));
+  /** May create/revoke own keys (true for both self-service and full-manage callers). */
+  readonly canCreate = computed(() => this.auth.hasAnyPermission(PERM.reporterManage, PERM.reporterSelf));
+  /** Self-service only (own keys) — drives the "get your own token" explainer. */
+  readonly selfServiceOnly = computed(() => this.canCreate() && !this.canManage());
 
   /** This dashboard's origin is exactly the reporter's `--url` value. */
   readonly serverUrl = signal(window.location.origin);
@@ -57,6 +66,12 @@ export class ReporterPage {
 
   constructor() {
     this.loadIngestKeys();
+  }
+
+  /** True when a key is owned by the signed-in caller (case-insensitive email match). */
+  isMine(k: IngestKey): boolean {
+    const me = this.auth.session()?.email?.toLowerCase();
+    return !!me && k.ownerEmail?.toLowerCase() === me;
   }
 
   private loadIngestKeys(): void {

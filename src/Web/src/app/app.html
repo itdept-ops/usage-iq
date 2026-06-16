@@ -33,8 +33,11 @@
       @if (auth.hasPermission('settings.view')) {
         <a mat-button class="nav__item" routerLink="/settings" routerLinkActive="active">Settings</a>
       }
-      @if (auth.hasPermission('reporter.view')) {
+      @if (auth.hasAnyPermission('reporter.view', 'reporter.manage', 'reporter.self')) {
         <a mat-button class="nav__item" routerLink="/reporter" routerLinkActive="active">Reporter</a>
+      }
+      @if (auth.hasAnyPermission('dashboard.view', 'reporter.view', 'reporter.manage')) {
+        <a mat-button class="nav__item" routerLink="/fleet" routerLinkActive="active">Fleet</a>
       }
       @if (auth.hasPermission('users.view')) {
         <a mat-button class="nav__item" routerLink="/users" routerLinkActive="active">Users</a>
