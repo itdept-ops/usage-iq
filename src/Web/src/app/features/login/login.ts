@@ -60,8 +60,10 @@ export class Login {
         cancel_on_tap_outside: false,
       });
 
+      // filled_black is Google's official dark button — it matches the dark theme (no clashing white
+      // card) and still personalizes to "Continue as <name>" for returning users.
       google.accounts.id.renderButton(this.btn().nativeElement, {
-        theme: 'filled_blue',
+        theme: 'filled_black',
         size: 'large',
         shape: 'pill',
         text: 'continue_with',
@@ -69,8 +71,8 @@ export class Login {
         width: 280,
       });
 
-      // Intentionally no One Tap prompt() — its personalized "Continue as <name>" card renders a
-      // broken avatar for accounts without a photo and overlaps the clean button.
+      // No One Tap prompt() — its "Continue as" card is a cross-origin Google iframe with a white
+      // background we can't recolor; the dark button above gives the same one-click sign-in.
     } catch {
       this.error.set('Could not load Google sign-in. Check your connection and try again.');
     }
