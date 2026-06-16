@@ -28,5 +28,22 @@ To tear it all down later: `aws cloudformation delete-stack --region us-west-2 -
 (plus deleting the two ECR repos if they still hold images).
 
 ## Deploying the app
-On every push to `main`, `.github/workflows/deploy.yml` builds the API + web images, pushes them to
-ECR, and rolls them out on the instance via SSM. The instance reads its secrets from SSM at start.
+On every push to `main`, `.github/workflows/deploy.yml`:
+1. assumes the deploy role via OIDC and logs in to ECR,
+2. builds the **api** (`src/Api/Dockerfile`) and **web** (`src/Web/Dockerfile`) images and pushes them,
+3. runs `deploy/remote-deploy.sh` on the instance via SSM — which reads secrets/config from SSM,
+   logs in to ECR, and `docker compose -f docker-compose.prod.yml up -d`.
+
+The runtime stack is **Caddy → web (SPA + /api) → api → Postgres**. Caddy fetches and renews a
+Let's Encrypt cert for `${DOMAIN}` automatically once DNS points at the Elastic IP.
+
+### Config (SSM Parameter Store)
+| Parameter | Set by | Notes |
+| --- | --- | --- |
+| `/usage-iq/jwt-key`, `/usage-iq/db-password` | `provision.sh` | generated SecureStrings |
+| `/usage-iq/domain` | optional | defaults to `usageiq.online` |
+| `/usage-iq/admin-email` | optional | first dashboard admin + ACME email |
+| `/usage-iq/google-client-id`, `/usage-iq/google-client-secret` | you | required for sign-in; add then redeploy |
+
+After provisioning: point DNS at the Elastic IP, add the domain to your Google OAuth client's
+authorized origins, put the Google client id/secret into SSM, and re-run the deploy.

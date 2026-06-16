@@ -1,26 +1,68 @@
 name: Deploy
 
-# For now this just proves the GitHub→AWS OIDC handshake works (no keys stored anywhere).
-# Once verified, this workflow grows into the real deploy (build images → ECR → roll out via SSM).
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  id-token: write   # lets the runner request a short-lived OIDC token
+  id-token: write   # OIDC
   contents: read
 
+env:
+  AWS_REGION: us-west-2
+  ECR_REGISTRY: 398152420190.dkr.ecr.us-west-2.amazonaws.com
+
 jobs:
-  oidc-check:
-    name: Verify AWS OIDC
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Assume the deploy role via OIDC
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: us-west-2
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Who am I (should print the assumed usage-iq-deploy role)
-        run: aws sts get-caller-identity
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push API image
+        run: |
+          docker build -f src/Api/Dockerfile -t "$ECR_REGISTRY/usage-iq-api:latest" src
+          docker push "$ECR_REGISTRY/usage-iq-api:latest"
+
+      - name: Build & push web image
+        run: |
+          docker build -f src/Web/Dockerfile -t "$ECR_REGISTRY/usage-iq-web:latest" src/Web
+          docker push "$ECR_REGISTRY/usage-iq-web:latest"
+
+      - name: Roll out on the instance (SSM)
+        run: |
+          BOOT='dnf install -y git >/dev/null 2>&1 || true; cd /opt/usage-iq && (if [ -d .git ]; then git fetch origin main -q && git reset --hard origin/main -q; else git clone -q https://github.com/itdept-ops/usage-iq .; fi) && bash deploy/remote-deploy.sh'
+          CMD_ID=$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --document-name AWS-RunShellScript \
+            --targets Key=tag:Project,Values=usage-iq \
+            --comment "usage-iq deploy ${{ github.sha }}" \
+            --parameters commands="$BOOT" \
+            --query Command.CommandId --output text)
+          echo "SSM command: $CMD_ID"
+
+          for i in $(seq 1 90); do
+            STATUS=$(aws ssm list-command-invocations --region "$AWS_REGION" --command-id "$CMD_ID" \
+              --query 'CommandInvocations[0].Status' --output text 2>/dev/null || echo Pending)
+            echo "  [$i] $STATUS"
+            case "$STATUS" in
+              Success) OK=1; break ;;
+              Failed|Cancelled|TimedOut) OK=0; break ;;
+            esac
+            sleep 10
+          done
+
+          echo "----- remote output -----"
+          aws ssm list-command-invocations --region "$AWS_REGION" --command-id "$CMD_ID" --details \
+            --query 'CommandInvocations[0].CommandPlugins[0].Output' --output text || true
+          echo "-------------------------"
+          [ "${OK:-0}" = "1" ] || { echo "Deploy step failed."; exit 1; }

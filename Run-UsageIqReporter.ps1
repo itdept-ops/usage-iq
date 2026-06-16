@@ -20,7 +20,7 @@
   Full guide: docs/reporter.md  ·  https://github.com/itdept-ops/usage-iq
 #>
 param(
-    [string]$Url      = "http://localhost:4200",
+    [string]$Url      = "https://usageiq.online",
     [string]$RepoRoot = "",                       # auto-detected if blank (see below)
     [string]$Key      = $env:REPORTER_KEY,
     [string]$Machine  = $env:COMPUTERNAME,

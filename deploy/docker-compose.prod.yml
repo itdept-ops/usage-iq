@@ -1,0 +1,64 @@
+# Production stack on the EC2 host. Images come from ECR (built + pushed by GitHub Actions).
+# Caddy terminates HTTPS for ${DOMAIN}; web serves the SPA and proxies /api; api talks to Postgres.
+# Values are filled from .env, which deploy/remote-deploy.sh writes from SSM secrets at deploy time.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ccusage
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ccusage
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ccusage -d ccusage"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    image: ${ECR}/usage-iq-api:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=ccusage;Username=ccusage;Password=${DB_PASSWORD}"
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: usage-iq
+      Jwt__Audience: usage-iq
+      Cors__AllowedOrigin: "https://${DOMAIN}"
+      AutoSync__Enabled: "false"           # cloud: data comes from the remote reporter, not local files
+      Google__ClientId: ${GOOGLE_CLIENT_ID}
+      Google__ClientSecret: ${GOOGLE_CLIENT_SECRET}
+      Auth__AdminEmails__0: ${ADMIN_EMAIL}
+      ASPNETCORE_URLS: "http://+:8080"
+
+  web:
+    image: ${ECR}/usage-iq-web:latest
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,9 @@
+# Auto-HTTPS via Let's Encrypt. Caddy fetches + renews the cert for $DOMAIN once DNS points here.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy web:80
+}
