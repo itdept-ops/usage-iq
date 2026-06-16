@@ -30,10 +30,15 @@ export class App {
   readonly status = signal<SyncStatus | null>(null);
   private readonly now = signal(Date.now());
 
-  /** Widget pop-outs and public shared views render bare (no toolbar / page chrome). */
+  /**
+   * Widget pop-outs, public shared views, and the public marketing pages (landing / features /
+   * how-it-works) render bare — they bring their own chrome, so the app toolbar is hidden.
+   */
   readonly bareLayout = signal(App.isBare(this.router.url));
+  private static readonly barePrefixes = ['/widget', '/share', '/login', '/features', '/how-it-works'];
   private static isBare(url: string): boolean {
-    return url.startsWith('/widget') || url.startsWith('/share');
+    const path = url.split('?')[0];
+    return App.barePrefixes.some(p => path === p || path.startsWith(p + '/'));
   }
 
   readonly state = computed(() => {

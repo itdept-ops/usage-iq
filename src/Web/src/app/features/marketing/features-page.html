@@ -1,0 +1,43 @@
+<app-marketing-nav />
+
+<main class="mpage">
+  <div class="bg-fx" aria-hidden="true"><div class="grid-fade"></div><div class="orb orb-a"></div><div class="orb orb-b"></div></div>
+
+  <header class="mpage-hero">
+    <span class="page-eyebrow">Features</span>
+    <h1>Everything Usage IQ does, in detail.</h1>
+    <p>A self-hosted command center for AI-agent spend. No telemetry, no seat pricing — just your data, on your infrastructure.</p>
+  </header>
+
+  <section class="blocks">
+    @for (b of blocks; track b.title; let i = $index) {
+      <article class="block" [class.flip]="i % 2 === 1">
+        <div class="block-copy">
+          <span class="block-icon"><mat-icon>{{ b.icon }}</mat-icon></span>
+          <span class="block-kicker">{{ b.kicker }}</span>
+          <h2>{{ b.title }}</h2>
+          <p>{{ b.text }}</p>
+        </div>
+        <ul class="block-points panel">
+          @for (pt of b.points; track pt) {
+            <li><mat-icon>check_circle</mat-icon><span>{{ pt }}</span></li>
+          }
+        </ul>
+      </article>
+    }
+  </section>
+
+  <section class="mpage-cta">
+    <div class="cta-card panel">
+      <div class="cta-glow" aria-hidden="true"></div>
+      <h2>Ready to see your own numbers?</h2>
+      <p>Sign in with an approved account, or read how the pipeline fits together.</p>
+      <div class="cta-row">
+        <a class="cta-pill" routerLink="/login">Sign in <span>→</span></a>
+        <a class="ghost-link" routerLink="/how-it-works">How it works <span>→</span></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<app-marketing-footer />

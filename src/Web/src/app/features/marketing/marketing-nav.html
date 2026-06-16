@@ -1,0 +1,40 @@
+<header class="mnav" [class.scrolled]="scrolled()">
+  <div class="mnav-inner">
+    <a class="brand" routerLink="/login" (click)="close()" aria-label="Usage IQ home">
+      <svg class="brand-logo" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="mnav-grad" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#3D8BFF" /><stop offset="0.52" stop-color="#8B7CFF" /><stop offset="1" stop-color="#3FD8D0" />
+          </linearGradient>
+        </defs>
+        <rect x="1.25" y="1.25" width="29.5" height="29.5" rx="7.5" fill="#0B1019" stroke="url(#mnav-grad)" stroke-width="1.5" />
+        <rect x="7" y="18" width="3.6" height="7" rx="1.3" fill="url(#mnav-grad)" />
+        <rect x="14.2" y="13" width="3.6" height="12" rx="1.3" fill="url(#mnav-grad)" />
+        <rect x="21.4" y="8" width="3.6" height="17" rx="1.3" fill="url(#mnav-grad)" />
+        <path d="M8.8 15.5 L16 11 L23.2 6.4" stroke="#E6EDF6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" />
+        <circle cx="23.2" cy="6.4" r="2" fill="#3FD8D0" />
+      </svg>
+      <span class="brand-word">Usage&nbsp;IQ</span>
+    </a>
+
+    <nav class="mnav-links" [class.open]="menuOpen()" aria-label="Primary">
+      @for (l of links; track l.path) {
+        <a [routerLink]="l.path" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: l.exact }"
+           (click)="close()">{{ l.label }}</a>
+      }
+      <a class="mnav-cta mobile-only" routerLink="/login" (click)="close()">Sign in</a>
+    </nav>
+
+    <div class="mnav-right">
+      <a class="gh" href="https://github.com/itdept-ops/usage-iq" target="_blank" rel="noopener" aria-label="GitHub">
+        <mat-icon>code</mat-icon>
+      </a>
+      <a class="mnav-cta desktop-only" routerLink="/login">
+        Sign in <span class="cta-arrow">→</span>
+      </a>
+      <button class="mnav-burger" (click)="toggle()" [attr.aria-expanded]="menuOpen()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>

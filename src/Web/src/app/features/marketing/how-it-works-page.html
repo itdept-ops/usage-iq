@@ -1,0 +1,57 @@
+<app-marketing-nav />
+
+<main class="mpage">
+  <div class="bg-fx" aria-hidden="true"><div class="grid-fade"></div><div class="orb orb-a"></div><div class="orb orb-b"></div></div>
+
+  <header class="mpage-hero">
+    <span class="page-eyebrow">How it works</span>
+    <h1>From log file to dashboard.</h1>
+    <p>Four stages move usage off your machine and onto a screen you control — privately, and idempotently.</p>
+  </header>
+
+  <section class="flow">
+    <div class="flow-line" aria-hidden="true"></div>
+    @for (s of stages; track s.n) {
+      <article class="flow-stage">
+        <div class="flow-marker">
+          <span class="flow-icon"><mat-icon>{{ s.icon }}</mat-icon></span>
+          <span class="flow-n">{{ s.n }}</span>
+        </div>
+        <div class="flow-body panel">
+          <h2>{{ s.title }}</h2>
+          <p class="flow-lead">{{ s.text }}</p>
+          <p class="flow-detail">{{ s.detail }}</p>
+        </div>
+      </article>
+    }
+  </section>
+
+  <section class="faq-section">
+    <header class="section-head">
+      <span class="section-eyebrow">Questions</span>
+      <h2>The things people ask first.</h2>
+    </header>
+    <div class="faqs">
+      @for (f of faqs; track f.q) {
+        <details class="faq panel">
+          <summary>{{ f.q }}<mat-icon>expand_more</mat-icon></summary>
+          <p>{{ f.a }}</p>
+        </details>
+      }
+    </div>
+  </section>
+
+  <section class="mpage-cta">
+    <div class="cta-card panel">
+      <div class="cta-glow" aria-hidden="true"></div>
+      <h2>That's the whole pipeline.</h2>
+      <p>Sign in to your dashboard, or browse the full feature list.</p>
+      <div class="cta-row">
+        <a class="cta-pill" routerLink="/login">Sign in <span>→</span></a>
+        <a class="ghost-link" routerLink="/features">See features <span>→</span></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<app-marketing-footer />

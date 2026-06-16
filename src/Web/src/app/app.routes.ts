@@ -10,6 +10,17 @@ export const routes: Routes = [
     title: 'Usage IQ · Sign in',
   },
   {
+    // Public marketing pages — no guard, render bare (own nav + footer).
+    path: 'features',
+    loadComponent: () => import('./features/marketing/features-page').then(m => m.FeaturesPage),
+    title: 'Usage IQ · Features',
+  },
+  {
+    path: 'how-it-works',
+    loadComponent: () => import('./features/marketing/how-it-works-page').then(m => m.HowItWorksPage),
+    title: 'Usage IQ · How it works',
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard),

@@ -1,17 +1,22 @@
 import { Component, ElementRef, NgZone, afterNextRender, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/auth';
+import { MarketingNav } from '../marketing/marketing-nav';
+import { MarketingFooter } from '../marketing/marketing-footer';
 
 declare const google: any;
 
 interface Feature { icon: string; title: string; text: string; }
+interface Stat { value: string; label: string; }
+interface Source { name: string; tag: string; }
+interface Step { n: string; title: string; text: string; }
 
 @Component({
   selector: 'app-login',
-  imports: [MatIconModule],
+  imports: [MatIconModule, RouterLink, MarketingNav, MarketingFooter],
   templateUrl: './login.html',
   styleUrl: './login.scss',
 })
@@ -25,11 +30,42 @@ export class Login {
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
 
+  readonly sources: Source[] = [
+    { name: 'Claude Code', tag: 'Anthropic' },
+    { name: 'OpenAI Codex', tag: 'Codex CLI' },
+    { name: 'Self-hosted', tag: 'Your infra' },
+    { name: 'PostgreSQL', tag: 'Your data' },
+  ];
+
+  readonly stats: Stat[] = [
+    { value: '2', label: 'Agents unified' },
+    { value: '1', label: 'Command center' },
+    { value: '6', label: 'Token tiers tracked' },
+    { value: '100%', label: 'Self-hosted' },
+  ];
+
   readonly features: Feature[] = [
     { icon: 'hub', title: 'Multi-source', text: 'Claude Code and OpenAI Codex usage, de-duplicated and unified into one view.' },
     { icon: 'insights', title: 'Cost & tokens', text: 'Break spend down by day, project, model, or session — with an editable pricing table.' },
+    { icon: 'calendar_month', title: 'Activity calendar', text: 'A GitHub-style heatmap of every active hour, with session-level drill-down.' },
     { icon: 'shield_person', title: 'Role-based access', text: 'Google sign-in with per-user permissions, re-checked on every request.' },
-    { icon: 'sync', title: 'Always fresh', text: 'A background timer keeps usage in sync — the bar shows when it last ran.' },
+    { icon: 'ios_share', title: 'Shareable views', text: 'Public, time-limited links to a read-only dashboard — revoke them anytime.' },
+    { icon: 'sync', title: 'Always fresh', text: 'A background reporter posts new usage on a timer; the bar shows when it last ran.' },
+  ];
+
+  readonly steps: Step[] = [
+    { n: '01', title: 'Run the reporter', text: 'A tiny agent on your machine reads Claude Code & Codex logs and posts new usage to your server.' },
+    { n: '02', title: 'It lands in Postgres', text: 'Records are de-duplicated, priced from your editable rate table, and bucketed by your timezone.' },
+    { n: '03', title: 'You see everything', text: 'Filter by date, project, model or session. Cost, tokens, cache tiers — all on one screen.' },
+  ];
+
+  readonly terminal: string[] = [
+    '$ usage-iq reporter --watch',
+    '  scanning ~/.claude/projects … 2,264 files',
+    '  + 318 new records  (412 deduped)',
+    '  posting → https://usageiq.online/api/ingest',
+    '  ✓ synced 14.15M tokens · $182.4',
+    '  next run in 30:00 …',
   ];
 
   constructor() {
@@ -42,6 +78,11 @@ export class Login {
 
   private returnUrl(): string {
     return this.route.snapshot.queryParamMap.get('returnUrl') || '/';
+  }
+
+  scrollTop(ev: Event): void {
+    ev.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   private async initGoogle(): Promise<void> {
