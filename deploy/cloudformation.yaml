@@ -1,9 +1,9 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Usage IQ — one tiny EC2 host (Docker), an Elastic IP, a dedicated security group,
+  Usage IQ - one tiny EC2 host (Docker), an Elastic IP, a dedicated security group,
   two ECR image repos, an SSM-managed instance role, and project-scoped deploy
   permissions on the existing GitHub OIDC role. Everything is tagged Project=usage-iq
-  and isolated from anything else in the account. SSM only — no inbound SSH.
+  and isolated from anything else in the account. SSM only - no inbound SSH.
 
 Parameters:
   VpcId:
@@ -44,7 +44,7 @@ Resources:
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: usage-iq web (80/443). No SSH — shell via SSM Session Manager.
+      GroupDescription: usage-iq web (ports 80 and 443). No SSH; shell access is via SSM Session Manager.
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - { IpProtocol: tcp, FromPort: 80,  ToPort: 80,  CidrIp: 0.0.0.0/0, Description: HTTP }
