@@ -58,7 +58,7 @@
   align-items: center;
   gap: 14px;
   min-height: 44px;
-  .gbtn { min-height: 44px; }
+  .gbtn { width: 280px; min-height: 44px; flex: 0 0 auto; }   /* match the rendered button so flex can't distort it */
   .cta-msg { font-size: var(--tech-fs-label); color: var(--tech-accent-cyan, #3fd8d0); }
 }
 

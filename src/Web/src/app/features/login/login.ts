@@ -69,8 +69,8 @@ export class Login {
         width: 280,
       });
 
-      // One Tap — shows the "Continue as <name>" prompt for returning Google users.
-      google.accounts.id.prompt();
+      // Intentionally no One Tap prompt() — its personalized "Continue as <name>" card renders a
+      // broken avatar for accounts without a photo and overlaps the clean button.
     } catch {
       this.error.set('Could not load Google sign-in. Check your connection and try again.');
     }

@@ -38,8 +38,22 @@ public sealed class ReporterOptions
     public string ResolvedCodexPath => string.IsNullOrWhiteSpace(CodexPath)
         ? Path.Combine(Home, ".codex") : CodexPath!;
 
+    // Per-server state file: the file/size/mtime fingerprints only mean "already sent to THIS server".
+    // Pointing the reporter at a different URL (e.g. switching from localhost to the cloud) uses a
+    // fresh state file and therefore does a full back-fill automatically, instead of skipping history
+    // it pushed to the old server. An explicit --state always wins.
     public string ResolvedStatePath => string.IsNullOrWhiteSpace(StatePath)
-        ? Path.Combine(Home, ".usage-iq", "reporter-state.json") : StatePath!;
+        ? Path.Combine(Home, ".usage-iq", $"reporter-state-{ServerSlug}.json") : StatePath!;
+
+    private string ServerSlug
+    {
+        get
+        {
+            var u = (Url ?? "").Trim().ToLowerInvariant().TrimEnd('/');
+            var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(u));
+            return Convert.ToHexString(hash)[..10].ToLowerInvariant();
+        }
+    }
 
     public int ResolvedBatchSize => Math.Clamp(BatchSize, 1, 5000);
     public int ResolvedIntervalSeconds => Math.Clamp(IntervalSeconds, 5, 3600);
