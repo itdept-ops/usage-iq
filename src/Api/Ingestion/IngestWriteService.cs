@@ -75,7 +75,7 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
             pending.Add(UsageRecordMapper.Map(pu, source, cwd, projectId, fileId, tz, pricing));
         }
 
-        var inserted = await InsertNewAsync(pending, ct);
+        var (inserted, insertedTokens) = await InsertNewAsync(pending, ct);
 
         if (inserted > 0)
             await db.IngestedFiles.Where(f => f.Id == fileId).ExecuteUpdateAsync(s => s
@@ -83,6 +83,7 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
                 .SetProperty(f => f.LastSyncUtc, _ => DateTime.UtcNow), ct);
 
         result.Inserted = inserted;
+        result.InsertedTokens = insertedTokens;                      // combined tokens of the new rows
         result.Duplicates = existing.Count;                          // valid keys already in the DB
         result.Skipped = Math.Max(0, result.Received - inserted - existing.Count); // malformed + within-batch + DB-rejected
         result.UnpricedModels = pricing.UnpricedModels.OrderBy(m => m).ToArray();
@@ -97,9 +98,9 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
     /// error (e.g. a single value that won't fit a column), fall back to per-row inserts so one bad
     /// row can never poison the whole batch.
     /// </summary>
-    private async Task<int> InsertNewAsync(List<UsageRecord> pending, CancellationToken ct)
+    private async Task<(int Count, long Tokens)> InsertNewAsync(List<UsageRecord> pending, CancellationToken ct)
     {
-        if (pending.Count == 0) return 0;
+        if (pending.Count == 0) return (0, 0);
         var remaining = pending;
 
         for (var attempt = 1; attempt <= 3; attempt++)
@@ -108,7 +109,7 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
             {
                 db.UsageRecords.AddRange(remaining);
                 await db.SaveChangesAsync(ct);
-                return remaining.Count;                              // AddRange+SaveChanges is atomic
+                return (remaining.Count, remaining.Sum(TokensOf));   // AddRange+SaveChanges is atomic
             }
             catch (DbUpdateException ex) when (IsUniqueViolation(ex) && attempt < 3)
             {
@@ -120,7 +121,7 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
                         .Where(r => keys.Contains(r.DedupKey)).Select(r => r.DedupKey).ToListAsync(ct))
                     .ToHashSet(StringComparer.Ordinal);
                 remaining = remaining.Where(p => !now.Contains(p.DedupKey)).ToList();
-                if (remaining.Count == 0) return 0;
+                if (remaining.Count == 0) return (0, 0);
             }
             catch (DbUpdateException ex)
             {
@@ -135,9 +136,10 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
     }
 
     /// <summary>Last-resort insert: one row per SaveChanges, dropping any row the DB rejects.</summary>
-    private async Task<int> InsertPerRowAsync(List<UsageRecord> rows, CancellationToken ct)
+    private async Task<(int Count, long Tokens)> InsertPerRowAsync(List<UsageRecord> rows, CancellationToken ct)
     {
         var ok = 0;
+        long tokens = 0;
         foreach (var r in rows)
         {
             try
@@ -145,15 +147,20 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
                 db.UsageRecords.Add(r);
                 await db.SaveChangesAsync(ct);
                 ok++;
+                tokens += TokensOf(r);
             }
             catch (DbUpdateException) { /* genuinely bad row or lost a race — drop it, keep going */ }
             finally { db.ChangeTracker.Clear(); }
         }
-        return ok;
+        return (ok, tokens);
     }
 
     private static bool IsUniqueViolation(DbUpdateException ex) =>
         ex.InnerException is Npgsql.PostgresException pg && pg.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation;
+
+    /// <summary>Combined token count of a row (all input/output/cache tiers).</summary>
+    private static long TokensOf(UsageRecord r) =>
+        (long)r.InputTokens + r.OutputTokens + r.CacheReadTokens + r.CacheCreation5mTokens + r.CacheCreation1hTokens;
 
     private async Task<int> GetOrCreateProjectAsync(string cwd, Dictionary<string, int> cache, CancellationToken ct)
     {

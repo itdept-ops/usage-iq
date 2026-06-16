@@ -25,6 +25,8 @@ public sealed class IngestResultDto
 {
     public int Received { get; set; }
     public int Inserted { get; set; }
+    /// <summary>Combined token count (all tiers) of the rows actually inserted.</summary>
+    public long InsertedTokens { get; set; }
     /// <summary>Rows whose key already existed in the DB.</summary>
     public int Duplicates { get; set; }
     /// <summary>Rows dropped before/at insert: malformed, collapsed within-batch, or DB-rejected.</summary>

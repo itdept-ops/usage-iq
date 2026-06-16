@@ -119,6 +119,9 @@ When it watches, only changed files do any work, so steady-state passes are chea
   ~40%). This is why a pass "skips" rows: it's redundancy, not lost data.
 - **Cross-file batching.** Distinct rows are coalesced across files into batches (`--batch`), so a
   backfill of thousands of small files is ~`rows/batch` requests, not one per file.
+- **Live token counter.** A pinned top-right HUD shows the combined token count (input + output +
+  every cache tier) of the rows *newly ingested this session*, ticking up as new usage is pushed. It
+  reflects what's actually added to the dashboard — duplicates and redundant lines don't inflate it.
 - **Privacy.** Only `ParsedUsage` (timestamp, model, token counts, session id, `cwd`, git branch,
   sidechain flag, version) is sent. No prompt or response text ever leaves the machine.
 

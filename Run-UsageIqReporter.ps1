@@ -25,7 +25,7 @@ param(
     [string]$Key      = $env:REPORTER_KEY,
     [string]$Machine  = $env:COMPUTERNAME,
     [int]   $Batch    = 1000,
-    [int]   $Interval = 60,
+    [int]   $Interval = 1800,
     [switch]$Once,
     [switch]$NoBuild
 )

@@ -95,6 +95,7 @@ public class IngestIntegrationTests(WebAppFactory factory)
         var r1 = await first.Content.ReadFromJsonAsync<JsonElement>();
         r1.GetProperty("received").GetInt32().Should().Be(2);
         r1.GetProperty("inserted").GetInt32().Should().Be(2);
+        r1.GetProperty("insertedTokens").GetInt64().Should().Be(3400); // 2 rows × (1000+500+200) combined tokens
 
         using (var scope = factory.Services.CreateScope())
         {

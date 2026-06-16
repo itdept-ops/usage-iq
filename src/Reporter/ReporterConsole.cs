@@ -1,15 +1,101 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 
 namespace Ccusage.Reporter;
 
 /// <summary>
-/// Friendly, colorized console output for the reporter. When stdout is redirected (piped to a file
-/// or captured), it drops the colors and the in-place "live" line so the captured log stays clean.
+/// Friendly, colorized console output for the reporter, plus a live "tokens this session" counter
+/// pinned to the top-right via a reserved (non-scrolling) status row. When stdout is redirected, it
+/// drops the colors, the in-place "live" line, and the HUD so captured logs stay clean.
 /// </summary>
-public sealed class ReporterConsole
+public sealed class ReporterConsole : IDisposable
 {
     private readonly bool _plain = Console.IsOutputRedirected;
     private bool _liveOpen;
+
+    // ---- top-right token HUD (a reserved, non-scrolling status row) ----
+    private bool _hud;
+    private long _tokens;
+    private nint _stdout;
+    private uint _origMode;
+
+    public ReporterConsole()
+    {
+        if (_plain) return;
+        try { StartHud(); } catch { _hud = false; }
+    }
+
+    private void StartHud()
+    {
+        // Enable VT processing on Windows so the scroll-region/SGR escapes render; other OSes do natively.
+        if (OperatingSystem.IsWindows())
+        {
+            _stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+            if (!GetConsoleMode(_stdout, out _origMode) || !SetConsoleMode(_stdout, _origMode | ENABLE_VT))
+                return; // can't do VT — skip the HUD (plain output still works)
+        }
+
+        int h;
+        try { h = Console.WindowHeight; } catch { return; }
+        if (h < 6) return; // too short to spare a status row
+
+        Console.Write($"\x1b[2;{h}r"); // reserve row 1: scroll region becomes rows 2..h
+        Console.Write("\x1b[2;1H");    // move below the status row so all output scrolls under it
+        _hud = true;
+        RenderHud();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => ResetHud();
+    }
+
+    /// <summary>Add to the live "tokens this session" counter shown top-right.</summary>
+    public void AddTokens(long delta)
+    {
+        _tokens += Math.Max(0, delta);
+        if (_hud) RenderHud();
+        try { Console.Title = $"Usage IQ · {FormatTokens(_tokens)} tokens"; } catch { /* not all hosts allow it */ }
+    }
+
+    private void RenderHud()
+    {
+        try
+        {
+            var w = Console.WindowWidth;
+            var num = FormatTokens(_tokens);
+            var visible = $"{num} tokens this session ";
+            var col = Math.Max(1, w - visible.Length);
+            Console.Write("\x1b7\x1b[1;1H\x1b[2K");                                  // save cursor, home row 1, clear
+            Console.Write($"\x1b[1;{col}H");                                         // right-align in the status row
+            Console.Write($"\x1b[92m{num}\x1b[0;90m tokens this session \x1b[0m");
+            Console.Write("\x1b8");                                                  // restore cursor
+        }
+        catch { /* transient terminal hiccup — skip this frame */ }
+    }
+
+    private void ResetHud()
+    {
+        if (!_hud) return;
+        _hud = false;
+        try
+        {
+            Console.Write("\x1b[r"); // release the scroll region
+            try { Console.Write($"\x1b[{Console.WindowHeight};1H"); } catch { /* ignore */ }
+            Console.Write("\n");
+            if (OperatingSystem.IsWindows() && _stdout != 0) SetConsoleMode(_stdout, _origMode);
+        }
+        catch { /* ignore */ }
+    }
+
+    public void Dispose() => ResetHud();
+
+    /// <summary>Compact token formatting: 842, 12.3K, 4.21M, 1.05B.</summary>
+    public static string FormatTokens(long n)
+    {
+        if (n < 1000) return n.ToString(CultureInfo.InvariantCulture);
+        if (n < 1_000_000) return (n / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + "K";
+        if (n < 1_000_000_000) return (n / 1_000_000.0).ToString("0.##", CultureInfo.InvariantCulture) + "M";
+        return (n / 1_000_000_000.0).ToString("0.##", CultureInfo.InvariantCulture) + "B";
+    }
+
+    // ---- structured output ----
 
     private static string Now() => DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
@@ -102,4 +188,11 @@ public sealed class ReporterConsole
     }
 
     private void WriteLine(string s = "", ConsoleColor? c = null) { Write(s, c); Console.WriteLine(); }
+
+    // ---- Win32 VT enable ----
+    private const int STD_OUTPUT_HANDLE = -11;
+    private const uint ENABLE_VT = 0x0004;
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern nint GetStdHandle(int nStdHandle);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetConsoleMode(nint handle, out uint mode);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool SetConsoleMode(nint handle, uint mode);
 }

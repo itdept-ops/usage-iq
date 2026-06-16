@@ -12,7 +12,7 @@ public sealed class FatalReporterException(string message) : Exception(message);
 public sealed record IngestBatch(string Source, string Machine, string Reporter, IReadOnlyList<ParsedUsage> Rows);
 
 /// <summary>Server's response to an ingest batch.</summary>
-public sealed record IngestResult(int Received, int Inserted, int Duplicates, int Skipped, string[]? UnpricedModels);
+public sealed record IngestResult(int Received, int Inserted, long InsertedTokens, int Duplicates, int Skipped, string[]? UnpricedModels);
 
 /// <summary>
 /// Posts batches to the Usage IQ ingest endpoint with the <c>X-Ingest-Key</c> credential. Transient
@@ -59,7 +59,7 @@ public sealed class IngestClient : IDisposable
 
                 resp.EnsureSuccessStatusCode(); // 4xx (other than 401/403/429) → surface as error
                 return await resp.Content.ReadFromJsonAsync<IngestResult>(Json, ct)
-                       ?? new IngestResult(rows.Count, 0, 0, 0, null);
+                       ?? new IngestResult(rows.Count, 0, 0, 0, 0, null);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
             {

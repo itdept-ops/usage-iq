@@ -58,7 +58,7 @@ if (invalid is not null)
     return 2;
 }
 
-var ui = new ReporterConsole();
+using var ui = new ReporterConsole(); // disposing releases the reserved HUD row + restores the console
 
 ui.Banner(Version);
 ui.Config("Server", opt.Url!);
@@ -112,6 +112,7 @@ async Task<int> RunPassAsync()
             ui.Summary(new[]
             {
                 ("new",         s.Inserted.ToString("N0", CultureInfo.InvariantCulture),    s.Inserted > 0 ? ConsoleColor.Green : g),
+                ("new tokens",  ReporterConsole.FormatTokens(s.InsertedTokens) + " combined", s.InsertedTokens > 0 ? ConsoleColor.Green : g),
                 ("already had", s.Duplicates.ToString("N0", CultureInfo.InvariantCulture),  g),
                 ("redundant",   $"{s.Redundant:N0}  (merged before send)",                  ConsoleColor.DarkGray),
                 ("pushed",      $"{s.Sent:N0} rows · {s.Requests:N0} request{(s.Requests == 1 ? "" : "s")}", g),

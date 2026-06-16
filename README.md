@@ -180,7 +180,7 @@ usage-iq-reporter --url https://usage.example.com --key uiq_… --once     # sin
 
 On Windows, [`Run-UsageIqReporter.ps1`](Run-UsageIqReporter.ps1) is a one-file "build + run the loop" launcher (asks for the key once, then it's a double-click).
 
-The reporter de-dupes locally before sending (one billed turn spans several identical-key log lines — that's the `redundant` count), coalesces rows across files into batches, and tracks per-file state so steady-state passes are cheap. Only parsed token counts/metadata are sent; the ingest key grants *write-only* access to `/api/ingest` and nothing else.
+The reporter de-dupes locally before sending (one billed turn spans several identical-key log lines — that's the `redundant` count), coalesces rows across files into batches, tracks per-file state so steady-state passes are cheap, and pins a **live combined-token counter** to the top-right (tokens newly ingested this session). Only parsed token counts/metadata are sent; the ingest key grants *write-only* access to `/api/ingest` and nothing else.
 
 **Full guides** — install, flags, run-as-a-service, cloud hosting, the ingest API, and all config — are in **[docs/](docs/)**: [Reporter](docs/reporter.md) · [Cloud hosting](docs/cloud-hosting.md) · [Ingest API](docs/ingest-api.md) · [Configuration](docs/configuration.md).
 

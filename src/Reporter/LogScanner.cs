@@ -20,6 +20,9 @@ public sealed class ScanSummary
     public int Duplicates { get; set; }
     public int Skipped { get; set; }
 
+    /// <summary>Combined token count (all tiers) of the rows newly inserted this pass.</summary>
+    public long InsertedTokens { get; set; }
+
     public long ElapsedMs { get; set; }
     public HashSet<string> Unpriced { get; } = new(StringComparer.Ordinal);
 
@@ -123,10 +126,12 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
                 var res = await client.PushAsync(kind, chunk, ct);
                 summary.Sent += res.Received;
                 summary.Inserted += res.Inserted;
+                summary.InsertedTokens += res.InsertedTokens;
                 summary.Duplicates += res.Duplicates;
                 summary.Skipped += res.Skipped;
                 summary.Requests++;
                 if (res.UnpricedModels is { } um) foreach (var m in um) summary.Unpriced.Add(m);
+                ui.AddTokens(res.InsertedTokens); // feed the live top-right token counter
                 ui.Live($"pushing {kind} — {summary.Requests:N0} requests, {summary.Sent:N0} rows, {summary.Inserted:N0} new");
             }
         }
