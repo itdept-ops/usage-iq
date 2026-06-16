@@ -19,6 +19,14 @@
   </a>
 
   @if (auth.isAuthenticated()) {
+    <!-- Hamburger: shown only below the nav breakpoint (CSS-gated). Toggles the drawer below. -->
+    <button type="button" class="navburger" (click)="toggleMobileNav()"
+            [class.navburger--open]="mobileNavOpen()"
+            [attr.aria-expanded]="mobileNavOpen()" aria-controls="mobile-nav"
+            aria-label="Navigation menu">
+      <span class="navburger__box" aria-hidden="true"><span></span><span></span><span></span></span>
+    </button>
+
     <nav class="nav" aria-label="Primary">
       @if (auth.hasPermission('dashboard.view')) {
         <a mat-button class="nav__item" routerLink="/" routerLinkActive="active"
@@ -110,6 +118,47 @@
     </mat-menu>
   }
 </mat-toolbar>
+
+@if (auth.isAuthenticated()) {
+  <!-- Mobile nav drawer + scrim. CSS keeps both hidden above the nav breakpoint, so this
+       markup is inert on desktop. Links mirror the inline nav and its permission gates. -->
+  <div class="mobile-nav-scrim" [class.open]="mobileNavOpen()" (click)="closeMobileNav()"
+       aria-hidden="true"></div>
+  <nav id="mobile-nav" class="mobile-nav" [class.open]="mobileNavOpen()" aria-label="Primary">
+    @if (auth.hasPermission('dashboard.view')) {
+      <a class="mobile-nav__item" routerLink="/" routerLinkActive="active"
+         [routerLinkActiveOptions]="{ exact: true }" (click)="closeMobileNav()">Dashboard</a>
+    }
+    @if (auth.hasPermission('calendar.view')) {
+      <a class="mobile-nav__item" routerLink="/calendar" routerLinkActive="active"
+         (click)="closeMobileNav()">Calendar</a>
+    }
+    @if (auth.hasPermission('pricing.view')) {
+      <a class="mobile-nav__item" routerLink="/pricing" routerLinkActive="active"
+         (click)="closeMobileNav()">Pricing</a>
+    }
+    @if (auth.hasPermission('settings.view')) {
+      <a class="mobile-nav__item" routerLink="/settings" routerLinkActive="active"
+         (click)="closeMobileNav()">Settings</a>
+    }
+    @if (auth.hasAnyPermission('reporter.view', 'reporter.manage', 'reporter.self')) {
+      <a class="mobile-nav__item" routerLink="/reporter" routerLinkActive="active"
+         (click)="closeMobileNav()">Reporter</a>
+    }
+    @if (auth.hasAnyPermission('dashboard.view', 'reporter.view', 'reporter.manage')) {
+      <a class="mobile-nav__item" routerLink="/fleet" routerLinkActive="active"
+         (click)="closeMobileNav()">Fleet</a>
+    }
+    @if (auth.hasPermission('users.view')) {
+      <a class="mobile-nav__item" routerLink="/users" routerLinkActive="active"
+         (click)="closeMobileNav()">Users</a>
+    }
+    @if (auth.hasPermission('activity.view')) {
+      <a class="mobile-nav__item" routerLink="/activity" routerLinkActive="active"
+         (click)="closeMobileNav()">Activity</a>
+    }
+  </nav>
+}
 }
 
 <main class="content" [class.content--bare]="bareLayout()">

@@ -724,3 +724,199 @@ mat-paginator {
   margin-top: 4px;
   --mat-paginator-container-text-color: var(--tech-text-secondary);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Responsive — tablet (≤960px) then phone (≤640px).
+   Goals: filter/scope cluster wraps & stacks (no page overflow),
+   the two-panel chart area is already 1-col ≤980px, charts shrink
+   to a shorter height, the records table scrolls inside its card
+   (never the page), and the cache card reflows. Presentational only.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ---- Tablet: let the single filter row wrap instead of crushing ---- */
+@media (max-width: 960px) {
+  .filters {
+    .filters-row {
+      flex-wrap: wrap;
+      row-gap: 12px;
+    }
+
+    /* Drop the vertical hairline separators once clusters wrap onto
+       their own lines — a left border on a wrapped row looks broken. */
+    .filter-cluster + .filter-cluster {
+      padding-left: 0;
+      border-left: 0;
+    }
+
+    /* Date + scope clusters each take a full row and share width. */
+    .filter-cluster.dates,
+    .filter-cluster.scopes {
+      flex: 1 1 100%;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .grow { display: none; }
+
+    /* Actions sit on their own wrapped line, pushed to the right. */
+    .filter-actions {
+      flex: 1 1 100%;
+      justify-content: flex-end;
+    }
+  }
+}
+
+/* ---- Phone: stack everything; full-width controls; ≥44px targets ---- */
+@media (max-width: 640px) {
+  /* A tall stacked filter set should not pin to the top and eat the
+     viewport — release the sticky behaviour on phones. */
+  .filters {
+    position: static;
+    padding: 12px;
+
+    .filters-row {
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    /* Clusters become vertical stacks of full-width controls. */
+    .filter-cluster {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding: 0;
+      width: 100%;
+    }
+
+    .cluster-label { margin-bottom: -2px; }
+
+    /* Material fields go full-width; restore the subscript spacing we
+       collapsed for the tight desktop row so wrapped fields don't kiss. */
+    mat-form-field { margin-bottom: 4px; }
+    .f-date,
+    .f-multi {
+      width: 100%;
+      flex: 1 1 auto;
+    }
+
+    .f-toggle {
+      margin: 2px 0;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .filter-actions {
+      flex-wrap: wrap;
+      gap: 10px;
+
+      button {
+        flex: 1 1 auto;
+        min-height: 44px;
+      }
+    }
+  }
+
+  /* Quick-range / Views / export row: wrap freely, comfy tap targets. */
+  .quick-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    row-gap: 10px;
+
+    .qr-label { width: 100%; margin: 0 0 2px; }
+
+    .qr-chip.mat-mdc-button {
+      height: 36px;
+      padding: 0 14px;
+    }
+
+    /* The flex spacers collapse so chips/buttons pack from the left. */
+    .qr-grow { flex-basis: 100%; height: 0; }
+    .qr-divider { display: none; }
+
+    .qr-export {
+      flex: 1 1 auto;
+      height: 40px;
+      justify-content: center;
+    }
+  }
+
+  /* KPI cards: single column reads better than cramped 2-up at 360px;
+     scale the hero number down so long currency values never clip. */
+  .cards {
+    grid-template-columns: 1fr;
+    gap: var(--tech-space-3);
+  }
+  .kpi {
+    padding: 14px 16px;
+    .kpi-value { font-size: clamp(22px, 7vw, var(--tech-fs-kpi)); }
+  }
+
+  /* Charts already stack 1-col ≤980px; give them a shorter phone height
+     and override the directive's 300px min so they don't tower. */
+  .charts {
+    gap: var(--tech-space-3);
+
+    .chart-card { padding: 12px 12px 10px; }
+    app-chart { height: 240px; }
+    ::ng-deep .chart-host { min-height: 240px; }
+  }
+
+  /* The group-by segmented control would overflow a 312px row — let the
+     head wrap and the toggle group scroll horizontally within the card. */
+  .chart-head {
+    flex-wrap: wrap;
+    gap: 8px;
+
+    mat-button-toggle-group {
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  /* Cache card: 3 tiny stat tiles don't fit at 312px — stack to 1 col,
+     and let the headline number scale with the viewport. */
+  .cache-card {
+    padding: 14px 16px 16px;
+
+    .cache-headline .cache-pct { font-size: clamp(22px, 7vw, var(--tech-fs-kpi)); }
+    .cache-stats { grid-template-columns: 1fr; }
+  }
+
+  /* Records table: keep the real table but scroll it INSIDE the card so
+     the page itself never scrolls sideways. First column stays put. */
+  .table-card { padding: 12px 12px 4px; }
+
+  .table-scroll { -webkit-overflow-scrolling: touch; }
+
+  .mat-mdc-header-cell,
+  .mat-mdc-cell {
+    padding-left: 10px;
+    padding-right: 10px;
+    white-space: nowrap;
+  }
+
+  /* Sticky first column (Date) keeps a fixed anchor while scrolling. */
+  .mat-mdc-header-row .mat-column-localDate,
+  .mat-mdc-row .mat-column-localDate {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--tech-bg-sunken);
+  }
+  /* Match the row hover/zebra under the sticky cell so it doesn't float. */
+  .mat-mdc-row:nth-child(even) .mat-column-localDate {
+    background: color-mix(in srgb, var(--tech-bg-sunken) 100%, #fff 1.5%);
+  }
+  .mat-mdc-row:hover .mat-column-localDate {
+    background: var(--tech-panel-raised);
+  }
+
+  /* Paginator controls wrap rather than overflow the card. */
+  ::ng-deep .mat-mdc-paginator-container {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 4px;
+  }
+}

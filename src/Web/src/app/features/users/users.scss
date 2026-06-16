@@ -9,7 +9,7 @@
   h2 {
     margin: 0 0 6px;
     font-family: var(--tech-font-ui);
-    font-size: var(--tech-fs-display);
+    font-size: clamp(20px, 5vw, var(--tech-fs-display));
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--tech-text);
@@ -80,6 +80,9 @@ mat-progress-bar {
 
 /* ---- Matrix table ---- */
 .table-scroll { overflow-x: auto; }
+
+/* Desktop shows the matrix table; the per-user card list is phone-only. */
+.matrix-mobile { display: none; }
 
 .perm-table {
   width: 100%;
@@ -343,4 +346,171 @@ mat-slide-toggle {
     border-top: 1px solid var(--tech-border-subtle);
   }
   .policy-save { border-radius: var(--tech-r-control); font-weight: 600; }
+}
+
+/* ===================================================================== */
+/* Mobile — per-user cards replace the wide matrix; everything stacks.   */
+/* ===================================================================== */
+
+/* Tablet: the matrix stays a table but scrolls within its container with
+   a sticky user column so the page itself never scrolls sideways. */
+@media (max-width: 960px) and (min-width: 641px) {
+  .perm-table {
+    .col-expand,
+    .col-user {
+      position: sticky;
+      z-index: 2;
+      background: var(--tech-panel, #111722);
+    }
+    .col-expand { left: 0; }
+    .col-user { left: 36px; box-shadow: 1px 0 0 var(--tech-border-subtle); }
+    thead .col-expand,
+    thead .col-user { z-index: 3; }
+    tbody tr:hover .col-expand,
+    tbody tr:hover .col-user { background: color-mix(in srgb, var(--tech-panel-raised) 60%, var(--tech-panel, #111722)); }
+    tbody tr.expanded .col-expand,
+    tbody tr.expanded .col-user,
+    tbody tr.disabled .col-expand,
+    tbody tr.disabled .col-user { background: color-mix(in srgb, var(--tech-panel-raised) 50%, var(--tech-panel, #111722)); }
+  }
+}
+
+@media (max-width: 640px) {
+  .panel { padding: 14px 14px; }
+
+  /* Swap the matrix table for the card list. */
+  .matrix-desktop { display: none; }
+  .matrix-mobile { display: flex; flex-direction: column; gap: 12px; }
+
+  /* ---- Add-user form: stack and go full width ---- */
+  .add-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+
+    .add-email { width: 100%; }
+    .add-perms { width: 100%; }
+    .add-btn { width: 100%; min-height: 44px; }
+  }
+  .add-perms .add-perm-group { flex: 1 1 100%; }
+
+  /* ---- Per-user cards ---- */
+  .ucard {
+    border: 1px solid var(--tech-border-subtle);
+    border-radius: var(--tech-r-control);
+    background: color-mix(in srgb, var(--tech-panel-raised) 36%, transparent);
+    padding: 14px;
+
+    &.disabled { opacity: 0.6; }
+  }
+  .ucard-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+
+    .u-cell { min-width: 0; flex: 1 1 auto; }
+    .u-email { word-break: break-all; }
+    .ucard-enabled { flex: 0 0 auto; }
+  }
+  .ucard-perms {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    .add-perm-group { width: 100%; }
+    /* Two-up perm checkboxes inside each group to use the width without crowding. */
+    .add-perm-group-items {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+    }
+    mat-checkbox { min-height: 40px; }
+  }
+  .ucard-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+
+    .save-btn { flex: 1 1 auto; min-height: 44px; }
+    .del-btn { width: 44px; height: 44px; }
+    .ucard-history-btn {
+      flex: 1 1 100%;
+      min-height: 44px;
+      justify-content: center;
+      color: var(--tech-text-secondary);
+    }
+  }
+
+  /* Sign-in history inside a card: stacked items, no wide table. */
+  .ucard-logins {
+    margin-top: 12px;
+    padding: 12px;
+    border-left: 2px solid var(--tech-accent);
+    border-radius: var(--tech-r-control);
+    background: color-mix(in srgb, var(--tech-panel-raised) 28%, transparent);
+  }
+  .logins-cards { display: flex; flex-direction: column; gap: 8px; }
+  .login-item {
+    padding: 10px;
+    border: 1px solid var(--tech-border-subtle);
+    border-radius: var(--tech-r-chip);
+    background: color-mix(in srgb, var(--tech-panel-raised) 40%, transparent);
+  }
+  .login-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+
+    .login-item-when { font-size: var(--tech-fs-label, 12px); color: var(--tech-text); }
+  }
+  .login-item-line {
+    display: flex;
+    gap: 8px;
+    font-size: var(--tech-fs-label, 12px);
+    color: var(--tech-text-secondary);
+    line-height: 1.4;
+
+    .li-lbl { flex: 0 0 52px; color: var(--tech-text-tertiary); }
+    span:last-child { min-width: 0; word-break: break-word; }
+  }
+  .login-item-agent { font-size: var(--tech-fs-micro, 11px); color: var(--tech-text-tertiary); }
+
+  /* ---- Access policy ---- */
+  .policy-card {
+    .policy-toggle { gap: 10px; }
+    .policy-perms { flex-direction: column; }
+    .policy-perms .add-perm-group { width: 100%; }
+    .policy-perms .add-perm-group-items {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+    }
+    .policy-save { width: 100%; min-height: 44px; }
+  }
+  .policy-card mat-checkbox { min-height: 40px; }
+
+  /* ---- Audit log: wrap rows instead of forcing a single wide line ---- */
+  .audit-row {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+
+    .audit-when { min-width: 0; }
+    .audit-detail {
+      flex: 1 1 100%;
+      white-space: normal;
+      word-break: break-word;
+    }
+    .audit-actor, .audit-target { word-break: break-all; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expand-chevron { transition: none; }
 }

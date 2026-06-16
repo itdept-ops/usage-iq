@@ -75,6 +75,24 @@
   }
 }
 
+/* Phones: stack the title above the action and let Recompute span the full
+   width with a comfortable (~44px) tap target. */
+@media (max-width: 640px) {
+  .head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--tech-space-3);
+
+    h2 { font-size: clamp(20px, 5.5vw, var(--tech-fs-display)); }
+  }
+
+  .recompute-btn {
+    align-self: stretch;
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
 /* Indeterminate bar tinted to accent */
 mat-progress-bar {
   margin: var(--tech-space-2) 0 var(--tech-space-4);
@@ -92,6 +110,14 @@ mat-progress-bar {
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: var(--tech-space-4);
   margin-top: var(--tech-space-4);
+
+  /* Phones: a fixed 340px min track overflows the ~312px content area at
+     360px, forcing horizontal PAGE scroll. Collapse to a single fluid
+     column so cards shrink to fit and the page never scrolls sideways. */
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+    gap: var(--tech-space-3);
+  }
 }
 
 /* =========================================================================
@@ -283,6 +309,32 @@ mat-form-field {
     height: 17px;
     margin-right: 2px;
   }
+}
+
+/* =========================================================================
+   Phone layout (<=640px) — keep cards comfortable on narrow screens
+   ========================================================================= */
+@media (max-width: 640px) {
+  /* Trim card padding so the 2-up rate grid keeps breathing room inside the
+     full-width card without the page ever scrolling sideways at 360px. */
+  .rate-card { padding: 16px 14px; }
+
+  /* Give labelled rate inputs a bit more vertical air for tapping. */
+  .rates { gap: var(--tech-space-3) var(--tech-space-2); }
+
+  /* Full-width Save with a comfortable tap target. */
+  .rc-actions { justify-content: stretch; }
+
+  .save-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* Very narrow phones: stack rate fields one per row so labels like
+   "Cache write 5m" never clip and each input is easy to hit. */
+@media (max-width: 380px) {
+  .rates { grid-template-columns: 1fr; }
 }
 
 /* =========================================================================

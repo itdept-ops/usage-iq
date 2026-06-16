@@ -18,9 +18,12 @@
   padding: 2px 4px 10px;
 
   .w-dot { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
-  .w-title { font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; font-size: 13px; }
-  .w-grow { flex: 1 1 auto; }
-  .w-total { font-weight: 700; font-size: 14px; color: var(--tech-text); }
+  .w-title {
+    font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; font-size: 13px;
+    min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .w-grow { flex: 1 1 auto; min-width: 6px; }
+  .w-total { flex: 0 0 auto; font-weight: 700; font-size: 14px; color: var(--tech-text); }
 }
 
 .w-grid { display: flex; flex-wrap: wrap; gap: 8px; }

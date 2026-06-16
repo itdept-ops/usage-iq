@@ -15,7 +15,7 @@
   h2 {
     margin: 0 0 6px;
     font-family: var(--tech-font-ui);
-    font-size: var(--tech-fs-display);
+    font-size: clamp(20px, 5vw, var(--tech-fs-display));
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--tech-text);
@@ -34,6 +34,14 @@
   --mat-standard-button-toggle-selected-state-background-color: color-mix(in srgb, var(--tech-accent) 22%, transparent);
   --mat-standard-button-toggle-selected-state-text-color: var(--tech-accent);
 }
+@media (max-width: 640px) {
+  .metric-toggle {
+    width: 100%;
+    // Split the three options evenly across the full width so each is an easy tap target.
+    ::ng-deep .mat-button-toggle { flex: 1 1 0; }
+    ::ng-deep .mat-button-toggle-label-content { line-height: 44px; }
+  }
+}
 
 mat-progress-bar {
   margin-bottom: var(--tech-space-3);
@@ -47,6 +55,7 @@ mat-progress-bar {
   margin-bottom: var(--tech-space-4);
 }
 @media (max-width: 820px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .stat-grid { grid-template-columns: 1fr; gap: var(--tech-space-2, 8px); } }
 
 .stat {
   padding: 14px 16px;
@@ -74,6 +83,20 @@ mat-progress-bar {
 .panel { padding: 12px 14px; }
 .cal-wrap { width: 100%; min-height: 220px; }
 
+@media (max-width: 640px) {
+  .panel { padding: 10px; }
+  // The year grid is intrinsically wide (52 weeks). Keep cells legible by holding a
+  // minimum drawing width and letting THIS wrapper scroll horizontally — never the page.
+  .cal-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cal-wrap app-chart { display: block; min-width: 560px; height: 100%; }
+  // The chart base sets min-height:300px; let the canvas match the (shorter) wrapper.
+  .cal-wrap ::ng-deep .chart-host { min-height: 0; }
+}
+
 .stat-grid--2 { margin-top: calc(-1 * var(--tech-space-2, 8px)); }
 
 .panel-header {
@@ -93,8 +116,15 @@ mat-progress-bar {
   margin-top: var(--tech-space-4, 16px);
 }
 @media (max-width: 900px) { .cal-cols { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .cal-cols { gap: var(--tech-space-3, 12px); margin-top: var(--tech-space-3, 12px); } }
 
 .hw-wrap { width: 100%; height: 260px; }
+.hw-wrap app-chart { display: block; width: 100%; height: 100%; }
+.hw-wrap ::ng-deep .chart-host { min-height: 260px; }
+@media (max-width: 640px) {
+  .hw-wrap { height: 220px; }
+  .hw-wrap ::ng-deep .chart-host { min-height: 220px; }
+}
 
 .ts-list { display: flex; flex-direction: column; max-height: 260px; overflow-y: auto; }
 .ts-row {
@@ -113,3 +143,14 @@ mat-progress-bar {
   .ts-chev { font-size: 18px; width: 18px; height: 18px; color: var(--tech-text-tertiary); }
 }
 .ts-empty { padding: 20px 4px; color: var(--tech-text-tertiary); font-size: 13px; }
+
+@media (max-width: 640px) {
+  .ts-list { max-height: none; } // let the list flow; the page scrolls, not a nested box
+  .ts-row {
+    min-height: 44px;          // comfortable tap target
+    padding: 10px 4px;
+    gap: 8px;
+    .ts-cost { min-width: 64px; }
+    .ts-msgs { white-space: nowrap; }
+  }
+}

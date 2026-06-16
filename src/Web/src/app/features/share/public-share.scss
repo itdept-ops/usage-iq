@@ -7,11 +7,13 @@
 }
 
 .ps-wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 40px; }
+@media (max-width: 560px) { .ps-wrap { padding: 20px 16px 32px; } }
 
 .ps-head {
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 10px 16px;
   padding-bottom: 18px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--tech-border, #26303f);
@@ -21,9 +23,14 @@
     font-family: var(--tech-font-ui); font-weight: 700; color: var(--tech-text);
     white-space: nowrap;
   }
-  .ps-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  h1 { margin: 0; font-size: var(--tech-fs-display, 22px); font-weight: 700; letter-spacing: -0.02em; }
-  .ps-scope { font-size: var(--tech-fs-label, 12px); color: var(--tech-text-tertiary); }
+  .ps-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+  h1 {
+    margin: 0;
+    font-size: clamp(18px, 5vw, var(--tech-fs-display, 22px));
+    font-weight: 700; letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+  }
+  .ps-scope { font-size: var(--tech-fs-label, 12px); color: var(--tech-text-tertiary); overflow-wrap: anywhere; }
 }
 
 .ps-kpis {

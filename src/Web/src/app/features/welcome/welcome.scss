@@ -26,7 +26,7 @@
   h2 {
     margin: 0 0 var(--tech-space-3);
     font-family: var(--tech-font-ui);
-    font-size: var(--tech-fs-display);
+    font-size: clamp(22px, 6vw, var(--tech-fs-display));
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--tech-text);
@@ -34,7 +34,7 @@
 
   .sub {
     margin: 0 0 var(--tech-space-6);
-    font-size: var(--tech-fs-body);
+    font-size: max(14px, var(--tech-fs-body));
     line-height: 1.55;
     color: var(--tech-text-secondary);
   }
@@ -117,5 +117,67 @@
     border-radius: var(--tech-r-control);
     color: var(--tech-text-secondary);
     --mdc-outlined-button-outline-color: var(--tech-border-strong);
+  }
+}
+
+/* ───────────────────────── Responsive (phones / small tablets) ───────────────────────── */
+@media (max-width: 640px) {
+  .welcome {
+    /* Center spacing is wasted on a phone — pull the hero to the top. */
+    padding-top: var(--tech-space-4);
+  }
+
+  .hero {
+    /* Tighter gutters so the inner cards keep their width; never wider than viewport. */
+    max-width: 100%;
+    padding: var(--tech-space-6) var(--tech-space-4) var(--tech-space-4);
+  }
+
+  /* Accessible-pages cards: one column, comfortable height, full bleed inside the hero. */
+  .cards {
+    grid-template-columns: 1fr;
+    gap: var(--tech-space-2);
+  }
+
+  .card {
+    gap: var(--tech-space-3);
+    padding: var(--tech-space-3);
+    min-height: 56px; /* >=44px tap target */
+
+    .card-icon {
+      width: 36px;
+      height: 36px;
+      mat-icon { font-size: 20px; width: 20px; height: 20px; }
+    }
+    .card-blurb { font-size: max(12px, var(--tech-fs-label)); }
+  }
+
+  .empty {
+    padding: var(--tech-space-4);
+  }
+
+  .actions .signout {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+}
+
+/* Tablet: ease the heavy hero padding a touch. */
+@media (max-width: 960px) and (min-width: 641px) {
+  .hero { padding: var(--tech-space-6); }
+}
+
+/* Respect reduced-motion for the card hover slide. */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card .card-chev {
+    transition: none;
+  }
+  .card:hover {
+    transform: none;
+  }
+  .card:hover .card-chev {
+    transform: none;
   }
 }

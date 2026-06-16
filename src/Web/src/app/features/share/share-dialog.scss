@@ -1,5 +1,9 @@
-:host { display: block; min-width: 460px; max-width: 560px; }
+:host { display: block; width: 100%; min-width: min(460px, 100%); max-width: 560px; }
 .mono { font-family: var(--tech-font-mono, ui-monospace, monospace); }
+
+@media (max-width: 560px) {
+  :host { min-width: 0; }
+}
 
 .sd-note {
   margin: 0 0 16px;
@@ -96,4 +100,31 @@
     .sd-view-ip { color: var(--tech-text); }
   }
   .sd-view-empty { padding: 6px 0; font-size: 11px; color: var(--tech-text-tertiary); }
+}
+
+/* ───────────────────────── Phones ───────────────────────── */
+@media (max-width: 560px) {
+  /* Stack the create form so each control is full-width and easy to tap. */
+  .sd-form {
+    .sd-label, .sd-expiry, .sd-create { flex: 1 1 100%; width: 100%; }
+  }
+
+  /* Copy row: input above, full-width button below. */
+  .sd-created .sd-url-row { flex-wrap: wrap; }
+  .sd-created .sd-url-row button { flex: 1 1 100%; }
+
+  /* Active-link row: let the meta + action buttons wrap to a second line
+     instead of crushing against the label. The action buttons keep mat's
+     ~40px touch size. */
+  .sd-item {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    .sd-item-main { flex: 1 1 100%; }
+    .sd-item-meta { order: 1; margin-right: auto; }
+  }
+
+  /* Inline edit form stacks full-width. */
+  .sd-edit {
+    .sd-edit-label, .sd-edit-expiry { flex: 1 1 100%; width: 100%; }
+  }
 }

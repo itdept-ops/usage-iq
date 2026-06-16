@@ -1,4 +1,9 @@
 :host { display: block; min-width: 420px; max-width: 520px; }
+/* On phones the dialog is opened near full-width (maxWidth 94vw); drop the fixed min so
+   it never forces horizontal overflow, and let tall content scroll inside. */
+@media (max-width: 640px) {
+  :host { min-width: 0; max-width: 100%; width: 100%; }
+}
 .mono { font-family: var(--tech-font-mono, ui-monospace, monospace); }
 
 h2[mat-dialog-title] {
@@ -90,3 +95,12 @@ h2[mat-dialog-title] {
 }
 
 mat-dialog-actions button mat-icon { font-size: 18px; width: 18px; height: 18px; margin-right: 4px; }
+
+/* Keep the footer actions usable on phones: allow wrapping and comfortable tap targets. */
+@media (max-width: 640px) {
+  mat-dialog-actions {
+    flex-wrap: wrap;
+    button { min-height: 44px; }
+  }
+  .fa-mode .fa-mode-btn { min-height: 44px; }
+}

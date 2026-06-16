@@ -44,7 +44,7 @@
 <!-- Permission matrix -->
 <mat-card appearance="outlined" class="panel table-card">
   <div class="panel-header">{{ users().length }} users</div>
-  <div class="table-scroll">
+  <div class="table-scroll matrix-desktop">
     <table class="perm-table">
       <thead>
         <tr class="group-row">
@@ -162,6 +162,93 @@
         }
       </tbody>
     </table>
+  </div>
+
+  <!-- Mobile: per-user cards (phones) — same signals/handlers as the matrix above -->
+  <div class="matrix-mobile">
+    @for (u of users(); track u.id) {
+      <div class="ucard" [class.disabled]="!u.isEnabled">
+        <div class="ucard-top">
+          <div class="u-cell">
+            @if (u.picture) {
+              <img class="u-avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
+            } @else {
+              <span class="u-avatar u-avatar--init">{{ (u.name || u.email).charAt(0).toUpperCase() }}</span>
+            }
+            <div class="u-id">
+              <span class="u-email mono-num">{{ u.email }}</span>
+              @if (u.name) { <span class="u-name">{{ u.name }}</span> }
+              <span class="u-last micro-label">{{ u.lastLoginUtc ? 'last in ' + (u.lastLoginUtc | date: 'MMM d, HH:mm') : 'never signed in' }}</span>
+            </div>
+          </div>
+          <mat-slide-toggle class="ucard-enabled" [ngModel]="u.isEnabled" (ngModelChange)="u.isEnabled = $event">Enabled</mat-slide-toggle>
+        </div>
+
+        <div class="ucard-perms">
+          @for (g of groups(); track g.name) {
+            <div class="add-perm-group">
+              <span class="add-perm-group-name micro-label">{{ g.name }}</span>
+              <div class="add-perm-group-items">
+                @for (p of g.perms; track p.key) {
+                  <mat-checkbox [checked]="hasPerm(u, p.key)" (change)="togglePerm(u, p.key, $event.checked)"
+                                [matTooltip]="p.description">{{ p.label }}</mat-checkbox>
+                }
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="ucard-actions">
+          <button mat-stroked-button class="save-btn" [disabled]="savingId() === u.id" (click)="save(u)">
+            <mat-icon>save</mat-icon> Save
+          </button>
+          <button mat-icon-button class="del-btn" matTooltip="Remove user" (click)="remove(u)">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+          <button mat-button class="ucard-history-btn" (click)="toggleExpand(u)"
+                  [attr.aria-expanded]="isExpanded(u.id)">
+            <mat-icon class="expand-chevron" [class.open]="isExpanded(u.id)">chevron_right</mat-icon>
+            Sign-in history
+          </button>
+        </div>
+
+        @if (isExpanded(u.id)) {
+          <div class="logins-panel ucard-logins">
+            <div class="logins-head">
+              <mat-icon class="logins-head-icon">login</mat-icon>
+              <span class="logins-head-title">Sign-in history</span>
+              <span class="logins-head-sub micro-label">most recent first · up to 200</span>
+            </div>
+
+            @if (loginHistory(u.id); as h) {
+              @if (h.loading) {
+                <div class="logins-state"><mat-progress-bar mode="indeterminate" /></div>
+              } @else if (h.error) {
+                <div class="logins-state logins-empty">Couldn't load sign-in history.</div>
+              } @else if (!h.events.length) {
+                <div class="logins-state logins-empty">No sign-ins recorded</div>
+              } @else {
+                <div class="logins-cards">
+                  @for (e of h.events; track e.id) {
+                    <div class="login-item">
+                      <div class="login-item-top">
+                        <span class="mono-num login-item-when">{{ e.whenUtc | date: 'MMM d, y, HH:mm:ss' }}</span>
+                        <span class="login-badge" [class.ok]="e.success" [class.denied]="!e.success">
+                          {{ e.success ? 'Success' : 'Denied' }}
+                        </span>
+                      </div>
+                      <div class="login-item-line"><span class="li-lbl micro-label">IP</span> <span class="mono-num">{{ e.ip || '—' }}</span></div>
+                      <div class="login-item-line"><span class="li-lbl micro-label">Reason</span> <span>{{ e.reason }}</span></div>
+                      <div class="login-item-line login-item-agent"><span class="li-lbl micro-label">Agent</span> <span>{{ e.userAgent || '—' }}</span></div>
+                    </div>
+                  }
+                </div>
+              }
+            }
+          </div>
+        }
+      </div>
+    }
   </div>
 </mat-card>
 

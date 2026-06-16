@@ -96,10 +96,10 @@
             <span class="lb-label" [title]="m.name">{{ isLocal(m.name) ? 'local (file sync)' : m.name }}</span>
             <span class="lb-tag micro-label">{{ m.users.length }} user{{ m.users.length === 1 ? '' : 's' }}</span>
           </span>
-          <span class="lb-seen mono-num" [title]="(m.lastSeenUtc | date: 'medium') || 'never'">{{ seen(m.lastSeenUtc) }}</span>
-          <span class="lb-num mono-num">{{ m.records | number }}</span>
-          <span class="lb-num mono-num">{{ m.tokens | compact }}</span>
-          <span class="lb-num mono-num cost">
+          <span class="lb-seen mono-num" data-label="Last seen" [title]="(m.lastSeenUtc | date: 'medium') || 'never'">{{ seen(m.lastSeenUtc) }}</span>
+          <span class="lb-num mono-num" data-label="Records">{{ m.records | number }}</span>
+          <span class="lb-num mono-num" data-label="Tokens">{{ m.tokens | compact }}</span>
+          <span class="lb-num mono-num cost" data-label="Cost">
             {{ m.costUsd | currency: 'USD' : 'symbol' : '1.2-2' }}
             <span class="lb-bar" aria-hidden="true"><i [style.width.%]="costPct(m.costUsd)"></i></span>
           </span>
@@ -209,10 +209,10 @@
             <span class="lb-label" [title]="u.email">{{ isLocal(u.email) ? 'local (file sync)' : u.email }}</span>
             <span class="lb-tag micro-label">{{ u.machines.length }} machine{{ u.machines.length === 1 ? '' : 's' }}</span>
           </span>
-          <span class="lb-seen mono-num" [title]="(u.lastSeenUtc | date: 'medium') || 'never'">{{ seen(u.lastSeenUtc) }}</span>
-          <span class="lb-num mono-num">{{ u.records | number }}</span>
-          <span class="lb-num mono-num">{{ u.tokens | compact }}</span>
-          <span class="lb-num mono-num cost">
+          <span class="lb-seen mono-num" data-label="Last seen" [title]="(u.lastSeenUtc | date: 'medium') || 'never'">{{ seen(u.lastSeenUtc) }}</span>
+          <span class="lb-num mono-num" data-label="Records">{{ u.records | number }}</span>
+          <span class="lb-num mono-num" data-label="Tokens">{{ u.tokens | compact }}</span>
+          <span class="lb-num mono-num cost" data-label="Cost">
             {{ u.costUsd | currency: 'USD' : 'symbol' : '1.2-2' }}
             <span class="lb-bar" aria-hidden="true"><i [style.width.%]="costPct(u.costUsd)"></i></span>
           </span>

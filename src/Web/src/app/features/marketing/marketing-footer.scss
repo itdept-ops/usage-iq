@@ -105,3 +105,11 @@
 @media (max-width: 720px) {
   .mfoot-inner { grid-template-columns: 1fr; gap: 36px; }
 }
+
+@media (max-width: 560px) {
+  /* Roomier tap targets for the footer nav links on phones. */
+  .mfoot-col { gap: 4px; }
+  .mfoot-col a { display: inline-flex; align-items: center; min-height: 40px; }
+  /* Base line wraps onto two centered rows rather than splitting awkwardly. */
+  .mfoot-base { justify-content: center; text-align: center; }
+}

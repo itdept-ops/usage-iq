@@ -38,6 +38,11 @@ export class App {
   readonly status = signal<SyncStatus | null>(null);
   private readonly now = signal(Date.now());
 
+  /** Mobile hamburger drawer open-state (only used below the nav breakpoint). */
+  readonly mobileNavOpen = signal(false);
+  toggleMobileNav(): void { this.mobileNavOpen.update(v => !v); }
+  closeMobileNav(): void { this.mobileNavOpen.set(false); }
+
   /**
    * Widget pop-outs, public shared views, and the public marketing pages (landing / features /
    * how-it-works) render bare — they bring their own chrome, so the app toolbar is hidden.
@@ -117,7 +122,10 @@ export class App {
   constructor() {
     this.router.events
       .pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed())
-      .subscribe(() => this.bareLayout.set(App.isBare(this.router.url)));
+      .subscribe(() => {
+        this.bareLayout.set(App.isBare(this.router.url));
+        this.closeMobileNav(); // never leave the drawer open across a route change
+      });
 
     // Poll sync status only when signed in; "now" keeps the relative label fresh.
     timer(0, 15000)

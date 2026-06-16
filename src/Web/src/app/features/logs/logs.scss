@@ -9,7 +9,7 @@
   h2 {
     margin: 0 0 6px;
     font-family: var(--tech-font-ui);
-    font-size: var(--tech-fs-display);
+    font-size: clamp(20px, 5vw, var(--tech-fs-display));
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--tech-text);
@@ -164,3 +164,104 @@ mat-progress-bar {
 }
 
 mat-form-field { --mat-form-field-container-text-size: 13px; }
+
+/* ===================================================================== */
+/* Mobile — full-width filters; the wide log table stacks into cards.    */
+/* ===================================================================== */
+@media (max-width: 640px) {
+  .panel { padding: 12px 14px; }
+
+  /* Filters: each control on its own full-width line, taps don't collide. */
+  .filter-row {
+    gap: 10px;
+
+    .f-method,
+    .f-status,
+    .f-search { width: 100%; flex: 1 1 100%; min-width: 0; }
+    .f-refresh { width: 100%; min-height: 44px; }
+  }
+
+  /* The log table becomes a list of cards — no horizontal page scroll. */
+  .table-scroll { overflow-x: visible; }
+
+  .log-table {
+    display: block;
+
+    thead { display: none; }
+    tbody { display: block; }
+    tbody > tr { display: block; }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 6px 10px;
+      padding: 12px 12px 12px 14px;
+      border: 1px solid var(--tech-border-subtle);
+      border-radius: var(--tech-r-control);
+      margin-bottom: 10px;
+      min-height: 44px;
+      white-space: normal;
+    }
+    .log-row.open { border-color: color-mix(in srgb, var(--tech-accent) 55%, transparent); }
+
+    /* Each cell drops its table sizing; values sit beside small labels. */
+    .log-row > td {
+      display: block;
+      padding: 0;
+      border: none;
+      white-space: normal;
+    }
+
+    /* Header line: method badge + status + chevron on the first row. */
+    .c-method { grid-row: 1; grid-column: 1; }
+    .c-status { grid-row: 1; grid-column: 2; }
+    .c-exp {
+      grid-row: 1; grid-column: 3;
+      text-align: right; width: auto;
+      align-self: start;
+    }
+
+    /* Path spans full width below the badges. */
+    .c-path {
+      grid-row: 2; grid-column: 1 / -1;
+      max-width: none;
+      word-break: break-all;
+      .path-txt { display: inline; }
+    }
+
+    /* Remaining fields: labelled key/value lines. */
+    .c-when,
+    .c-dur,
+    .c-user,
+    .c-ip {
+      grid-column: 1 / -1;
+      font-size: var(--tech-fs-label, 12px);
+    }
+    .c-when::before,
+    .c-dur::before,
+    .c-user::before,
+    .c-ip::before {
+      content: attr(data-label) ": ";
+      color: var(--tech-text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: var(--tech-fs-micro, 11px);
+      margin-right: 4px;
+    }
+
+    /* Detail row: full-width block under the card it belongs to. */
+    .detail-row { display: block; }
+    .detail-row td { display: block; }
+  }
+
+  .detail { padding: 12px 4px 4px; }
+  .bodies { gap: 12px; }
+  .body { max-height: 240px; font-size: 11.5px; }
+
+  .empty { display: block; padding: 24px 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .log-row { transition: none; }
+}

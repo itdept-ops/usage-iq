@@ -11,7 +11,7 @@
   h2 {
     margin: 0 0 var(--tech-space-1);
     font-family: var(--tech-font-ui);
-    font-size: var(--tech-fs-display);
+    font-size: clamp(22px, 6vw, var(--tech-fs-display));
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--tech-text);
@@ -19,14 +19,14 @@
   .sub {
     margin: 0;
     max-width: 680px;
-    font-size: var(--tech-fs-body);
+    font-size: max(14px, var(--tech-fs-body));
     color: var(--tech-text-secondary);
     line-height: 1.5;
   }
 }
 
 .panel {
-  padding: var(--tech-space-4) var(--tech-space-6) var(--tech-space-5);
+  padding: var(--tech-space-4) var(--tech-space-6) var(--tech-space-6);
   margin-top: var(--tech-space-4);
 }
 
@@ -471,4 +471,90 @@
   padding-top: var(--tech-space-3);
   border-top: 1px solid var(--tech-border-subtle);
   a { color: var(--tech-text-accent); text-decoration: none; &:hover { text-decoration: underline; } }
+}
+
+/* ───────────────────────── Responsive (phones / small tablets) ───────────────────────── */
+@media (max-width: 640px) {
+  /* Tighter panel gutters so inner controls keep their width at 360px. */
+  .panel {
+    padding: var(--tech-space-4);
+  }
+
+  /* Step header: let the title wrap below the number; tag drops to its own line. */
+  .step-head {
+    flex-wrap: wrap;
+    gap: var(--tech-space-2) var(--tech-space-3);
+
+    .grow { display: none; }
+  }
+
+  /* Self-service & "where" intro blocks: keep the icon inline, let text flow. */
+  .self-explainer .se-head,
+  .where {
+    gap: var(--tech-space-3);
+  }
+
+  /* Key generation: stack the label field above a full-width Generate button. */
+  .keygen {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--tech-space-2);
+
+    .keygen-name { width: 100%; }
+    button { width: 100%; min-height: 44px; justify-content: center; }
+  }
+
+  /* Fresh key reveal: code value above a full-width Copy button. */
+  .fresh-key .fk-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--tech-space-2);
+
+    .fk-copy { width: 100%; min-height: 44px; justify-content: center; }
+  }
+
+  /* Ingest-key list: each row reflows — identity on line 1, owner/meta/actions wrap below.
+     Nothing forces page width; long prefixes/emails ellipsize within the row. */
+  .key-row {
+    flex-wrap: wrap;
+    gap: var(--tech-space-2) var(--tech-space-3);
+    padding: var(--tech-space-3);
+
+    .key-name { flex: 1 1 auto; min-width: 0; }
+    .grow { display: none; }
+
+    .key-owner { max-width: 100%; }
+
+    .key-meta {
+      flex: 1 1 100%;
+      white-space: normal;
+    }
+
+    .key-revoke {
+      flex: 1 1 auto;
+      min-height: 44px;
+      justify-content: center;
+    }
+  }
+
+  /* Option rows: keep the flag and its description on the same line but let it wrap. */
+  .opt {
+    flex-wrap: wrap;
+    gap: 2px var(--tech-space-3);
+    code { min-width: 0; }
+  }
+
+  /* Service snippets collapse to a single column on the narrowest screens. */
+  .svc-grid { grid-template-columns: 1fr; }
+
+  /* Command copy buttons stay a comfortable tap target. */
+  .cmd .cmd-copy,
+  .fresh-key .fk-x {
+    width: 36px; height: 36px; line-height: 36px;
+  }
+}
+
+/* Tablet: ease panel padding a touch. */
+@media (max-width: 960px) and (min-width: 641px) {
+  .panel { padding: var(--tech-space-4) var(--tech-space-4) var(--tech-space-6); }
 }

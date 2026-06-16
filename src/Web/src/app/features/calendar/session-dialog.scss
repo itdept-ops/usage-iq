@@ -1,6 +1,15 @@
 :host { display: block; min-width: 520px; max-width: 680px; }
 .mono { font-family: var(--tech-font-mono, ui-monospace, monospace); }
 
+@media (max-width: 640px) {
+  // The dialog panel is opened at maxWidth:94vw; drop the fixed min-width so the
+  // content can shrink to the phone viewport instead of forcing horizontal scroll.
+  :host { min-width: 0; width: 100%; }
+  // Let the dialog body scroll vertically when the timeline is long; cap it to the
+  // viewport so the panel itself never overflows the screen.
+  ::ng-deep .mat-mdc-dialog-content { max-height: 70vh; }
+}
+
 .sx-head { margin-bottom: 14px; }
 .sx-id { font-size: 12px; color: var(--tech-text); word-break: break-all; }
 .sx-meta {
@@ -19,6 +28,15 @@
 }
 
 .sx-chart { height: 200px; margin-bottom: 14px; }
+.sx-chart app-chart { display: block; width: 100%; height: 100%; }
+.sx-chart ::ng-deep .chart-host { min-height: 200px; }
+
+@media (max-width: 640px) {
+  .sx-kpis { gap: 8px; }
+  .sx-kpi { padding: 8px 10px; .v { font-size: 17px; } }
+  .sx-chart { height: 180px; }
+  .sx-chart ::ng-deep .chart-host { min-height: 180px; }
+}
 
 .sx-list-head {
   font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
@@ -30,9 +48,14 @@
   border-bottom: 1px solid var(--tech-border-subtle);
   &:last-child { border-bottom: none; }
   .sx-time { color: var(--tech-text-tertiary); flex: 0 0 auto; }
-  .sx-model { color: var(--tech-text); }
+  .sx-model { color: var(--tech-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .sx-sub { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--tech-accent) 18%, transparent); color: var(--tech-accent); }
   .sx-grow { flex: 1 1 auto; }
   .sx-tok { color: var(--tech-text-secondary); }
   .sx-cost { color: var(--tech-text); min-width: 72px; text-align: right; }
+}
+
+@media (max-width: 640px) {
+  .sx-list { max-height: none; } // dialog body already scrolls; avoid a nested scroll box
+  .sx-row { gap: 7px; .sx-cost { min-width: 60px; } }
 }

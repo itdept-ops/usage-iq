@@ -315,12 +315,90 @@ mat-slide-toggle {
   gap: 20px;
   margin: 10px 0 14px;
 
-  .threshold { width: 180px; }
+  .threshold { width: 180px; max-width: 100%; }
 }
 .danger-btn {
   color: var(--tech-text-tertiary);
   &:hover { color: var(--tech-error, #ff5c6c); }
 }
 
-.notif-row .mention { width: 220px; }
+.notif-row .mention { width: 220px; max-width: 100%; }
 .notif-row .notif-hint { color: var(--tech-text-tertiary); }
+
+/* ───────────────────────── Responsive (phones / small tablets) ───────────────────────── */
+@media (max-width: 640px) {
+  .head h2 { font-size: clamp(20px, 6vw, var(--tech-fs-display)); }
+
+  /* Tighter panel gutters so inner controls keep their width */
+  .s-panel {
+    padding: var(--tech-space-4) var(--tech-space-4) var(--tech-space-6);
+  }
+
+  /* Panel header: stack the title above its status pill/toggle */
+  .s-panel-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--tech-space-2);
+  }
+
+  .sync-pill {
+    margin-left: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  /* Sources: let the header metadata wrap; toggle drops to its own line */
+  .source-row {
+    margin: 0 calc(-1 * var(--tech-space-1));
+    padding: var(--tech-space-3);
+
+    .source-head {
+      flex-wrap: wrap;
+      gap: var(--tech-space-2) var(--tech-space-3);
+
+      .grow { display: none; }
+      mat-slide-toggle { flex: 1 0 100%; }
+    }
+
+    /* Path input above a full-width Save button */
+    .source-edit {
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--tech-space-2);
+
+      .src-save { align-self: stretch; justify-content: center; min-height: 44px; }
+    }
+  }
+
+  /* Notification toggle/field rows stack; fields go full width */
+  .notif-row {
+    gap: var(--tech-space-3);
+
+    .threshold,
+    .mention { width: 100%; }
+  }
+
+  /* Every form field in a stacked grid spans the row (digest hour, weekly day, etc.). */
+  .field-grid mat-form-field { width: 100%; }
+
+  /* Keep readable body copy at >=14px on small screens. */
+  .source-row .src-name,
+  .result .kv { font-size: 14px; }
+
+  /* Action button rows wrap; each control is comfortably tappable */
+  .actions {
+    flex-wrap: wrap;
+
+    button {
+      flex: 1 1 auto;
+      min-height: 44px;
+      justify-content: center;
+    }
+  }
+}
+
+/* Tablet: ease the heavy right gutter a touch */
+@media (max-width: 960px) and (min-width: 641px) {
+  .s-panel { padding: var(--tech-space-4) var(--tech-space-4) var(--tech-space-6); }
+}

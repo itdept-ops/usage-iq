@@ -149,6 +149,151 @@
   flex: 1 1 auto;
 }
 
+/* ---- Mobile hamburger + drawer ------------------------------------- */
+/* Burger is hidden on desktop; the @media block below reveals it and
+   hides the inline .nav once the toolbar runs short on room. */
+.navburger {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: 6px;
+  padding: 0;
+  background: var(--tech-input);
+  border: 1px solid var(--tech-border-subtle, #1c2533);
+  border-radius: var(--tech-r-control, 8px);
+  color: var(--tech-text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color var(--tech-t-control, 140ms) ease,
+    border-color var(--tech-t-control, 140ms) ease,
+    background-color var(--tech-t-control, 140ms) ease;
+
+  &:hover {
+    color: var(--tech-text);
+    border-color: var(--tech-border-strong, #33425a);
+  }
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--tech-focus-ring);
+  }
+
+  &__box {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 18px;
+    height: 14px;
+
+    span {
+      display: block;
+      height: 2px;
+      width: 100%;
+      border-radius: 2px;
+      background: currentColor;
+      transition:
+        transform var(--tech-t-control, 140ms) var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+        opacity var(--tech-t-control, 140ms) ease;
+    }
+  }
+
+  /* Morph to an X while the drawer is open. */
+  &--open {
+    color: var(--tech-text);
+    border-color: var(--tech-border-strong, #33425a);
+
+    .navburger__box span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+    .navburger__box span:nth-child(2) { opacity: 0; }
+    .navburger__box span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+  }
+}
+
+/* Scrim behind the open drawer (mobile only — kept display:none until the
+   breakpoint so it never intercepts taps on desktop). */
+.mobile-nav-scrim {
+  display: none;
+  position: fixed;
+  inset: 56px 0 0 0;
+  z-index: 49;
+  background: var(--tech-glass-scrim, rgba(6, 9, 14, 0.72));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--tech-t-panel, 200ms) var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1));
+
+  &.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Slide-down drawer that lists the same permission-gated links as .nav. */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  inset: 56px 0 auto 0;
+  z-index: 50;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 10px var(--tech-page-gutter, 24px) 16px;
+  max-height: calc(100dvh - 56px);
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--tech-bg-void, #060910) 96%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--tech-border, #26303f);
+  box-shadow: var(--tech-shadow-popover, 0 24px 60px -20px rgba(0, 0, 0, 0.8));
+  transform: translateY(-12px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--tech-t-panel, 200ms) var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+    transform var(--tech-t-panel, 200ms) var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1));
+
+  &.open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 14px;
+    border-radius: var(--tech-r-control, 8px);
+    font-family: var(--tech-font-ui);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--tech-text-secondary);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      color var(--tech-t-control, 140ms) ease,
+      background-color var(--tech-t-control, 140ms) ease;
+
+    &:hover {
+      color: var(--tech-text);
+      background: color-mix(in srgb, var(--tech-panel-raised) 70%, transparent);
+    }
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--tech-focus-ring);
+    }
+
+    /* Active route: accent text + 2px neon left bar (mirrors desktop language). */
+    &.active {
+      color: var(--tech-text);
+      background: color-mix(in srgb, var(--tech-panel-raised) 60%, transparent);
+      box-shadow: inset 2px 0 0 var(--tech-accent);
+    }
+  }
+}
+
 /* ---- Right cluster: status + GitHub -------------------------------- */
 .status {
   display: inline-flex;
@@ -483,18 +628,54 @@
 }
 
 /* ---- Responsive ---------------------------------------------------- */
+/* Below this width the inline links overflow the bar, so swap them for the
+   hamburger + drawer. Brand, sync pill, GitHub, and account menu stay inline. */
+@media (max-width: 860px) {
+  .nav {
+    display: none;
+  }
+  .navburger {
+    display: inline-flex;
+  }
+  .mobile-nav,
+  .mobile-nav-scrim {
+    display: flex;
+  }
+}
+
 @media (max-width: 720px) {
   .brand__prompt {
     display: none;
-  }
-  .nav {
-    margin-left: 10px;
   }
   .status__text {
     display: none;
   }
   .status {
     padding: 6px;
+  }
+}
+
+/* Phones: tighten the right cluster so the bar never overflows at 360px. */
+@media (max-width: 480px) {
+  .topbar {
+    gap: 4px;
+    padding: 0 12px;
+  }
+  /* Hide the verbose username; the avatar + chevron still open the menu. */
+  .user.mat-mdc-button .user__name {
+    display: none;
+  }
+  .user.mat-mdc-button {
+    padding: 0 4px;
+    margin-left: 0;
+  }
+  /* Icon-only GitHub link is already compact; drop it here to reclaim room. */
+  .gh.mat-mdc-icon-button {
+    display: none;
+  }
+  .mobile-nav,
+  .mobile-nav-scrim {
+    inset-block-start: 56px;
   }
 }
 
@@ -519,5 +700,11 @@
   }
   ::ng-deep .account-menu.mat-mdc-menu-panel {
     animation: none;
+  }
+  .navburger,
+  .navburger__box span,
+  .mobile-nav,
+  .mobile-nav-scrim {
+    transition: none;
   }
 }

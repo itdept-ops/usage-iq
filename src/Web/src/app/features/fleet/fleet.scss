@@ -18,7 +18,7 @@ mat-progress-bar {
   h2 {
     margin: 0 0 var(--tech-space-1);
     font-family: var(--tech-font-ui);
-    font-size: var(--tech-fs-display);
+    font-size: clamp(20px, 5vw, var(--tech-fs-display));
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--tech-text);
@@ -82,6 +82,42 @@ mat-progress-bar {
   }
 }
 
+/* On phones the filter bar stops being sticky chrome and stacks into full-width clusters
+   so nothing clips and the controls stay comfortably tappable. */
+@media (max-width: 640px) {
+  .filters {
+    position: static;
+    padding: 12px;
+
+    .filters-row { gap: 12px; }
+
+    /* Each cluster claims the full row and lays out its own controls. */
+    .filter-cluster.dates {
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+      padding-right: 0;
+    }
+    .cluster-label { flex: 1 1 100%; }
+    .f-date { flex: 1 1 0; width: auto; min-width: 0; }
+
+    .quick-chips {
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+      padding-left: 0;
+      border-left: none;
+      gap: 6px;
+    }
+    .qr-chip { flex: 1 1 auto; min-height: 44px; }
+
+    .grow { display: none; }
+
+    .filter-actions {
+      flex: 1 1 100%;
+      .btn-reset, .btn-apply { flex: 1 1 0; min-height: 44px; }
+    }
+  }
+}
+
 /* ───────────────────────── KPI cards ───────────────────────── */
 .cards {
   display: grid;
@@ -90,9 +126,11 @@ mat-progress-bar {
   margin-bottom: var(--tech-space-4);
 }
 @media (max-width: 880px) { .cards { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .cards { gap: var(--tech-space-2); } }
 
 .kpi {
   padding: var(--tech-space-3) var(--tech-space-4);
+  @media (max-width: 640px) { padding: var(--tech-space-3); }
 
   .kpi-top { display: flex; align-items: center; justify-content: space-between; }
   .kpi-label {
@@ -102,8 +140,9 @@ mat-progress-bar {
   .kpi-icon mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--tech-text-tertiary); }
   .kpi-value {
     margin: 6px 0 2px;
-    font-size: var(--tech-fs-display, 26px);
+    font-size: clamp(20px, 4.5vw, var(--tech-fs-display, 26px));
     font-weight: 600; color: var(--tech-text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     &.cost { color: var(--tech-accent-magenta, #f472b6); }
   }
   .kpi-sub { font-size: var(--tech-fs-micro, 11px); color: var(--tech-text-tertiary); }
@@ -113,14 +152,26 @@ mat-progress-bar {
 
 /* ───────────────────────── Leaderboard ───────────────────────── */
 .board-card { padding: var(--tech-space-4) var(--tech-space-4) var(--tech-space-3); }
+@media (max-width: 640px) { .board-card { padding: var(--tech-space-3) var(--tech-space-3) var(--tech-space-2); } }
 
 .board-head {
   display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap;
   margin-bottom: var(--tech-space-3); gap: var(--tech-space-3);
 
   mat-button-toggle-group {
     border-radius: var(--tech-r-control);
     mat-icon { font-size: 16px; width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
+  }
+
+  /* The board toggle goes full-width and stays a comfortable tap target on phones. */
+  @media (max-width: 640px) {
+    gap: var(--tech-space-2);
+    .panel-header { flex: 1 1 100%; }
+    mat-button-toggle-group { flex: 1 1 100%; }
+    // Split the two options evenly across the full width so each is an easy tap target.
+    ::ng-deep .mat-button-toggle { flex: 1 1 0; }
+    ::ng-deep .mat-button-toggle-label-content { line-height: 44px; }
   }
 }
 
@@ -158,6 +209,12 @@ mat-progress-bar {
     .lb-main { grid-column: 1; }
     .lb-actions { grid-column: 2; }
     .lb-detail { grid-column: 1 / -1; }
+
+    /* On phones the main grows tall (stacked card); keep the actions trigger by the name row. */
+    @media (max-width: 640px) {
+      align-items: start;
+      .lb-actions { margin-top: 6px; }
+    }
   }
 }
 
@@ -226,21 +283,60 @@ mat-progress-bar {
   }
 }
 
+/* Tablet: name spans the top, then the four metrics flow two-per-row
+   (seen | records, tokens | cost) so the column header can drop away. */
 @media (max-width: 720px) {
   .lb-head { display: none; }
   .lb-main {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr 1fr;
     grid-auto-rows: auto;
-    row-gap: 4px;
+    row-gap: 6px;
+    column-gap: var(--tech-space-3);
     .lb-rank { display: none; }
     .lb-name { grid-column: 1 / -1; }
-    .lb-seen { grid-column: 1; }
-    .lb-num { grid-column: 2; }
+    .lb-seen { grid-column: 1; text-align: left; }
+  }
+}
+
+/* Phone: the row becomes a self-labeled stacked card so nothing clips at 360px.
+   The metrics carry inline labels (added here, not in the markup) since the column
+   header is hidden, and the cost + its relative-spend bar own the full width. */
+@media (max-width: 640px) {
+  .lb-main {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 12px 10px;
+
+    .lb-name { order: 0; flex-wrap: wrap; row-gap: 4px; }
+
+    .lb-seen, .lb-num {
+      display: flex; align-items: baseline; justify-content: space-between;
+      text-align: right; white-space: normal;
+      padding: 4px 0;
+      border-top: 1px solid var(--tech-border-subtle);
+      &::before {
+        content: attr(data-label);
+        flex: 0 0 auto; margin-right: var(--tech-space-3);
+        font-family: var(--tech-font-mono);
+        font-size: var(--tech-fs-micro);
+        letter-spacing: 0.06em; text-transform: uppercase;
+        color: var(--tech-text-tertiary);
+      }
+    }
+
+    /* Cost keeps its label + value on one line and the spend bar spans full-width below. */
+    .cost {
+      flex-wrap: wrap;
+      .lb-bar { flex: 1 1 100%; order: 3; margin-top: 4px; }
+    }
   }
 }
 
 .lb-detail {
   padding: 0 10px var(--tech-space-3) 40px;
+  @media (max-width: 640px) { padding-left: 10px; }
 
   .lb-detail-lbl { display: block; color: var(--tech-text-tertiary); margin-bottom: 6px; }
   .lb-detail-empty { font-size: var(--tech-fs-label); color: var(--tech-text-tertiary); }
@@ -262,8 +358,8 @@ mat-progress-bar {
     gap: var(--tech-space-2) var(--tech-space-4);
     margin: 0;
   }
-  @media (max-width: 720px) { .meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 480px) { .meta-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 880px) { .meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .meta-grid { grid-template-columns: 1fr; } }
 
   .meta-item {
     display: flex;
