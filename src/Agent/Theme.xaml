@@ -1,0 +1,164 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:s="clr-namespace:UsageIq.Agent.Services">
+
+    <!-- ============================================================
+         Usage IQ dark theme — approximates the brand palette.
+         Brand gradient: #3D8BFF -> #8B7CFF -> #3FD8D0
+         ============================================================ -->
+
+    <!-- Log severity → color converters (live activity view) -->
+    <s:SeverityToBrushConverter x:Key="SeverityToBrush"/>
+    <s:SeverityToTextConverter  x:Key="SeverityToText"/>
+
+    <!-- Surfaces -->
+    <SolidColorBrush x:Key="Bg"          Color="#0B0F1A"/>
+    <SolidColorBrush x:Key="BgPanel"     Color="#111726"/>
+    <SolidColorBrush x:Key="BgElevated"  Color="#161D2F"/>
+    <SolidColorBrush x:Key="BgInput"     Color="#0E1422"/>
+    <SolidColorBrush x:Key="Border"      Color="#243049"/>
+
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextPrimary"   Color="#EAF0FF"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#9AA7C2"/>
+    <SolidColorBrush x:Key="TextMuted"     Color="#5E6B86"/>
+
+    <!-- Brand accents -->
+    <SolidColorBrush x:Key="BrandBlue"  Color="#3D8BFF"/>
+    <SolidColorBrush x:Key="BrandPurple" Color="#8B7CFF"/>
+    <SolidColorBrush x:Key="BrandTeal"  Color="#3FD8D0"/>
+
+    <LinearGradientBrush x:Key="BrandGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#3D8BFF" Offset="0"/>
+        <GradientStop Color="#8B7CFF" Offset="0.55"/>
+        <GradientStop Color="#3FD8D0" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Severity colors for the live log -->
+    <SolidColorBrush x:Key="SevInfo"    Color="#9AA7C2"/>
+    <SolidColorBrush x:Key="SevScan"    Color="#3D8BFF"/>
+    <SolidColorBrush x:Key="SevPost"    Color="#8B7CFF"/>
+    <SolidColorBrush x:Key="SevSuccess" Color="#3FD8D0"/>
+    <SolidColorBrush x:Key="SevWarning" Color="#F5C451"/>
+    <SolidColorBrush x:Key="SevError"   Color="#FF6B7A"/>
+
+    <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas, monospace</FontFamily>
+
+    <!-- Primary (gradient) button -->
+    <Style x:Key="PrimaryButton" TargetType="Button">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="{StaticResource BrandGradient}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="b" Background="{TemplateBinding Background}"
+                            CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="b" Property="Opacity" Value="0.9"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="b" Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Secondary (outlined) button -->
+    <Style x:Key="GhostButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Background" Value="{StaticResource BgElevated}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="b" Background="{TemplateBinding Background}"
+                            BorderBrush="{StaticResource Border}" BorderThickness="1"
+                            CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="b" Property="BorderBrush" Value="{StaticResource BrandBlue}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="b" Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Text input -->
+    <Style x:Key="Field" TargetType="TextBox">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Background" Value="{StaticResource BgInput}"/>
+        <Setter Property="CaretBrush" Value="{StaticResource BrandTeal}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="10,7"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="FieldPassword" TargetType="PasswordBox">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Background" Value="{StaticResource BgInput}"/>
+        <Setter Property="CaretBrush" Value="{StaticResource BrandTeal}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="10,7"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PasswordBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Field label -->
+    <Style x:Key="FieldLabel" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Margin" Value="0,0,0,5"/>
+    </Style>
+
+    <!-- CheckBox -->
+    <Style x:Key="ToggleCheck" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Margin" Value="0,6"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+</ResourceDictionary>

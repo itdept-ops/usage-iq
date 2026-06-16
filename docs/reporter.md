@@ -10,6 +10,10 @@ database in the cloud while the logs stay on your workstation.
 The server stays authoritative: it prices each row, resolves the project from `cwd`, and de-dupes on a
 unique key. So re-running the reporter is idempotent, and remote rows merge with any local sync.
 
+> **Prefer a GUI?** On Windows, the [desktop agent](agent.md) is the same engine as a system-tray app —
+> a live activity view, a point-and-click Settings screen, and a run-at-sign-in checkbox. This page
+> covers the cross-platform console reporter.
+
 ## 1. Generate an ingest key
 
 In the dashboard: **Reporter** (top nav, requires the `settings.manage` permission) → **Generate key**.

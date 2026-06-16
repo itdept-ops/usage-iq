@@ -178,11 +178,11 @@ usage-iq-reporter --url https://usage.example.com --key uiq_xxxxxxxx…   # watc
 usage-iq-reporter --url https://usage.example.com --key uiq_… --once     # single pass (cron/Task Scheduler)
 ```
 
-On Windows, [`Run-UsageIqReporter.ps1`](Run-UsageIqReporter.ps1) is a one-file "build + run the loop" launcher (asks for the key once, then it's a double-click).
+On Windows, [`Run-UsageIqReporter.ps1`](Run-UsageIqReporter.ps1) is a one-file "build + run the loop" launcher (asks for the key once, then it's a double-click). Prefer a GUI? The **[desktop agent](docs/agent.md)** (`src/Agent`) is the same engine as a **system-tray app** — a live activity view, a point-and-click Settings screen, and a run-at-sign-in checkbox — distributable as a single self-contained `.exe`.
 
 The reporter de-dupes locally before sending (one billed turn spans several identical-key log lines — that's the `redundant` count), coalesces rows across files into batches, tracks per-file state so steady-state passes are cheap, and pins a **live combined-token counter** to the top-right (tokens newly ingested this session). Only parsed token counts/metadata are sent; the ingest key grants *write-only* access to `/api/ingest` and nothing else.
 
-**Full guides** — install, flags, run-as-a-service, cloud hosting, the ingest API, and all config — are in **[docs/](docs/)**: [Reporter](docs/reporter.md) · [Cloud hosting](docs/cloud-hosting.md) · [Ingest API](docs/ingest-api.md) · [Configuration](docs/configuration.md).
+**Full guides** — install, flags, run-as-a-service, cloud hosting, the ingest API, and all config — are in **[docs/](docs/)**: [Reporter](docs/reporter.md) · [Desktop agent](docs/agent.md) · [Cloud hosting](docs/cloud-hosting.md) · [Ingest API](docs/ingest-api.md) · [Configuration](docs/configuration.md).
 
 ## API reference
 
@@ -250,7 +250,9 @@ usage-iq/
    │  ├─ Auth/                 # JWT, per-request permission filter, ingest-key filter
    │  ├─ Infrastructure/       # global exception handler, request-logging middleware
    │  └─ Endpoints/            # API surface
-   ├─ Reporter/                # console app: parse local logs, push to /api/ingest (cloud hosting)
+   ├─ ReporterCore/            # shared reporter engine: scan/parse/push, structured events, config loader
+   ├─ Reporter/                # console app on ReporterCore: parse local logs, push to /api/ingest
+   ├─ Agent/                   # Windows system-tray desktop app on ReporterCore (WPF + tray NotifyIcon)
    └─ Web/                     # Angular 21 (standalone + signals, ECharts)
       └─ src/app/{features/{dashboard,calendar,pricing,settings,reporter,users,logs,login},core,shared}
 ```

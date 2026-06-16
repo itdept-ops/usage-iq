@@ -212,10 +212,11 @@ public sealed class AgentController : IDisposable
         Emit(LogLine.Info("manual sync requested"));
         _ = Task.Run(async () =>
         {
+            // The manual pass gets its own cancellation source (race-free vs. a concurrent Stop disposing
+            // the loop's CTS). The pass lock serializes it against any in-flight timed pass.
             using var localCts = new CancellationTokenSource();
-            var token = _loopCts?.Token ?? localCts.Token;
             var wasRunning = IsRunning;
-            await RunPassAsync(engine, once: !wasRunning, token);
+            await RunPassAsync(engine, once: !wasRunning, localCts.Token);
             // If we're not in the watch loop, restore the resting state afterwards.
             if (!wasRunning) SetStatus(s => s with { State = AgentState.Paused });
         });

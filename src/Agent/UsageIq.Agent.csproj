@@ -35,6 +35,22 @@
   </ItemGroup>
 
   <!--
+    This project uses WPF for the UI and WinForms ONLY for the tray NotifyIcon, so many type names
+    (Application, Brush, Brushes, Binding, MessageBox, …) exist in both namespaces. Resolve the common
+    ones to their WPF flavor project-wide via global using aliases; the few WinForms types we need are
+    referenced through the `WinForms` alias in TrayIcon.cs.
+  -->
+  <ItemGroup>
+    <Using Include="System.Windows.Application" Alias="Application" />
+    <Using Include="System.Windows.MessageBox" Alias="MessageBox" />
+    <Using Include="System.Windows.MessageBoxButton" Alias="MessageBoxButton" />
+    <Using Include="System.Windows.MessageBoxImage" Alias="MessageBoxImage" />
+    <Using Include="System.Windows.Media.Brush" Alias="Brush" />
+    <Using Include="System.Windows.Media.Brushes" Alias="Brushes" />
+    <Using Include="System.Windows.Data.Binding" Alias="Binding" />
+  </ItemGroup>
+
+  <!--
     Embed the brand icon as a WPF resource so it can be loaded at runtime via a pack URI
     (pack://application:,,,/Assets/usage-iq.ico) for both the WPF Window chrome and the
     WinForms NotifyIcon. It is also the ApplicationIcon (exe icon) above.
