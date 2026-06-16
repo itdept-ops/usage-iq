@@ -15,6 +15,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<LoginEvent> LoginEvents => Set<LoginEvent>();
     public DbSet<RequestLog> RequestLogs => Set<RequestLog>();
     public DbSet<NotificationSetting> NotificationSettings => Set<NotificationSetting>();
     public DbSet<ShareLink> ShareLinks => Set<ShareLink>();
@@ -139,6 +140,20 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.TargetEmail).HasMaxLength(256);
             e.Property(x => x.Detail).HasMaxLength(1024);
             e.HasIndex(x => x.WhenUtc);
+        });
+
+        b.Entity<LoginEvent>(e =>
+        {
+            e.Property(x => x.Email).HasMaxLength(256);
+            e.Property(x => x.WhenUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.Ip).HasMaxLength(64).HasDefaultValue("");
+            e.Property(x => x.Reason).HasMaxLength(64);
+            e.Property(x => x.Name).HasMaxLength(256);
+            e.Property(x => x.UserAgent).HasMaxLength(256);
+            // The per-user history filters by Email and reads newest-first; a composite index with
+            // (Email asc, WhenUtc desc) serves that exact query directly, and its Email prefix also
+            // covers plain lookups by email, so a separate single-column Email index is redundant.
+            e.HasIndex(x => new { x.Email, x.WhenUtc }).IsDescending(false, true);
         });
 
         b.Entity<RequestLog>(e =>

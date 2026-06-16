@@ -62,6 +62,26 @@ public static class UsersEndpoints
                 .OrderBy(u => u.Email).ToListAsync(ct)).Select(ToDto)))
             .RequireAnyPermission(Permissions.UsersView, Permissions.UsersManage);
 
+        // Per-user sign-in history (newest first, capped). Filters by the user's email so it also
+        // surfaces events recorded before a UserId was bound (and survives id churn).
+        users.MapGet("/{id:int}/logins", async (int id, UsageDbContext db, CancellationToken ct) =>
+        {
+            var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
+            if (user is null) return Results.NotFound();
+
+            var events = await db.LoginEvents.AsNoTracking()
+                .Where(e => e.Email == user.Email)
+                .OrderByDescending(e => e.WhenUtc).ThenByDescending(e => e.Id)
+                .Take(200)
+                .Select(e => new LoginEventDto
+                {
+                    Id = e.Id, WhenUtc = e.WhenUtc, Ip = e.Ip, Success = e.Success,
+                    Reason = e.Reason, Name = e.Name, UserAgent = e.UserAgent,
+                })
+                .ToListAsync(ct);
+            return Results.Ok(events);
+        }).RequireAnyPermission(Permissions.UsersView, Permissions.UsersManage);
+
         users.MapPost("/", async (UserUpsertRequest req, UsageDbContext db, AuditLogger audit, CancellationToken ct) =>
         {
             var email = (req.Email ?? "").Trim().ToLowerInvariant();

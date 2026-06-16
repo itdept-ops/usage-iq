@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AccessPolicy, AuditEntry, CacheEfficiency, CalendarDay, CreateShareRequest, Fleet, FleetDeleteRequest,
   FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, GroupBy,
-  HeatmapCell, IngestionSource, IngestKey, IngestKeyCreated, MachineStat, ManagedUser, ModelStat, NotificationSettings,
+  HeatmapCell, IngestionSource, IngestKey, IngestKeyCreated, LoginEvent, MachineStat, ManagedUser, ModelStat, NotificationSettings,
   NotificationUpdate, PagedResult, PermissionItem, Pricing, ProjectDto, PublicShare, RequestLogEntry, SavedView,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SummaryResponse,
   SyncResult, SyncStatus, UsageFilter, UsageRecord, UsageStats,
@@ -230,6 +230,11 @@ export class Api {
 
   users(): Observable<ManagedUser[]> {
     return this.http.get<ManagedUser[]>(`${this.base}/users`);
+  }
+
+  /** A user's recent sign-in history (newest first, capped at 200). Gated by users.view|users.manage. */
+  userLogins(id: number): Observable<LoginEvent[]> {
+    return this.http.get<LoginEvent[]>(`${this.base}/users/${id}/logins`);
   }
 
   createUser(body: { email: string; name?: string; isEnabled: boolean; permissions: string[] }): Observable<ManagedUser> {

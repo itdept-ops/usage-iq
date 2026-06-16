@@ -343,6 +343,21 @@ export interface AuditEntry {
   detail: string | null;
 }
 
+/**
+ * One recorded sign-in attempt in a user's login history (GET /api/users/{id}/logins).
+ * Mirrors LoginEventDto on the API. `reason` is one of: "ok", "auto-provisioned",
+ * "account disabled", "google id mismatch".
+ */
+export interface LoginEvent {
+  id: number;
+  whenUtc: string;
+  ip: string;
+  success: boolean;
+  reason: string;
+  name: string | null;
+  userAgent: string | null;
+}
+
 export interface NotificationSettings {
   webhookConfigured: boolean;
   webhookMasked: string | null;

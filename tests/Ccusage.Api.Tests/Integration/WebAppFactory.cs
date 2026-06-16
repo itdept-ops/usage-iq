@@ -1,5 +1,8 @@
+using System.Net;
 using Ccusage.Api.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +37,13 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
 {
     public const string Key = "usage-iq-integration-test-signing-key-32-bytes-min!";
     public const string AdminEmail = "admin@test.local";
+
+    /// <summary>
+    /// The TestServer leaves <c>Connection.RemoteIpAddress</c> null; a startup filter stamps this
+    /// known value early in the pipeline so server-observed-IP code (login history, IP logging) has
+    /// a deterministic, non-empty client IP to record — mirroring production where there always is one.
+    /// </summary>
+    public const string TestClientIp = "203.0.113.7";
 
     private readonly PostgreSqlContainer _pg = new PostgreSqlBuilder("postgres:16-alpine").Build();
 
@@ -76,6 +86,23 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
         {
             services.RemoveAll<IGoogleTokenValidator>();
             services.AddSingleton<IGoogleTokenValidator, FakeGoogleTokenValidator>();
+
+            // Stamp a deterministic client IP before the app pipeline runs (the TestServer otherwise
+            // leaves RemoteIpAddress null). UseForwardedHeaders won't override it absent an X-Forwarded-For.
+            services.AddSingleton<Microsoft.AspNetCore.Hosting.IStartupFilter, RemoteIpStartupFilter>();
         });
+    }
+
+    private sealed class RemoteIpStartupFilter : Microsoft.AspNetCore.Hosting.IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (ctx, nextMw) =>
+            {
+                ctx.Connection.RemoteIpAddress = IPAddress.Parse(TestClientIp);
+                await nextMw();
+            });
+            next(app);
+        };
     }
 }

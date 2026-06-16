@@ -48,6 +48,7 @@
     <table class="perm-table">
       <thead>
         <tr class="group-row">
+          <th class="col-expand" rowspan="2"></th>
           <th class="col-user" rowspan="2">User</th>
           <th class="col-enabled" rowspan="2">Enabled</th>
           @for (g of groups(); track g.name) {
@@ -65,7 +66,14 @@
       </thead>
       <tbody>
         @for (u of users(); track u.id) {
-          <tr [class.disabled]="!u.isEnabled">
+          <tr [class.disabled]="!u.isEnabled" [class.expanded]="isExpanded(u.id)">
+            <td class="col-expand">
+              <button mat-icon-button class="expand-btn" (click)="toggleExpand(u)"
+                      [attr.aria-expanded]="isExpanded(u.id)"
+                      [matTooltip]="isExpanded(u.id) ? 'Hide sign-in history' : 'Show sign-in history'">
+                <mat-icon class="expand-chevron" [class.open]="isExpanded(u.id)">chevron_right</mat-icon>
+              </button>
+            </td>
             <td class="col-user">
               <div class="u-cell">
                 @if (u.picture) {
@@ -99,6 +107,58 @@
               </button>
             </td>
           </tr>
+
+          <!-- Expandable sign-in history (lazy-loaded on first expand) -->
+          @if (isExpanded(u.id)) {
+            <tr class="logins-row">
+              <td [attr.colspan]="columnCount()">
+                <div class="logins-panel">
+                  <div class="logins-head">
+                    <mat-icon class="logins-head-icon">login</mat-icon>
+                    <span class="logins-head-title">Sign-in history</span>
+                    <span class="logins-head-sub micro-label">most recent first · up to 200</span>
+                  </div>
+
+                  @if (loginHistory(u.id); as h) {
+                    @if (h.loading) {
+                      <div class="logins-state"><mat-progress-bar mode="indeterminate" /></div>
+                    } @else if (h.error) {
+                      <div class="logins-state logins-empty">Couldn't load sign-in history.</div>
+                    } @else if (!h.events.length) {
+                      <div class="logins-state logins-empty">No sign-ins recorded</div>
+                    } @else {
+                      <table class="logins-table">
+                        <thead>
+                          <tr>
+                            <th class="lc-when">When</th>
+                            <th class="lc-ip">IP</th>
+                            <th class="lc-status">Status</th>
+                            <th class="lc-reason">Reason</th>
+                            <th class="lc-agent">User agent</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (e of h.events; track e.id) {
+                            <tr>
+                              <td class="lc-when mono-num">{{ e.whenUtc | date: 'MMM d, y, HH:mm:ss' }}</td>
+                              <td class="lc-ip mono-num">{{ e.ip || '—' }}</td>
+                              <td class="lc-status">
+                                <span class="login-badge" [class.ok]="e.success" [class.denied]="!e.success">
+                                  {{ e.success ? 'Success' : 'Denied' }}
+                                </span>
+                              </td>
+                              <td class="lc-reason">{{ e.reason }}</td>
+                              <td class="lc-agent" [matTooltip]="e.userAgent || ''">{{ e.userAgent || '—' }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    }
+                  }
+                </div>
+              </td>
+            </tr>
+          }
         }
       </tbody>
     </table>

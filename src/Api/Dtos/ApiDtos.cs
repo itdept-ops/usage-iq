@@ -494,6 +494,18 @@ public sealed class AuditEntryDto
     public string? Detail { get; set; }
 }
 
+/// <summary>One recorded sign-in attempt for a user (the per-user login history).</summary>
+public sealed class LoginEventDto
+{
+    public long Id { get; set; }
+    public DateTime WhenUtc { get; set; }
+    public string Ip { get; set; } = "";
+    public bool Success { get; set; }
+    public string Reason { get; set; } = "";
+    public string? Name { get; set; }
+    public string? UserAgent { get; set; }
+}
+
 public sealed class RequestLogDto
 {
     public long Id { get; set; }

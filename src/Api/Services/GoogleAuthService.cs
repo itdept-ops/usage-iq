@@ -20,7 +20,8 @@ public sealed record SignInResult(SignInStatus Status, AuthResultDto? Auth, stri
 /// JWT — it is re-checked against the DB on every request.
 /// </summary>
 public sealed class GoogleAuthService(
-    UsageDbContext db, IGoogleTokenValidator validator, IConfiguration config, ILogger<GoogleAuthService> logger)
+    UsageDbContext db, IGoogleTokenValidator validator, IConfiguration config,
+    ILogger<GoogleAuthService> logger, IHttpContextAccessor http)
 {
     public async Task<SignInResult> SignInAsync(string idToken, CancellationToken ct)
     {
@@ -105,6 +106,8 @@ public sealed class GoogleAuthService(
                 logger.LogInformation("Auto-provisioned {Email} with [{Permissions}] on first sign-in.",
                     email, string.Join(", ", defaultPerms));
 
+                await RecordLoginAsync(email, created.Id, success: true, "auto-provisioned", payload.Name, ct);
+
                 var (newJwt, newExpires) = IssueToken(payload.Subject, email, created.Name, created.Picture);
                 return new SignInResult(SignInStatus.Ok, new AuthResultDto
                 {
@@ -123,6 +126,7 @@ public sealed class GoogleAuthService(
         {
             logger.LogWarning("Sign-in denied for {Email} (disabled).", email);
             await AuditDenialAsync(email, "account disabled", ct);
+            await RecordLoginAsync(email, user.Id, success: false, "account disabled", payload.Name, ct);
             return new SignInResult(SignInStatus.Forbidden, null, email, payload.Name);
         }
 
@@ -138,6 +142,7 @@ public sealed class GoogleAuthService(
             logger.LogWarning(
                 "Sign-in denied for {Email}: Google subject mismatch (account is bound to a different Google id).", email);
             await AuditDenialAsync(email, "Google id mismatch", ct);
+            await RecordLoginAsync(email, user.Id, success: false, "google id mismatch", payload.Name, ct);
             return new SignInResult(SignInStatus.Forbidden, null, email, payload.Name);
         }
 
@@ -145,6 +150,8 @@ public sealed class GoogleAuthService(
         user.Picture = payload.Picture ?? user.Picture;
         user.LastLoginUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+
+        await RecordLoginAsync(email, user.Id, success: true, "ok", payload.Name, ct);
 
         var permissions = user.Permissions.Select(p => p.Permission).ToArray();
         var (jwt, expires) = IssueToken(payload.Subject, email, user.Name, user.Picture);
@@ -168,6 +175,40 @@ public sealed class GoogleAuthService(
     private static string[] ParseDefaultPermissions(string? csv) =>
         (csv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(Auth.Permissions.IsDefaultable).Distinct().ToArray();
+
+    /// <summary>
+    /// Record a structured per-user login event (history shown on the Users page). BEST-EFFORT: a
+    /// failure here is logged and swallowed so it can never block or fail an otherwise-valid sign-in.
+    /// Captures the server-observed client IP (post-UseForwardedHeaders) and the request User-Agent.
+    /// </summary>
+    private async Task RecordLoginAsync(string email, int? userId, bool success, string reason, string? name, CancellationToken ct)
+    {
+        try
+        {
+            var ctx = http.HttpContext;
+            var ip = ctx?.Connection.RemoteIpAddress?.ToString() ?? "";
+            var userAgent = ctx?.Request.Headers.UserAgent.ToString();
+            if (userAgent is { Length: > 256 }) userAgent = userAgent[..256];
+
+            db.LoginEvents.Add(new LoginEvent
+            {
+                Email = email,
+                UserId = userId,
+                WhenUtc = DateTime.UtcNow,
+                Ip = ip,
+                Success = success,
+                Reason = reason,
+                Name = name,
+                UserAgent = string.IsNullOrEmpty(userAgent) ? null : userAgent,
+            });
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // Never let login-history bookkeeping break a sign-in.
+            logger.LogWarning(ex, "Failed to record login event for {Email} (reason={Reason}).", email, reason);
+        }
+    }
 
     /// <summary>Record a denied sign-in in the audit log (a security signal; also forwarded to Discord if enabled).</summary>
     private async Task AuditDenialAsync(string email, string reason, CancellationToken ct)

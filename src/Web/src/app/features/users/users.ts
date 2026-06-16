@@ -18,8 +18,16 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
-  AccessPolicy, AuditEntry, ManagedUser, PermissionItem, PERM, PERM_GROUP_OF, PERM_GROUP_ORDER,
+  AccessPolicy, AuditEntry, LoginEvent, ManagedUser, PermissionItem, PERM, PERM_GROUP_OF, PERM_GROUP_ORDER,
 } from '../../core/models';
+
+/** Lazy-loaded login-history state for one expanded user row. */
+interface LoginHistory {
+  loading: boolean;
+  loaded: boolean;
+  error: boolean;
+  events: LoginEvent[];
+}
 
 /** A catalog group with its ordered permission items — drives the grouped matrix columns. */
 interface PermGroup {
@@ -47,6 +55,10 @@ export class Users {
   readonly audit = signal<AuditEntry[]>([]);
   readonly loading = signal(true);
   readonly savingId = signal<number | null>(null);
+
+  // Per-user login history: which rows are expanded + their lazy-loaded sign-in logs (keyed by user id).
+  readonly expanded = signal<Set<number>>(new Set());
+  readonly logins = signal<Map<number, LoginHistory>>(new Map());
 
   // new-user form
   readonly newEmail = signal('');
@@ -90,6 +102,11 @@ export class Users {
       .filter(g => g.perms.length),
   );
 
+  /** Total <td> count of a body row — drives the colspan of the expanded login-history sub-row. */
+  readonly columnCount = computed(() =>
+    2 + this.groups().reduce((n, g) => n + g.perms.length, 0) + 2, // User + Enabled + perms + Expand + Actions
+  );
+
   constructor() { this.load(); }
 
   private load(): void {
@@ -111,6 +128,35 @@ export class Users {
 
   private loadAudit(): void {
     this.api.auditLog().subscribe({ next: a => this.audit.set(a), error: () => { /* non-critical */ } });
+  }
+
+  // ---- Per-user login history (expandable rows, lazy-loaded on first expand) ----
+  isExpanded(id: number): boolean { return this.expanded().has(id); }
+
+  loginHistory(id: number): LoginHistory | undefined { return this.logins().get(id); }
+
+  toggleExpand(u: ManagedUser): void {
+    const next = new Set(this.expanded());
+    if (next.has(u.id)) {
+      next.delete(u.id);
+    } else {
+      next.add(u.id);
+      // Lazy-load on first expand only; cached thereafter (and across collapses).
+      if (!this.logins().has(u.id)) this.loadLogins(u.id);
+    }
+    this.expanded.set(next);
+  }
+
+  private setLoginHistory(id: number, state: LoginHistory): void {
+    this.logins.update(m => new Map(m).set(id, state));
+  }
+
+  private loadLogins(id: number): void {
+    this.setLoginHistory(id, { loading: true, loaded: false, error: false, events: [] });
+    this.api.userLogins(id).subscribe({
+      next: events => this.setLoginHistory(id, { loading: false, loaded: true, error: false, events }),
+      error: () => this.setLoginHistory(id, { loading: false, loaded: true, error: true, events: [] }),
+    });
   }
 
   hasPerm(u: ManagedUser, key: string): boolean { return u.permissions.includes(key); }
