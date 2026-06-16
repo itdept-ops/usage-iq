@@ -46,6 +46,12 @@ public static class ApiEndpoints
             Results.Ok(await q.SummaryAsync(filter, groupBy ?? "day", ct)))
             .RequirePermission(Permissions.DashboardView);
 
+        // Cache-efficiency rollup — same filters as /usage/summary; readable by dashboard OR calendar viewers.
+        api.MapGet("/usage/cache-efficiency", async (
+            [AsParameters] UsageFilterQuery filter, UsageQueries q, CancellationToken ct) =>
+            Results.Ok(await q.CacheEfficiencyAsync(filter, ct)))
+            .RequireAnyPermission(Permissions.DashboardView, Permissions.CalendarView);
+
         api.MapGet("/usage/records", async (
             [AsParameters] UsageFilterQuery filter,
             int? page, int? pageSize, string? sort, bool? desc,

@@ -266,6 +266,7 @@ app.MapHealthChecks("/health/ready");
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
 app.MapApiEndpoints();
+app.MapSavedViewsEndpoints();
 app.MapObservabilityEndpoints();
 app.MapNotificationsEndpoints();
 app.MapShareEndpoints();

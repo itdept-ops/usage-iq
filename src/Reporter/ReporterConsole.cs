@@ -1,12 +1,17 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using Ccusage.Reporter.Core;
 
 namespace Ccusage.Reporter;
 
 /// <summary>
-/// Friendly, colorized console output for the reporter, plus a live "tokens this session" counter
-/// pinned to the top-right via a reserved (non-scrolling) status row. When stdout is redirected, it
-/// drops the colors, the in-place "live" line, and the HUD so captured logs stay clean.
+/// Friendly, colorized console renderer for the reporter — now an event LISTENER over
+/// <see cref="ReporterEvent"/> rather than something the engine calls into. It subscribes to a
+/// <see cref="ReporterEngine"/> (via <see cref="On"/>) and turns each structured event into clean,
+/// timestamped output, an in-place "live" progress line, a per-pass summary, and the live
+/// "tokens this session" counter pinned to the top-right via a reserved (non-scrolling) status row.
+/// When stdout is redirected, it drops the colors, the in-place line, and the HUD so captured logs
+/// stay clean. It never sees the ingest key — only token counts and metadata.
 /// </summary>
 public sealed class ReporterConsole : IDisposable
 {
@@ -23,6 +28,56 @@ public sealed class ReporterConsole : IDisposable
     {
         if (_plain || !enableHud) return;
         try { StartHud(); } catch { _hud = false; }
+    }
+
+    /// <summary>
+    /// The single event sink wired to <see cref="ReporterEngine.Progress"/>. Routes each event kind
+    /// to the matching renderer; multiple consoles/GUIs can subscribe to the same engine independently.
+    /// </summary>
+    public void On(ReporterEvent e)
+    {
+        switch (e.Kind)
+        {
+            case ReporterEventKind.PassStarted:
+                Live("scanning…");
+                break;
+
+            case ReporterEventKind.FileScanned:
+                Live(e.Message);
+                break;
+
+            case ReporterEventKind.RowsFound:
+                // kept quiet on the live line; the running counts arrive via FileScanned/BatchPosting
+                break;
+
+            case ReporterEventKind.BatchPosting:
+                Live(e.Message);
+                break;
+
+            case ReporterEventKind.BatchPosted:
+                Live($"posted {e.Endpoint} → {e.Inserted:N0} new, {e.Duplicates:N0} dup of {e.RowCount:N0}");
+                break;
+
+            case ReporterEventKind.TokensSynced:
+                AddTokens(e.TokenDelta); // feed the top-right HUD + title ticker
+                break;
+
+            case ReporterEventKind.Warning:
+                Warn(e.Message);
+                break;
+
+            case ReporterEventKind.Error:
+                Error(e.Message);
+                break;
+
+            case ReporterEventKind.Idle:
+                if (e.NextRunAt is { } at) Watching(at);
+                break;
+
+            case ReporterEventKind.PassCompleted:
+                if (e.Summary is { } s) RenderPassSummary(s);
+                break;
+        }
     }
 
     private void StartHud()
@@ -152,6 +207,36 @@ public sealed class ReporterConsole : IDisposable
         if (!_liveOpen) return;
         try { Console.Write("\r" + new string(' ', Console.BufferWidth - 1) + "\r"); } catch { /* ignore */ }
         _liveOpen = false;
+    }
+
+    /// <summary>Render the headline + per-source breakdown + counters block for a completed pass.</summary>
+    private void RenderPassSummary(ScanSummary s)
+    {
+        if (!s.Changed)
+        {
+            // Quietly note an idle pass on a single line; the watch loop will print the next-scan time.
+            Stamp($"scanned in {s.ElapsedSeconds:0.0}s — nothing new", ConsoleColor.Gray);
+            return;
+        }
+
+        var headline = s.Inserted > 0
+            ? $"synced {s.Inserted:N0} new row{(s.Inserted == 1 ? "" : "s")} in {s.ElapsedSeconds:0.0}s"
+            : $"scanned in {s.ElapsedSeconds:0.0}s — nothing new";
+        Stamp(headline, s.Inserted > 0 ? ConsoleColor.Green : ConsoleColor.Gray);
+
+        foreach (var src in s.Sources)
+            Detail(src.Source, $"{src.Files:N0} files · {src.Changed:N0} changed");
+
+        var g = ConsoleColor.Gray;
+        Summary(new[]
+        {
+            ("new",         s.Inserted.ToString("N0", CultureInfo.InvariantCulture),               s.Inserted > 0 ? ConsoleColor.Green : g),
+            ("new tokens",  FormatTokens(s.InsertedTokens) + " combined",                          s.InsertedTokens > 0 ? ConsoleColor.Green : g),
+            ("already had", s.Duplicates.ToString("N0", CultureInfo.InvariantCulture),             g),
+            ("redundant",   $"{s.Redundant:N0}  (merged before send)",                             ConsoleColor.DarkGray),
+            ("pushed",      $"{s.Sent:N0} rows · {s.Requests:N0} request{(s.Requests == 1 ? "" : "s")}", g),
+            ("files",       $"{s.FilesParsed:N0} changed of {s.FilesScanned:N0} scanned",          g),
+        });
     }
 
     public void Summary(IEnumerable<(string label, string value, ConsoleColor color)> rows)

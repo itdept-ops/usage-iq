@@ -1,12 +1,11 @@
-using System.Globalization;
 using System.Text;
 using Ccusage.Reporter;
-using Microsoft.Extensions.Configuration;
+using Ccusage.Reporter.Core;
 
 // UTF-8 so box/rule glyphs and arrows render instead of mojibake (the classic "?" / box artifact).
 try { Console.OutputEncoding = Encoding.UTF8; } catch { /* some hosts disallow it */ }
 
-const string Version = "v1.0";
+const string Version = "v1.1";
 
 // ---- flags (separated so the valued-option parser below never sees a bare flag) ----
 var flagSet = new HashSet<string>(args, StringComparer.OrdinalIgnoreCase);
@@ -22,27 +21,12 @@ if (wantsHelp)
 
 var valued = args.Where(a => a is not ("--once" or "--watch" or "--help" or "-h" or "--no-hud")).ToArray();
 
-var switchMappings = new Dictionary<string, string>
-{
-    ["--url"] = "Url", ["-u"] = "Url",
-    ["--key"] = "Key", ["-k"] = "Key",
-    ["--machine"] = "Machine", ["-m"] = "Machine",
-    ["--claude-path"] = "ClaudePath",
-    ["--codex-path"] = "CodexPath",
-    ["--state"] = "StatePath",
-    ["--batch"] = "BatchSize",
-    ["--interval"] = "IntervalSeconds",
-};
-
+// Config now resolves in the core: appsettings.json → ~/.usage-iq/config.json → reporter.key (key
+// only) → REPORTER_* env → CLI. The raw key is never echoed.
 ReporterOptions opt;
 try
 {
-    var config = new ConfigurationBuilder()
-        .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true)
-        .AddEnvironmentVariables("REPORTER_")
-        .AddCommandLine(valued, switchMappings)
-        .Build();
-    opt = config.Get<ReporterOptions>() ?? new ReporterOptions();
+    opt = ReporterConfig.Load(valued);
 }
 catch (Exception ex)
 {
@@ -73,63 +57,32 @@ if (Uri.TryCreate(opt.Url, UriKind.Absolute, out var parsed) && parsed.Scheme ==
     ui.Warn("--url is http:// to a non-local host — the ingest key is sent in cleartext. Use https.");
 
 using var cts = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); ui.Stamp("stopping…", ConsoleColor.DarkGray); };
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;       // first Ctrl+C: cancel gracefully (the loop/pass unwinds and state is saved)
+    cts.Cancel();
+    ui.Stamp("stopping… (Ctrl+C again to force quit)", ConsoleColor.DarkGray);
+};
 
-using var client = new IngestClient(opt.Url!, opt.Key!, opt.ResolvedMachine);
-var store = FileStateStore.Load(opt.ResolvedStatePath);
-var scanner = new LogScanner(client, store, opt.ResolvedBatchSize, ui);
+using var engine = new ReporterEngine(opt);
+engine.Progress += ui.On; // the console is just one listener; a GUI could subscribe to the same engine
 
 if (once)
-    return await RunPassAsync();
-
-while (!cts.IsCancellationRequested)
-{
-    var code = await RunPassAsync();
-    if (code == 1) return 1; // fatal (e.g. rejected key) — stop the loop
-    if (cts.IsCancellationRequested) break;
-    ui.Watching(DateTime.Now.AddSeconds(opt.ResolvedIntervalSeconds));
-    try { await Task.Delay(TimeSpan.FromSeconds(opt.ResolvedIntervalSeconds), cts.Token); }
-    catch (TaskCanceledException) { break; }
-}
-return 0;
-
-async Task<int> RunPassAsync()
 {
     try
     {
-        ui.Live("scanning…");
-        var s = await scanner.ScanAsync(opt.ResolvedClaudePath, opt.ResolvedCodexPath, cts.Token);
-
-        if (s.Changed || once)
-        {
-            var headline = s.Inserted > 0
-                ? $"synced {s.Inserted:N0} new row{(s.Inserted == 1 ? "" : "s")} in {s.ElapsedSeconds:0.0}s"
-                : $"scanned in {s.ElapsedSeconds:0.0}s — nothing new";
-            ui.Stamp(headline, s.Inserted > 0 ? ConsoleColor.Green : ConsoleColor.Gray);
-            foreach (var src in s.Sources)
-                ui.Detail(src.Source, $"{src.Files:N0} files · {src.Changed:N0} changed");
-
-            var g = ConsoleColor.Gray;
-            ui.Summary(new[]
-            {
-                ("new",         s.Inserted.ToString("N0", CultureInfo.InvariantCulture),    s.Inserted > 0 ? ConsoleColor.Green : g),
-                ("new tokens",  ReporterConsole.FormatTokens(s.InsertedTokens) + " combined", s.InsertedTokens > 0 ? ConsoleColor.Green : g),
-                ("already had", s.Duplicates.ToString("N0", CultureInfo.InvariantCulture),  g),
-                ("redundant",   $"{s.Redundant:N0}  (merged before send)",                  ConsoleColor.DarkGray),
-                ("pushed",      $"{s.Sent:N0} rows · {s.Requests:N0} request{(s.Requests == 1 ? "" : "s")}", g),
-                ("files",       $"{s.FilesParsed:N0} changed of {s.FilesScanned:N0} scanned", g),
-            });
-
-            if (s.Unpriced.Count > 0)
-                ui.Warn($"{s.Unpriced.Count} unpriced model(s): {string.Join(", ", s.Unpriced.Take(6))}. " +
-                        "Set rates on the Pricing page, then Recompute.");
-        }
+        await engine.RunOnceAsync(once: true, cts.Token);
         return 0;
     }
-    catch (OperationCanceledException) { return 0; }
-    catch (FatalReporterException ex) { ui.Error(ex.Message); return 1; }
-    catch (Exception ex) { ui.Warn($"pass failed: {ex.Message} (will retry)"); return 0; }
+    catch (FatalReporterException) { return 1; } // key rejected etc. — already rendered as an error
 }
+
+try
+{
+    await engine.RunForeverAsync(cts.Token);
+    return 0;
+}
+catch (FatalReporterException) { return 1; }
 
 static string Pretty(string path)
 {
@@ -163,7 +116,8 @@ static void PrintUsage()
               --no-hud           Disable the top-right token counter (live count stays in the window title)
           -h, --help             Show this help
 
-        Config may also come from REPORTER_*-prefixed env vars or an appsettings.json beside the exe.
-        Only parsed token counts/metadata are sent — never prompt or response text.
+        Config may also come from ~/.usage-iq/config.json, REPORTER_*-prefixed env vars, or an
+        appsettings.json beside the exe. The ingest key may live in ~/.usage-iq/reporter.key (never in
+        config.json). Only parsed token counts/metadata are sent — never prompt or response text.
         """);
 }

@@ -390,6 +390,61 @@ public sealed class UsageQueries(UsageDbContext db)
         return new FleetDto { Machines = machines, Users = users };
     }
 
+    /// <summary>
+    /// Cache-efficiency rollup for the filtered range. Aggregates token tiers per model in one grouped
+    /// DB pass, then prices each group in memory using the same per-model rate resolution as the cost
+    /// calculator ('*' fallback included).
+    ///
+    /// savingsUsd = Σ over models of cacheReadTokens × (inputRatePerToken − cacheReadRatePerToken):
+    /// the dollars saved by serving prompt input from the (cheap) cache instead of paying the full
+    /// input price. Clamped at 0 per model so a (pathological) cache-read rate above the input rate
+    /// can't produce a negative "saving".
+    /// </summary>
+    public async Task<CacheEfficiencyDto> CacheEfficiencyAsync(UsageFilterQuery f, CancellationToken ct)
+    {
+        var pricing = new PricingMatcher(await db.ModelPricings.AsNoTracking().ToListAsync(ct));
+
+        // One grouped aggregate per model — keeps the heavy lifting in the database.
+        var byModel = await Filtered(f).GroupBy(r => r.Model).Select(g => new
+        {
+            Model = g.Key,
+            Input = g.Sum(x => (long)x.InputTokens),
+            Output = g.Sum(x => (long)x.OutputTokens),
+            Read = g.Sum(x => x.CacheReadTokens),
+            W5 = g.Sum(x => (long)x.CacheCreation5mTokens),
+            W1 = g.Sum(x => (long)x.CacheCreation1hTokens),
+            Records = g.Count(),
+        }).ToListAsync(ct);
+
+        const decimal M = 1_000_000m;
+        var dto = new CacheEfficiencyDto();
+        decimal savings = 0m, writeCost = 0m;
+
+        foreach (var m in byModel)
+        {
+            dto.CacheReadTokens += m.Read;
+            dto.CacheWrite5mTokens += m.W5;
+            dto.CacheWrite1hTokens += m.W1;
+            dto.InputTokens += m.Input;
+            dto.OutputTokens += m.Output;
+            dto.RecordCount += m.Records;
+
+            var p = pricing.Resolve(m.Model);
+            // Per-model savings: cache reads valued at (full input rate − cache-read rate). Clamp at 0.
+            var perModelSavings = m.Read / M * (p.InputPerMTok - p.CacheReadPerMTok);
+            if (perModelSavings > 0m) savings += perModelSavings;
+
+            writeCost += m.W5 / M * p.CacheWrite5mPerMTok + m.W1 / M * p.CacheWrite1hPerMTok;
+        }
+
+        dto.CacheWriteTokens = dto.CacheWrite5mTokens + dto.CacheWrite1hTokens;
+        var denom = dto.CacheReadTokens + dto.InputTokens;
+        dto.CacheReadRatio = denom > 0 ? (double)dto.CacheReadTokens / denom : 0d;
+        dto.SavingsUsd = Math.Max(0m, savings);
+        dto.CacheWriteCostUsd = writeCost;
+        return dto;
+    }
+
     public async Task<PagedResult<UsageRecordDto>> RecordsAsync(
         UsageFilterQuery f, int page, int pageSize, string sort, bool desc, CancellationToken ct)
     {
@@ -499,7 +554,9 @@ public sealed class UsageQueries(UsageDbContext db)
             Records = r.Records,
             TotalTokens = r.Input + r.Output + r.Read + r.W5 + r.W1,
             CostUsd = r.Cost,
-            IsPlaceholderPricing = pricing.Resolve(r.Model).IsPlaceholder,
+            // Flag only genuinely unpriced models (resolved via '*' fallback / all-zero rates), so
+            // intentionally-seeded estimates like claude-fable-5 don't trip the placeholder warning.
+            IsPlaceholderPricing = pricing.IsUnpriced(r.Model),
         }).OrderByDescending(m => m.CostUsd).ToList();
     }
 }

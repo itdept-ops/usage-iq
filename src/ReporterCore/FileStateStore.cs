@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Ccusage.Reporter;
+namespace Ccusage.Reporter.Core;
 
 /// <summary>One file's last-seen fingerprint. A change in either field means re-parse + re-push.</summary>
 public sealed class FileState

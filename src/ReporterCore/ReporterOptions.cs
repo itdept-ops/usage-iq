@@ -1,8 +1,9 @@
-namespace Ccusage.Reporter;
+namespace Ccusage.Reporter.Core;
 
 /// <summary>
 /// Reporter configuration, resolved from (lowest→highest precedence): appsettings.json next to the
-/// executable, environment variables prefixed <c>REPORTER_</c>, then command-line switches.
+/// executable, the JSON config at <c>~/.usage-iq/config.json</c>, environment variables prefixed
+/// <c>REPORTER_</c>, then command-line switches. See <see cref="ReporterConfig"/> for the loader.
 /// </summary>
 public sealed class ReporterOptions
 {
@@ -29,6 +30,14 @@ public sealed class ReporterOptions
 
     /// <summary>Watch-mode poll interval in seconds.</summary>
     public int IntervalSeconds { get; set; } = 60;
+
+    // ---- GUI-only preferences (defined here so the desktop app and console share one config file) ----
+
+    /// <summary>GUI: start the desktop window minimized to the tray. Ignored by the console.</summary>
+    public bool StartMinimized { get; set; }
+
+    /// <summary>GUI: register the desktop app to launch at user logon. Ignored by the console.</summary>
+    public bool RunOnStartup { get; set; }
 
     public string ResolvedMachine => string.IsNullOrWhiteSpace(Machine) ? Environment.MachineName : Machine!.Trim();
 

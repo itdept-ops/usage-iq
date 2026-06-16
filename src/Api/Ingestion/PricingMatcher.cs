@@ -49,6 +49,20 @@ public sealed class PricingMatcher
         return match;
     }
 
+    /// <summary>
+    /// True when a model has no real price: it resolved only to the catch-all <c>*</c> fallback row,
+    /// or to a row whose every rate is zero (so cost is always $0). This is what drives the dashboard's
+    /// "some models use placeholder pricing" warning — it fires for genuinely unpriced models only, NOT
+    /// for intentionally-seeded estimates (e.g. claude-fable-5), which carry real non-zero rates.
+    /// </summary>
+    public bool IsUnpriced(string model)
+    {
+        var p = Resolve(model);
+        if (ReferenceEquals(p, _fallback)) return true;
+        return p.InputPerMTok == 0m && p.OutputPerMTok == 0m && p.CacheReadPerMTok == 0m
+            && p.CacheWrite5mPerMTok == 0m && p.CacheWrite1hPerMTok == 0m;
+    }
+
     /// <summary>USD cost for a single record using its model's resolved rates.</summary>
     public decimal Cost(string model, long input, long output, long read, long write5m, long write1h)
     {

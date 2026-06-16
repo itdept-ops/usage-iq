@@ -265,6 +265,63 @@ public sealed class ModelStatDto
     public bool IsPlaceholderPricing { get; set; }
 }
 
+/// <summary>
+/// Cache-efficiency rollup for the filtered range: how much prompt input was served from the
+/// (cheap) cache, what cache-writes cost, and the dollars saved by reading from cache instead
+/// of paying the full input rate.
+/// </summary>
+public sealed class CacheEfficiencyDto
+{
+    public long CacheReadTokens { get; set; }
+    public long CacheWrite5mTokens { get; set; }
+    public long CacheWrite1hTokens { get; set; }
+
+    /// <summary>5m + 1h cache-creation tokens.</summary>
+    public long CacheWriteTokens { get; set; }
+
+    public long InputTokens { get; set; }
+    public long OutputTokens { get; set; }
+    public int RecordCount { get; set; }
+
+    /// <summary>Share of prompt input served from cache: cacheRead / (cacheRead + input), 0..1.</summary>
+    public double CacheReadRatio { get; set; }
+
+    /// <summary>Dollars saved by cache reads vs paying the full input rate (never negative).</summary>
+    public decimal SavingsUsd { get; set; }
+
+    /// <summary>Cost of the 5m + 1h cache-creation tokens.</summary>
+    public decimal CacheWriteCostUsd { get; set; }
+}
+
+/// <summary>A personal saved dashboard view (filter payload) owned by the caller.</summary>
+public sealed class SavedViewDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public DateOnly? From { get; set; }
+    public DateOnly? To { get; set; }
+    public int[] ProjectId { get; set; } = Array.Empty<int>();
+    public string[] Model { get; set; } = Array.Empty<string>();
+    public string[] Source { get; set; } = Array.Empty<string>();
+    public bool IncludeSidechain { get; set; } = true;
+    public string GroupBy { get; set; } = "day";
+    public DateTime CreatedUtc { get; set; }
+    public DateTime? LastUsedUtc { get; set; }
+}
+
+/// <summary>Create/update payload for a saved view (name + dashboard filter).</summary>
+public sealed class SavedViewUpsertRequest
+{
+    public string Name { get; set; } = "";
+    public DateOnly? From { get; set; }
+    public DateOnly? To { get; set; }
+    public int[]? ProjectId { get; set; }
+    public string[]? Model { get; set; }
+    public string[]? Source { get; set; }
+    public bool IncludeSidechain { get; set; } = true;
+    public string GroupBy { get; set; } = "day";
+}
+
 public sealed class PricingDto
 {
     public int Id { get; set; }

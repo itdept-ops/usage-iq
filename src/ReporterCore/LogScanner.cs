@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Ccusage.Api.Ingestion;
 
-namespace Ccusage.Reporter;
+namespace Ccusage.Reporter.Core;
 
 /// <summary>Aggregate counters for one scan pass.</summary>
 public sealed class ScanSummary
@@ -41,11 +41,16 @@ public sealed class ScanSummary
 /// several lines), and pushes the distinct rows to the server in batches coalesced across files. A
 /// file's state is recorded only after its rows pushed successfully, so an interrupted push retries
 /// next pass. Parsing happens locally; only token counts/metadata (never transcript text) are sent.
+///
+/// Progress is reported via a structured <see cref="ReporterEvent"/> callback (the <c>emit</c>
+/// delegate) rather than the console — the engine forwards those to every subscriber.
 /// </summary>
-public sealed class LogScanner(IngestClient client, FileStateStore state, int batchSize, ReporterConsole ui)
+public sealed class LogScanner(IngestClient client, FileStateStore state, int batchSize, Action<ReporterEvent> emit)
 {
     // Mirror the server's skip list so the two ingest paths consider the same files.
     private static readonly string[] SkipSegments = { @"\.tmp\", @"\node_modules\", "plugins-backup" };
+
+    private const string Endpoint = "api/ingest";
 
     public async Task<ScanSummary> ScanAsync(string claudeRoot, string codexRoot, CancellationToken ct)
     {
@@ -60,7 +65,6 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
 
         state.Save();
         summary.ElapsedMs = sw.ElapsedMilliseconds;
-        ui.EndLive();
         return summary;
     }
 
@@ -95,22 +99,28 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
 
             List<ParsedUsage> rows;
             try { rows = ParseFile(parser, path, name); }
-            catch (Exception ex) { ui.Warn($"{kind}: parse failed ({name}): {ex.Message}"); continue; }
+            catch (Exception ex) { emit(ReporterEvent.Warning($"{kind}: parse failed ({name}): {ex.Message}", ex)); continue; }
 
             changed++;
             summary.FilesParsed++;
             summary.RawRows += rows.Count;
-            foreach (var r in rows) if (seen.Add(r.DedupKey)) buffer.Add(r); // local de-dup
+            var added = 0;
+            foreach (var r in rows) if (seen.Add(r.DedupKey)) { buffer.Add(r); added++; } // local de-dup
             staged.Add((path, size, mtime));
+            if (added > 0) emit(ReporterEvent.RowsFound(kind, added, changed));
 
             if (buffer.Count >= batchSize) await FlushAsync(kind, buffer, staged, summary, ct);
             if ((scanned & 127) == 0)
-                ui.Live($"scanning {kind} — {scanned:N0} files, {changed:N0} changed, {summary.Sent:N0} sent");
+                emit(ReporterEvent.FileScanned(kind, scanned, changed, summary.Sent));
         }
 
         await FlushAsync(kind, buffer, staged, summary, ct); // final flush (also commits 0-row changed files)
         summary.FilesSkipped += scanned - changed;
-        if (scanned > 0) summary.Sources.Add((kind, scanned, changed));
+        if (scanned > 0)
+        {
+            summary.Sources.Add((kind, scanned, changed));
+            emit(ReporterEvent.FileScanned(kind, scanned, changed, summary.Sent));
+        }
     }
 
     /// <summary>Push the buffered distinct rows in wire-sized chunks, then commit every staged file's state.</summary>
@@ -123,6 +133,8 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
             for (var i = 0; i < buffer.Count; i += batchSize)
             {
                 var chunk = buffer.GetRange(i, Math.Min(batchSize, buffer.Count - i));
+                emit(ReporterEvent.BatchPosting(kind, Endpoint, chunk.Count));
+
                 var res = await client.PushAsync(kind, chunk, ct);
                 summary.Sent += res.Received;
                 summary.Inserted += res.Inserted;
@@ -131,8 +143,10 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
                 summary.Skipped += res.Skipped;
                 summary.Requests++;
                 if (res.UnpricedModels is { } um) foreach (var m in um) summary.Unpriced.Add(m);
-                ui.AddTokens(res.InsertedTokens); // feed the live top-right token counter
-                ui.Live($"pushing {kind} — {summary.Requests:N0} requests, {summary.Sent:N0} rows, {summary.Inserted:N0} new");
+
+                // A successful PushAsync return always implies a 2xx (non-2xx either retried or threw).
+                emit(ReporterEvent.BatchPosted(kind, Endpoint, res.Received, res.Inserted, res.Duplicates, 200));
+                emit(ReporterEvent.TokensSynced(summary.InsertedTokens, res.InsertedTokens, 0m));
             }
         }
 

@@ -19,9 +19,12 @@ public static class PricingSeed
         // Haiku tier (prefix matches the date-suffixed id, e.g. claude-haiku-4-5-20251001)
         new() { Id = 3, ModelPattern = "claude-haiku-4-5", DisplayName = "Claude Haiku 4.5",
             InputPerMTok = 1.00m, OutputPerMTok = 5.00m, CacheWrite5mPerMTok = 1.25m, CacheWrite1hPerMTok = 2.00m, CacheReadPerMTok = 0.10m },
-        // Fable — no public price; placeholder you can correct in the UI.
-        new() { Id = 4, ModelPattern = "claude-fable-5", DisplayName = "Claude Fable 5 (placeholder)",
-            InputPerMTok = 3.00m, OutputPerMTok = 15.00m, CacheWrite5mPerMTok = 3.75m, CacheWrite1hPerMTok = 6.00m, CacheReadPerMTok = 0.30m, IsPlaceholder = true },
+        // Fable — no public price yet. We seed an ESTIMATED rate that mirrors the Opus tier (its closest
+        // sibling) so cost figures are reasonable rather than $0, and clear the placeholder flag so the
+        // dashboard's "placeholder pricing" warning no longer fires for it. NOTE: this is an estimate —
+        // adjust it on the Pricing page once a real Fable 5 rate is published.
+        new() { Id = 4, ModelPattern = "claude-fable-5", DisplayName = "Claude Fable 5 (estimated)",
+            InputPerMTok = 15m, OutputPerMTok = 75m, CacheWrite5mPerMTok = 18.75m, CacheWrite1hPerMTok = 30m, CacheReadPerMTok = 1.50m, IsPlaceholder = false },
         // Catch-all fallback for any unpriced/unknown model (incl. <synthetic>): $0 until you price it.
         new() { Id = 5, ModelPattern = "*", DisplayName = "Unpriced fallback",
             InputPerMTok = 0m, OutputPerMTok = 0m, CacheWrite5mPerMTok = 0m, CacheWrite1hPerMTok = 0m, CacheReadPerMTok = 0m, IsPlaceholder = true },

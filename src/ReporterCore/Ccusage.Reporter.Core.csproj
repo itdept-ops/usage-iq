@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Ccusage.Reporter.Core</RootNamespace>
+    <AssemblyName>Ccusage.Reporter.Core</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ingestion\Ccusage.Ingestion.csproj" />
+  </ItemGroup>
+
+  <!-- Reuse the Usage IQ brand icon as a shared asset for the console + future desktop/tray app. -->
+  <ItemGroup>
+    <None Include="Assets\usage-iq.ico" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets\usage-iq.ico')" />
+  </ItemGroup>
+
+</Project>

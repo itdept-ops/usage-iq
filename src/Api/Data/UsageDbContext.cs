@@ -20,6 +20,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<ShareLink> ShareLinks => Set<ShareLink>();
     public DbSet<ShareAccess> ShareAccesses => Set<ShareAccess>();
     public DbSet<IngestKey> IngestKeys => Set<IngestKey>();
+    public DbSet<SavedView> SavedViews => Set<SavedView>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -196,6 +197,22 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             // A deleted user must not cascade-delete usage-bearing keys: orphan them instead.
             e.HasOne(x => x.User).WithMany()
                 .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<SavedView>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(80);
+            e.Property(x => x.ProjectIdsCsv).HasMaxLength(2048).HasDefaultValue("");
+            e.Property(x => x.ModelsCsv).HasMaxLength(2048).HasDefaultValue("");
+            e.Property(x => x.SourcesCsv).HasMaxLength(512).HasDefaultValue("");
+            e.Property(x => x.IncludeSidechain).HasDefaultValue(true);
+            e.Property(x => x.GroupBy).HasMaxLength(20).HasDefaultValue("day");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.LastUsedUtc).HasColumnType("timestamp with time zone");
+            e.HasIndex(x => new { x.UserId, x.Name });
+            // Personal views: required owner, cascade-delete with the user.
+            e.HasOne(x => x.User).WithMany()
+                .HasForeignKey(x => x.UserId).IsRequired().OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

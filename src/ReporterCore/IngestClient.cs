@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Ccusage.Api.Ingestion;
 
-namespace Ccusage.Reporter;
+namespace Ccusage.Reporter.Core;
 
 /// <summary>Thrown for unrecoverable conditions (e.g. a rejected key) — the run should stop, not retry.</summary>
 public sealed class FatalReporterException(string message) : Exception(message);
