@@ -305,3 +305,10 @@
 .key-empty { color: var(--tech-text-tertiary); padding: var(--tech-space-2) 0; }
 
 .danger-btn { color: var(--tech-text-tertiary); &:hover { color: var(--tech-error, #ff5c6c); } }
+
+.foot {
+  margin: var(--tech-space-4) 0 0;
+  padding-top: var(--tech-space-3);
+  border-top: 1px solid var(--tech-border-subtle);
+  a { color: var(--tech-text-accent); text-decoration: none; &:hover { text-decoration: underline; } }
+}

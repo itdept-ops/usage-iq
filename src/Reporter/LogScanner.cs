@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Ccusage.Api.Ingestion;
 
 namespace Ccusage.Reporter;
@@ -8,22 +9,37 @@ public sealed class ScanSummary
     public int FilesScanned { get; set; }
     public int FilesSkipped { get; set; }
     public int FilesParsed { get; set; }
-    public int FilesPushed { get; set; }
-    public int Received { get; set; }
+
+    /// <summary>Rows the parsers produced (before local de-dup).</summary>
+    public int RawRows { get; set; }
+    /// <summary>Distinct rows actually pushed to the server.</summary>
+    public int Sent { get; set; }
+    public int Requests { get; set; }
+
     public int Inserted { get; set; }
     public int Duplicates { get; set; }
     public int Skipped { get; set; }
+
+    public long ElapsedMs { get; set; }
     public HashSet<string> Unpriced { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Per-source (files scanned, files changed), for the pass breakdown.</summary>
+    public List<(string Source, int Files, int Changed)> Sources { get; } = new();
+
+    /// <summary>Redundant rows dropped before sending (one billed turn spans several identical-key lines).</summary>
+    public int Redundant => Math.Max(0, RawRows - Sent);
+    public bool Changed => FilesParsed > 0 || Inserted > 0;
+    public double ElapsedSeconds => ElapsedMs / 1000.0;
 }
 
 /// <summary>
 /// Walks each source's log tree, parses only files whose size/mtime changed since the last pass (via
-/// <see cref="FileStateStore"/>), and pushes the parsed rows to the server in batches. A file's state
-/// is recorded only after all of its rows pushed successfully, so an interrupted push is retried next
-/// pass. Parsing happens locally with the same parsers the server uses; only token counts/metadata
-/// (never transcript text) are sent.
+/// <see cref="FileStateStore"/>), de-dups the rows locally (the raw JSONL repeats each turn across
+/// several lines), and pushes the distinct rows to the server in batches coalesced across files. A
+/// file's state is recorded only after its rows pushed successfully, so an interrupted push retries
+/// next pass. Parsing happens locally; only token counts/metadata (never transcript text) are sent.
 /// </summary>
-public sealed class LogScanner(IngestClient client, FileStateStore state, int batchSize, Action<string> log)
+public sealed class LogScanner(IngestClient client, FileStateStore state, int batchSize, ReporterConsole ui)
 {
     // Mirror the server's skip list so the two ingest paths consider the same files.
     private static readonly string[] SkipSegments = { @"\.tmp\", @"\node_modules\", "plugins-backup" };
@@ -31,25 +47,32 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
     public async Task<ScanSummary> ScanAsync(string claudeRoot, string codexRoot, CancellationToken ct)
     {
         var summary = new ScanSummary();
-        await ScanSourceAsync("claude", new ClaudeParser(), claudeRoot, summary, ct);
-        await ScanSourceAsync("codex", new CodexParser(), codexRoot, summary, ct);
+        var sw = Stopwatch.StartNew();
+        // Local de-dup across the whole pass: the parsers emit one row per content line, and a single
+        // billed turn spans several lines that all carry the same key — send each key at most once.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        await ScanSourceAsync("claude", new ClaudeParser(), claudeRoot, summary, seen, ct);
+        await ScanSourceAsync("codex", new CodexParser(), codexRoot, summary, seen, ct);
+
         state.Save();
+        summary.ElapsedMs = sw.ElapsedMilliseconds;
+        ui.EndLive();
         return summary;
     }
 
     private async Task ScanSourceAsync(
-        string kind, ISourceParser parser, string root, ScanSummary summary, CancellationToken ct)
+        string kind, ISourceParser parser, string root, ScanSummary summary, HashSet<string> seen, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
-        {
-            log($"  [{kind}] path not found, skipping: {root}");
-            return;
-        }
+            return; // path not configured / not present on this machine — quietly skip
 
-        // Coalesce rows ACROSS files into batches: a backfill of thousands of small files becomes
-        // ~rows/batchSize requests instead of one request per file (which would trip the rate limit).
+        // Coalesce distinct rows ACROSS files into batches: a backfill of thousands of small files
+        // becomes ~rows/batchSize requests, not one per file (which would trip the rate limit).
         var buffer = new List<ParsedUsage>(batchSize);
         var staged = new List<(string path, long size, DateTime mtime)>();
+        var scanned = 0;
+        var changed = 0;
 
         foreach (var path in SafeEnumerateFiles(root))
         {
@@ -57,6 +80,7 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
             var name = Path.GetFileName(path);
             if (ShouldSkip(path) || !parser.MatchesFile(name)) continue;
 
+            scanned++;
             summary.FilesScanned++;
 
             long size;
@@ -64,26 +88,29 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
             try { var fi = new FileInfo(path); size = fi.Length; mtime = fi.LastWriteTimeUtc; }
             catch { continue; }
 
-            if (state.IsUnchanged(path, size, mtime)) { summary.FilesSkipped++; continue; }
+            if (state.IsUnchanged(path, size, mtime)) continue;
 
             List<ParsedUsage> rows;
             try { rows = ParseFile(parser, path, name); }
-            catch (Exception ex) { log($"  [{kind}] parse failed ({name}): {ex.Message}"); continue; }
+            catch (Exception ex) { ui.Warn($"{kind}: parse failed ({name}): {ex.Message}"); continue; }
 
+            changed++;
             summary.FilesParsed++;
-            buffer.AddRange(rows);
+            summary.RawRows += rows.Count;
+            foreach (var r in rows) if (seen.Add(r.DedupKey)) buffer.Add(r); // local de-dup
             staged.Add((path, size, mtime));
 
-            // Flush at a file boundary once we have enough rows — staged files are then fully sent.
-            if (buffer.Count >= batchSize)
-                await FlushAsync(kind, buffer, staged, summary, ct);
+            if (buffer.Count >= batchSize) await FlushAsync(kind, buffer, staged, summary, ct);
+            if ((scanned & 127) == 0)
+                ui.Live($"scanning {kind} — {scanned:N0} files, {changed:N0} changed, {summary.Sent:N0} sent");
         }
 
-        // Final flush for this source (also records state for changed files that parsed to 0 rows).
-        await FlushAsync(kind, buffer, staged, summary, ct);
+        await FlushAsync(kind, buffer, staged, summary, ct); // final flush (also commits 0-row changed files)
+        summary.FilesSkipped += scanned - changed;
+        if (scanned > 0) summary.Sources.Add((kind, scanned, changed));
     }
 
-    /// <summary>Push the buffered rows in wire-sized chunks, then commit every staged file's state.</summary>
+    /// <summary>Push the buffered distinct rows in wire-sized chunks, then commit every staged file's state.</summary>
     private async Task FlushAsync(
         string kind, List<ParsedUsage> buffer, List<(string path, long size, DateTime mtime)> staged,
         ScanSummary summary, CancellationToken ct)
@@ -94,13 +121,14 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
             {
                 var chunk = buffer.GetRange(i, Math.Min(batchSize, buffer.Count - i));
                 var res = await client.PushAsync(kind, chunk, ct);
-                summary.Received += res.Received;
+                summary.Sent += res.Received;
                 summary.Inserted += res.Inserted;
                 summary.Duplicates += res.Duplicates;
                 summary.Skipped += res.Skipped;
+                summary.Requests++;
                 if (res.UnpricedModels is { } um) foreach (var m in um) summary.Unpriced.Add(m);
+                ui.Live($"pushing {kind} — {summary.Requests:N0} requests, {summary.Sent:N0} rows, {summary.Inserted:N0} new");
             }
-            summary.FilesPushed += staged.Count;
         }
 
         // Only after the rows pushed successfully are these files safe to mark seen.

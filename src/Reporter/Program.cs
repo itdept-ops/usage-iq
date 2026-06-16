@@ -1,5 +1,12 @@
+using System.Globalization;
+using System.Text;
 using Ccusage.Reporter;
 using Microsoft.Extensions.Configuration;
+
+// UTF-8 so box/rule glyphs and arrows render instead of mojibake (the classic "?" / box artifact).
+try { Console.OutputEncoding = Encoding.UTF8; } catch { /* some hosts disallow it */ }
+
+const string Version = "v1.0";
 
 // ---- flags (separated so the valued-option parser below never sees a bare flag) ----
 var flagSet = new HashSet<string>(args, StringComparer.OrdinalIgnoreCase);
@@ -51,22 +58,25 @@ if (invalid is not null)
     return 2;
 }
 
+var ui = new ReporterConsole();
+
+ui.Banner(Version);
+ui.Config("Server", opt.Url!);
+ui.Config("Machine", opt.ResolvedMachine);
+ui.Config("Sources", $"{Pretty(opt.ResolvedClaudePath)} · {Pretty(opt.ResolvedCodexPath)}");
+ui.Config("Mode", once ? "one-shot" : $"watch · every {opt.ResolvedIntervalSeconds}s  ·  Ctrl+C to stop");
+ui.Rule();
+
 // The ingest key is a bearer secret; over plain http to a non-local host it travels in cleartext.
 if (Uri.TryCreate(opt.Url, UriKind.Absolute, out var parsed) && parsed.Scheme == "http" && !parsed.IsLoopback)
-    Console.Error.WriteLine("WARNING: --url is http:// to a non-local host — the ingest key is sent in cleartext. Use https.");
+    ui.Warn("--url is http:// to a non-local host — the ingest key is sent in cleartext. Use https.");
 
 using var cts = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); Log("Shutting down…"); };
-
-Log($"Usage IQ reporter → {opt.Url}  (machine: {opt.ResolvedMachine})");
-Log($"  Claude: {opt.ResolvedClaudePath}");
-Log($"  Codex:  {opt.ResolvedCodexPath}");
-Log($"  State:  {opt.ResolvedStatePath}");
-Log(once ? "Mode: one-shot" : $"Mode: watch (every {opt.ResolvedIntervalSeconds}s) — Ctrl+C to stop");
+Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); ui.Stamp("stopping…", ConsoleColor.DarkGray); };
 
 using var client = new IngestClient(opt.Url!, opt.Key!, opt.ResolvedMachine);
 var store = FileStateStore.Load(opt.ResolvedStatePath);
-var scanner = new LogScanner(client, store, opt.ResolvedBatchSize, Log);
+var scanner = new LogScanner(client, store, opt.ResolvedBatchSize, ui);
 
 if (once)
     return await RunPassAsync();
@@ -75,6 +85,8 @@ while (!cts.IsCancellationRequested)
 {
     var code = await RunPassAsync();
     if (code == 1) return 1; // fatal (e.g. rejected key) — stop the loop
+    if (cts.IsCancellationRequested) break;
+    ui.Watching(DateTime.Now.AddSeconds(opt.ResolvedIntervalSeconds));
     try { await Task.Delay(TimeSpan.FromSeconds(opt.ResolvedIntervalSeconds), cts.Token); }
     catch (TaskCanceledException) { break; }
 }
@@ -84,22 +96,46 @@ async Task<int> RunPassAsync()
 {
     try
     {
+        ui.Live("scanning…");
         var s = await scanner.ScanAsync(opt.ResolvedClaudePath, opt.ResolvedCodexPath, cts.Token);
-        var changed = s.FilesParsed > 0 || s.Inserted > 0;
-        if (changed || once)
-            Log($"Scanned {s.FilesScanned} files ({s.FilesSkipped} unchanged), {s.FilesParsed} parsed → " +
-                $"{s.Inserted} new, {s.Duplicates} dup, {s.Skipped} skipped of {s.Received} sent.");
-        if (s.Unpriced.Count > 0)
-            Log($"  Note: {s.Unpriced.Count} unpriced model(s): {string.Join(", ", s.Unpriced.Take(8))}. " +
-                "Set rates on the Pricing page, then Recompute.");
+
+        if (s.Changed || once)
+        {
+            var headline = s.Inserted > 0
+                ? $"synced {s.Inserted:N0} new row{(s.Inserted == 1 ? "" : "s")} in {s.ElapsedSeconds:0.0}s"
+                : $"scanned in {s.ElapsedSeconds:0.0}s — nothing new";
+            ui.Stamp(headline, s.Inserted > 0 ? ConsoleColor.Green : ConsoleColor.Gray);
+            foreach (var src in s.Sources)
+                ui.Detail(src.Source, $"{src.Files:N0} files · {src.Changed:N0} changed");
+
+            var g = ConsoleColor.Gray;
+            ui.Summary(new[]
+            {
+                ("new",         s.Inserted.ToString("N0", CultureInfo.InvariantCulture),    s.Inserted > 0 ? ConsoleColor.Green : g),
+                ("already had", s.Duplicates.ToString("N0", CultureInfo.InvariantCulture),  g),
+                ("redundant",   $"{s.Redundant:N0}  (merged before send)",                  ConsoleColor.DarkGray),
+                ("pushed",      $"{s.Sent:N0} rows · {s.Requests:N0} request{(s.Requests == 1 ? "" : "s")}", g),
+                ("files",       $"{s.FilesParsed:N0} changed of {s.FilesScanned:N0} scanned", g),
+            });
+
+            if (s.Unpriced.Count > 0)
+                ui.Warn($"{s.Unpriced.Count} unpriced model(s): {string.Join(", ", s.Unpriced.Take(6))}. " +
+                        "Set rates on the Pricing page, then Recompute.");
+        }
         return 0;
     }
     catch (OperationCanceledException) { return 0; }
-    catch (FatalReporterException ex) { Console.Error.WriteLine($"FATAL: {ex.Message}"); return 1; }
-    catch (Exception ex) { Log($"Pass failed: {ex.Message}"); return 0; } // transient; try again next interval
+    catch (FatalReporterException ex) { ui.Error(ex.Message); return 1; }
+    catch (Exception ex) { ui.Warn($"pass failed: {ex.Message} (will retry)"); return 0; }
 }
 
-static void Log(string message) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
+static string Pretty(string path)
+{
+    var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return !string.IsNullOrEmpty(home) && path.StartsWith(home, StringComparison.OrdinalIgnoreCase)
+        ? "~" + path[home.Length..]
+        : path;
+}
 
 static void PrintUsage()
 {
@@ -112,15 +148,15 @@ static void PrintUsage()
 
         REQUIRED:
           -u, --url <url>        Usage IQ API base URL (e.g. https://usage.example.com)
-          -k, --key <key>        Ingest key (Settings → Ingest keys). Treat as a secret.
+          -k, --key <key>        Ingest key (Dashboard -> Reporter -> Generate key). Treat as a secret.
 
         OPTIONS:
           -m, --machine <name>   Label for this machine (default: OS machine name)
               --claude-path <p>  Claude projects dir (default: ~/.claude/projects)
               --codex-path <p>   Codex sessions dir (default: ~/.codex)
               --state <p>        State file path (default: ~/.usage-iq/reporter-state.json)
-              --batch <n>        Rows per request, 1–5000 (default: 500)
-              --interval <s>     Watch poll interval seconds, 5–3600 (default: 60)
+              --batch <n>        Rows per request, 1-5000 (default: 500)
+              --interval <s>     Watch poll interval seconds, 5-3600 (default: 60)
               --once             Run a single pass and exit (default: watch continuously)
           -h, --help             Show this help
 

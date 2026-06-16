@@ -183,4 +183,9 @@ Restart=always</code>
   --url {{ serverUrl() }} --key uiq_… --once</code>
     </div>
   </div>
+  <p class="hint foot">On Windows, <code>Run-UsageIqReporter.ps1</code> in the repo is a one-file "build
+    + run the loop" launcher. The reporter merges the redundant log lines each turn emits before
+    sending, so a backfill is a few hundred requests, not thousands — full details, service setup, and
+    troubleshooting are in the
+    <a href="https://github.com/itdept-ops/usage-iq/blob/main/docs/reporter.md" target="_blank" rel="noopener">reporter guide</a>.</p>
 </mat-card>

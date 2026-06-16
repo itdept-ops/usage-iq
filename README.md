@@ -166,31 +166,23 @@ By default the API reads the JSONL logs off local disk. If you'd rather **host t
 
 The server stays authoritative: it prices each row from the editable pricing table, resolves the project from `cwd`, and de-dupes on the unique key — so re-running the reporter is idempotent, and remote rows merge with any local sync.
 
-**1. Create an ingest key.** In the app: **Settings → Ingest keys → Generate key**. Copy it now — it's shown once and stored only as a hash. Revoke it anytime; revocation takes effect on the next request.
+![Usage IQ reporter console](docs/reporter-console.png)
+
+**1. Create an ingest key.** In the app: **Reporter** (top nav, requires `settings.manage`) → **Generate key**. It's shown once and stored only as a hash; revoke anytime (effective on the next request).
 
 **2. Run the reporter** on the machine that has the logs:
 
 ```bash
-# from a build of src/Reporter (dotnet build -c Release), or `dotnet run --project src/Reporter --`
-usage-iq-reporter --url https://usage.example.com --key uiq_xxxxxxxx…
-
-# one-shot (e.g. from cron / Task Scheduler) instead of the default watch loop
-usage-iq-reporter --url https://usage.example.com --key uiq_… --once
+dotnet build src/Reporter -c Release
+usage-iq-reporter --url https://usage.example.com --key uiq_xxxxxxxx…   # watch (default)
+usage-iq-reporter --url https://usage.example.com --key uiq_… --once     # single pass (cron/Task Scheduler)
 ```
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `-u, --url` | — | **Required.** Usage IQ API base URL. |
-| `-k, --key` | — | **Required.** Ingest key from Settings. Treat as a secret. |
-| `-m, --machine` | OS machine name | Label this machine reports under. |
-| `--claude-path` | `~/.claude/projects` | Claude Code logs directory. |
-| `--codex-path` | `~/.codex` | Codex logs directory. |
-| `--state` | `~/.usage-iq/reporter-state.json` | Per-file sync state (so only changed files are re-read). |
-| `--batch` | `500` | Rows per request (server caps at 5000). |
-| `--interval` | `60` | Watch poll interval, seconds. |
-| `--once` | — | Single pass then exit (otherwise watches continuously). |
+On Windows, [`Run-UsageIqReporter.ps1`](Run-UsageIqReporter.ps1) is a one-file "build + run the loop" launcher (asks for the key once, then it's a double-click).
 
-Config can also come from `REPORTER_*` environment variables or an `appsettings.json` beside the executable. Only `dashboard.view` users ever see the data; the ingest key grants *write-only* access to `/api/ingest` and nothing else.
+The reporter de-dupes locally before sending (one billed turn spans several identical-key log lines — that's the `redundant` count), coalesces rows across files into batches, and tracks per-file state so steady-state passes are cheap. Only parsed token counts/metadata are sent; the ingest key grants *write-only* access to `/api/ingest` and nothing else.
+
+**Full guides** — install, flags, run-as-a-service, cloud hosting, the ingest API, and all config — are in **[docs/](docs/)**: [Reporter](docs/reporter.md) · [Cloud hosting](docs/cloud-hosting.md) · [Ingest API](docs/ingest-api.md) · [Configuration](docs/configuration.md).
 
 ## API reference
 
@@ -233,6 +225,8 @@ Set via `.env`, environment variables, or `src/Api/appsettings.json`:
 | `AutoSync__IntervalSeconds` | `300` | Auto-sync cadence (min 30s). |
 | `Cors__AllowedOrigin` | `http://localhost:4200` | Angular dev origin. |
 
+Secrets (`Jwt:Key`, Google OAuth, email allowlists) live in git-ignored `src/Api/appsettings.Local.json`. The full set — plus all reporter settings — is in **[docs/configuration.md](docs/configuration.md)**.
+
 ## A note on `claude-fable-5` pricing
 
 `claude-fable-5` has no public price, so it ships with a **placeholder** rate (flagged in the UI). Set the real rate on the **Pricing** page and hit **Recompute** — all stored rows re-price instantly. The known Opus / Haiku rates are best-effort defaults and equally editable.
@@ -241,22 +235,24 @@ Set via `.env`, environment variables, or `src/Api/appsettings.json`:
 
 ```
 usage-iq/
-├─ docker-compose.yml        # db (default) + api/web (--profile full)
-├─ .github/workflows/ci.yml  # build API + Angular, run dotnet test
+├─ docker-compose.yml          # db (default) + api/web (--profile full)
+├─ .github/workflows/ci.yml    # build API + reporter + Angular, run dotnet test
+├─ Run-UsageIqReporter.ps1     # Windows "build + run the reporter loop" launcher
+├─ docs/                       # reporter, cloud-hosting, ingest-API, configuration guides
 ├─ tests/
-│  └─ Ccusage.Api.Tests/     # xUnit: unit + Testcontainers integration tests
+│  └─ Ccusage.Api.Tests/       # xUnit: unit + Testcontainers integration tests
 └─ src/
-   ├─ Ingestion/            # shared parser library (Claude + Codex JSONL → ParsedUsage)
-   ├─ Api/                   # .NET 9 minimal API
-   │  ├─ Data/               # EF entities, DbContext, pricing seed
-   │  ├─ Ingestion/          # sync, dedup, cost, project/timezone resolve, HTTP ingest write path
-   │  ├─ Services/           # queries, recompute, sync coordinator, audit, Discord notifier
-   │  ├─ Auth/               # JWT, per-request permission filter, ingest-key filter
-   │  ├─ Infrastructure/     # global exception handler, request-logging middleware
-   │  └─ Endpoints/          # API surface
-   ├─ Reporter/              # console app: parse local logs, push to /api/ingest (cloud hosting)
-   └─ Web/                   # Angular 21 (standalone + signals, ECharts)
-      └─ src/app/{features/{dashboard,calendar,pricing,settings,users,logs,login},core,shared}
+   ├─ Ingestion/               # shared parser library (Claude + Codex JSONL → ParsedUsage)
+   ├─ Api/                     # .NET 9 minimal API
+   │  ├─ Data/                 # EF entities, DbContext, pricing seed
+   │  ├─ Ingestion/            # sync, dedup, cost, project/timezone resolve, HTTP ingest write path
+   │  ├─ Services/             # queries, recompute, sync coordinator, audit, Discord notifier
+   │  ├─ Auth/                 # JWT, per-request permission filter, ingest-key filter
+   │  ├─ Infrastructure/       # global exception handler, request-logging middleware
+   │  └─ Endpoints/            # API surface
+   ├─ Reporter/                # console app: parse local logs, push to /api/ingest (cloud hosting)
+   └─ Web/                     # Angular 21 (standalone + signals, ECharts)
+      └─ src/app/{features/{dashboard,calendar,pricing,settings,reporter,users,logs,login},core,shared}
 ```
 
 ## License
