@@ -89,6 +89,19 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
         result.UnpricedModels = pricing.UnpricedModels.OrderBy(m => m).ToArray();
         logger.LogInformation("Ingest from '{Machine}' ({Source}): {Inserted} new, {Dup} dup, {Skip} skipped of {Received}",
             machine ?? "unknown", source, inserted, result.Duplicates, result.Skipped, result.Received);
+
+        // Reflect this push in the dashboard's "Synced X ago" indicator — when the API is hosted in the
+        // cloud there's no local file sync to drive it, so the remote reporter is the sync. Best-effort.
+        try
+        {
+            var now = DateTime.UtcNow;
+            await db.SyncStatuses.Where(x => x.Id == 1).ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.LastSyncUtc, now)
+                .SetProperty(x => x.LastNewRecords, inserted)
+                .SetProperty(x => x.LastError, (string?)null), ct);
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "Failed to update sync status after ingest."); }
+
         return result;
     }
 

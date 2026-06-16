@@ -191,4 +191,17 @@ public class IngestIntegrationTests(WebAppFactory factory)
         var r = await resp.Content.ReadFromJsonAsync<JsonElement>();
         r.GetProperty("inserted").GetInt32().Should().Be(1);
     }
+
+    [Fact]
+    public async Task Ingest_bumps_the_dashboard_sync_status()
+    {
+        var (_, key) = await CreateKeyAsync("syncstatus");
+        var before = DateTime.UtcNow.AddSeconds(-5);
+        await WithKey(key).PostAsJsonAsync("/api/ingest",
+            new { source = "claude", rows = new[] { Row(Guid.NewGuid().ToString("N")) } });
+
+        // The dashboard's "Synced X ago" chip reads /api/sync/status — ingest must move it.
+        var status = await (await Admin().GetAsync("/api/sync/status")).Content.ReadFromJsonAsync<JsonElement>();
+        status.GetProperty("lastSyncUtc").GetDateTime().Should().BeAfter(before);
+    }
 }
