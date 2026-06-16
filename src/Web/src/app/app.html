@@ -64,6 +64,57 @@
       <span class="status__dot" aria-hidden="true"></span>
       <span class="status__text mono-num">{{ label() }}</span>
     </span>
+
+    <!-- Online teammates: green dot + live count + stacked avatars; opens a roster menu.
+         Collapses to a compact "● N" pill on phones (CSS-gated) so it never crowds the bar. -->
+    @if (onlineCount() > 0) {
+      <button type="button" class="presence" [matMenuTriggerFor]="presenceMenu"
+              #presenceTrigger="matMenuTrigger"
+              [class.presence--open]="presenceTrigger.menuOpen"
+              aria-haspopup="menu"
+              [attr.aria-label]="onlineCount() + ' teammates online'"
+              matTooltip="Who's online" matTooltipClass="axon-tip">
+        <span class="presence__dot" aria-hidden="true"></span>
+        <span class="presence__count mono-num">{{ onlineCount() }}</span>
+        <span class="presence__stack" aria-hidden="true">
+          @for (u of onlineAvatars(); track u.email) {
+            @if (u.picture) {
+              <img class="presence__avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
+            } @else {
+              <span class="presence__avatar presence__avatar--init">{{ u.initials }}</span>
+            }
+          }
+          @if (onlineOverflow() > 0) {
+            <span class="presence__avatar presence__avatar--more">+{{ onlineOverflow() }}</span>
+          }
+        </span>
+      </button>
+      <mat-menu #presenceMenu="matMenu" class="presence-menu" xPosition="before" overlapTrigger="false">
+        <div class="pres-head" role="presentation">
+          <span class="pres-head__dot" aria-hidden="true"></span>
+          <span class="pres-head__title">Online now</span>
+          <span class="pres-head__count mono-num">{{ onlineCount() }}</span>
+        </div>
+        <div class="pres-list" role="presentation">
+          @for (u of onlineUsers(); track u.email) {
+            <div class="pres-item" role="presentation">
+              @if (u.picture) {
+                <img class="pres-item__avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
+              } @else {
+                <span class="pres-item__avatar pres-item__avatar--init">{{ u.initials }}</span>
+              }
+              <div class="pres-item__id">
+                <div class="pres-item__name">
+                  {{ u.name || u.email }}
+                  @if (u.isYou) { <span class="pres-item__you">you</span> }
+                </div>
+                <div class="pres-item__seen">active {{ timeAgo(u.lastSeenUtc, now()) }}</div>
+              </div>
+            </div>
+          }
+        </div>
+      </mat-menu>
+    }
   }
 
   <a mat-icon-button class="gh" href="https://github.com/itdept-ops/usage-iq" target="_blank" rel="noopener"

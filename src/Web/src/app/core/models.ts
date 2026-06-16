@@ -308,6 +308,19 @@ export interface SyncResult {
   warning: string | null;
 }
 
+/**
+ * One teammate currently online (GET /api/presence). Presence is recorded server-side on every
+ * authenticated request, so it stays fresh from the existing /me + /sync/status polls — the client
+ * only polls this endpoint. Mirrors PresenceDto on the API. The caller themselves is included.
+ */
+export interface Presence {
+  email: string;
+  name: string;
+  picture: string | null;
+  /** ISO-8601 UTC timestamp of the user's last authenticated request. */
+  lastSeenUtc: string;
+}
+
 export interface AuthSession {
   token: string;
   email: string;

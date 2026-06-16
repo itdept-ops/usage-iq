@@ -10,8 +10,14 @@ import { MatMenuModule } from '@angular/material/menu';
 
 import { Api } from './core/api';
 import { AuthService } from './core/auth';
-import { SyncStatus, PERM } from './core/models';
+import { Presence, SyncStatus, PERM } from './core/models';
 import { timeAgo, humanizeInterval } from './shared/format';
+
+/** A teammate online, enriched with the initials + "you" flag the indicator needs to render. */
+interface OnlineUser extends Presence {
+  initials: string;
+  isYou: boolean;
+}
 
 /** A quick-link row in the account menu, shown only when the user holds `perm`. */
 interface QuickLink {
@@ -36,7 +42,11 @@ export class App {
   readonly auth = inject(AuthService);
 
   readonly status = signal<SyncStatus | null>(null);
-  private readonly now = signal(Date.now());
+  readonly online = signal<Presence[]>([]);
+  readonly now = signal(Date.now());
+
+  /** Exposed for the template's "active …" presence lines. */
+  readonly timeAgo = timeAgo;
 
   /** Mobile hamburger drawer open-state (only used below the nav breakpoint). */
   readonly mobileNavOpen = signal(false);
@@ -93,12 +103,37 @@ export class App {
     return `${last}\n${auto}`;
   });
 
-  readonly initials = computed(() => {
-    const s = this.auth.session();
-    const name = s?.name || s?.email || '';
-    const parts = name.split(/[\s@.]+/).filter(Boolean);
+  /** Two-letter initials from a name (falls back to email), used by the avatar fallbacks. */
+  private static initialsOf(name: string | null | undefined, email?: string | null): string {
+    const src = name || email || '';
+    const parts = src.split(/[\s@.]+/).filter(Boolean);
     return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U';
+  }
+
+  readonly initials = computed(() => App.initialsOf(this.auth.session()?.name, this.auth.session()?.email));
+
+  /**
+   * Online teammates projected for the indicator: each enriched with display initials and a "you"
+   * flag (matched on the current session's email, case-insensitively). The server orders them, so
+   * we preserve that order and just tag the caller.
+   */
+  readonly onlineUsers = computed<OnlineUser[]>(() => {
+    const me = this.auth.session()?.email?.toLowerCase() ?? null;
+    return this.online().map(u => ({
+      ...u,
+      initials: App.initialsOf(u.name, u.email),
+      isYou: !!me && u.email.toLowerCase() === me,
+    }));
   });
+
+  /** How many teammates are online right now. */
+  readonly onlineCount = computed(() => this.onlineUsers().length);
+
+  /** The first ~4 avatars to stack in the cluster; the rest collapse into a "+N" chip. */
+  readonly onlineAvatars = computed(() => this.onlineUsers().slice(0, 4));
+
+  /** Overflow beyond the stacked avatars (0 when everyone fits). */
+  readonly onlineOverflow = computed(() => Math.max(0, this.onlineCount() - 4));
 
   /**
    * A coarse access tier shown in the account menu header. Anyone who can manage users is an
@@ -145,6 +180,16 @@ export class App {
         takeUntilDestroyed(),
       )
       .subscribe(me => { if (me) { this.auth.applyMe(me); this.enforceCurrentRoute(); } });
+
+    // Poll who's online (~20s) while signed in; errors collapse to an empty list.
+    timer(400, 20000)
+      .pipe(
+        switchMap(() => this.auth.isAuthenticated()
+          ? this.api.presence().pipe(catchError(() => of<Presence[]>([])))
+          : of<Presence[]>([])),
+        takeUntilDestroyed(),
+      )
+      .subscribe(list => this.online.set(list));
   }
 
   /**
@@ -163,6 +208,7 @@ export class App {
     if (err?.status === 401 || err?.status === 403) {
       this.auth.logout();
       this.status.set(null);
+      this.online.set([]);
       this.router.navigate(['/login']);
     }
   }

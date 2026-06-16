@@ -21,7 +21,7 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next, RequestLogQue
     // (segment-based match leaves "/api/shares" management endpoints logged).
     private static readonly string[] Excluded =
     {
-        "/api/health", "/api/auth/me", "/api/auth/config", "/api/sync/status", "/api/logs", "/api/share",
+        "/api/health", "/api/auth/me", "/api/auth/config", "/api/sync/status", "/api/presence", "/api/logs", "/api/share",
         "/api/ingest", // high-volume reporter pushes; the IngestKey LastUsed stamp is the activity trail
     };
 

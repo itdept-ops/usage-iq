@@ -449,6 +449,15 @@ public sealed class MeDto
     public string[] Permissions { get; set; } = Array.Empty<string>();
 }
 
+/// <summary>One teammate currently online (active within the presence window).</summary>
+public sealed class PresenceDto
+{
+    public string Email { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Picture { get; set; }
+    public DateTime LastSeenUtc { get; set; }
+}
+
 public sealed class UserDto
 {
     public int Id { get; set; }

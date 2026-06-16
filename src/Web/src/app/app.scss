@@ -342,6 +342,216 @@
   animation: none;
 }
 
+/* ---- Online-teammates indicator ------------------------------------ */
+/* A compact cluster: green presence dot + live count + up to 4 overlapping
+   avatars, with a "+N" overflow chip. Click opens the roster mat-menu. */
+.presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 9px 0 10px;
+  border-radius: var(--tech-r-pill, 999px);
+  background: var(--tech-input);
+  border: 1px solid var(--tech-border-subtle, #1c2533);
+  color: var(--tech-text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--tech-t-control, 140ms) ease,
+    border-color var(--tech-t-control, 140ms) ease,
+    color var(--tech-t-control, 140ms) ease;
+
+  &:hover {
+    color: var(--tech-text);
+    border-color: var(--tech-border-strong, #33425a);
+  }
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--tech-focus-ring);
+  }
+  &--open {
+    color: var(--tech-text);
+    border-color: var(--tech-border-strong, #33425a);
+    background: color-mix(in srgb, var(--tech-panel-raised) 85%, transparent);
+  }
+
+  &__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--tech-success);
+    box-shadow: 0 0 8px 0 rgba(61, 214, 140, 0.7);
+    animation: axon-pulse 2s ease-in-out infinite;
+    flex: 0 0 auto;
+  }
+
+  &__count {
+    font-size: var(--tech-fs-micro, 10.5px);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    color: var(--tech-success);
+  }
+
+  /* Overlapping avatar row. Negative margin tucks each behind the previous. */
+  &__stack {
+    display: inline-flex;
+    align-items: center;
+    padding-left: 4px;
+  }
+
+  &__avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: 0 0 auto;
+    box-shadow: 0 0 0 2px var(--tech-panel, #111722);
+
+    & + & { margin-left: -8px; }
+  }
+  &__avatar--init {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--tech-font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--tech-text-on-accent, #06090e);
+    background: linear-gradient(135deg, #3d8bff 0%, #8b7cff 52%, #3fd8d0 100%);
+  }
+  &__avatar--more {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--tech-font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--tech-text-secondary);
+    background: var(--tech-bg-sunken, #0c1118);
+    box-shadow: 0 0 0 2px var(--tech-panel, #111722), inset 0 0 0 1px var(--tech-border-subtle, #1c2533);
+  }
+}
+
+/* ---- Online-roster menu panel (CDK overlay) ------------------------ */
+::ng-deep .presence-menu.mat-mdc-menu-panel {
+  min-width: 252px;
+  max-width: 312px;
+  border: 1px solid var(--tech-border, #26303f);
+  border-radius: var(--tech-r-panel, 12px);
+  background: var(--tech-panel, #111722);
+  background-image: radial-gradient(120% 100% at 100% 0%, rgba(61, 214, 140, 0.08), transparent 55%);
+  box-shadow: var(--tech-shadow-popover, 0 24px 60px -20px rgba(0, 0, 0, 0.8));
+  overflow: hidden;
+  transform-origin: top right;
+  animation: acct-menu-in 160ms var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1));
+
+  .mat-mdc-menu-content { padding: 6px; }
+
+  .pres-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px 11px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--tech-border-subtle, #1c2533);
+    cursor: default;
+  }
+  .pres-head__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--tech-success);
+    box-shadow: 0 0 8px 0 rgba(61, 214, 140, 0.7);
+  }
+  .pres-head__title {
+    flex: 1 1 auto;
+    font-family: var(--tech-font-mono);
+    font-size: var(--tech-fs-micro, 10.5px);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tech-text-secondary);
+  }
+  .pres-head__count {
+    font-family: var(--tech-font-mono);
+    font-size: var(--tech-fs-label, 11px);
+    font-weight: 700;
+    color: var(--tech-success);
+  }
+
+  .pres-list {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .pres-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 8px;
+    border-radius: var(--tech-r-control, 8px);
+
+    &:hover { background: color-mix(in srgb, var(--tech-panel-raised, #161d2a) 70%, transparent); }
+  }
+  .pres-item__avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: 0 0 auto;
+    box-shadow: 0 0 0 1px var(--tech-border-subtle, #1c2533);
+  }
+  .pres-item__avatar--init {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--tech-font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--tech-text-on-accent, #06090e);
+    background: linear-gradient(135deg, #3d8bff 0%, #8b7cff 52%, #3fd8d0 100%);
+  }
+  .pres-item__id {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .pres-item__name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--tech-font-ui);
+    font-size: var(--tech-fs-body, 13px);
+    font-weight: 500;
+    color: var(--tech-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pres-item__you {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: var(--tech-r-pill, 999px);
+    background: color-mix(in srgb, var(--tech-success) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tech-success) 38%, transparent);
+    font-family: var(--tech-font-mono);
+    font-size: var(--tech-fs-micro, 10.5px);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+    color: var(--tech-success);
+  }
+  .pres-item__seen {
+    font-family: var(--tech-font-mono);
+    font-size: var(--tech-fs-label, 11px);
+    color: var(--tech-text-tertiary, #5e6c82);
+    line-height: 1.3;
+    margin-top: 1px;
+  }
+}
+
 .gh.mat-mdc-icon-button {
   color: var(--tech-text-secondary);
   transition: color var(--tech-t-control, 140ms) ease;
@@ -653,6 +863,16 @@
   .status {
     padding: 6px;
   }
+  /* Collapse to a compact "● N" pill — drop the avatar stack but keep the
+     count + tap target, so it still opens the roster menu. */
+  .presence__stack {
+    display: none;
+  }
+  .presence {
+    height: 30px;
+    padding: 0 9px;
+    gap: 6px;
+  }
 }
 
 /* Phones: tighten the right cluster so the bar never overflows at 360px. */
@@ -692,7 +912,11 @@
 @media (prefers-reduced-motion: reduce) {
   .caret,
   .status__dot,
+  .presence__dot,
   .nav__item.mat-mdc-button.active::after {
+    animation: none;
+  }
+  ::ng-deep .presence-menu.mat-mdc-menu-panel {
     animation: none;
   }
   .user.mat-mdc-button .user__chev {

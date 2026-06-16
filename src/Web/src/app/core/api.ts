@@ -5,7 +5,7 @@ import {
   AccessPolicy, AuditEntry, CacheEfficiency, CalendarDay, CreateShareRequest, Fleet, FleetDeleteRequest,
   FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, GroupBy,
   HeatmapCell, IngestionSource, IngestKey, IngestKeyCreated, LoginEvent, MachineStat, ManagedUser, ModelStat, NotificationSettings,
-  NotificationUpdate, PagedResult, PermissionItem, Pricing, ProjectDto, PublicShare, RequestLogEntry, SavedView,
+  NotificationUpdate, PagedResult, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, RequestLogEntry, SavedView,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SummaryResponse,
   SyncResult, SyncStatus, UsageFilter, UsageRecord, UsageStats,
 } from './models';
@@ -221,6 +221,11 @@ export class Api {
 
   syncStatus(): Observable<SyncStatus> {
     return this.http.get<SyncStatus>(`${this.base}/sync/status`);
+  }
+
+  /** Teammates active within the last ~2 minutes (includes the caller). Requires any signed-in user. */
+  presence(): Observable<Presence[]> {
+    return this.http.get<Presence[]>(`${this.base}/presence`);
   }
 
   // ---- User management (requires users.manage) ----

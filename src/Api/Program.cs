@@ -50,6 +50,10 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<SyncCoordinator>();
 builder.Services.AddHostedService<AutoSyncBackgroundService>();
 
+// In-memory online-users presence. Fed by PresenceMiddleware on every authenticated request
+// (the SPA's existing /me + /sync/status polls double as the heartbeat); read by GET /api/presence.
+builder.Services.AddSingleton<PresenceTracker>();
+
 // Request/response action log: a bounded queue fed by middleware, drained by a background writer.
 builder.Services.AddSingleton<RequestLogQueue>();
 builder.Services.AddHostedService<RequestLogWriter>();
@@ -246,6 +250,10 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// After auth so HttpContext.User is populated: best-effort stamp the caller as "online".
+app.UseMiddleware<PresenceMiddleware>();
+
 app.UseRateLimiter();
 
 // Cap the ingest request body BEFORE it is buffered/deserialized (model binding runs before the
@@ -266,6 +274,7 @@ app.MapHealthChecks("/health/ready");
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
 app.MapApiEndpoints();
+app.MapPresenceEndpoints();
 app.MapSavedViewsEndpoints();
 app.MapObservabilityEndpoints();
 app.MapNotificationsEndpoints();
