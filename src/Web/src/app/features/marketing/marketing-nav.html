@@ -19,7 +19,7 @@
 
     <nav class="mnav-links" [class.open]="menuOpen()" aria-label="Primary">
       @for (l of links; track l.path) {
-        <a [routerLink]="l.path" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: l.exact }"
+        <a [routerLink]="l.path" routerLinkActive="active" [routerLinkActiveOptions]="l.opts"
            (click)="close()">{{ l.label }}</a>
       }
       <a class="mnav-cta mobile-only" routerLink="/signin" (click)="close()">Sign in</a>

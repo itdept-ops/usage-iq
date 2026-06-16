@@ -1,6 +1,13 @@
 import { Component, HostListener, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { IsActiveMatchOptions, RouterLink, RouterLinkActive } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+
+// Active-link matching that IGNORES query params (and matrix/fragment) so "Home" (=/login) stays
+// underlined even when the auth guard appends ?returnUrl=… on a redirect from the app root (/).
+const EXACT_IGNORING_QUERY: IsActiveMatchOptions =
+  { paths: 'exact', queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' };
+const SUBSET_IGNORING_QUERY: IsActiveMatchOptions =
+  { paths: 'subset', queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' };
 
 /** Sticky, glassy public nav shared across the marketing pages. */
 @Component({
@@ -14,10 +21,10 @@ export class MarketingNav {
   readonly menuOpen = signal(false);
 
   readonly links = [
-    { path: '/login', label: 'Home', exact: true },
-    { path: '/features', label: 'Features', exact: false },
-    { path: '/how-it-works', label: 'How it works', exact: false },
-    { path: '/about', label: 'About', exact: false },
+    { path: '/login', label: 'Home', opts: EXACT_IGNORING_QUERY },
+    { path: '/features', label: 'Features', opts: SUBSET_IGNORING_QUERY },
+    { path: '/how-it-works', label: 'How it works', opts: SUBSET_IGNORING_QUERY },
+    { path: '/about', label: 'About', opts: SUBSET_IGNORING_QUERY },
   ];
 
   @HostListener('window:scroll')
