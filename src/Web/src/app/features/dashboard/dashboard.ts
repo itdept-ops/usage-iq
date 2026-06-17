@@ -91,6 +91,13 @@ export class Dashboard {
   // Estimated active engagement time (gap-based) for the current filter — per-day, from the calendar.
   readonly calendarDays = signal<CalendarDay[]>([]);
   readonly activeHours = computed(() => this.calendarDays().reduce((a, d) => a + d.activeMinutes, 0) / 60);
+  // Days that had measurable engaged time (a single-message day has 0 active minutes — not an "active day").
+  readonly activeDays = computed(() => this.calendarDays().filter(d => d.activeMinutes > 0).length);
+  // Average active hours on a day you actually worked with AI (total active hours ÷ active days).
+  readonly dailyAvgHours = computed(() => {
+    const days = this.activeDays();
+    return days > 0 ? this.activeHours() / days : 0;
+  });
 
   // Cache-efficiency derived figures. Empty state = no input and no cache reads in the range.
   readonly cachePct = computed(() => Math.round((this.cacheEff()?.cacheReadRatio ?? 0) * 100));
