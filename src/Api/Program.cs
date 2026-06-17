@@ -7,11 +7,13 @@ using Ccusage.Api.Auth;
 using Ccusage.Api.Data;
 using Ccusage.Api.Data.Entities;
 using Ccusage.Api.Endpoints;
+using Ccusage.Api.Hubs;
 using Ccusage.Api.Infrastructure;
 using Ccusage.Api.Ingestion;
 using Ccusage.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
@@ -67,6 +69,13 @@ builder.Services.AddHttpClient("discord").ConfigurePrimaryHttpMessageHandler(() 
 builder.Services.AddScoped<DiscordNotifier>();
 builder.Services.AddHostedService<NotificationBackgroundService>();
 
+// Real-time chat + in-app notifications. The hub addresses individual users by their email claim
+// (EmailUserIdProvider) so per-user pushes work across all of a user's connections; the fan-out
+// service is the shared broadcast/notify path used by both the REST endpoints and the hub.
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IUserIdProvider, EmailUserIdProvider>();
+builder.Services.AddScoped<ChatNotificationService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -97,6 +106,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(2),
+        };
+        // Browsers can't set Authorization headers on a WebSocket handshake, so SignalR passes the
+        // JWT as the ?access_token query param. Lift it into the token slot for hub routes only
+        // (never for normal API calls, which must keep using the Authorization header).
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                var token = ctx.Request.Query["access_token"];
+                var path = ctx.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(token) && path.StartsWithSegments("/api/hubs"))
+                    ctx.Token = token;
+                return Task.CompletedTask;
+            },
         };
     });
 builder.Services.AddAuthorization();
@@ -137,6 +160,10 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("ingest", http => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 600, QueueLimit = 0 }));
+    // Chat sends: cap per-email so one account can't flood a channel (~30 messages/min).
+    o.AddPolicy("chat", http => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: http.User.FindFirst("email")?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 30, QueueLimit = 0 }));
 });
 
 var app = builder.Build();
@@ -281,6 +308,9 @@ app.MapNotificationsEndpoints();
 app.MapShareEndpoints();
 app.MapIngestEndpoints();
 app.MapFleetEndpoints();
+app.MapChatEndpoints();
+app.MapInboxEndpoints();
+app.MapHub<ChatHub>("/api/hubs/chat");
 app.MapGet("/", () => app.Environment.IsDevelopment()
     ? Results.Redirect("/swagger")
     : Results.Ok(new { service = "Usage IQ API" }));

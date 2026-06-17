@@ -23,6 +23,11 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<IngestKey> IngestKeys => Set<IngestKey>();
     public DbSet<SavedView> SavedViews => Set<SavedView>();
     public DbSet<MachineInfo> MachineInfos => Set<MachineInfo>();
+    public DbSet<ChatChannel> ChatChannels => Set<ChatChannel>();
+    public DbSet<ChatChannelMember> ChatChannelMembers => Set<ChatChannelMember>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -246,6 +251,68 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             // Personal views: required owner, cascade-delete with the user.
             e.HasOne(x => x.User).WithMany()
                 .HasForeignKey(x => x.UserId).IsRequired().OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ChatChannel>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(120);
+            // Two lower-cased emails (<=256 each) joined with a pipe.
+            e.Property(x => x.DirectKey).HasMaxLength(513);
+            e.Property(x => x.Topic).HasMaxLength(512);
+            e.Property(x => x.CreatedByEmail).HasMaxLength(256);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.ArchivedUtc).HasColumnType("timestamp with time zone");
+            // One Direct channel per unordered email pair; named channels (null key) are exempt.
+            e.HasIndex(x => x.DirectKey).IsUnique().HasFilter("\"DirectKey\" IS NOT NULL");
+        });
+
+        b.Entity<ChatChannelMember>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.JoinedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.MutedUntil).HasColumnType("timestamp with time zone");
+            // One membership row per (channel, user); also the lookup for "is the caller a member".
+            e.HasIndex(x => new { x.ChannelId, x.UserEmail }).IsUnique();
+            e.HasOne(x => x.Channel).WithMany(c => c.Members)
+                .HasForeignKey(x => x.ChannelId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ChatMessage>(e =>
+        {
+            e.Property(x => x.SenderEmail).HasMaxLength(256);
+            e.Property(x => x.Body).HasMaxLength(4000);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.EditedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.DeletedUtc).HasColumnType("timestamp with time zone");
+            // Channel timelines page newest-first within a channel.
+            e.HasIndex(x => new { x.ChannelId, x.CreatedUtc });
+            e.HasOne(x => x.Channel).WithMany(c => c.Messages)
+                .HasForeignKey(x => x.ChannelId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<Notification>(e =>
+        {
+            e.Property(x => x.RecipientEmail).HasMaxLength(256);
+            e.Property(x => x.Text).HasMaxLength(512);
+            e.Property(x => x.Link).HasMaxLength(512);
+            e.Property(x => x.ActorEmail).HasMaxLength(256);
+            e.Property(x => x.ActorName).HasMaxLength(256);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // The inbox reads a recipient's unread/all notifications newest-first.
+            e.HasIndex(x => new { x.RecipientEmail, x.IsRead, x.CreatedUtc });
+        });
+
+        b.Entity<NotificationPreference>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.NotifyDirectMessages).HasDefaultValue(true);
+            e.Property(x => x.NotifyMentions).HasDefaultValue(true);
+            e.Property(x => x.NotifyChannelMessages).HasDefaultValue(false);
+            e.Property(x => x.NotifySystemEvents).HasDefaultValue(true);
+            e.Property(x => x.SurfaceToasts).HasDefaultValue(true);
+            e.Property(x => x.SurfaceBrowser).HasDefaultValue(false);
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            e.HasIndex(x => x.UserEmail).IsUnique();
         });
     }
 }

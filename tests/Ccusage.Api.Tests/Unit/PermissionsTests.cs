@@ -5,7 +5,7 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 19 keys.
+    // The full catalog of 22 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
@@ -14,6 +14,7 @@ public class PermissionsTests
         "settings.view", "settings.manage", "sources.manage",
         "reporter.view", "reporter.manage", "reporter.self",
         "notifications.view", "notifications.manage",
+        "chat.read", "chat.send", "chat.moderate",
         "shares.view", "shares.manage",
         "users.view", "users.manage", "activity.view",
     };
@@ -33,6 +34,9 @@ public class PermissionsTests
     [InlineData("reporter.self")]
     [InlineData("notifications.view")]
     [InlineData("notifications.manage")]
+    [InlineData("chat.read")]
+    [InlineData("chat.send")]
+    [InlineData("chat.moderate")]
     [InlineData("shares.view")]
     [InlineData("shares.manage")]
     [InlineData("users.view")]
@@ -70,6 +74,9 @@ public class PermissionsTests
         Permissions.ReporterSelf.Should().Be("reporter.self");
         Permissions.NotificationsView.Should().Be("notifications.view");
         Permissions.NotificationsManage.Should().Be("notifications.manage");
+        Permissions.ChatRead.Should().Be("chat.read");
+        Permissions.ChatSend.Should().Be("chat.send");
+        Permissions.ChatModerate.Should().Be("chat.moderate");
         Permissions.SharesView.Should().Be("shares.view");
         Permissions.SharesManage.Should().Be("shares.manage");
         Permissions.UsersView.Should().Be("users.view");
@@ -78,9 +85,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_nineteen_known_keys()
+    public void All_contains_exactly_the_twenty_two_known_keys()
     {
-        Permissions.All.Should().HaveCount(19);
+        Permissions.All.Should().HaveCount(22);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -91,9 +98,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_nineteen_entries()
+    public void Catalog_has_twenty_two_entries()
     {
-        Permissions.Catalog.Should().HaveCount(19);
+        Permissions.Catalog.Should().HaveCount(22);
     }
 
     [Fact]
@@ -123,13 +130,24 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Views_are_exactly_the_nine_view_keys_and_all_valid()
+    public void Views_are_the_page_view_gates_and_all_valid()
     {
-        Permissions.Views.Should().HaveCount(9);
-        Permissions.Views.Should().OnlyContain(k => k.EndsWith(".view"));
+        // The page-view gates: every *.view key plus chat.read (the Chat page gate, which has
+        // no *.view suffix). 9 *.view keys + chat.read = 10.
+        Permissions.Views.Should().HaveCount(10);
         Permissions.Views.Should().OnlyContain(k => Permissions.IsValid(k));
+        Permissions.Views.Should().OnlyContain(k => k.EndsWith(".view") || k == Permissions.ChatRead);
         // Every *.view key in the catalog is represented in Views.
         var catalogViews = Permissions.All.Where(k => k.EndsWith(".view"));
-        Permissions.Views.Should().BeEquivalentTo(catalogViews);
+        Permissions.Views.Should().Contain(catalogViews);
+        Permissions.Views.Should().Contain(Permissions.ChatRead);
+    }
+
+    [Fact]
+    public void ChatModerate_is_not_defaultable()
+    {
+        Permissions.IsDefaultable(Permissions.ChatModerate).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.ChatRead).Should().BeTrue();
+        Permissions.IsDefaultable(Permissions.ChatSend).Should().BeTrue();
     }
 }

@@ -544,3 +544,109 @@ public sealed class SyncStatusDto
     public bool AutoSyncEnabled { get; set; }
     public int IntervalSeconds { get; set; }
 }
+
+// ---- Chat + Notifications ----
+
+/// <summary>A participant in a channel or DM (identity for rendering message authorship / membership).</summary>
+public sealed class MemberDto
+{
+    public string Email { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Picture { get; set; }
+}
+
+/// <summary>One chat message. <see cref="Body"/> is null and <see cref="Deleted"/> is true for soft-deleted messages — deleted text is never exposed.</summary>
+public sealed class ChatMessageDto
+{
+    public long Id { get; set; }
+    public int ChannelId { get; set; }
+    public string SenderEmail { get; set; } = "";
+    public string SenderName { get; set; } = "";
+    public string? SenderPicture { get; set; }
+    public string? Body { get; set; }
+    public DateTime CreatedUtc { get; set; }
+    public DateTime? EditedUtc { get; set; }
+    public bool Deleted { get; set; }
+}
+
+/// <summary>A channel or direct message as seen by the calling member, with unread state and last message.</summary>
+public sealed class ChatChannelDto
+{
+    public int Id { get; set; }
+
+    /// <summary>"channel" or "direct".</summary>
+    public string Kind { get; set; } = "";
+
+    public string? Name { get; set; }
+    public string? Topic { get; set; }
+    public bool IsPrivate { get; set; }
+    public bool Archived { get; set; }
+
+    /// <summary>For a direct message, the OTHER member's name (or email); for a channel, the channel name.</summary>
+    public string DisplayName { get; set; } = "";
+
+    public MemberDto[] Members { get; set; } = Array.Empty<MemberDto>();
+    public ChatMessageDto? LastMessage { get; set; }
+    public int UnreadCount { get; set; }
+}
+
+/// <summary>One in-app inbox notification for the caller.</summary>
+public sealed class NotificationDto
+{
+    public long Id { get; set; }
+
+    /// <summary>The <see cref="Data.Entities.NotificationType"/> serialized as a camelCase string.</summary>
+    public string Type { get; set; } = "";
+
+    public string Text { get; set; } = "";
+    public string? Link { get; set; }
+    public string? ActorEmail { get; set; }
+    public string? ActorName { get; set; }
+    public bool IsRead { get; set; }
+    public DateTime CreatedUtc { get; set; }
+}
+
+/// <summary>The caller's notification-delivery preferences.</summary>
+public sealed class NotificationPreferenceDto
+{
+    public bool NotifyDirectMessages { get; set; }
+    public bool NotifyMentions { get; set; }
+    public bool NotifyChannelMessages { get; set; }
+    public bool NotifySystemEvents { get; set; }
+    public bool SurfaceToasts { get; set; }
+    public bool SurfaceBrowser { get; set; }
+}
+
+public sealed class CreateChannelRequest
+{
+    public string Name { get; set; } = "";
+    public string? Topic { get; set; }
+    public bool IsPrivate { get; set; }
+    public string[] MemberEmails { get; set; } = Array.Empty<string>();
+}
+
+public sealed class SendMessageRequest
+{
+    public string Body { get; set; } = "";
+    public string[]? MentionedEmails { get; set; }
+}
+
+public sealed class OpenDirectRequest
+{
+    public string UserEmail { get; set; } = "";
+}
+
+public sealed class EditMessageRequest
+{
+    public string Body { get; set; } = "";
+}
+
+public sealed class MarkReadRequest
+{
+    public long MessageId { get; set; }
+}
+
+public sealed class MarkNotificationsReadRequest
+{
+    public long[] Ids { get; set; } = Array.Empty<long>();
+}

@@ -31,6 +31,11 @@ public static class Permissions
     public const string NotificationsView = "notifications.view";
     public const string NotificationsManage = "notifications.manage";
 
+    // ---- Chat ----
+    public const string ChatRead = "chat.read";
+    public const string ChatSend = "chat.send";
+    public const string ChatModerate = "chat.moderate";
+
     // ---- Shares ----
     public const string SharesView = "shares.view";
     public const string SharesManage = "shares.manage";
@@ -62,6 +67,10 @@ public static class Permissions
         new PermissionInfo(NotificationsView, "Notifications", "View notifications", "View the Discord/notification config."),
         new PermissionInfo(NotificationsManage, "Notifications", "Manage notifications", "Edit notifications and send a test."),
 
+        new PermissionInfo(ChatRead, "Chat", "View chat", "See channels and direct messages you belong to and read their messages."),
+        new PermissionInfo(ChatSend, "Chat", "Send messages", "Post messages, create channels, and start direct messages."),
+        new PermissionInfo(ChatModerate, "Chat", "Moderate chat", "Edit or delete other people’s messages, and archive or delete channels."),
+
         new PermissionInfo(SharesView, "Shares", "View shares", "View share links and access logs."),
         new PermissionInfo(SharesManage, "Shares", "Manage shares", "Create, edit, and revoke share links."),
 
@@ -72,11 +81,11 @@ public static class Permissions
 
     public static readonly string[] All = Catalog.Select(p => p.Key).ToArray();
 
-    /// <summary>The nine <c>*.view</c> keys — every page-level viewing capability.</summary>
+    /// <summary>The <c>*.view</c> page-view gate keys — every page-level viewing capability.</summary>
     public static readonly string[] Views =
     {
         DashboardView, CalendarView, PricingView, SettingsView,
-        ReporterView, NotificationsView, SharesView, UsersView, ActivityView,
+        ReporterView, NotificationsView, ChatRead, SharesView, UsersView, ActivityView,
     };
 
     public static bool IsValid(string key) => All.Contains(key);
@@ -85,6 +94,8 @@ public static class Permissions
     /// Whether a permission may appear in the open-sign-up default set. Excludes <see cref="UsersManage"/>
     /// so auto-provisioning can never mint an administrator: granting admin must always be an explicit,
     /// per-user action on the Users page, never something every new Google account inherits by default.
+    /// Also excludes <see cref="ChatModerate"/> for the same reason — chat-moderation is a privileged
+    /// capability that must be granted deliberately, never inherited by every new account.
     /// </summary>
-    public static bool IsDefaultable(string key) => IsValid(key) && key != UsersManage;
+    public static bool IsDefaultable(string key) => IsValid(key) && key != UsersManage && key != ChatModerate;
 }
