@@ -180,8 +180,8 @@
         <span class="kpi-icon"><mat-icon>schedule</mat-icon></span>
       </div>
       <div class="kpi-value mono-num">{{ activeHours() | number: '1.0-1' }}<span class="dim">h</span></div>
-      @if (activeDays() > 0) {
-        <div class="kpi-sub">avg <span class="mono-num">{{ dailyAvgHours() | number: '1.0-1' }}</span>h/day</div>
+      @if (activeWeekdays() > 0) {
+        <div class="kpi-sub">avg <span class="mono-num">{{ dailyAvgHours() | number: '1.0-1' }}</span>h/weekday</div>
       } @else {
         <div class="kpi-sub">estimated time with AI</div>
       }

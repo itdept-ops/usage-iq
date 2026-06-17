@@ -29,6 +29,16 @@ import { CacheEfficiency, CalendarDay, GroupBy, IngestionSource, MachineStat, Mo
 import { ChartComponent } from '../../shared/chart';
 import { CompactPipe } from '../../shared/format';
 
+/**
+ * True for Mon–Fri. Parses the calendar's display-local "yyyy-MM-dd" string by its components
+ * (not `new Date(str)`, which would parse as UTC and could shift the weekday across timezones).
+ */
+function isWeekday(localDate: string): boolean {
+  const [y, m, d] = localDate.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay(); // 0 = Sun … 6 = Sat, in local time on a date-only value
+  return dow >= 1 && dow <= 5;
+}
+
 @Component({
   selector: 'app-dashboard',
   imports: [
@@ -91,11 +101,13 @@ export class Dashboard {
   // Estimated active engagement time (gap-based) for the current filter — per-day, from the calendar.
   readonly calendarDays = signal<CalendarDay[]>([]);
   readonly activeHours = computed(() => this.calendarDays().reduce((a, d) => a + d.activeMinutes, 0) / 60);
-  // Days that had measurable engaged time (a single-message day has 0 active minutes — not an "active day").
-  readonly activeDays = computed(() => this.calendarDays().filter(d => d.activeMinutes > 0).length);
-  // Average active hours on a day you actually worked with AI (total active hours ÷ active days).
+  // Weekdays (Mon–Fri) with measurable engaged time. Weekend days are NOT counted toward the average's
+  // denominator — but weekend hours still count in the total above ("keep the total, drop the days").
+  readonly activeWeekdays = computed(() =>
+    this.calendarDays().filter(d => d.activeMinutes > 0 && isWeekday(d.date)).length);
+  // Average active hours per active weekday: total active hours (incl. weekends) ÷ active weekdays.
   readonly dailyAvgHours = computed(() => {
-    const days = this.activeDays();
+    const days = this.activeWeekdays();
     return days > 0 ? this.activeHours() / days : 0;
   });
 
