@@ -36,6 +36,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<ExerciseLibrary> ExerciseLibrary => Set<ExerciseLibrary>();
     public DbSet<WeightEntry> WeightEntries => Set<WeightEntry>();
     public DbSet<CustomFood> CustomFoods => Set<CustomFood>();
+    public DbSet<CustomExercise> CustomExercises => Set<CustomExercise>();
     public DbSet<HydrationEntry> HydrationEntries => Set<HydrationEntry>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -416,6 +417,20 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => new { x.UserEmail, x.LastUsedUtc });
             // One saved row per (user, food identity); the manual-log upsert keys on this unique index.
             e.HasIndex(x => new { x.UserEmail, x.Description, x.Brand, x.ServingDesc }).IsUnique();
+        });
+
+        b.Entity<CustomExercise>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Name).HasMaxLength(128);
+            // NameKey is the trim+lower'd Name used for dedup; stored alongside the display Name.
+            e.Property(x => x.NameKey).HasMaxLength(128);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.LastUsedUtc).HasColumnType("timestamp with time zone");
+            // The "My exercises" list reads one user's saved exercises newest-used-first.
+            e.HasIndex(x => new { x.UserEmail, x.LastUsedUtc });
+            // One saved row per (user, normalized name); the manual-log upsert keys on this unique index.
+            e.HasIndex(x => new { x.UserEmail, x.NameKey }).IsUnique();
         });
     }
 }

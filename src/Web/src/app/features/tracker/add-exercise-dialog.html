@@ -224,11 +224,55 @@
       }
     }
   } @else {
+    <!-- "My exercises": the caller's per-user saved library (auto-built from manual logs), pickable to prefill. -->
+    <div class="ax-saved">
+      <mat-form-field appearance="outline" class="ax-field ax-search">
+        <mat-icon matPrefix>bookmark</mat-icon>
+        <mat-label>My exercises</mat-label>
+        <input matInput autocomplete="off" placeholder="Search your saved exercises"
+               [ngModel]="savedQuery()" (ngModelChange)="savedQuery.set($event)" />
+      </mat-form-field>
+
+      @if (savedLoading()) { <mat-progress-bar mode="indeterminate" aria-label="Loading" /> }
+
+      @if (saved().length > 0) {
+        <div class="ax-list" role="list" aria-label="My exercises">
+          @for (ex of saved(); track ex.id) {
+            <div role="listitem" class="ax-row ax-saved-row">
+              <button type="button" class="ax-ex"
+                      [class.selected]="pickedSavedId() === ex.id"
+                      [attr.aria-pressed]="pickedSavedId() === ex.id"
+                      (click)="pickSaved(ex)">
+                <span class="ax-ex__id">
+                  <span class="ax-ex__name">{{ ex.name }}</span>
+                  <span class="ax-ex__cat">
+                    @if (ex.defaultCaloriesBurned != null) { {{ ex.defaultCaloriesBurned }} kcal · }
+                    @if (ex.defaultDurationMin != null) { {{ ex.defaultDurationMin }} min · }
+                    used {{ ex.useCount }}×
+                  </span>
+                </span>
+                @if (pickedSavedId() === ex.id) { <mat-icon class="ax-ex__check">check_circle</mat-icon> }
+              </button>
+              <button mat-icon-button type="button" class="ax-saved-del" (click)="deleteSaved(ex, $event)"
+                      [attr.aria-label]="'Remove ' + ex.name + ' from my exercises'">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          }
+        </div>
+      } @else if (!savedLoading()) {
+        <p class="ax-empty">
+          @if (savedQuery().trim()) { No saved exercises match. }
+          @else { No saved exercises yet. Exercises you enter manually are saved here. }
+        </p>
+      }
+    </div>
+
     <div class="ax-manual">
       <mat-form-field appearance="outline" class="ax-field">
         <mat-label>Exercise name</mat-label>
-        <input matInput cdkFocusInitial autocomplete="off" maxlength="80"
-               [ngModel]="mName()" (ngModelChange)="mName.set($event)" placeholder="e.g. Evening walk" />
+        <input matInput #nameInput cdkFocusInitial autocomplete="off" maxlength="80"
+               [ngModel]="mName()" (ngModelChange)="setManualName($event)" placeholder="e.g. Evening walk" />
       </mat-form-field>
       <mat-form-field appearance="outline" class="ax-field">
         <mat-label>Calories burned</mat-label>
@@ -236,7 +280,22 @@
                [ngModel]="mCalories()" (ngModelChange)="mCalories.set($event)" />
         <span matTextSuffix>kcal</span>
       </mat-form-field>
+      <mat-form-field appearance="outline" class="ax-field">
+        <mat-label>Duration (optional)</mat-label>
+        <input matInput type="number" min="1" inputmode="numeric"
+               [ngModel]="mDuration()" (ngModelChange)="mDuration.set($event)" />
+        <span matTextSuffix>min</span>
+      </mat-form-field>
+
+      @if (mWillSave()) {
+        <p class="ax-savehint" aria-live="polite" aria-atomic="true">
+          <mat-icon aria-hidden="true">bookmark_add</mat-icon> Saved to My exercises for next time.
+        </p>
+      }
     </div>
+
+    <!-- Polite sr-only announcement spoken after a "My exercises" pick prefills the form below. -->
+    <span class="ax-sr-status" role="status" aria-live="polite">{{ pickAnnounce() }}</span>
   }
 </mat-dialog-content>
 

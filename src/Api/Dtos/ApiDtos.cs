@@ -948,6 +948,26 @@ public sealed class AddExerciseRequest
     public string? Name { get; set; }
     public int? DurationMin { get; set; }
     public int? CaloriesBurned { get; set; }
+
+    /// <summary>
+    /// Where the exercise came from ("library" | "workoutx" | "custom"), or null/absent when MANUALLY typed.
+    /// A manual log (no source AND no <see cref="ExerciseId"/>) is auto-saved to the caller's "My exercises"
+    /// library; a "custom" log bumps the matching saved exercise's use count; library/workoutx logs are not
+    /// saved (library is goal-tagged + searchable; workoutx is searchable upstream).
+    /// </summary>
+    public string? Source { get; set; }
+}
+
+/// <summary>One of the caller's saved "My exercises" — a per-user library auto-built from manual exercise
+/// logs. The default calories/duration are the values last logged; <see cref="UseCount"/> tracks how often
+/// it was logged (newest-used first in the list).</summary>
+public sealed class CustomExerciseDto
+{
+    public long Id { get; set; }
+    public string Name { get; set; } = "";
+    public int? DefaultCaloriesBurned { get; set; }
+    public int? DefaultDurationMin { get; set; }
+    public int UseCount { get; set; }
 }
 
 /// <summary>Log a drink onto a day; <see cref="AmountMl"/> is always millilitres (1..5000), with an

@@ -839,6 +839,25 @@ export interface AddExerciseRequest {
   name?: string;
   durationMin?: number;
   caloriesBurned?: number;
+  /**
+   * Where the exercise came from ("library" | "workoutx" | "custom"), or null/omitted when MANUALLY
+   * typed. A manual log (no source + no exerciseId) gets auto-saved to the caller's "My exercises"
+   * library; a "custom" log (re-picked from My exercises) bumps that saved row's use count.
+   */
+  source?: string;
+}
+
+/**
+ * One of the caller's saved "My exercises" (GET /api/tracker/exercises/saved) — a per-user library
+ * auto-built from manual exercise logs. The defaults are the calories/duration last logged; re-picking
+ * one prefills the manual form. Mirrors CustomExerciseDto.
+ */
+export interface CustomExerciseDto {
+  id: number;
+  name: string;
+  defaultCaloriesBurned?: number;
+  defaultDurationMin?: number;
+  useCount: number;
 }
 
 /** Canonical permission keys (mirror of the backend catalog — all 22 keys). */

@@ -784,6 +784,106 @@ public class TrackerIntegrationTests(WebAppFactory factory)
         (await Json(await alice.GetAsync("/api/tracker/foods/saved"))).EnumerateArray().Should().BeEmpty();
     }
 
+    // ---- Saved "My exercises": manual logs auto-save + dedupe; library/workoutx logs don't ----
+
+    [Fact]
+    public async Task Manual_exercise_log_auto_saves_and_a_second_identical_log_bumps_use_count_without_duplicating()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        async Task LogManualAsync() =>
+            (await user.PostAsJsonAsync("/api/tracker/exercise", new
+            {
+                date = Today, name = "Garage barbell circuit", durationMin = 25, caloriesBurned = 180,
+            })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // First manual log creates a saved exercise (UseCount = 1) with the logged defaults.
+        await LogManualAsync();
+        var saved1 = (await Json(await user.GetAsync("/api/tracker/exercises/saved"))).EnumerateArray().ToList();
+        saved1.Should().ContainSingle();
+        saved1[0].GetProperty("name").GetString().Should().Be("Garage barbell circuit");
+        saved1[0].GetProperty("useCount").GetInt32().Should().Be(1);
+        saved1[0].GetProperty("defaultCaloriesBurned").GetInt32().Should().Be(180);
+        saved1[0].GetProperty("defaultDurationMin").GetInt32().Should().Be(25);
+
+        // A second identical manual log bumps UseCount to 2 — no duplicate row.
+        await LogManualAsync();
+        var saved2 = (await Json(await user.GetAsync("/api/tracker/exercises/saved"))).EnumerateArray().ToList();
+        saved2.Should().ContainSingle();
+        saved2[0].GetProperty("useCount").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task A_workoutx_or_library_sourced_exercise_log_does_not_create_a_saved_exercise()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        // A WorkoutX-sourced log (source set, no library ExerciseId).
+        await user.PostAsJsonAsync("/api/tracker/exercise", new
+        {
+            date = Today, source = "workoutx", name = "Cable fly", durationMin = 15, caloriesBurned = 90,
+        });
+
+        // A library-sourced log (carries a real ExerciseId from the goal-tagged library).
+        var lib = (await Json(await user.GetAsync("/api/tracker/exercises"))).EnumerateArray().First();
+        var exId = lib.GetProperty("id").GetInt32();
+        await user.PostAsJsonAsync("/api/tracker/exercise", new
+        {
+            date = Today, exerciseId = exId, durationMin = 30, caloriesBurned = 200,
+        });
+
+        var saved = (await Json(await user.GetAsync("/api/tracker/exercises/saved"))).EnumerateArray().ToList();
+        saved.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Saved_exercises_are_caller_own_only_and_filterable_by_query()
+    {
+        var (_, alice) = await ProvisionUser("tracker.self");
+        var (_, bob) = await ProvisionUser("tracker.self");
+
+        await alice.PostAsJsonAsync("/api/tracker/exercise", new
+        {
+            date = Today, name = "Morning jog", durationMin = 20, caloriesBurned = 160,
+        });
+        await alice.PostAsJsonAsync("/api/tracker/exercise", new
+        {
+            date = Today, name = "Kettlebell swings", durationMin = 10, caloriesBurned = 110,
+        });
+
+        // Bob sees none of Alice's saved exercises.
+        (await Json(await bob.GetAsync("/api/tracker/exercises/saved"))).EnumerateArray().Should().BeEmpty();
+
+        // Alice sees both; a query filters on name, case-insensitively.
+        var all = (await Json(await alice.GetAsync("/api/tracker/exercises/saved"))).EnumerateArray().ToList();
+        all.Should().HaveCount(2);
+
+        var byName = (await Json(await alice.GetAsync("/api/tracker/exercises/saved?q=JOG"))).EnumerateArray().ToList();
+        byName.Should().ContainSingle();
+        byName[0].GetProperty("name").GetString().Should().Be("Morning jog");
+    }
+
+    [Fact]
+    public async Task Deleting_a_saved_exercise_is_owner_only_and_404_for_another_user()
+    {
+        var (_, alice) = await ProvisionUser("tracker.self");
+        var (_, bob) = await ProvisionUser("tracker.self");
+
+        await alice.PostAsJsonAsync("/api/tracker/exercise", new
+        {
+            date = Today, name = "Stair climber", durationMin = 12, caloriesBurned = 120,
+        });
+        var savedId = (await Json(await alice.GetAsync("/api/tracker/exercises/saved")))
+            .EnumerateArray().First().GetProperty("id").GetInt64();
+
+        // Bob can't delete Alice's saved exercise → 404 (never reveal the row).
+        (await bob.DeleteAsync($"/api/tracker/exercises/saved/{savedId}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // Alice deletes her own → 204, and it's gone.
+        (await alice.DeleteAsync($"/api/tracker/exercises/saved/{savedId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await Json(await alice.GetAsync("/api/tracker/exercises/saved"))).EnumerateArray().Should().BeEmpty();
+    }
+
     // ---- Hydration: add + appears on the day (sum + entries), delete own ----
 
     [Fact]

@@ -275,7 +275,49 @@ public static class TrackerEndpoints
             };
             db.ExerciseEntries.Add(entry);
             await db.SaveChangesAsync(ct);
+
+            // Saved "My exercises" upkeep. A MANUAL log (no library ExerciseId AND no source) is auto-saved
+            // / bumped; an explicit "custom" re-log bumps the matching saved row; library/workoutx logs are
+            // never saved (library is goal-tagged + searchable, workoutx is searchable upstream).
+            var source = (req.Source ?? "").Trim().ToLowerInvariant();
+            var isManual = source.Length == 0 && req.ExerciseId is null;
+            if (isManual || source == "custom")
+                await UpsertCustomExerciseAsync(db, caller.Email, entry, bumpOnly: source == "custom", ct);
+
             return Results.Ok(ToExerciseDto(entry));
+        }).RequirePermission(Permissions.TrackerSelf);
+
+        // ---- The caller's saved "My exercises" library (auto-built from manual logs), newest-used first ----
+        g.MapGet("/exercises/saved", async (
+            string? q, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var query = db.CustomExercises.AsNoTracking().Where(x => x.UserEmail == caller.Email);
+
+            var term = (q ?? "").Trim();
+            if (term.Length > 0)
+            {
+                var like = $"%{term}%";
+                query = query.Where(x => EF.Functions.ILike(x.Name, like));
+            }
+
+            var rows = await query
+                .OrderByDescending(x => x.LastUsedUtc).ThenByDescending(x => x.Id)
+                .Take(100)
+                .ToListAsync(ct);
+            return Results.Ok(rows.Select(ToCustomExerciseDto).ToArray());
+        }).RequirePermission(Permissions.TrackerSelf);
+
+        // ---- Delete one of the caller's saved exercises (owner only) ----
+        g.MapDelete("/exercises/saved/{id:long}", async (
+            long id, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            // 404 when it doesn't exist OR isn't the caller's (never reveal someone else's saved exercise).
+            var deleted = await db.CustomExercises
+                .Where(x => x.Id == id && x.UserEmail == caller.Email)
+                .ExecuteDeleteAsync(ct);
+            return deleted == 0 ? Results.NotFound() : Results.NoContent();
         }).RequirePermission(Permissions.TrackerSelf);
 
         // ---- Delete a logged exercise (owner only) ----
@@ -796,6 +838,79 @@ public static class TrackerEndpoints
     private static string NormalizeKey(string? s) => (s ?? "").Trim();
 
     // ===================================================================================
+    // Saved "My exercises" upkeep
+    // ===================================================================================
+
+    /// <summary>
+    /// Upsert the caller's saved "My exercises" row for a just-logged exercise, keyed by the normalized
+    /// name (UserEmail, NameKey = trim+lower of the name): if it exists, bump UseCount + LastUsedUtc and
+    /// (unless <paramref name="bumpOnly"/>) refresh the snapshot defaults (calories burned + duration);
+    /// otherwise insert with UseCount=1. The display Name is stored exactly as logged.
+    /// <paramref name="bumpOnly"/> is for an explicit "custom" re-log (a pick of an existing saved
+    /// exercise): it must never create a new row — if no match exists it is a no-op. The unique-index
+    /// violation catch handles a concurrent insert racing the same identity.
+    /// </summary>
+    private static async Task UpsertCustomExerciseAsync(
+        UsageDbContext db, string email, ExerciseEntry entry, bool bumpOnly, CancellationToken ct)
+    {
+        var name = entry.Name; // already trimmed + capped at log time
+        var nameKey = name.ToLowerInvariant();
+        var calories = entry.CaloriesBurned;
+        var duration = entry.DurationMin;
+
+        var existing = await db.CustomExercises.FirstOrDefaultAsync(x =>
+            x.UserEmail == email && x.NameKey == nameKey, ct);
+
+        if (existing is not null)
+        {
+            existing.UseCount += 1;
+            existing.LastUsedUtc = DateTime.UtcNow;
+            if (!bumpOnly)
+            {
+                existing.Name = name; // keep the latest-entered casing
+                existing.DefaultCaloriesBurned = calories;
+                existing.DefaultDurationMin = duration;
+            }
+            await db.SaveChangesAsync(ct);
+            return;
+        }
+
+        // A "custom" re-log of an exercise that's no longer saved (e.g. the user deleted it) is a no-op.
+        if (bumpOnly) return;
+
+        var now = DateTime.UtcNow;
+        db.CustomExercises.Add(new CustomExercise
+        {
+            UserEmail = email,
+            Name = name,
+            NameKey = nameKey,
+            DefaultCaloriesBurned = calories,
+            DefaultDurationMin = duration,
+            UseCount = 1,
+            CreatedUtc = now,
+            LastUsedUtc = now,
+        });
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            // A concurrent log for the same identity won the race; drop our insert and bump the winner.
+            db.ChangeTracker.Clear();
+            var winner = await db.CustomExercises.FirstOrDefaultAsync(x =>
+                x.UserEmail == email && x.NameKey == nameKey, ct);
+            if (winner is null) return;
+            winner.UseCount += 1;
+            winner.LastUsedUtc = DateTime.UtcNow;
+            winner.Name = name;
+            winner.DefaultCaloriesBurned = calories;
+            winner.DefaultDurationMin = duration;
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
+    // ===================================================================================
     // Date handling
     // ===================================================================================
 
@@ -855,6 +970,15 @@ public static class TrackerEndpoints
         CarbG = f.CarbG,
         FatG = f.FatG,
         UseCount = f.UseCount,
+    };
+
+    private static CustomExerciseDto ToCustomExerciseDto(CustomExercise x) => new()
+    {
+        Id = x.Id,
+        Name = x.Name,
+        DefaultCaloriesBurned = x.DefaultCaloriesBurned,
+        DefaultDurationMin = x.DefaultDurationMin,
+        UseCount = x.UseCount,
     };
 
     private static ExerciseEntryDto ToExerciseDto(ExerciseEntry x) => new()

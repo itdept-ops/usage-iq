@@ -76,7 +76,11 @@
   &.selected { background: color-mix(in srgb, var(--tech-accent) 12%, transparent); }
 
   &__id { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
-  &__name { font-size: var(--tech-fs-body); font-weight: 500; color: var(--tech-text); }
+  // Truncate to one line — manual names run up to 80 chars and would otherwise wrap.
+  &__name {
+    font-size: var(--tech-fs-body); font-weight: 500; color: var(--tech-text);
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   &__cat { font-size: var(--tech-fs-label); color: var(--tech-text-tertiary); text-transform: capitalize; }
   &__met { font-size: var(--tech-fs-label); color: var(--tech-text-secondary); flex: 0 0 auto; }
   &__check { color: var(--tech-accent); flex: 0 0 auto; font-size: 20px; width: 20px; height: 20px; }
@@ -96,6 +100,41 @@
   flex-direction: column;
   gap: var(--tech-space-3);
   padding-top: var(--tech-space-1);
+}
+
+/* ── "My exercises" quick-pick (Manual tab) ── */
+.ax-saved {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-2);
+}
+
+/* A saved row: pickable button + a remove (×). */
+.ax-saved-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  .ax-ex { flex: 1 1 auto; min-width: 0; }
+  // The meta line here is free-text (calories · duration · uses), not a category — don't title-case it.
+  .ax-ex__cat { text-transform: none; }
+}
+
+.ax-saved-del {
+  flex: 0 0 auto;
+  color: var(--tech-text-tertiary);
+  &:hover { color: var(--tech-error); }
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+}
+
+/* Subtle "saved to My exercises" hint shown while typing a fresh manual entry. */
+.ax-savehint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-tertiary);
+  mat-icon { font-size: 16px; width: 16px; height: 16px; color: var(--tech-accent); }
 }
 
 .ax-override {
@@ -249,6 +288,18 @@
   border-radius: var(--tech-r-control);
   min-height: 44px;
   mat-icon { font-size: 18px; width: 18px; height: 18px; margin-right: 4px; vertical-align: -4px; }
+}
+
+@media (max-width: 520px) {
+  // Bump the remove (×) button to a >=44px touch target on mobile (Material's default is ~40px),
+  // keeping the icon glyph centered. Matches the other tracker touch-target fixes.
+  .ax-saved-del {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 /* Visually-hidden polite-region text (GIF load/fail announcements). */

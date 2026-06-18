@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, CacheEfficiency, CalendarDay, ChatChannelDto, ChatContactDto, ChatMessageDto, CreateChannelRequest,
-  CreateShareRequest, CustomFoodDto, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
+  CreateShareRequest, CustomExerciseDto, CustomFoodDto, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
   FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy,
   HeatmapCell, HydrationEntryDto, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, ModelStat, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, RequestLogEntry, SavedView,
@@ -448,6 +448,20 @@ export class Api {
   /** Delete a logged exercise entry. */
   deleteExercise(id: number): Observable<unknown> {
     return this.http.delete(`${this.base}/tracker/exercise/${id}`);
+  }
+
+  /**
+   * The caller's saved "My exercises" library (auto-built from manual exercise logs), newest-used first.
+   * Pass `q` for a case-insensitive name filter.
+   */
+  savedExercises(q?: string): Observable<CustomExerciseDto[]> {
+    const params = q ? new HttpParams().set('q', q) : undefined;
+    return this.http.get<CustomExerciseDto[]>(`${this.base}/tracker/exercises/saved`, { params });
+  }
+
+  /** Delete one of the caller's saved exercises (owner-only). */
+  deleteSavedExercise(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/tracker/exercises/saved/${id}`);
   }
 
   /** The exercise library, filtered to a goal. Omit `goal` to use the caller's profile goal. */

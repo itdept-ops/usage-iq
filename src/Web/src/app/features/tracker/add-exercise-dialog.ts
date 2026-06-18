@@ -1,7 +1,8 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, Injector, afterNextRender, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Subject, catchError, debounceTime, distinctUntilChanged, firstValueFrom, of, switchMap } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,7 +15,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 
 import { Api } from '../../core/api';
-import { AddExerciseRequest, ExerciseLibraryDto, WorkoutXExerciseDto } from '../../core/models';
+import { AddExerciseRequest, CustomExerciseDto, ExerciseLibraryDto, WorkoutXExerciseDto } from '../../core/models';
 
 /** Curated WorkoutX filter values — the provider has no option-list endpoint, so these mirror the catalog. */
 const WX_BODY_PARTS = ['Back', 'Cardio', 'Chest', 'Lower Arms', 'Lower Legs', 'Neck', 'Shoulders', 'Upper Arms', 'Upper Legs', 'Waist'];
@@ -49,6 +50,7 @@ export interface AddExerciseData {
 export class AddExerciseDialog {
   private api = inject(Api);
   private ref = inject(MatDialogRef<AddExerciseDialog, AddExerciseRequest>);
+  private injector = inject(Injector);
   readonly data = inject<AddExerciseData>(MAT_DIALOG_DATA);
 
   readonly mode = signal<'library' | 'workoutx' | 'manual'>('library');
@@ -115,9 +117,34 @@ export class AddExerciseDialog {
   // ---- fully manual ----
   readonly mName = signal('');
   readonly mCalories = signal<number | null>(null);
+  readonly mDuration = signal<number | null>(null);
+  /** The manual name field — focused after a "My exercises" pick prefills the form below the list. */
+  private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
+  /** Brief sr-only announcement (e.g. "Loaded {name}") spoken after a saved pick prefills the form. */
+  readonly pickAnnounce = signal('');
+
+  // ---- "My exercises" quick-pick (per-user saved library, atop the Manual tab) ----
+  readonly savedQuery = signal('');
+  readonly savedLoading = signal(false);
+  readonly saved = signal<CustomExerciseDto[]>([]);
+  private readonly savedQueryStream = new Subject<string>();
+  private savedLoadedOnce = false;
+  /**
+   * Id of the saved exercise the manual form was last prefilled from, or null for a freshly-typed
+   * entry. Drives source="custom" (bump the saved row) vs no source (auto-save a new one). Cleared the
+   * moment the user edits the name away from the picked one.
+   */
+  readonly pickedSavedId = signal<number | null>(null);
 
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
+
+  /**
+   * Show the subtle "saved to My exercises" hint while typing a fresh manual entry — i.e. a non-empty
+   * name that wasn't re-picked from the saved library (those bump instead of creating a new row).
+   */
+  readonly mWillSave = computed(() =>
+    this.pickedSavedId() === null && this.mName().trim().length > 0);
 
   /** Whether we can let the server estimate (profile weight + a chosen library item + a duration). */
   readonly canEstimate = computed(() =>
@@ -145,6 +172,24 @@ export class AddExerciseDialog {
 
   constructor() {
     void this.loadLibrary();
+
+    // Debounced "My exercises" filter — re-fetches the caller's saved library on each keystroke.
+    this.savedQueryStream.pipe(
+      debounceTime(250),
+      distinctUntilChanged(),
+      switchMap(q => {
+        this.savedLoading.set(true);
+        return this.api.savedExercises(q.trim() || undefined).pipe(
+          catchError(() => of<CustomExerciseDto[]>([])),
+        );
+      }),
+      takeUntilDestroyed(),
+    ).subscribe(list => {
+      this.savedLoading.set(false);
+      this.saved.set(list);
+    });
+
+    effect(() => this.savedQueryStream.next(this.savedQuery()));
 
     // Load the demo GIF whenever the WorkoutX selection changes. The effect owns the object URL's whole
     // lifetime: its onCleanup (which Angular also runs on destroy) unsubscribes the in-flight request and
@@ -210,6 +255,33 @@ export class AddExerciseDialog {
     if (m === 'workoutx' && this.wxResults().length === 0 && !this.wxLoading() && !this.wxUnavailable()) {
       void this.searchWorkoutx();
     }
+    // Lazy-load the saved "My exercises" library the first time the Manual tab is opened.
+    if (m === 'manual' && !this.savedLoadedOnce) {
+      this.savedLoadedOnce = true;
+      this.savedQueryStream.next(this.savedQuery());
+    }
+  }
+
+  /** Pick a saved "My exercises" entry → prefill the manual form (name + calories + duration). */
+  pickSaved(ex: CustomExerciseDto): void {
+    this.mName.set(ex.name);
+    this.mCalories.set(ex.defaultCaloriesBurned ?? null);
+    this.mDuration.set(ex.defaultDurationMin ?? null);
+    // Remember it was a saved pick so save() sends source="custom" (bump, not duplicate).
+    this.pickedSavedId.set(ex.id);
+    // The prefilled fields render below the list, so move focus there (and announce) — otherwise
+    // keyboard/SR users don't realise the form filled. Focus after the DOM reflects the model update.
+    this.pickAnnounce.set(`Loaded ${ex.name}`);
+    afterNextRender(() => this.nameInput()?.nativeElement.focus(), { injector: this.injector });
+  }
+
+  /** Remove a saved exercise from the caller's library (× on a "My exercises" row). Optimistic. */
+  deleteSaved(ex: CustomExerciseDto, event: Event): void {
+    event.stopPropagation();
+    const prev = this.saved();
+    this.saved.update(list => list.filter(e => e.id !== ex.id));
+    if (this.pickedSavedId() === ex.id) this.pickedSavedId.set(null);
+    this.api.deleteSavedExercise(ex.id).subscribe({ error: () => this.saved.set(prev) });
   }
 
   /** Run a fresh WorkoutX search (resets pagination + selection). */
@@ -276,14 +348,25 @@ export class AddExerciseDialog {
     this.wxSelected.set(this.wxSelected()?.id === e.id ? null : e);
   }
 
+  /** Manual-name edit: drop any saved-pick association the moment the name diverges. */
+  setManualName(name: string): void {
+    this.mName.set(name);
+    this.pickedSavedId.set(null);
+  }
+
   save(): void {
     if (!this.canSave()) return;
     let body: AddExerciseRequest;
     if (this.mode() === 'manual') {
+      // A re-picked "My exercises" entry bumps the saved row (source="custom"); a freshly-typed entry
+      // sends NO source so the backend auto-saves it to the library.
+      const fromSaved = this.pickedSavedId() !== null;
       body = {
         date: this.data.date,
         name: this.mName().trim(),
+        durationMin: (this.mDuration() ?? 0) > 0 ? this.mDuration()! : undefined,
         caloriesBurned: this.mCalories() ?? 0,
+        source: fromSaved ? 'custom' : undefined,
       };
     } else if (this.mode() === 'workoutx') {
       // WorkoutX exercises aren't in the local library, so log by name + a concrete calorie figure
@@ -294,6 +377,8 @@ export class AddExerciseDialog {
         name: e.name,
         durationMin: this.wxDuration() ?? undefined,
         caloriesBurned: this.wxEffectiveCals(),
+        // Tag the source so the backend never auto-saves a WorkoutX log to "My exercises".
+        source: 'workoutx',
       };
     } else {
       const e = this.selected()!;
@@ -305,6 +390,8 @@ export class AddExerciseDialog {
         durationMin: this.durationMin() ?? undefined,
         // Omit caloriesBurned so the server estimates from weight + duration + MET; otherwise send it.
         caloriesBurned: deferToServer ? undefined : (this.effectiveCals() ?? undefined),
+        // Library logs aren't auto-saved (the ExerciseId already classifies it; source is belt-and-braces).
+        source: 'library',
       };
     }
     this.ref.close(body);
