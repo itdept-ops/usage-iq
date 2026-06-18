@@ -26,6 +26,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<ChatChannel> ChatChannels => Set<ChatChannel>();
     public DbSet<ChatChannelMember> ChatChannelMembers => Set<ChatChannelMember>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<ChatMessageReaction> ChatMessageReactions => Set<ChatMessageReaction>();
     public DbSet<ChatContact> ChatContacts => Set<ChatContact>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
@@ -289,6 +290,19 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => new { x.ChannelId, x.CreatedUtc });
             e.HasOne(x => x.Channel).WithMany(c => c.Messages)
                 .HasForeignKey(x => x.ChannelId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ChatMessageReaction>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Emoji).HasMaxLength(32);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // One of each emoji per user per message; also the lookup for "does this reaction exist".
+            e.HasIndex(x => new { x.MessageId, x.UserEmail, x.Emoji }).IsUnique();
+            // Batch-load all reactions for a page of messages by message id.
+            e.HasIndex(x => x.MessageId);
+            e.HasOne(x => x.Message).WithMany()
+                .HasForeignKey(x => x.MessageId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<ChatContact>(e =>

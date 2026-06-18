@@ -586,6 +586,167 @@ public class ChatIntegrationTests(WebAppFactory factory)
         }
     }
 
+    // ---- Emoji reactions: toggle, count, history, permissions, validation ----
+
+    /// <summary>Post a message as <paramref name="sender"/> in a channel and return its id.</summary>
+    private static async Task<long> Send(HttpClient sender, int channelId, string body)
+    {
+        var send = await sender.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages",
+            new { body, mentionedEmails = (string[]?)null });
+        send.StatusCode.Should().Be(HttpStatusCode.OK);
+        return (await Json(send)).GetProperty("id").GetInt64();
+    }
+
+    [Fact]
+    public async Task Reacting_adds_a_group_and_toggling_the_same_emoji_removes_it()
+    {
+        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "react-" + Guid.NewGuid().ToString("N")[..6]);
+        var messageId = await Send(alice, channelId, "react to me");
+
+        // First toggle ADDS the reaction → one group, count 1, with the reactor in ReactedBy.
+        var add = await alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "👍" });
+        add.StatusCode.Should().Be(HttpStatusCode.OK);
+        var groups = (await Json(add)).EnumerateArray().ToList();
+        groups.Should().ContainSingle();
+        groups[0].GetProperty("emoji").GetString().Should().Be("👍");
+        groups[0].GetProperty("count").GetInt32().Should().Be(1);
+        groups[0].GetProperty("reactedBy").EnumerateArray().Select(e => e.GetString())
+            .Should().ContainSingle(); // exactly the caller
+
+        // Second toggle of the SAME emoji REMOVES it → no groups left.
+        var remove = await alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "👍" });
+        remove.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(remove)).EnumerateArray().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Two_users_reacting_with_the_same_emoji_yields_count_two_with_both_in_reactedBy()
+    {
+        var (aliceEmail, alice) = await ProvisionUser("chat.read", "chat.send");
+        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "react2-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var messageId = await Send(alice, channelId, "double react");
+
+        await alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "❤️" });
+        var second = await bob.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "❤️" });
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var groups = (await Json(second)).EnumerateArray().ToList();
+        groups.Should().ContainSingle();
+        groups[0].GetProperty("count").GetInt32().Should().Be(2);
+        var reactedBy = groups[0].GetProperty("reactedBy").EnumerateArray().Select(e => e.GetString()).ToList();
+        reactedBy.Should().Contain(aliceEmail);
+        reactedBy.Should().Contain(bobEmail);
+    }
+
+    [Fact]
+    public async Task Reactions_appear_in_the_message_history_dto()
+    {
+        var (aliceEmail, alice) = await ProvisionUser("chat.read", "chat.send");
+        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "histreact-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var messageId = await Send(alice, channelId, "history reaction");
+
+        await alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "🔥" });
+
+        // Bob (a member) reads history and sees the reaction group attached to the message.
+        var hist = (await Json(await bob.GetAsync($"/api/chat/channels/{channelId}/messages")))
+            .EnumerateArray().First(m => m.GetProperty("id").GetInt64() == messageId);
+        var reactions = hist.GetProperty("reactions").EnumerateArray().ToList();
+        reactions.Should().ContainSingle();
+        reactions[0].GetProperty("emoji").GetString().Should().Be("🔥");
+        reactions[0].GetProperty("count").GetInt32().Should().Be(1);
+        reactions[0].GetProperty("reactedBy").EnumerateArray().Select(e => e.GetString())
+            .Should().Contain(aliceEmail);
+
+        // A message with no reactions still carries an (empty) reactions array — never null.
+        var plainId = await Send(alice, channelId, "no reactions here");
+        var plain = (await Json(await bob.GetAsync($"/api/chat/channels/{channelId}/messages")))
+            .EnumerateArray().First(m => m.GetProperty("id").GetInt64() == plainId);
+        plain.GetProperty("reactions").ValueKind.Should().Be(JsonValueKind.Array);
+        plain.GetProperty("reactions").EnumerateArray().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_read_only_member_without_chat_send_cannot_react()
+    {
+        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
+        var (readerEmail, reader) = await ProvisionUser("chat.read"); // member, but no chat.send
+        var channelId = await CreateChannel(alice, "ro-react-" + Guid.NewGuid().ToString("N")[..6], readerEmail);
+        var messageId = await Send(alice, channelId, "look but don't touch");
+
+        // The read-only member is a member of the channel but lacks chat.send → 403 (not 404).
+        (await reader.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "👍" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_non_member_reacting_is_404()
+    {
+        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
+        var (_, outsider) = await ProvisionUser("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "nm-react-" + Guid.NewGuid().ToString("N")[..6]);
+        var messageId = await Send(alice, channelId, "members only react");
+
+        // A non-member (has chat.send, but not in the channel) → 404, never leaking the message exists.
+        (await outsider.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "👍" }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // A reaction on a message that doesn't exist at all is also 404.
+        (await alice.PostAsJsonAsync("/api/chat/messages/999999999/reactions", new { emoji = "👍" }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Concurrent_toggle_of_the_same_reaction_converges_without_throwing()
+    {
+        var (aliceEmail, alice) = await ProvisionUser("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "race-react-" + Guid.NewGuid().ToString("N")[..6]);
+        var messageId = await Send(alice, channelId, "race to react");
+
+        // Two clients for the SAME user fire the SAME (message, user, emoji) ADD at once. The unique
+        // index on (MessageId, UserEmail, Emoji) lets at most one row in; the losing racer must recover
+        // from the 23505 violation rather than 500. Both calls succeed and converge on identical groups.
+        var second = Client(aliceEmail);
+        var first = alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "👍" });
+        var firstAgain = second.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "👍" });
+        await Task.WhenAll(first, firstAgain);
+
+        (await first).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await firstAgain).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Exactly one reaction row survived: one group, count 1, the caller in ReactedBy.
+        var hist = (await Json(await alice.GetAsync($"/api/chat/channels/{channelId}/messages")))
+            .EnumerateArray().First(m => m.GetProperty("id").GetInt64() == messageId);
+        var reactions = hist.GetProperty("reactions").EnumerateArray().ToList();
+        reactions.Should().ContainSingle();
+        reactions[0].GetProperty("emoji").GetString().Should().Be("👍");
+        reactions[0].GetProperty("count").GetInt32().Should().Be(1);
+        reactions[0].GetProperty("reactedBy").EnumerateArray().Select(e => e.GetString())
+            .Should().ContainSingle().And.Contain(aliceEmail);
+    }
+
+    [Fact]
+    public async Task Reaction_emoji_validation_rejects_empty_too_long_and_control_chars()
+    {
+        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "valid-react-" + Guid.NewGuid().ToString("N")[..6]);
+        var messageId = await Send(alice, channelId, "validate my reactions");
+
+        // Empty / whitespace-only emoji → 400.
+        (await alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "   " }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Over 32 chars → 400.
+        (await alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = new string('x', 33) }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Control / newline characters → 400.
+        (await alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "a\nb" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     /// <summary>
     /// Build and start a real SignalR client connected to the in-memory test server (LongPolling,
     /// since the TestServer has no WebSocket). The JWT rides the ?access_token query param the hub

@@ -9,7 +9,7 @@ import {
 
 import { Api } from './api';
 import { AuthService } from './auth';
-import { ChatChannelDto, ChatMessageDto, NotificationDto, NotificationPreferenceDto } from './models';
+import { ChatChannelDto, ChatMessageDto, NotificationDto, NotificationPreferenceDto, ReactionGroupDto } from './models';
 import { firstValueFrom } from 'rxjs';
 
 /** Sensible defaults until the real preferences are loaded from the server (everything on). */
@@ -223,6 +223,8 @@ export class ChatRealtime {
     c.on('UnreadChanged', (channelId: number, unreadCount: number) => this.onUnreadChanged(channelId, unreadCount));
     c.on('InboxUnreadChanged', (totalUnread: number) => this._inboxUnread.set(totalUnread));
     c.on('ChannelAdded', (channel: ChatChannelDto) => this.onChannelAdded(channel));
+    c.on('ReactionChanged', (channelId: number, messageId: number, reactions: ReactionGroupDto[]) =>
+      this.onReactionChanged(channelId, messageId, reactions));
   }
 
   private onReceiveMessage(msg: ChatMessageDto): void {
@@ -299,6 +301,18 @@ export class ChatRealtime {
     void this.joinChannel(channel.id);
   }
 
+  /** Replace the reaction groups for a single message in the cache (find by channelId + messageId). */
+  private onReactionChanged(channelId: number, messageId: number, reactions: ReactionGroupDto[]): void {
+    this._messages.update(map => {
+      const list = map[channelId];
+      if (!list) return map;
+      return {
+        ...map,
+        [channelId]: list.map(m => m.id === messageId ? { ...m, reactions: reactions ?? [] } : m),
+      };
+    });
+  }
+
   // =========================================================================
   // Hub server-method calls
   // =========================================================================
@@ -333,6 +347,43 @@ export class ChatRealtime {
   /** Join a channel group so the live connection receives its broadcasts. */
   async joinChannel(channelId: number): Promise<void> {
     await this.invoke('JoinChannel', channelId);
+  }
+
+  /**
+   * Toggle an emoji reaction on a message (add if absent, remove if present). Prefers the hub when
+   * connected; otherwise falls back to REST and folds the returned groups into the cache directly.
+   * The hub path relies on the server's ReactionChanged broadcast (handled by {@link onReactionChanged})
+   * to update every client — including this one — so it doesn't fold the result itself.
+   */
+  async toggleReaction(messageId: number, emoji: string): Promise<void> {
+    const c = this.connection;
+    if (c && c.state === HubConnectionState.Connected) {
+      try {
+        await c.invoke('ToggleReaction', messageId, emoji);
+        return;
+      } catch {
+        /* fall through to REST below */
+      }
+    }
+    // REST fallback (offline/reconnecting, or a failed hub invoke). We still get a ReactionChanged
+    // broadcast if joined, but fold the response in directly so the chip updates even when we're not.
+    const channelId = this.channelIdOfMessage(messageId);
+    try {
+      const groups = await firstValueFrom(this.api.toggleReaction(messageId, emoji));
+      if (channelId != null) this.onReactionChanged(channelId, messageId, groups);
+    } catch {
+      /* swallow — the UI surfaces connection state separately */
+    }
+  }
+
+  /** Locate which channel a loaded message belongs to (for folding a REST reaction toggle back in). */
+  private channelIdOfMessage(messageId: number): number | null {
+    const map = this._messages();
+    for (const key of Object.keys(map)) {
+      const channelId = Number(key);
+      if (map[channelId].some(m => m.id === messageId)) return channelId;
+    }
+    return null;
   }
 
   /** Safe invoke: no-ops (does not throw) when the connection isn't live. */
@@ -471,7 +522,16 @@ export class ChatRealtime {
     this._messages.update(map => {
       const list = map[msg.channelId];
       if (!list) return map;
-      return { ...map, [msg.channelId]: list.map(m => m.id === msg.id ? msg : m) };
+      return {
+        ...map,
+        [msg.channelId]: list.map(m => {
+          if (m.id !== msg.id) return m;
+          // Edited-message broadcasts carry empty reactions (reactions flow via ReactionChanged), so
+          // keep the existing reaction groups rather than wiping the chips on an edit.
+          const reactions = msg.reactions?.length ? msg.reactions : (m.reactions ?? []);
+          return { ...msg, reactions };
+        }),
+      };
     });
   }
 

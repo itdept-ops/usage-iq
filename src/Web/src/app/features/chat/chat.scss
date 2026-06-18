@@ -372,6 +372,92 @@
   .cx-msg:hover .cx-msg__tools { opacity: 1; }
 }
 
+/* Reaction chips (under a message) */
+.cx-reacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 3px 0 2px;
+}
+
+.cx-react-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 1px 8px 1px 6px;
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-r-pill);
+  background: var(--tech-panel-raised);
+  color: var(--tech-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  transition: background-color var(--tech-t-control) ease, border-color var(--tech-t-control) ease;
+
+  &:hover { background: color-mix(in srgb, var(--tech-accent) 10%, var(--tech-panel-raised)); }
+  &:focus-visible { outline: none; box-shadow: var(--tech-focus-ring); }
+
+  &.mine {
+    border-color: var(--tech-accent);
+    background: color-mix(in srgb, var(--tech-accent) 18%, transparent);
+    color: var(--tech-text);
+  }
+
+  /* Read-only users (no chat.send): aria-disabled (NOT native `disabled`, which would suppress the
+     reactor-list matTooltip). The click is a no-op via the canSend() guard in toggleReaction(). */
+  &.is-disabled { cursor: default; opacity: 0.75; &:hover { background: var(--tech-panel-raised); } }
+
+  &__emoji { font-size: 14px; line-height: 1; }
+  &__count { font-size: var(--tech-fs-micro); font-weight: 700; }
+}
+
+/* ---- React-picker panel (CDK overlay; reach it via the .cx-react-menu panelClass) ----
+   The menu lives outside this component's DOM, so reach it via ::ng-deep scoped to the
+   .cx-react-menu class forwarded onto the panel. Mirrors the notification-bell / account /
+   presence menu language so it reads as the same dark app surface — without it the picker
+   renders on Material's default LIGHT panel and the default max-width crushes the grid. */
+::ng-deep .cx-react-menu.mat-mdc-menu-panel {
+  /* Fit the 8-column grid (8×34px + 7×2px gap + 2×6px padding) without Material's narrow cap. */
+  min-width: 0;
+  max-width: none;
+  width: max-content;
+  border: 1px solid var(--tech-border, #26303f);
+  border-radius: var(--tech-r-panel, 12px);
+  background: var(--tech-panel, #111722);
+  background-image: radial-gradient(120% 100% at 100% 0%, rgba(61, 139, 255, 0.08), transparent 55%);
+  box-shadow: var(--tech-shadow-popover, 0 24px 60px -20px rgba(0, 0, 0, 0.8));
+  overflow: hidden;
+
+  .mat-mdc-menu-content { padding: 0; }
+}
+
+/* Curated emoji react picker (inside the mat-menu panel) */
+.cx-react-picker {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  padding: 6px;
+  max-width: 320px;
+}
+
+.cx-react-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--tech-r-control);
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+
+  &:hover { background: color-mix(in srgb, var(--tech-accent) 16%, transparent); }
+  &:focus-visible { outline: none; box-shadow: var(--tech-focus-ring); }
+}
+
 /* Inline edit box */
 .cx-edit {
   flex: 1 1 100%;
@@ -547,6 +633,15 @@
     height: 44px;
     mat-icon { font-size: 20px; width: 20px; height: 20px; }
   }
+
+  /* >=40px tap targets on touch for reaction chips + the picker's emoji options. */
+  .cx-react-chip { min-height: 40px; padding: 2px 12px 2px 10px; }
+  .cx-react-chip__emoji { font-size: 16px; }
+  .cx-react-opt { width: 40px; height: 40px; font-size: 20px; }
+  /* 7 columns at 40px (7×40 + 6×4 gap + 2×8 padding ≈ 320px) keeps every cell a full 40px
+     tap target while still fitting a ~360px phone viewport. The curated 40 emojis just wrap
+     onto more rows. The base max-width: 320px cap is removed so the cells don't shrink. */
+  .cx-react-picker { grid-template-columns: repeat(7, 40px); gap: 4px; padding: 8px; max-width: none; }
 }
 
 /* Tablet: a slightly narrower sidebar so the conversation gets room. */

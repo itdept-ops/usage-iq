@@ -1,6 +1,7 @@
 using Ccusage.Api.Data;
 using Ccusage.Api.Data.Entities;
 using Ccusage.Api.Dtos;
+using Ccusage.Api.Endpoints;
 using Ccusage.Api.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -164,6 +165,113 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
             var inboxUnread = await db.Notifications.CountAsync(x => x.RecipientEmail == email && !x.IsRead, ct);
             await hub.Clients.User(email).SendAsync("InboxUnreadChanged", inboxUnread, ct);
         }
+    }
+
+    /// <summary>
+    /// The single code path that toggles a caller's emoji reaction on a message and broadcasts the
+    /// result. Used by BOTH the REST endpoint and the hub so they behave identically. Assumes the
+    /// caller has already been authorized (chat.send) and verified as a member of the message's
+    /// channel. <paramref name="email"/> and <paramref name="emoji"/> must already be normalized
+    /// (lower-cased email; trimmed, validated emoji). Returns the message's full updated reaction
+    /// groups (ordered by first-reacted) and pushes <c>ReactionChanged</c> to the channel group.
+    /// </summary>
+    public async Task<ReactionGroupDto[]> ToggleReactionAsync(
+        int channelId, long messageId, string email, string emoji, CancellationToken ct = default)
+    {
+        var existing = await db.ChatMessageReactions
+            .FirstOrDefaultAsync(r => r.MessageId == messageId && r.UserEmail == email && r.Emoji == emoji, ct);
+        if (existing is not null)
+        {
+            db.ChatMessageReactions.Remove(existing);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // A concurrent toggle already removed this same row (expected 1 affected, got 0). The row
+                // is gone, which is the desired end state — drop our tracked delete and converge below.
+                db.ChangeTracker.Clear();
+            }
+        }
+        else
+        {
+            db.ChatMessageReactions.Add(new ChatMessageReaction
+            {
+                MessageId = messageId, UserEmail = email, Emoji = emoji, CreatedUtc = DateTime.UtcNow,
+            });
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (ChatEndpoints.IsUniqueViolation(ex))
+            {
+                // A concurrent ADD of the same (MessageId, UserEmail, Emoji) won the race (Postgres 23505).
+                // The reaction is already present — drop our rejected insert and converge below, so both
+                // racers broadcast identical groups. Mirrors GetOrCreateDirectAsync's losing-racer recovery.
+                db.ChangeTracker.Clear();
+            }
+        }
+
+        var groups = (await ReactionGroupsForMessagesAsync(db, new[] { messageId }, ct))
+            .GetValueOrDefault(messageId, Array.Empty<ReactionGroupDto>());
+        await hub.Clients.Group(GroupFor(channelId)).SendAsync("ReactionChanged", channelId, messageId, groups, ct);
+        return groups;
+    }
+
+    /// <summary>
+    /// Batch-load reaction groups for a page of message ids in ONE query. Returns a map message id →
+    /// groups, each group ordered by first-reacted (earliest <see cref="ChatMessageReaction.CreatedUtc"/>)
+    /// so chip order is stable. Message ids with no reactions are simply absent from the map (callers
+    /// default to an empty array).
+    /// </summary>
+    public static async Task<Dictionary<long, ReactionGroupDto[]>> ReactionGroupsForMessagesAsync(
+        UsageDbContext db, IReadOnlyCollection<long> messageIds, CancellationToken ct = default)
+    {
+        var result = new Dictionary<long, ReactionGroupDto[]>();
+        if (messageIds.Count == 0) return result;
+
+        var rows = await db.ChatMessageReactions.AsNoTracking()
+            .Where(r => messageIds.Contains(r.MessageId))
+            .Select(r => new { r.MessageId, r.UserEmail, r.Emoji, r.CreatedUtc })
+            .ToListAsync(ct);
+        if (rows.Count == 0) return result;
+
+        foreach (var byMessage in rows.GroupBy(r => r.MessageId))
+        {
+            var groups = byMessage
+                .GroupBy(r => r.Emoji)
+                .Select(g => new
+                {
+                    Group = new ReactionGroupDto
+                    {
+                        Emoji = g.Key,
+                        Count = g.Count(),
+                        ReactedBy = g.OrderBy(r => r.CreatedUtc).Select(r => r.UserEmail).ToArray(),
+                    },
+                    FirstReacted = g.Min(r => r.CreatedUtc),
+                })
+                .OrderBy(x => x.FirstReacted)
+                .Select(x => x.Group)
+                .ToArray();
+            result[byMessage.Key] = groups;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Normalize and validate a reaction emoji: trim, reject empty, cap at 32 chars, and reject any
+    /// control/newline character. Returns the trimmed emoji on success, or null with a reason on
+    /// failure. Shared by the REST endpoint and the hub so both reject identically.
+    /// </summary>
+    public static bool TryNormalizeEmoji(string? raw, out string emoji, out string error)
+    {
+        emoji = (raw ?? "").Trim();
+        error = "";
+        if (emoji.Length == 0) { error = "An emoji is required."; return false; }
+        if (emoji.Length > 32) { error = "That emoji is too long."; return false; }
+        if (emoji.Any(char.IsControl)) { error = "That emoji is not valid."; return false; }
+        return true;
     }
 
     private static NotificationPreference Defaults(string email) => new() { UserEmail = email };

@@ -80,6 +80,31 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
             channel, msg, name, pic, mentionedEmails ?? Array.Empty<string>(), Context.ConnectionAborted);
     }
 
+    /// <summary>Toggle the caller's emoji reaction on a message — the hub mirror of the REST reactions endpoint.</summary>
+    public async Task ToggleReaction(long messageId, string emoji)
+    {
+        var email = Email;
+        if (string.IsNullOrEmpty(email)) throw new HubException("Not authenticated.");
+
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var reactions = scope.ServiceProvider.GetRequiredService<ChatNotificationService>();
+
+        if (!await HasSendAsync(scope, email)) throw new HubException("You don't have permission to react.");
+
+        if (!ChatNotificationService.TryNormalizeEmoji(emoji, out var normalized, out var error))
+            throw new HubException(error);
+
+        var msg = await db.ChatMessages.AsNoTracking()
+            .Where(m => m.Id == messageId)
+            .Select(m => new { m.Id, m.ChannelId })
+            .FirstOrDefaultAsync(Context.ConnectionAborted);
+        if (msg is null || !await ChatEndpoints.IsMemberAsync(db, msg.ChannelId, email, Context.ConnectionAborted))
+            throw new HubException("You are not a member of that channel.");
+
+        await reactions.ToggleReactionAsync(msg.ChannelId, msg.Id, email, normalized, Context.ConnectionAborted);
+    }
+
     public async Task StartTyping(int channelId) => await BroadcastTyping(channelId, true);
 
     public async Task StopTyping(int channelId) => await BroadcastTyping(channelId, false);

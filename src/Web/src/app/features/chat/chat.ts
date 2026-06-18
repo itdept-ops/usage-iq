@@ -16,7 +16,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { ChatRealtime } from '../../core/chat-realtime';
-import { ChatChannelDto, ChatContactDto, ChatMember, ChatMessageDto, PERM, Presence } from '../../core/models';
+import { ChatChannelDto, ChatContactDto, ChatMember, ChatMessageDto, PERM, Presence, ReactionGroupDto } from '../../core/models';
 import { timeAgo } from '../../shared/format';
 import { ChatCreateData, ChatCreateDialog, ChatPickPerson } from './chat-create-dialog';
 
@@ -37,6 +37,18 @@ interface MentionCandidate extends ChatMember {
 
 const PRESENCE_STALE_MS = 2 * 60 * 1000; // a presence row older than this is "offline"
 const TYPING_STOP_MS = 3500;             // stop broadcasting typing after this idle gap
+
+/**
+ * A curated set of common reaction emotes for the picker (no external emoji dependency). The first
+ * row of eight are the quick favourites; the rest round out reactions for most everyday needs.
+ */
+const REACTION_EMOJIS: readonly string[] = [
+  '👍', '❤️', '😂', '🎉', '😮', '😢', '🙏', '🔥',
+  '👏', '😀', '😅', '😉', '😍', '🤔', '🙄', '😎',
+  '😴', '😱', '🤯', '🥳', '😭', '😡', '👀', '💯',
+  '✅', '❌', '⚡', '🚀', '💡', '⭐', '✨', '💪',
+  '🤝', '👋', '🙌', '🤷', '👌', '🤞', '☕', '🐛',
+];
 
 /**
  * The full Chat page: a two-pane workspace (conversation sidebar + active conversation) rendered
@@ -162,6 +174,10 @@ export class Chat implements AfterViewChecked, OnDestroy {
   // ---- inline edit ----
   readonly editingId = signal<number | null>(null);
   readonly editDraft = signal('');
+
+  // ---- emoji reactions ----
+  /** The curated emoji set the react picker offers (no external dependency). */
+  readonly reactionEmojis = REACTION_EMOJIS;
 
   // ---- view refs for scroll handling ----
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
@@ -577,6 +593,52 @@ export class Chat implements AfterViewChecked, OnDestroy {
     this.api.deleteChatMessage(m.id).subscribe({
       error: () => this.snack.open('Could not delete the message.', 'Dismiss', { duration: 4000 }),
     });
+  }
+
+  // =========================================================================
+  // Emoji reactions
+  // =========================================================================
+
+  /** True when the signed-in user has reacted with this group's emoji (mine = reactedBy ∋ my email). */
+  reactionMine(r: ReactionGroupDto): boolean {
+    const me = this.myEmail();
+    return !!me && r.reactedBy.some(e => e.toLowerCase() === me);
+  }
+
+  /** aria-label for a reaction chip, e.g. "React with 👍, 3 reactions". */
+  reactionLabel(r: ReactionGroupDto): string {
+    return `React with ${r.emoji}, ${r.count} reaction${r.count === 1 ? '' : 's'}`;
+  }
+
+  /**
+   * Human-readable tooltip listing who reacted (display names resolved from the active channel's
+   * members, falling back to the email), e.g. "Ada, Grace and Linus reacted with 👍".
+   */
+  reactionTooltip(r: ReactionGroupDto): string {
+    const ch = this.selectedChannel();
+    const byEmail = new Map<string, string>();
+    if (ch) for (const m of ch.members) byEmail.set(m.email.toLowerCase(), m.name || m.email);
+    const me = this.myEmail();
+    const names = r.reactedBy.map(e => {
+      const key = e.toLowerCase();
+      if (key === me) return 'You';
+      return byEmail.get(key) ?? e;
+    });
+    const who = names.length <= 1
+      ? (names[0] ?? '')
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    return `${who} reacted with ${r.emoji}`;
+  }
+
+  /** Toggle my reaction with this emoji on a message (gated on chat.send). */
+  toggleReaction(m: ChatMessageDto, emoji: string): void {
+    if (!this.canSend() || m.deleted) return;
+    void this.chat.toggleReaction(m.id, emoji);
+  }
+
+  /** Pick an emoji from the curated picker: toggle it (the menu closes itself). */
+  pickReaction(m: ChatMessageDto, emoji: string): void {
+    this.toggleReaction(m, emoji);
   }
 
   // =========================================================================

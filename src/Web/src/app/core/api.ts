@@ -6,7 +6,7 @@ import {
   CreateShareRequest, Fleet, FleetDeleteRequest,
   FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, GroupBy,
   HeatmapCell, IngestionSource, IngestKey, IngestKeyCreated, LoginEvent, MachineStat, ManagedUser, ModelStat, NotificationDto, NotificationPreferenceDto, NotificationSettings,
-  NotificationUpdate, PagedResult, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, RequestLogEntry, SavedView,
+  NotificationUpdate, PagedResult, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, RequestLogEntry, SavedView,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SummaryResponse,
   SyncResult, SyncStatus, UsageFilter, UsageRecord, UsageStats,
 } from './models';
@@ -301,6 +301,15 @@ export class Api {
   /** Mark a channel read up to `messageId`; returns the resulting unread count. */
   markChatRead(channelId: number, messageId: number): Observable<{ unreadCount: number }> {
     return this.http.post<{ unreadCount: number }>(`${this.base}/chat/channels/${channelId}/read`, { messageId });
+  }
+
+  /**
+   * Toggle an emoji reaction on a message (add if absent, remove if present) via REST — the realtime
+   * hub is preferred, this is the fallback. Returns the message's full updated reaction groups.
+   * Requires chat.send + membership of the message's channel.
+   */
+  toggleReaction(messageId: number, emoji: string): Observable<ReactionGroupDto[]> {
+    return this.http.post<ReactionGroupDto[]>(`${this.base}/chat/messages/${messageId}/reactions`, { emoji });
   }
 
   // ---- Chat contacts / circles (admin-managed; the picker draws from these) ----

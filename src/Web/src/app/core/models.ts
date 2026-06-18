@@ -493,6 +493,18 @@ export interface ChatChannelDto {
 }
 
 /**
+ * One emoji reaction group on a message: the emoji, how many people used it, and the lowercased
+ * emails of who reacted with it. The client derives "mine" = `reactedBy` contains my email (so no
+ * server-computed Mine field is needed and the same shape serves REST and the hub broadcast).
+ * Mirrors ReactionGroupDto.
+ */
+export interface ReactionGroupDto {
+  emoji: string;
+  count: number;
+  reactedBy: string[];
+}
+
+/**
  * One chat message. `body` is null when `deleted` is true (render a muted placeholder).
  * `editedUtc` is set on edits. Timestamps are ISO-8601 UTC strings. Mirrors ChatMessageDto.
  */
@@ -506,6 +518,8 @@ export interface ChatMessageDto {
   createdUtc: string;
   editedUtc?: string;
   deleted: boolean;
+  /** Emoji reaction groups, ordered by first-reacted. Never null — defaults to an empty array. */
+  reactions: ReactionGroupDto[];
 }
 
 /** One in-app notification (inbox / bell). The bell UI ships in Phase 2b. Mirrors NotificationDto. */

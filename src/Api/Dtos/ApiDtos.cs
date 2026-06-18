@@ -555,6 +555,18 @@ public sealed class MemberDto
     public string? Picture { get; set; }
 }
 
+/// <summary>
+/// One emoji reaction group on a message: the emoji, how many reacted with it, and the lowercased
+/// emails of who did. The client derives "mine" = <see cref="ReactedBy"/> contains my email, so the
+/// same shape serves both the REST response and the hub broadcast (no server-computed Mine field).
+/// </summary>
+public sealed class ReactionGroupDto
+{
+    public string Emoji { get; set; } = "";
+    public int Count { get; set; }
+    public string[] ReactedBy { get; set; } = Array.Empty<string>();
+}
+
 /// <summary>One chat message. <see cref="Body"/> is null and <see cref="Deleted"/> is true for soft-deleted messages — deleted text is never exposed.</summary>
 public sealed class ChatMessageDto
 {
@@ -567,6 +579,12 @@ public sealed class ChatMessageDto
     public DateTime CreatedUtc { get; set; }
     public DateTime? EditedUtc { get; set; }
     public bool Deleted { get; set; }
+
+    /// <summary>
+    /// Reaction groups on this message, ordered by first-reacted (stable chip order). Never null —
+    /// defaults to an empty array; only the message-history endpoint populates real reactions.
+    /// </summary>
+    public ReactionGroupDto[] Reactions { get; set; } = Array.Empty<ReactionGroupDto>();
 }
 
 /// <summary>A channel or direct message as seen by the calling member, with unread state and last message.</summary>
@@ -644,6 +662,12 @@ public sealed class EditMessageRequest
 public sealed class MarkReadRequest
 {
     public long MessageId { get; set; }
+}
+
+/// <summary>Toggle a single emoji reaction on a message (add if absent, remove if present).</summary>
+public sealed class ReactRequest
+{
+    public string Emoji { get; set; } = "";
 }
 
 public sealed class MarkNotificationsReadRequest

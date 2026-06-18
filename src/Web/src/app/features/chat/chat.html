@@ -190,20 +190,55 @@
                   } @else {
                     <span class="cx-msg__text">{{ m.body }}</span>
                     @if (m.editedUtc) { <span class="cx-msg__edited">(edited)</span> }
-                    @if (canManageMessage(m)) {
+                    @if (canSend() || canManageMessage(m)) {
                       <span class="cx-msg__tools">
-                        <button mat-icon-button class="cx-msg__tool" (click)="startEdit(m)"
-                                matTooltip="Edit" aria-label="Edit message">
-                          <mat-icon>edit</mat-icon>
-                        </button>
-                        <button mat-icon-button class="cx-msg__tool" (click)="deleteMessage(m)"
-                                matTooltip="Delete" aria-label="Delete message">
-                          <mat-icon>delete_outline</mat-icon>
-                        </button>
+                        @if (canSend()) {
+                          <button mat-icon-button class="cx-msg__tool"
+                                  #reactTrigger="matMenuTrigger" [matMenuTriggerFor]="reactMenu"
+                                  matTooltip="React" aria-label="Add a reaction">
+                            <mat-icon>add_reaction</mat-icon>
+                          </button>
+                          <mat-menu #reactMenu="matMenu" class="cx-react-menu" xPosition="before">
+                            <div class="cx-react-picker" aria-label="Pick a reaction">
+                              @for (e of reactionEmojis; track e) {
+                                <button type="button" class="cx-react-opt"
+                                        [attr.aria-label]="'React with ' + e"
+                                        (click)="pickReaction(m, e); reactTrigger.closeMenu()">{{ e }}</button>
+                              }
+                            </div>
+                          </mat-menu>
+                        }
+                        @if (canManageMessage(m)) {
+                          <button mat-icon-button class="cx-msg__tool" (click)="startEdit(m)"
+                                  matTooltip="Edit" aria-label="Edit message">
+                            <mat-icon>edit</mat-icon>
+                          </button>
+                          <button mat-icon-button class="cx-msg__tool" (click)="deleteMessage(m)"
+                                  matTooltip="Delete" aria-label="Delete message">
+                            <mat-icon>delete_outline</mat-icon>
+                          </button>
+                        }
                       </span>
                     }
                   }
                 </div>
+                @if (!m.deleted && m.reactions.length > 0) {
+                  <div class="cx-reacts">
+                    @for (r of m.reactions; track r.emoji) {
+                      <button type="button" class="cx-react-chip"
+                              [class.mine]="reactionMine(r)"
+                              [class.is-disabled]="!canSend()"
+                              [attr.aria-pressed]="reactionMine(r)"
+                              [attr.aria-label]="reactionLabel(r)"
+                              [attr.aria-disabled]="!canSend() ? true : null"
+                              [matTooltip]="reactionTooltip(r)"
+                              (click)="toggleReaction(m, r.emoji)">
+                        <span class="cx-react-chip__emoji">{{ r.emoji }}</span>
+                        <span class="cx-react-chip__count mono-num">{{ r.count }}</span>
+                      </button>
+                    }
+                  </div>
+                }
               }
             </div>
           </div>

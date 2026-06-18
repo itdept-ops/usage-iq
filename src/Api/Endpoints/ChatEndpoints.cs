@@ -118,10 +118,15 @@ public static class ChatEndpoints
 
             var rows = await q.OrderByDescending(m => m.Id).Take(take).ToListAsync(ct);
             var senders = await SenderLookupAsync(db, rows.Select(r => r.SenderEmail), ct);
+            // Batch-load every reaction for this page of messages in ONE query.
+            var reactions = await ChatNotificationService.ReactionGroupsForMessagesAsync(
+                db, rows.Select(r => r.Id).ToArray(), ct);
             var dtos = rows.Select(m =>
             {
                 var (nm, pic) = senders.GetValueOrDefault(m.SenderEmail, (m.SenderEmail, (string?)null));
-                return ChatNotificationService.ToDto(m, nm, pic);
+                var dto = ChatNotificationService.ToDto(m, nm, pic);
+                dto.Reactions = reactions.GetValueOrDefault(m.Id, Array.Empty<ReactionGroupDto>());
+                return dto;
             }).ToArray();
             return Results.Ok(dtos);
         }).RequirePermission(Permissions.ChatRead);
@@ -206,6 +211,29 @@ public static class ChatEndpoints
                 .SendAsync("MessageDeleted", msg.ChannelId, msg.Id, ct);
             return Results.NoContent();
         }).RequireAnyPermission(Permissions.ChatSend, Permissions.ChatModerate);
+
+        // ---- Toggle an emoji reaction on a message (add if absent, remove if present) ----
+        g.MapPost("/messages/{id:long}/reactions", async (
+            long id, ReactRequest req, CurrentUserAccessor me, UsageDbContext db,
+            ChatNotificationService reactions, CancellationToken ct) =>
+        {
+            var user = (await me.GetUserAsync(ct))!;
+
+            if (!ChatNotificationService.TryNormalizeEmoji(req.Emoji, out var emoji, out var error))
+                return Results.BadRequest(new { message = error });
+
+            // 404 if the message doesn't exist OR the caller isn't a member of its channel
+            // (never leak that a message in a channel they can't see exists).
+            var msg = await db.ChatMessages.AsNoTracking()
+                .Where(m => m.Id == id)
+                .Select(m => new { m.Id, m.ChannelId })
+                .FirstOrDefaultAsync(ct);
+            if (msg is null || !await IsMemberAsync(db, msg.ChannelId, user.Email, ct))
+                return Results.NotFound();
+
+            var groups = await reactions.ToggleReactionAsync(msg.ChannelId, msg.Id, user.Email, emoji, ct);
+            return Results.Ok(groups);
+        }).RequirePermission(Permissions.ChatSend).RequireRateLimiting("chat");
 
         // ---- Mark a channel read up to a message id ----
         g.MapPost("/channels/{id:int}/read", async (
@@ -305,7 +333,9 @@ public static class ChatEndpoints
         return string.CompareOrdinal(x, y) <= 0 ? $"{x}|{y}" : $"{y}|{x}";
     }
 
-    private static bool IsUniqueViolation(DbUpdateException ex) =>
+    /// <summary>True when a save failed on a Postgres unique-index violation (23505) — the signal a
+    /// concurrent caller won an insert race. Shared with <see cref="ChatNotificationService"/>.</summary>
+    internal static bool IsUniqueViolation(DbUpdateException ex) =>
         ex.InnerException is Npgsql.PostgresException pg && pg.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation;
 
     /// <summary>Unread count for a member: messages newer than their cursor, excluding their own.</summary>
