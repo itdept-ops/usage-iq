@@ -1,0 +1,50 @@
+.pf-title {
+  font-family: var(--tech-font-ui);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--tech-text);
+}
+
+.pf-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-3);
+  min-width: min(420px, 82vw);
+  padding-top: 4px !important;
+}
+
+.pf-field { width: 100%; }
+
+.pf-section {
+  margin-top: var(--tech-space-1);
+  color: var(--tech-text-secondary);
+}
+
+.pf-macgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--tech-space-2);
+  mat-form-field { margin-bottom: -1.25em; }
+}
+
+.pf-share {
+  margin-top: var(--tech-space-2);
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text-secondary);
+}
+
+.pf-share-note {
+  margin: -4px 0 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-tertiary);
+}
+
+.pf-actions {
+  padding: var(--tech-space-3) var(--tech-space-4);
+  gap: 8px;
+  button { border-radius: var(--tech-r-control); font-weight: 600; min-height: 44px; }
+}
+
+@media (max-width: 480px) {
+  .pf-macgrid { grid-template-columns: 1fr; }
+}

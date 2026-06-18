@@ -569,6 +569,139 @@ export interface ChatContactDto {
   picture?: string | null;
 }
 
+// ---- Food & fitness tracker (Phase 2) ----
+
+/** Tracker macro/exercise goal preset (mirrors the backend goal enum names). */
+export type TrackerGoal = 'LoseWeight' | 'Maintain' | 'GainMuscle' | 'Endurance';
+
+/** Which meal a food entry belongs to. */
+export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+/** Whether a food's calories/macros are quoted per listed serving or per 100 g. */
+export type NutritionBasis = 'perServing' | 'per100g';
+
+/**
+ * One USDA food-search hit (GET /api/foods/search or /api/foods/{fdcId}). Calories/macros are quoted
+ * either per serving or per 100 g (see `basis`); the add-food dialog scales them by quantity.
+ * Mirrors FoodSearchItemDto.
+ */
+export interface FoodSearchItemDto {
+  fdcId: number;
+  description: string;
+  brand?: string;
+  gtinUpc?: string;
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  servingSize?: number;
+  servingUnit?: string;
+  basis: NutritionBasis;
+}
+
+/** One logged food entry on a tracker day (calories/macros are the SNAPSHOT scaled by quantity). Mirrors FoodEntryDto. */
+export interface FoodEntryDto {
+  id: number;
+  meal: Meal;
+  fdcId?: number;
+  description: string;
+  brand?: string;
+  quantity: number;
+  servingDesc?: string;
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+}
+
+/** One exercise from the library (GET /api/tracker/exercises). MET drives the server-side calorie estimate. Mirrors ExerciseLibraryDto. */
+export interface ExerciseLibraryDto {
+  id: number;
+  name: string;
+  category: string;
+  met: number;
+  goals: string[];
+}
+
+/** One logged exercise entry on a tracker day. Mirrors ExerciseEntryDto. */
+export interface ExerciseEntryDto {
+  id: number;
+  exerciseId?: number;
+  name: string;
+  durationMin?: number;
+  caloriesBurned: number;
+}
+
+/**
+ * The caller's tracker profile / goals (GET/PUT /api/tracker/profile). `weightKg` comes back null when
+ * viewing someone else's tracker (by design). Mirrors TrackerProfileDto.
+ */
+export interface TrackerProfileDto {
+  goal: string;
+  weightKg?: number;
+  dailyCalorieGoal?: number;
+  proteinGoalG?: number;
+  carbGoalG?: number;
+  fatGoalG?: number;
+  shareWithContacts: boolean;
+}
+
+/**
+ * A full tracker day (GET /api/tracker/day). `readOnly` is true when viewing someone else's tracker —
+ * the UI then hides all add/delete controls. Totals are server-computed. Mirrors TrackerDayDto.
+ */
+export interface TrackerDayDto {
+  date: string;
+  userEmail: string;
+  readOnly: boolean;
+  profile: TrackerProfileDto;
+  foods: FoodEntryDto[];
+  exercises: ExerciseEntryDto[];
+  caloriesIn: number;
+  caloriesOut: number;
+  netCalories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  calorieGoal?: number;
+  remaining?: number;
+}
+
+/** Someone whose tracker the caller may view read-only (GET /api/tracker/shared). Mirrors SharedUserDto. */
+export interface SharedUserDto {
+  email: string;
+  name: string;
+  picture?: string;
+}
+
+/** Log-a-food payload (POST /api/tracker/food) — snapshot the scaled calories/macros into the request. Mirrors AddFoodRequest. */
+export interface AddFoodRequest {
+  date: string;
+  meal: string;
+  fdcId?: number;
+  description: string;
+  brand?: string;
+  quantity: number;
+  servingDesc?: string;
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+}
+
+/**
+ * Log-an-exercise payload (POST /api/tracker/exercise). Pass `exerciseId` + `durationMin` (with a
+ * profile weight) to let the server estimate `caloriesBurned`; otherwise `caloriesBurned` is required.
+ * Mirrors AddExerciseRequest.
+ */
+export interface AddExerciseRequest {
+  date: string;
+  exerciseId?: number;
+  name?: string;
+  durationMin?: number;
+  caloriesBurned?: number;
+}
+
 /** Canonical permission keys (mirror of the backend catalog — all 22 keys). */
 export const PERM = {
   dashboardView: 'dashboard.view',
@@ -594,6 +727,8 @@ export const PERM = {
   chatSend: 'chat.send',
   chatModerate: 'chat.moderate',
   chatContactsManage: 'chat.contacts.manage',
+  trackerSelf: 'tracker.self',
+  trackerViewAll: 'tracker.viewall',
 } as const;
 
 /**
@@ -603,7 +738,7 @@ export const PERM = {
  */
 export const PERM_GROUP_ORDER: readonly string[] = [
   'Dashboard', 'Calendar', 'Pricing', 'Settings', 'Reporter',
-  'Notifications', 'Chat', 'Shares', 'Administration',
+  'Notifications', 'Chat', 'Tracker', 'Shares', 'Administration',
 ];
 
 /** Maps each permission key to its UI group (mirror of the backend catalog grouping). */
@@ -626,6 +761,8 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   [PERM.chatSend]: 'Chat',
   [PERM.chatModerate]: 'Chat',
   [PERM.chatContactsManage]: 'Chat',
+  [PERM.trackerSelf]: 'Tracker',
+  [PERM.trackerViewAll]: 'Tracker',
   [PERM.sharesView]: 'Shares',
   [PERM.sharesManage]: 'Shares',
   [PERM.usersView]: 'Administration',

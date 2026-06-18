@@ -80,6 +80,12 @@ export const routes: Routes = [
     title: 'Usage IQ · Chat',
   },
   {
+    path: 'tracker',
+    canActivate: [permissionGuard(PERM.trackerSelf)],
+    loadComponent: () => import('./features/tracker/tracker').then(m => m.Tracker),
+    title: 'Usage IQ · Tracker',
+  },
+  {
     path: 'users',
     canActivate: [permissionGuard(PERM.usersView)],
     loadComponent: () => import('./features/users/users').then(m => m.Users),

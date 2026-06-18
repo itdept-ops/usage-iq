@@ -2,13 +2,13 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AccessPolicy, AuditEntry, CacheEfficiency, CalendarDay, ChatChannelDto, ChatContactDto, ChatMessageDto, CreateChannelRequest,
-  CreateShareRequest, Fleet, FleetDeleteRequest,
-  FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, GroupBy,
+  AccessPolicy, AddExerciseRequest, AddFoodRequest, AuditEntry, CacheEfficiency, CalendarDay, ChatChannelDto, ChatContactDto, ChatMessageDto, CreateChannelRequest,
+  CreateShareRequest, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
+  FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy,
   HeatmapCell, IngestionSource, IngestKey, IngestKeyCreated, LoginEvent, MachineStat, ManagedUser, ModelStat, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, RequestLogEntry, SavedView,
-  SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SummaryResponse,
-  SyncResult, SyncStatus, UsageFilter, UsageRecord, UsageStats,
+  SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SummaryResponse,
+  SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, UsageFilter, UsageRecord, UsageStats,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -385,5 +385,74 @@ export class Api {
 
   updateAccessPolicy(body: AccessPolicy): Observable<AccessPolicy> {
     return this.http.put<AccessPolicy>(`${this.base}/access-policy`, body);
+  }
+
+  // ---- Food & fitness tracker (gated by tracker.self; tracker.viewall to view others) ----
+
+  /**
+   * USDA food search. Pass `q` for a name search OR `barcode` for a UPC/EAN lookup (not both).
+   * Returns 503 ProblemDetails when USDA is unconfigured — the caller should fall back to manual entry.
+   */
+  searchFoods(opts: { q?: string; barcode?: string }): Observable<FoodSearchItemDto[]> {
+    let p = new HttpParams();
+    if (opts.q) p = p.set('q', opts.q);
+    if (opts.barcode) p = p.set('barcode', opts.barcode);
+    return this.http.get<FoodSearchItemDto[]>(`${this.base}/foods/search`, { params: p });
+  }
+
+  /** Fetch a single food by its USDA FDC id. */
+  food(fdcId: number): Observable<FoodSearchItemDto> {
+    return this.http.get<FoodSearchItemDto>(`${this.base}/foods/${fdcId}`);
+  }
+
+  /** A full tracker day. Omit `user` for self; pass `user` to view someone you may (read-only). */
+  trackerDay(date: string, user?: string): Observable<TrackerDayDto> {
+    let p = new HttpParams().set('date', date);
+    if (user) p = p.set('user', user);
+    return this.http.get<TrackerDayDto>(`${this.base}/tracker/day`, { params: p });
+  }
+
+  /** Log a food entry (snapshot the scaled calories/macros into the request). */
+  addFood(body: AddFoodRequest): Observable<FoodEntryDto> {
+    return this.http.post<FoodEntryDto>(`${this.base}/tracker/food`, body);
+  }
+
+  /** Delete a logged food entry. */
+  deleteFood(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/tracker/food/${id}`);
+  }
+
+  /**
+   * Log an exercise entry. Pass `exerciseId` + `durationMin` (with a profile weight) to let the server
+   * estimate the calories burned; otherwise `caloriesBurned` is required.
+   */
+  addExercise(body: AddExerciseRequest): Observable<ExerciseEntryDto> {
+    return this.http.post<ExerciseEntryDto>(`${this.base}/tracker/exercise`, body);
+  }
+
+  /** Delete a logged exercise entry. */
+  deleteExercise(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/tracker/exercise/${id}`);
+  }
+
+  /** The exercise library, filtered to a goal. Omit `goal` to use the caller's profile goal. */
+  exerciseLibrary(goal?: string): Observable<ExerciseLibraryDto[]> {
+    const params = goal ? new HttpParams().set('goal', goal) : undefined;
+    return this.http.get<ExerciseLibraryDto[]>(`${this.base}/tracker/exercises`, { params });
+  }
+
+  /** The caller's tracker profile / goals. */
+  trackerProfile(): Observable<TrackerProfileDto> {
+    return this.http.get<TrackerProfileDto>(`${this.base}/tracker/profile`);
+  }
+
+  /** Persist the caller's tracker profile / goals; returns the saved row. */
+  saveTrackerProfile(body: TrackerProfileDto): Observable<TrackerProfileDto> {
+    return this.http.put<TrackerProfileDto>(`${this.base}/tracker/profile`, body);
+  }
+
+  /** People whose tracker the caller may view read-only. */
+  trackerShared(): Observable<SharedUserDto[]> {
+    return this.http.get<SharedUserDto[]>(`${this.base}/tracker/shared`);
   }
 }

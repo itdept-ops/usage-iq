@@ -1,0 +1,224 @@
+<section class="tracker">
+  <header class="tracker__head">
+    <div class="tracker__title">
+      <h1>Tracker</h1>
+      <p class="tracker__sub">Food &amp; fitness — log meals and exercise against your goals.</p>
+    </div>
+
+    <div class="tracker__head-actions">
+      <!-- Shared-view selector: view your own tracker or a contact's (read-only). -->
+      @if (store.shared().length > 0) {
+        <button mat-stroked-button type="button" class="tracker__viewbtn" [matMenuTriggerFor]="viewMenu"
+                aria-label="Whose tracker to view">
+          <mat-icon>visibility</mat-icon>
+          {{ viewingUser ? viewingUser.name : 'My tracker' }}
+          <mat-icon class="tracker__caret">expand_more</mat-icon>
+        </button>
+        <mat-menu #viewMenu="matMenu">
+          <button mat-menu-item type="button" (click)="viewSelf()">
+            <mat-icon>person</mat-icon> My tracker
+          </button>
+          @for (u of store.shared(); track u.email) {
+            <button mat-menu-item type="button" (click)="viewOther(u.email)">
+              <mat-icon>group</mat-icon> {{ u.name }}
+            </button>
+          }
+        </mat-menu>
+      }
+
+      @if (!store.readOnly()) {
+        <button mat-stroked-button type="button" class="tracker__goalbtn" (click)="openProfile()">
+          <mat-icon>flag</mat-icon> Goals
+        </button>
+      }
+    </div>
+  </header>
+
+  <!-- Read-only banner when viewing someone else. -->
+  @if (viewingUser; as vu) {
+    <div class="tracker__readonly" role="status">
+      <span class="tracker__readonly-avatar">{{ initials(vu) }}</span>
+      <span>Viewing <strong>{{ vu.name }}</strong>’s tracker — read-only.</span>
+      <button mat-button type="button" class="tracker__exitview" (click)="viewSelf()">Back to mine</button>
+    </div>
+  }
+
+  <!-- Date navigator. -->
+  <div class="tracker__datenav" role="group" aria-label="Choose day">
+    <button mat-icon-button type="button" (click)="prevDay()" aria-label="Previous day">
+      <mat-icon>chevron_left</mat-icon>
+    </button>
+    <div class="tracker__datelabel">
+      <span class="tracker__dateheading" id="tracker-dateheading">{{ dateHeading() }}</span>
+      <input class="tracker__dateinput mono-num" type="date" [value]="store.date()"
+             (change)="onDateInput($any($event.target).value)" aria-label="Pick a date"
+             aria-describedby="tracker-dateheading" />
+    </div>
+    <button mat-icon-button type="button" (click)="nextDay()" aria-label="Next day">
+      <mat-icon>chevron_right</mat-icon>
+    </button>
+    <button mat-stroked-button type="button" class="tracker__today" (click)="today()">Today</button>
+  </div>
+
+  <!-- Visually-hidden polite live region: announces day reloads and entry deletions to screen readers. -->
+  <span class="tracker__sr-status" aria-live="polite" aria-atomic="true">{{ statusMsg() }}</span>
+
+  @if (store.loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Loading day" />
+  }
+
+  @if (store.error(); as err) {
+    <div class="tracker__error" role="alert">{{ err }}</div>
+  }
+
+  @if (store.day(); as day) {
+    <!-- First-time setup prompt (own tracker, no goal/data). -->
+    @if (needsSetup()) {
+      <div class="tracker__setup">
+        <mat-icon class="tracker__setup-icon" aria-hidden="true">rocket_launch</mat-icon>
+        <div class="tracker__setup-copy">
+          <h2>Let’s set up your tracker</h2>
+          <p>Pick a goal and (optionally) a daily calorie target so we can show your progress. Then start logging meals and exercise.</p>
+        </div>
+        <button mat-flat-button color="primary" type="button" (click)="openProfile()">
+          <mat-icon>flag</mat-icon> Set your goals
+        </button>
+      </div>
+    }
+
+    <!-- Headline summary: calorie ring + breakdown + macro bars. -->
+    <div class="tracker__summary">
+      <div class="tracker__ringcard">
+        <app-calorie-ring
+          [caloriesIn]="day.caloriesIn" [caloriesOut]="day.caloriesOut"
+          [netCalories]="day.netCalories" [goal]="day.calorieGoal" [remaining]="day.remaining" />
+        <div class="tracker__cals">
+          <div class="tracker__cal">
+            <span class="tracker__cal-v mono-num">{{ day.caloriesIn | number }}</span>
+            <span class="tracker__cal-l">in</span>
+          </div>
+          <span class="tracker__cal-op">−</span>
+          <div class="tracker__cal">
+            <span class="tracker__cal-v mono-num">{{ day.caloriesOut | number }}</span>
+            <span class="tracker__cal-l">out</span>
+          </div>
+          <span class="tracker__cal-op">=</span>
+          <div class="tracker__cal">
+            <span class="tracker__cal-v tracker__cal-v--net mono-num">{{ day.netCalories | number }}</span>
+            <span class="tracker__cal-l">net</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tracker__macros">
+        @for (m of [
+          { key: 'protein', label: 'Protein', val: day.proteinG, target: day.profile.proteinGoalG, cls: 'p' },
+          { key: 'carb', label: 'Carbs', val: day.carbG, target: day.profile.carbGoalG, cls: 'c' },
+          { key: 'fat', label: 'Fat', val: day.fatG, target: day.profile.fatGoalG, cls: 'f' }
+        ]; track m.key) {
+          <div class="tracker__macro">
+            <div class="tracker__macro-head">
+              <span class="tracker__macro-label">{{ m.label }}</span>
+              <span class="tracker__macro-val mono-num">
+                {{ m.val | number:'1.0-0' }} g@if (m.target) { <span class="tracker__macro-target"> / {{ m.target }} g</span> }
+              </span>
+            </div>
+            @if (m.target) {
+              <div class="tracker__macro-track"
+                   role="progressbar" aria-valuemin="0" [attr.aria-valuenow]="m.val" [attr.aria-valuemax]="m.target"
+                   [attr.aria-label]="m.label + ' grams'">
+                <div class="tracker__macro-fill" [class]="'tracker__macro-fill--' + m.cls"
+                     [style.width.%]="macroPct(m.val, m.target)"></div>
+              </div>
+            } @else {
+              <div class="tracker__macro-track" [attr.aria-label]="m.label + ' grams'">
+                <div class="tracker__macro-fill" [class]="'tracker__macro-fill--' + m.cls"
+                     [style.width.%]="macroPct(m.val, undefined)"></div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Meal sections. -->
+    @for (s of mealSections; track s.meal) {
+      <section class="tracker__meal" [attr.aria-label]="s.label">
+        <div class="tracker__meal-head">
+          <h2 class="tracker__meal-title">
+            <mat-icon aria-hidden="true">{{ s.icon }}</mat-icon> {{ s.label }}
+          </h2>
+          <span class="tracker__meal-cal mono-num">{{ caloriesFor(s.meal) | number }} kcal</span>
+        </div>
+
+        <ul class="tracker__entries">
+          @for (f of foodsFor(s.meal); track f.id) {
+            <li class="tracker__entry">
+              <div class="tracker__entry-id">
+                <span class="tracker__entry-name">{{ f.description }}</span>
+                <span class="tracker__entry-meta">
+                  @if (f.brand) { {{ f.brand }} · }
+                  @if (f.servingDesc) { {{ f.servingDesc }} · }
+                  <span class="mono-num">{{ f.proteinG }}P {{ f.carbG }}C {{ f.fatG }}F</span>
+                </span>
+              </div>
+              <span class="tracker__entry-cal mono-num">{{ f.calories | number }}</span>
+              @if (!store.readOnly()) {
+                <button mat-icon-button type="button" class="tracker__entry-del"
+                        (click)="removeFood(f)" [attr.aria-label]="'Remove ' + f.description">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+            </li>
+          } @empty {
+            <li class="tracker__entry tracker__entry--empty">Nothing logged yet.</li>
+          }
+        </ul>
+
+        @if (!store.readOnly()) {
+          <button mat-button type="button" class="tracker__add" (click)="openAddFood(s.meal)">
+            <mat-icon>add</mat-icon> Add food
+          </button>
+        }
+      </section>
+    }
+
+    <!-- Exercise section. -->
+    <section class="tracker__meal tracker__exercise" aria-label="Exercise">
+      <div class="tracker__meal-head">
+        <h2 class="tracker__meal-title">
+          <mat-icon aria-hidden="true">fitness_center</mat-icon> Exercise
+        </h2>
+        <span class="tracker__meal-cal mono-num">{{ day.caloriesOut | number }} kcal</span>
+      </div>
+
+      <ul class="tracker__entries">
+        @for (e of day.exercises; track e.id) {
+          <li class="tracker__entry">
+            <div class="tracker__entry-id">
+              <span class="tracker__entry-name">{{ e.name }}</span>
+              @if (e.durationMin) {
+                <span class="tracker__entry-meta"><span class="mono-num">{{ e.durationMin }}</span> min</span>
+              }
+            </div>
+            <span class="tracker__entry-cal tracker__entry-cal--burn mono-num">−{{ e.caloriesBurned | number }}</span>
+            @if (!store.readOnly()) {
+              <button mat-icon-button type="button" class="tracker__entry-del"
+                      (click)="removeExercise(e)" [attr.aria-label]="'Remove ' + e.name">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </li>
+        } @empty {
+          <li class="tracker__entry tracker__entry--empty">No exercise logged yet.</li>
+        }
+      </ul>
+
+      @if (!store.readOnly()) {
+        <button mat-button type="button" class="tracker__add" (click)="openAddExercise()">
+          <mat-icon>add</mat-icon> Add exercise
+        </button>
+      }
+    </section>
+  }
+</section>

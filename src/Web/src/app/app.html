@@ -50,6 +50,9 @@
       @if (auth.hasPermission('chat.read')) {
         <a mat-button class="nav__item" routerLink="/chat" routerLinkActive="active">Chat</a>
       }
+      @if (auth.hasPermission('tracker.self')) {
+        <a mat-button class="nav__item" routerLink="/tracker" routerLinkActive="active">Tracker</a>
+      }
       @if (auth.hasPermission('users.view')) {
         <a mat-button class="nav__item" routerLink="/users" routerLinkActive="active">Users</a>
       }
@@ -211,6 +214,10 @@
     @if (auth.hasPermission('chat.read')) {
       <a class="mobile-nav__item" routerLink="/chat" routerLinkActive="active"
          (click)="closeMobileNav()">Chat</a>
+    }
+    @if (auth.hasPermission('tracker.self')) {
+      <a class="mobile-nav__item" routerLink="/tracker" routerLinkActive="active"
+         (click)="closeMobileNav()">Tracker</a>
     }
     @if (auth.hasPermission('users.view')) {
       <a class="mobile-nav__item" routerLink="/users" routerLinkActive="active"

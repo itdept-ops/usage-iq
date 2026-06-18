@@ -1,0 +1,98 @@
+<h2 mat-dialog-title class="ax-title">Add exercise</h2>
+
+<mat-dialog-content class="ax-body">
+  <mat-button-toggle-group class="ax-mode" [value]="mode()" (change)="setMode($event.value)"
+                           aria-label="How to add exercise" hideSingleSelectionIndicator>
+    <mat-button-toggle value="library"><mat-icon>fitness_center</mat-icon> Library</mat-button-toggle>
+    <mat-button-toggle value="manual"><mat-icon>edit</mat-icon> Manual</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  @if (mode() === 'library') {
+    <div class="ax-libhead">
+      <mat-checkbox [ngModel]="showAll()" (ngModelChange)="toggleShowAll($event)">Show all goals</mat-checkbox>
+    </div>
+
+    @if (library().length > 0) {
+      <mat-form-field appearance="outline" class="ax-field ax-search">
+        <mat-icon matPrefix>search</mat-icon>
+        <input matInput autocomplete="off" placeholder="Filter exercises"
+               [ngModel]="query()" (ngModelChange)="query.set($event)" />
+      </mat-form-field>
+    }
+
+    @if (loading()) { <mat-progress-bar mode="indeterminate" aria-label="Loading exercises" /> }
+    @if (error(); as e) { <p class="ax-error" role="alert"><mat-icon>error_outline</mat-icon> {{ e }}</p> }
+
+    <div class="ax-list" role="list" aria-label="Exercises">
+      @for (e of filtered(); track e.id) {
+        <div role="listitem" class="ax-row">
+          <button type="button" class="ax-ex"
+                  [class.selected]="selected()?.id === e.id"
+                  [attr.aria-pressed]="selected()?.id === e.id"
+                  (click)="pick(e)">
+            <span class="ax-ex__id">
+              <span class="ax-ex__name">{{ e.name }}</span>
+              <span class="ax-ex__cat">{{ e.category }}</span>
+            </span>
+            <span class="ax-ex__met mono-num">MET {{ e.met }}</span>
+            @if (selected()?.id === e.id) { <mat-icon class="ax-ex__check">check_circle</mat-icon> }
+          </button>
+        </div>
+      } @empty {
+        @if (!loading()) { <p class="ax-empty">No exercises match.</p> }
+      }
+    </div>
+
+    @if (selected(); as sel) {
+      <div class="ax-detail">
+        <mat-form-field appearance="outline" class="ax-field">
+          <mat-label>Duration</mat-label>
+          <input matInput type="number" min="1" inputmode="numeric"
+                 [ngModel]="durationMin()" (ngModelChange)="durationMin.set($event)" />
+          <span matTextSuffix>min</span>
+        </mat-form-field>
+
+        @if (data.hasWeight) {
+          <mat-checkbox class="ax-override" [ngModel]="overrideCals()" (ngModelChange)="overrideCals.set($event)">
+            Enter calories myself instead of estimating
+          </mat-checkbox>
+        } @else {
+          <p class="ax-hint">Set a weight in your profile to auto-estimate calories, or enter them below.</p>
+        }
+
+        @if (overrideCals() || !data.hasWeight) {
+          <mat-form-field appearance="outline" class="ax-field">
+            <mat-label>Calories burned</mat-label>
+            <input matInput type="number" min="0" inputmode="numeric"
+                   [ngModel]="manualCalsForLib()" (ngModelChange)="manualCalsForLib.set($event)" />
+            <span matTextSuffix>kcal</span>
+          </mat-form-field>
+        } @else {
+          <p class="ax-estimate" role="status">
+            <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+            Calories will be estimated from your weight, the duration, and MET {{ sel.met }}.
+          </p>
+        }
+      </div>
+    }
+  } @else {
+    <div class="ax-manual">
+      <mat-form-field appearance="outline" class="ax-field">
+        <mat-label>Exercise name</mat-label>
+        <input matInput cdkFocusInitial autocomplete="off" maxlength="80"
+               [ngModel]="mName()" (ngModelChange)="mName.set($event)" placeholder="e.g. Evening walk" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="ax-field">
+        <mat-label>Calories burned</mat-label>
+        <input matInput type="number" min="0" inputmode="numeric"
+               [ngModel]="mCalories()" (ngModelChange)="mCalories.set($event)" />
+        <span matTextSuffix>kcal</span>
+      </mat-form-field>
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions class="ax-actions" align="end">
+  <button mat-stroked-button type="button" (click)="cancel()" [disabled]="saving()">Cancel</button>
+  <button mat-flat-button type="button" color="primary" (click)="save()" [disabled]="!canSave()">Add exercise</button>
+</mat-dialog-actions>

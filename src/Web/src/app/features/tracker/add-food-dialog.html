@@ -1,0 +1,146 @@
+<h2 mat-dialog-title class="af-title">Add food</h2>
+
+<mat-dialog-content class="af-body">
+  <!-- Step 2: quantity + meal for a chosen/manual food. -->
+  @if (selected() || manual()) {
+    @if (manual()) {
+      <div class="af-manual">
+        <p class="af-manual__lead">Enter the food and its totals.</p>
+        <mat-form-field appearance="outline" class="af-field">
+          <mat-label>Description</mat-label>
+          <input matInput cdkFocusInitial autocomplete="off" maxlength="120"
+                 [ngModel]="mDesc()" (ngModelChange)="mDesc.set($event)" placeholder="e.g. Homemade chili" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="af-field">
+          <mat-label>Brand (optional)</mat-label>
+          <input matInput autocomplete="off" maxlength="80"
+                 [ngModel]="mBrand()" (ngModelChange)="mBrand.set($event)" />
+        </mat-form-field>
+        <div class="af-macgrid">
+          <mat-form-field appearance="outline">
+            <mat-label>Calories</mat-label>
+            <input matInput type="number" min="0" inputmode="numeric"
+                   [ngModel]="mCalories()" (ngModelChange)="mCalories.set($event)" />
+            <span matTextSuffix>kcal</span>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Protein</mat-label>
+            <input matInput type="number" min="0" [ngModel]="mProtein()" (ngModelChange)="mProtein.set($event)" />
+            <span matTextSuffix>g</span>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Carbs</mat-label>
+            <input matInput type="number" min="0" [ngModel]="mCarb()" (ngModelChange)="mCarb.set($event)" />
+            <span matTextSuffix>g</span>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Fat</mat-label>
+            <input matInput type="number" min="0" [ngModel]="mFat()" (ngModelChange)="mFat.set($event)" />
+            <span matTextSuffix>g</span>
+          </mat-form-field>
+        </div>
+      </div>
+    } @else {
+      <div class="af-chosen">
+        <div class="af-chosen__id">
+          <span class="af-chosen__name">{{ selected()!.description }}</span>
+          @if (selected()!.brand) { <span class="af-chosen__brand">{{ selected()!.brand }}</span> }
+          <span class="af-chosen__basis micro-label">{{ basisLabel(selected()!) }}</span>
+        </div>
+        <button mat-icon-button type="button" (click)="clearSelection()" aria-label="Choose a different food">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <mat-form-field appearance="outline" class="af-field af-qty">
+        <mat-label>Quantity ({{ quantityUnit() }})</mat-label>
+        <input matInput type="number" min="0" step="any" inputmode="decimal"
+               [ngModel]="quantity()" (ngModelChange)="quantity.set($event)" cdkFocusInitial />
+        <span matTextSuffix>{{ quantityUnit() }}</span>
+      </mat-form-field>
+    }
+
+    <div class="af-mealpick">
+      <span class="micro-label">Meal</span>
+      <mat-button-toggle-group class="af-mealtoggle" [value]="meal()" (change)="meal.set($event.value)"
+                               aria-label="Meal" hideSingleSelectionIndicator>
+        @for (m of meals; track m.value) {
+          <mat-button-toggle [value]="m.value">{{ m.label }}</mat-button-toggle>
+        }
+      </mat-button-toggle-group>
+    </div>
+
+    <div class="af-totals" role="status" aria-live="polite">
+      <div class="af-total af-total--cal">
+        <span class="af-total__v mono-num">{{ scaled().calories }}</span>
+        <span class="af-total__l">kcal</span>
+      </div>
+      <div class="af-total"><span class="af-total__v mono-num">{{ scaled().proteinG }}</span><span class="af-total__l">P</span></div>
+      <div class="af-total"><span class="af-total__v mono-num">{{ scaled().carbG }}</span><span class="af-total__l">C</span></div>
+      <div class="af-total"><span class="af-total__v mono-num">{{ scaled().fatG }}</span><span class="af-total__l">F</span></div>
+    </div>
+  } @else {
+    <!-- Step 1: find a food (search / scan) or go manual. -->
+    <mat-button-toggle-group class="af-mode" [value]="mode()" (change)="setMode($event.value)"
+                             aria-label="How to add food" hideSingleSelectionIndicator>
+      <mat-button-toggle value="search"><mat-icon>search</mat-icon> Search</mat-button-toggle>
+      <mat-button-toggle value="scan"><mat-icon>qr_code_scanner</mat-icon> Scan</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    @if (mode() === 'search') {
+      @if (searchUnavailable()) {
+        <div class="af-notice" role="status">
+          <mat-icon aria-hidden="true">info</mat-icon>
+          <span>Food search isn’t configured yet. You can still add foods manually.</span>
+        </div>
+      } @else {
+        <mat-form-field appearance="outline" class="af-field af-search">
+          <mat-icon matPrefix>search</mat-icon>
+          <mat-label>Search foods</mat-label>
+          <input matInput autocomplete="off" cdkFocusInitial
+                 [ngModel]="query()" (ngModelChange)="query.set($event)" placeholder="e.g. greek yogurt" />
+        </mat-form-field>
+
+        @if (searching()) { <mat-progress-bar mode="indeterminate" aria-label="Searching" /> }
+        @if (searchError(); as e) { <p class="af-error" role="alert"><mat-icon>error_outline</mat-icon> {{ e }}</p> }
+
+        <div class="af-results" role="list" aria-label="Search results">
+          @for (f of results(); track f.fdcId) {
+            <div role="listitem" class="af-result-row">
+              <button type="button" class="af-result" (click)="pick(f)">
+                <span class="af-result__id">
+                  <span class="af-result__name">{{ f.description }}</span>
+                  @if (f.brand) { <span class="af-result__brand">{{ f.brand }}</span> }
+                </span>
+                <span class="af-result__nutr">
+                  <span class="af-result__cal mono-num">{{ f.calories }} kcal</span>
+                  <span class="af-result__basis">{{ basisLabel(f) }}</span>
+                </span>
+              </button>
+            </div>
+          } @empty {
+            @if (!searching() && query().trim().length >= 2) {
+              <p class="af-empty">No matches. Try another name or add it manually.</p>
+            }
+          }
+        </div>
+      }
+    } @else {
+      <app-barcode-scanner (detected)="onBarcode($event)" />
+      @if (searchError(); as e) { <p class="af-error" role="alert"><mat-icon>error_outline</mat-icon> {{ e }}</p> }
+    }
+
+    <button mat-stroked-button type="button" class="af-manual-btn" (click)="startManual()">
+      <mat-icon>edit</mat-icon> Enter manually
+    </button>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions class="af-actions" align="end">
+  <button mat-stroked-button type="button" (click)="cancel()" [disabled]="saving()">Cancel</button>
+  @if (selected() || manual()) {
+    <button mat-flat-button type="button" color="primary" (click)="save()" [disabled]="!canSave()">
+      Add to {{ meal() }}
+    </button>
+  }
+</mat-dialog-actions>

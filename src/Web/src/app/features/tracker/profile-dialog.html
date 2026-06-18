@@ -1,0 +1,56 @@
+<h2 mat-dialog-title class="pf-title">Your goals</h2>
+
+<mat-dialog-content class="pf-body">
+  <mat-form-field appearance="outline" class="pf-field">
+    <mat-label>Goal</mat-label>
+    <mat-select [ngModel]="goal()" (ngModelChange)="goal.set($event)">
+      @for (g of goals; track g.value) {
+        <mat-option [value]="g.value">{{ g.label }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="pf-field">
+    <mat-label>Body weight (optional)</mat-label>
+    <input matInput type="number" min="0" step="0.1" inputmode="decimal"
+           [ngModel]="weightKg()" (ngModelChange)="weightKg.set($event)" />
+    <span matTextSuffix>kg</span>
+    <mat-hint>Used to estimate calories burned from exercise duration.</mat-hint>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="pf-field">
+    <mat-label>Daily calorie goal (optional)</mat-label>
+    <input matInput type="number" min="0" inputmode="numeric"
+           [ngModel]="dailyCalorieGoal()" (ngModelChange)="dailyCalorieGoal.set($event)" />
+    <span matTextSuffix>kcal</span>
+  </mat-form-field>
+
+  <span class="micro-label pf-section">Macro targets (optional)</span>
+  <div class="pf-macgrid">
+    <mat-form-field appearance="outline">
+      <mat-label>Protein</mat-label>
+      <input matInput type="number" min="0" [ngModel]="proteinGoalG()" (ngModelChange)="proteinGoalG.set($event)" />
+      <span matTextSuffix>g</span>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Carbs</mat-label>
+      <input matInput type="number" min="0" [ngModel]="carbGoalG()" (ngModelChange)="carbGoalG.set($event)" />
+      <span matTextSuffix>g</span>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Fat</mat-label>
+      <input matInput type="number" min="0" [ngModel]="fatGoalG()" (ngModelChange)="fatGoalG.set($event)" />
+      <span matTextSuffix>g</span>
+    </mat-form-field>
+  </div>
+
+  <mat-checkbox class="pf-share" [ngModel]="shareWithContacts()" (ngModelChange)="shareWithContacts.set($event)">
+    Share my tracker with my contacts
+  </mat-checkbox>
+  <p class="pf-share-note">When on, people in your contact circle can view this tracker read-only.</p>
+</mat-dialog-content>
+
+<mat-dialog-actions class="pf-actions" align="end">
+  <button mat-stroked-button type="button" (click)="cancel()">Cancel</button>
+  <button mat-flat-button type="button" color="primary" (click)="save()">Save goals</button>
+</mat-dialog-actions>
