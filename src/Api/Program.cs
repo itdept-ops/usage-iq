@@ -69,6 +69,16 @@ builder.Services.AddHttpClient("discord").ConfigurePrimaryHttpMessageHandler(() 
 builder.Services.AddScoped<DiscordNotifier>();
 builder.Services.AddHostedService<NotificationBackgroundService>();
 
+// Food & fitness tracker: USDA FoodData Central proxy. The api_key is a secret (appsettings.Local.json
+// locally / Usda__ApiKey env var in prod) and is never logged; when blank the food lookup endpoints
+// return 503 and the rest of the tracker still works. The host is fixed (from Usda:BaseUrl), never
+// user-controlled, so no SSRF allowlist is needed. Responses are cached to respect the key's rate limit.
+builder.Services.Configure<UsdaOptions>(builder.Configuration.GetSection(UsdaOptions.SectionName));
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient(UsdaFoodService.HttpClientName,
+    c => c.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddScoped<UsdaFoodService>();
+
 // Real-time chat + in-app notifications. The hub addresses individual users by their email claim
 // (EmailUserIdProvider) so per-user pushes work across all of a user's connections; the fan-out
 // service is the shared broadcast/notify path used by both the REST endpoints and the hub.
@@ -205,6 +215,14 @@ using (var scope = app.Services.CreateScope())
         await db.SaveChangesAsync();
     }
 
+    // Seed the food & fitness exercise library once (idempotent): only when the table is empty, so
+    // user/admin edits are never clobbered on restart. Mirrors the ingestion-sources seeding above.
+    if (!await db.ExerciseLibrary.AnyAsync())
+    {
+        db.ExerciseLibrary.AddRange(ExerciseLibrarySeed.Build());
+        await db.SaveChangesAsync();
+    }
+
     // An explicit configured/env path (e.g. a container's read-only mount) overrides the stored path.
     if (!string.IsNullOrWhiteSpace(claudePath))
         await db.IngestionSources.Where(s => s.Kind == "claude" && s.RootPath != claudePath)
@@ -311,6 +329,7 @@ app.MapFleetEndpoints();
 app.MapChatEndpoints();
 app.MapContactsEndpoints();
 app.MapInboxEndpoints();
+app.MapTrackerEndpoints();
 app.MapHub<ChatHub>("/api/hubs/chat");
 app.MapGet("/", () => app.Environment.IsDevelopment()
     ? Results.Redirect("/swagger")

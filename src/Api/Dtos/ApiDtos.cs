@@ -688,3 +688,136 @@ public sealed class AddContactRequest
 {
     public string ContactEmail { get; set; } = "";
 }
+
+// ---------------------------------------------------------------------------
+// Food & fitness tracker
+// ---------------------------------------------------------------------------
+
+/// <summary>One USDA FoodData Central match, normalized for logging. <see cref="Basis"/> tells the
+/// frontend whether the nutrition is per serving ("perServing", typically Branded) or per 100 g
+/// ("per100g", typically Foundation / SR Legacy) so quantities can be scaled correctly.</summary>
+public sealed class FoodSearchItemDto
+{
+    public int FdcId { get; set; }
+    public string Description { get; set; } = "";
+    public string? Brand { get; set; }
+    public string? GtinUpc { get; set; }
+    public int Calories { get; set; }
+    public double ProteinG { get; set; }
+    public double CarbG { get; set; }
+    public double FatG { get; set; }
+    public double? ServingSize { get; set; }
+    public string? ServingUnit { get; set; }
+    /// <summary>"perServing" or "per100g".</summary>
+    public string Basis { get; set; } = "per100g";
+}
+
+/// <summary>One logged food, with its meal so the day view can group by meal. Nutrition is the
+/// snapshot stored at log time.</summary>
+public sealed class FoodEntryDto
+{
+    public long Id { get; set; }
+    /// <summary>"breakfast" | "lunch" | "dinner" | "snack".</summary>
+    public string Meal { get; set; } = "";
+    public int? FdcId { get; set; }
+    public string Description { get; set; } = "";
+    public string? Brand { get; set; }
+    public double Quantity { get; set; }
+    public string? ServingDesc { get; set; }
+    public int Calories { get; set; }
+    public double ProteinG { get; set; }
+    public double CarbG { get; set; }
+    public double FatG { get; set; }
+}
+
+/// <summary>One seeded activity with its MET and the goals it suits (for the goal-filtered picker).</summary>
+public sealed class ExerciseLibraryDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string Category { get; set; } = "";
+    public double Met { get; set; }
+    public string[] Goals { get; set; } = Array.Empty<string>();
+}
+
+/// <summary>One logged workout.</summary>
+public sealed class ExerciseEntryDto
+{
+    public long Id { get; set; }
+    public int? ExerciseId { get; set; }
+    public string Name { get; set; } = "";
+    public int? DurationMin { get; set; }
+    public int CaloriesBurned { get; set; }
+}
+
+/// <summary>A user's tracker profile: goal, weight, optional calorie/macro targets, sharing flag.
+/// Doubles as the body of <c>PUT /api/tracker/profile</c> (UpdateTrackerProfileRequest).</summary>
+public sealed class TrackerProfileDto
+{
+    /// <summary>One of the <c>TrackerGoal</c> names: "LoseWeight" | "Maintain" | "GainMuscle" | "Endurance".</summary>
+    public string Goal { get; set; } = "Maintain";
+    public double? WeightKg { get; set; }
+    public int? DailyCalorieGoal { get; set; }
+    public int? ProteinGoalG { get; set; }
+    public int? CarbGoalG { get; set; }
+    public int? FatGoalG { get; set; }
+    public bool ShareWithContacts { get; set; }
+}
+
+/// <summary>A whole day's tracker: the profile, foods (grouped by meal on the client), exercises, and
+/// the rolled-up totals. <see cref="ReadOnly"/> is true when viewing someone else's tracker.</summary>
+public sealed class TrackerDayDto
+{
+    public string Date { get; set; } = "";
+    public string UserEmail { get; set; } = "";
+    public bool ReadOnly { get; set; }
+    public TrackerProfileDto Profile { get; set; } = new();
+    public FoodEntryDto[] Foods { get; set; } = Array.Empty<FoodEntryDto>();
+    public ExerciseEntryDto[] Exercises { get; set; } = Array.Empty<ExerciseEntryDto>();
+    public int CaloriesIn { get; set; }
+    public int CaloriesOut { get; set; }
+    public int NetCalories { get; set; }
+    public double ProteinG { get; set; }
+    public double CarbG { get; set; }
+    public double FatG { get; set; }
+    public int? CalorieGoal { get; set; }
+    /// <summary>When a goal is set: goal − caloriesIn + caloriesOut.</summary>
+    public int? Remaining { get; set; }
+}
+
+/// <summary>A person whose tracker the caller may view (a sharing mutual contact, or anyone when the
+/// caller has tracker.viewall).</summary>
+public sealed class SharedUserDto
+{
+    public string Email { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Picture { get; set; }
+}
+
+/// <summary>Log a food onto a day/meal with its snapshotted nutrition.</summary>
+public sealed class AddFoodRequest
+{
+    public string Date { get; set; } = "";
+    public string Meal { get; set; } = "";
+    public int? FdcId { get; set; }
+    public string Description { get; set; } = "";
+    public string? Brand { get; set; }
+    public double Quantity { get; set; }
+    public string? ServingDesc { get; set; }
+    public int Calories { get; set; }
+    public double ProteinG { get; set; }
+    public double CarbG { get; set; }
+    public double FatG { get; set; }
+}
+
+/// <summary>Log an exercise. When <see cref="CaloriesBurned"/> is omitted and an
+/// <see cref="ExerciseId"/> + <see cref="DurationMin"/> are given and the profile has a weight, the
+/// server computes calories burned from the library MET.</summary>
+public sealed class AddExerciseRequest
+{
+    public string Date { get; set; } = "";
+    public int? ExerciseId { get; set; }
+    public string? Name { get; set; }
+    public int? DurationMin { get; set; }
+    public int? CaloriesBurned { get; set; }
+}

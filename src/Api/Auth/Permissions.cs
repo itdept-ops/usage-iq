@@ -37,6 +37,10 @@ public static class Permissions
     public const string ChatModerate = "chat.moderate";
     public const string ChatContactsManage = "chat.contacts.manage";
 
+    // ---- Tracker ----
+    public const string TrackerSelf = "tracker.self";
+    public const string TrackerViewAll = "tracker.viewall";
+
     // ---- Shares ----
     public const string SharesView = "shares.view";
     public const string SharesManage = "shares.manage";
@@ -73,6 +77,9 @@ public static class Permissions
         new PermissionInfo(ChatModerate, "Chat", "Moderate chat", "Edit or delete other people’s messages, and archive or delete channels."),
         new PermissionInfo(ChatContactsManage, "Chat", "Manage contacts", "Add or remove the people in any user’s chat contacts (their circle)."),
 
+        new PermissionInfo(TrackerSelf, "Tracker", "Track food & fitness", "Log and view your own food intake and exercises."),
+        new PermissionInfo(TrackerViewAll, "Tracker", "View all trackers", "View every user’s food & fitness log (coach/admin)."),
+
         new PermissionInfo(SharesView, "Shares", "View shares", "View share links and access logs."),
         new PermissionInfo(SharesManage, "Shares", "Manage shares", "Create, edit, and revoke share links."),
 
@@ -87,7 +94,7 @@ public static class Permissions
     public static readonly string[] Views =
     {
         DashboardView, CalendarView, PricingView, SettingsView,
-        ReporterView, NotificationsView, ChatRead, SharesView, UsersView, ActivityView,
+        ReporterView, NotificationsView, ChatRead, TrackerSelf, SharesView, UsersView, ActivityView,
     };
 
     public static bool IsValid(string key) => All.Contains(key);
@@ -99,8 +106,11 @@ public static class Permissions
     /// Also excludes <see cref="ChatModerate"/> for the same reason — chat-moderation is a privileged
     /// capability that must be granted deliberately, never inherited by every new account. Likewise
     /// excludes <see cref="ChatContactsManage"/>: curating other people's contacts is an admin
-    /// capability that must be granted deliberately, never inherited by every new account.
+    /// capability that must be granted deliberately, never inherited by every new account. Likewise
+    /// excludes <see cref="TrackerViewAll"/>: reading every user's food &amp; fitness log is a
+    /// coach/admin capability that must be granted deliberately, never inherited by default.
     /// </summary>
     public static bool IsDefaultable(string key) =>
-        IsValid(key) && key != UsersManage && key != ChatModerate && key != ChatContactsManage;
+        IsValid(key) && key != UsersManage && key != ChatModerate && key != ChatContactsManage
+        && key != TrackerViewAll;
 }

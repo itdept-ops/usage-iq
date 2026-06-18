@@ -33,6 +33,7 @@ services:
       Google__ClientId: ${GOOGLE_CLIENT_ID}
       Google__ClientSecret: ${GOOGLE_CLIENT_SECRET}
       Auth__AdminEmails__0: ${ADMIN_EMAIL}
+      Usda__ApiKey: ${USDA_API_KEY:-}    # food & fitness tracker; blank → food lookup returns 503
       ASPNETCORE_URLS: "http://+:8080"
 
   web:

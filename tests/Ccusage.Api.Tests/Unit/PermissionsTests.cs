@@ -5,7 +5,7 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 23 keys.
+    // The full catalog of 25 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
@@ -15,6 +15,7 @@ public class PermissionsTests
         "reporter.view", "reporter.manage", "reporter.self",
         "notifications.view", "notifications.manage",
         "chat.read", "chat.send", "chat.moderate", "chat.contacts.manage",
+        "tracker.self", "tracker.viewall",
         "shares.view", "shares.manage",
         "users.view", "users.manage", "activity.view",
     };
@@ -38,6 +39,8 @@ public class PermissionsTests
     [InlineData("chat.send")]
     [InlineData("chat.moderate")]
     [InlineData("chat.contacts.manage")]
+    [InlineData("tracker.self")]
+    [InlineData("tracker.viewall")]
     [InlineData("shares.view")]
     [InlineData("shares.manage")]
     [InlineData("users.view")]
@@ -79,6 +82,8 @@ public class PermissionsTests
         Permissions.ChatSend.Should().Be("chat.send");
         Permissions.ChatModerate.Should().Be("chat.moderate");
         Permissions.ChatContactsManage.Should().Be("chat.contacts.manage");
+        Permissions.TrackerSelf.Should().Be("tracker.self");
+        Permissions.TrackerViewAll.Should().Be("tracker.viewall");
         Permissions.SharesView.Should().Be("shares.view");
         Permissions.SharesManage.Should().Be("shares.manage");
         Permissions.UsersView.Should().Be("users.view");
@@ -87,9 +92,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_twenty_three_known_keys()
+    public void All_contains_exactly_the_twenty_five_known_keys()
     {
-        Permissions.All.Should().HaveCount(23);
+        Permissions.All.Should().HaveCount(25);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -100,9 +105,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_twenty_three_entries()
+    public void Catalog_has_twenty_five_entries()
     {
-        Permissions.Catalog.Should().HaveCount(23);
+        Permissions.Catalog.Should().HaveCount(25);
     }
 
     [Fact]
@@ -134,15 +139,18 @@ public class PermissionsTests
     [Fact]
     public void Views_are_the_page_view_gates_and_all_valid()
     {
-        // The page-view gates: every *.view key plus chat.read (the Chat page gate, which has
-        // no *.view suffix). 9 *.view keys + chat.read = 10.
-        Permissions.Views.Should().HaveCount(10);
+        // The page-view gates: every *.view key plus chat.read (the Chat page gate) and tracker.self
+        // (the Tracker page gate) — both page gates without a *.view suffix. 9 *.view keys + chat.read
+        // + tracker.self = 11.
+        Permissions.Views.Should().HaveCount(11);
         Permissions.Views.Should().OnlyContain(k => Permissions.IsValid(k));
-        Permissions.Views.Should().OnlyContain(k => k.EndsWith(".view") || k == Permissions.ChatRead);
+        Permissions.Views.Should().OnlyContain(k =>
+            k.EndsWith(".view") || k == Permissions.ChatRead || k == Permissions.TrackerSelf);
         // Every *.view key in the catalog is represented in Views.
         var catalogViews = Permissions.All.Where(k => k.EndsWith(".view"));
         Permissions.Views.Should().Contain(catalogViews);
         Permissions.Views.Should().Contain(Permissions.ChatRead);
+        Permissions.Views.Should().Contain(Permissions.TrackerSelf);
     }
 
     [Fact]
@@ -158,5 +166,14 @@ public class PermissionsTests
     {
         Permissions.IsDefaultable(Permissions.ChatContactsManage).Should().BeFalse();
         Permissions.IsDefaultable(Permissions.UsersManage).Should().BeFalse();
+    }
+
+    [Fact]
+    public void TrackerViewAll_is_not_defaultable_but_TrackerSelf_is()
+    {
+        // Reading every user's food & fitness log is a coach/admin capability that must be granted
+        // deliberately; logging your own is a defaultable, per-user capability.
+        Permissions.IsDefaultable(Permissions.TrackerViewAll).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.TrackerSelf).Should().BeTrue();
     }
 }

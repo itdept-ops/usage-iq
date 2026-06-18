@@ -30,6 +30,10 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<ChatContact> ChatContacts => Set<ChatContact>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+    public DbSet<TrackerProfile> TrackerProfiles => Set<TrackerProfile>();
+    public DbSet<FoodEntry> FoodEntries => Set<FoodEntry>();
+    public DbSet<ExerciseEntry> ExerciseEntries => Set<ExerciseEntry>();
+    public DbSet<ExerciseLibrary> ExerciseLibrary => Set<ExerciseLibrary>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -338,6 +342,45 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.SurfaceBrowser).HasDefaultValue(false);
             e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
             e.HasIndex(x => x.UserEmail).IsUnique();
+        });
+
+        b.Entity<TrackerProfile>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // One profile row per user; also the lookup for "this caller's profile".
+            e.HasIndex(x => x.UserEmail).IsUnique();
+        });
+
+        b.Entity<FoodEntry>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Description).HasMaxLength(256);
+            e.Property(x => x.Brand).HasMaxLength(256);
+            e.Property(x => x.ServingDesc).HasMaxLength(128);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // The day view reads one user's entries for one local date.
+            e.HasIndex(x => new { x.UserEmail, x.LocalDate });
+        });
+
+        b.Entity<ExerciseEntry>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Name).HasMaxLength(128);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // The day view reads one user's entries for one local date.
+            e.HasIndex(x => new { x.UserEmail, x.LocalDate });
+            // Deleting a library activity must not delete a logged workout: orphan the FK instead
+            // (the activity name is snapshotted onto the row, so the log stays readable).
+            e.HasOne(x => x.Exercise).WithMany()
+                .HasForeignKey(x => x.ExerciseId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<ExerciseLibrary>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(128);
+            e.Property(x => x.Category).HasMaxLength(64);
+            e.Property(x => x.GoalTags).HasMaxLength(128);
         });
     }
 }

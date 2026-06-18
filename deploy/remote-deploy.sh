@@ -18,6 +18,9 @@ DOMAIN=$(ssm /usage-iq/domain);                 DOMAIN=${DOMAIN:-usageiq.online}
 ADMIN_EMAIL=$(ssm /usage-iq/admin-email);        ADMIN_EMAIL=${ADMIN_EMAIL:-it_dept@eqchomecare.com}
 GOOGLE_ID=$(ssm /usage-iq/google-client-id)
 GOOGLE_SECRET=$(ssm /usage-iq/google-client-secret --with-decryption)
+# Optional: USDA FoodData Central key for the food & fitness tracker. Non-fatal if unset — the
+# tracker still runs, only the food-search/details endpoints return 503 until a key is configured.
+USDA_API_KEY=$(ssm /usage-iq/usda-api-key --with-decryption)
 
 if [ -z "$JWT" ] || [ -z "$DBPW" ]; then
   echo "FATAL: /usage-iq/jwt-key or /usage-iq/db-password missing in SSM." >&2; exit 1
@@ -33,6 +36,7 @@ ACME_EMAIL=$ADMIN_EMAIL
 ADMIN_EMAIL=$ADMIN_EMAIL
 GOOGLE_CLIENT_ID=$GOOGLE_ID
 GOOGLE_CLIENT_SECRET=$GOOGLE_SECRET
+USDA_API_KEY=$USDA_API_KEY
 EOF
 
 echo "==> Logging in to ECR"
