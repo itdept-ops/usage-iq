@@ -461,7 +461,9 @@ public sealed class PresenceDto
 public sealed class UserDto
 {
     public int Id { get; set; }
-    public string Email { get; set; } = "";
+    /// <summary>The user's email, or null when masked (server-side email-visibility gate). The caller's
+    /// own row is always real; OTHER users' emails are null unless the X-Email-Reveal-Key header matches.</summary>
+    public string? Email { get; set; }
     public string Name { get; set; } = "";
     public string? Picture { get; set; }
     public bool IsEnabled { get; set; }
@@ -497,8 +499,11 @@ public sealed class AuditEntryDto
 {
     public long Id { get; set; }
     public DateTime WhenUtc { get; set; }
-    public string ActorEmail { get; set; } = "";
+    /// <summary>The acting admin's email, or null when masked. The caller's own actor email stays real;
+    /// other actors' emails are null unless the X-Email-Reveal-Key header matches the configured key.</summary>
+    public string? ActorEmail { get; set; }
     public string Action { get; set; } = "";
+    /// <summary>The affected user's email, or null when masked (same gate as <see cref="ActorEmail"/>).</summary>
     public string? TargetEmail { get; set; }
     public string? Detail { get; set; }
 }

@@ -332,7 +332,8 @@ export interface AuthSession {
 
 export interface ManagedUser {
   id: number;
-  email: string;
+  /** Null when masked: the email-reveal key was absent/incorrect and this is not the caller's own row. */
+  email: string | null;
   name: string;
   picture: string | null;
   isEnabled: boolean;
@@ -350,8 +351,10 @@ export interface PermissionItem {
 export interface AuditEntry {
   id: number;
   whenUtc: string;
-  actorEmail: string;
+  /** Null when masked (email-reveal key absent/incorrect) and not the caller's own email. */
+  actorEmail: string | null;
   action: string;
+  /** Null when absent, OR when masked (email-reveal key absent/incorrect) and not the caller's own email. */
   targetEmail: string | null;
   detail: string | null;
 }

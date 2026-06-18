@@ -5,6 +5,25 @@
     <p class="sub">Grant per-capability access. Changes apply <strong>immediately</strong> — the server re-checks
       permissions on every request, so removing access takes effect on a user's next action.</p>
   </div>
+
+  <div class="head-tools">
+    @if (auth.hasPermission(PERM.usersView)) {
+    <button mat-stroked-button class="reveal-toggle" type="button"
+            [class.revealed]="emailsRevealed()"
+            [disabled]="revealing()"
+            [attr.aria-pressed]="emailsRevealed()"
+            [attr.aria-label]="emailsRevealed() ? 'Hide email addresses' : 'Show email addresses (requires a key)'"
+            [matTooltip]="emailsRevealed() ? 'Hide email addresses' : 'Show email addresses (requires a key)'"
+            (click)="toggleEmails()">
+      @if (revealing()) {
+        <mat-progress-spinner class="reveal-spinner" mode="indeterminate" [diameter]="18" />
+      } @else {
+        <mat-icon>{{ emailsRevealed() ? 'lock_open' : 'lock' }}</mat-icon>
+      }
+      {{ emailsRevealed() ? 'Hide emails' : 'Show emails' }}
+    </button>
+    }
+  </div>
 </div>
 
 @if (loading()) { <mat-progress-bar mode="indeterminate" /> }
@@ -79,10 +98,16 @@
                 @if (u.picture) {
                   <img class="u-avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
                 } @else {
-                  <span class="u-avatar u-avatar--init">{{ (u.name || u.email).charAt(0).toUpperCase() }}</span>
+                  <span class="u-avatar u-avatar--init">{{ userInitial(u) }}</span>
                 }
                 <div class="u-id">
-                  <span class="u-email mono-num">{{ u.email }}</span>
+                  @if (u.email) {
+                    <span class="u-email mono-num">{{ u.email }}</span>
+                  } @else {
+                    <span class="u-email email-hidden" role="img" aria-label="email hidden">
+                      <mat-icon class="email-hidden-icon">lock</mat-icon>••••••
+                    </span>
+                  }
                   @if (u.name) { <span class="u-name">{{ u.name }}</span> }
                   <span class="u-last micro-label">{{ u.lastLoginUtc ? 'last in ' + (u.lastLoginUtc | date: 'MMM d, HH:mm') : 'never signed in' }}</span>
                 </div>
@@ -168,8 +193,14 @@
                     }
                   }
 
-                  <!-- Admin chat-contacts editor (chat.contacts.manage only) -->
-                  @if (canManageContacts()) {
+                  <!-- Admin chat-contacts editor (chat.contacts.manage only; email-keyed, so reveal-gated) -->
+                  @if (canManageContacts() && !emailsRevealed()) {
+                    <div class="contacts-block contacts-locked">
+                      <mat-icon class="contacts-locked-icon">lock</mat-icon>
+                      <span>Reveal emails to manage contacts.</span>
+                    </div>
+                  }
+                  @if (canEditContacts()) {
                     <div class="contacts-block" [attr.aria-busy]="contactsState(u.id)?.busyEmail ? true : null">
                       <span class="contacts-sr-status" aria-live="polite" aria-atomic="true">{{ contactsStatus() }}</span>
                       <div class="logins-head">
@@ -262,10 +293,16 @@
             @if (u.picture) {
               <img class="u-avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
             } @else {
-              <span class="u-avatar u-avatar--init">{{ (u.name || u.email).charAt(0).toUpperCase() }}</span>
+              <span class="u-avatar u-avatar--init">{{ userInitial(u) }}</span>
             }
             <div class="u-id">
-              <span class="u-email mono-num">{{ u.email }}</span>
+              @if (u.email) {
+                <span class="u-email mono-num">{{ u.email }}</span>
+              } @else {
+                <span class="u-email email-hidden" role="img" aria-label="email hidden">
+                  <mat-icon class="email-hidden-icon">lock</mat-icon>••••••
+                </span>
+              }
               @if (u.name) { <span class="u-name">{{ u.name }}</span> }
               <span class="u-last micro-label">{{ u.lastLoginUtc ? 'last in ' + (u.lastLoginUtc | date: 'MMM d, HH:mm') : 'never signed in' }}</span>
             </div>
@@ -348,8 +385,14 @@
             }
           </div>
 
-          <!-- Admin chat-contacts editor (mobile, chat.contacts.manage only) -->
-          @if (canManageContacts()) {
+          <!-- Admin chat-contacts editor (mobile, chat.contacts.manage only; email-keyed, so reveal-gated) -->
+          @if (canManageContacts() && !emailsRevealed()) {
+            <div class="logins-panel ucard-logins contacts-block contacts-locked">
+              <mat-icon class="contacts-locked-icon">lock</mat-icon>
+              <span>Reveal emails to manage contacts.</span>
+            </div>
+          }
+          @if (canEditContacts()) {
             <div class="logins-panel ucard-logins contacts-block"
                  [attr.aria-busy]="contactsState(u.id)?.busyEmail ? true : null">
               <span class="contacts-sr-status" aria-live="polite" aria-atomic="true">{{ contactsStatus() }}</span>
@@ -485,7 +528,13 @@
         <div class="audit-row">
           <span class="audit-when mono-num">{{ a.whenUtc | date: 'MMM d, HH:mm' }}</span>
           <span class="audit-action pill">{{ a.action }}</span>
-          <span class="audit-actor mono-num">{{ a.actorEmail }}</span>
+          @if (a.actorEmail) {
+            <span class="audit-actor mono-num">{{ a.actorEmail }}</span>
+          } @else {
+            <span class="audit-actor email-hidden" role="img" aria-label="email hidden">
+              <mat-icon class="email-hidden-icon">lock</mat-icon>••••••
+            </span>
+          }
           @if (a.targetEmail) {
             <mat-icon class="audit-arrow">arrow_forward</mat-icon>
             <span class="audit-target mono-num">{{ a.targetEmail }}</span>

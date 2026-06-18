@@ -188,13 +188,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
-// The API runs behind the bundled nginx reverse proxy, so honor X-Forwarded-For (from the proxy hop
-// only) — otherwise every request appears to come from the proxy and per-IP rate limits / logged IPs
-// would all collapse to one address. Trust the private/container networks the proxy runs on.
+// The API runs behind a chain of reverse proxies (Caddy → the bundled nginx → Kestrel, plus any AWS
+// infra in front), so honor X-Forwarded-For — otherwise every request appears to come from the
+// nearest proxy and per-IP rate limits / logged IPs (login history, the Activity request log, and the
+// Fleet machine IP) would all collapse to one private address.
+//
+// ForwardLimit = null unwinds the FULL chain of *trusted* proxies rather than a fixed number of hops:
+// with a hard limit only the last N hops are unwound, so behind the multi-hop production chain the
+// real client IP is never reached and RemoteIpAddress stays a private/proxy address. Leaving it null
+// is safe here only because the trust is bounded by KnownNetworks below — unwinding stops at the first
+// address that is NOT in a trusted private range, which is the leftmost public IP (the real client).
+// Kestrel is never publicly reachable (the api container publishes no host port; it is reached only
+// over the Docker network via nginx), so the X-Forwarded-For chain can only have been written by our
+// own trusted private proxies — a client cannot spoof a public hop into the trusted middle of it.
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    o.ForwardLimit = 1;
+    o.ForwardLimit = null;
     o.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Parse("10.0.0.0"), 8));
     o.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Parse("172.16.0.0"), 12));
     o.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Parse("192.168.0.0"), 16));
@@ -207,9 +217,12 @@ builder.Services.AddHealthChecks().AddDbContextCheck<UsageDbContext>("database")
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Per-IP login cap. Config-bound (default 20/min) so the integration tests — which all share one
+    // stamped client IP and so one rate-limit partition — can raise it and not flake on cross-test 429s.
+    var authPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:AuthPermitLimit") ?? 20;
     o.AddPolicy("auth", http => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 20, QueueLimit = 0 }));
+        factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = authPermitLimit, QueueLimit = 0 }));
     // The "send test" button pokes Discord; cap it so it can't be used to spam the channel.
     o.AddPolicy("notif-test", http => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: http.User.FindFirst("email")?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",

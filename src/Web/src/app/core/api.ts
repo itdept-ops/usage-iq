@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
@@ -119,8 +119,18 @@ export class Api {
     return this.http.get(`${this.base}/usage/records.csv`, { params: this.filterParams(f), responseType: 'blob' });
   }
 
-  auditLog(): Observable<AuditEntry[]> {
-    return this.http.get<AuditEntry[]>(`${this.base}/audit`);
+  /**
+   * The user-management audit log. Pass `revealKey` to send the X-Email-Reveal-Key header so the server
+   * returns real actor/target emails; omit it and other users' emails come back masked (null). The key
+   * travels only in the header — never a URL/query string — and is never persisted.
+   */
+  auditLog(revealKey?: string): Observable<AuditEntry[]> {
+    return this.http.get<AuditEntry[]>(`${this.base}/audit`, { headers: this.revealHeader(revealKey) });
+  }
+
+  /** Build the X-Email-Reveal-Key header when a key is supplied; otherwise no extra headers (emails stay masked). */
+  private revealHeader(revealKey?: string): HttpHeaders | undefined {
+    return revealKey ? new HttpHeaders({ 'X-Email-Reveal-Key': revealKey }) : undefined;
   }
 
   requestLogs(opts: { method?: string; status?: string; q?: string; take?: number } = {}): Observable<RequestLogEntry[]> {
@@ -235,8 +245,13 @@ export class Api {
     return this.http.get<PermissionItem[]>(`${this.base}/permissions`);
   }
 
-  users(): Observable<ManagedUser[]> {
-    return this.http.get<ManagedUser[]>(`${this.base}/users`);
+  /**
+   * The managed-user list. Pass `revealKey` to send the X-Email-Reveal-Key header so the server returns
+   * real emails; omit it and other users' emails come back masked (null — the caller's own row is always
+   * real). The key travels only in the header — never a URL/query string — and is never persisted.
+   */
+  users(revealKey?: string): Observable<ManagedUser[]> {
+    return this.http.get<ManagedUser[]>(`${this.base}/users`, { headers: this.revealHeader(revealKey) });
   }
 
   /** A user's recent sign-in history (newest first, capped at 200). Gated by users.view|users.manage. */

@@ -45,13 +45,21 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
     /// </summary>
     public const string TestClientIp = "203.0.113.7";
 
+    /// <summary>
+    /// Lets a test override the stamped immediate-peer IP for a single request via the
+    /// <c>X-Test-Peer-Ip</c> header — used to simulate the request arriving from a trusted private
+    /// proxy (nginx) so <c>UseForwardedHeaders</c> will actually unwind an X-Forwarded-For chain.
+    /// Absent the header the default public <see cref="TestClientIp"/> is stamped.
+    /// </summary>
+    public const string PeerIpHeader = "X-Test-Peer-Ip";
+
     private readonly PostgreSqlContainer _pg = new PostgreSqlBuilder("postgres:16-alpine").Build();
 
     private static readonly string[] OwnedVars =
     {
         "SkipLocalSettings", "ConnectionStrings__Default", "Jwt__Key", "Jwt__Issuer",
         "Jwt__Audience", "Jwt__ExpiryMinutes", "Google__ClientId", "Auth__AdminEmails__0",
-        "AutoSync__Enabled",
+        "AutoSync__Enabled", "RateLimiting__AuthPermitLimit",
     };
 
     public async Task InitializeAsync()
@@ -69,6 +77,10 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
         Environment.SetEnvironmentVariable("Google__ClientId", "test-client-id.apps.googleusercontent.com");
         Environment.SetEnvironmentVariable("Auth__AdminEmails__0", AdminEmail);
         Environment.SetEnvironmentVariable("AutoSync__Enabled", "false");
+        // Every integration test stamps the same client IP, so all /api/auth/google calls across the
+        // serialized collection fall into one rate-limit partition. Raise the per-IP login cap well above
+        // the suite's cumulative login count so auth tests don't flake on a shared-partition 429.
+        Environment.SetEnvironmentVariable("RateLimiting__AuthPermitLimit", "100000");
     }
 
     async Task IAsyncLifetime.DisposeAsync()
@@ -99,7 +111,12 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
         {
             app.Use(async (ctx, nextMw) =>
             {
-                ctx.Connection.RemoteIpAddress = IPAddress.Parse(TestClientIp);
+                // A test may stamp a trusted-private peer (simulating nginx) so UseForwardedHeaders
+                // unwinds the X-Forwarded-For chain; otherwise stamp the default public client IP.
+                var peer = ctx.Request.Headers.TryGetValue(PeerIpHeader, out var v) && !string.IsNullOrEmpty(v)
+                    ? v.ToString()
+                    : TestClientIp;
+                ctx.Connection.RemoteIpAddress = IPAddress.Parse(peer);
                 await nextMw();
             });
             next(app);

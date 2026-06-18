@@ -4,7 +4,13 @@
 }
 
 .head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: var(--tech-space-4);
+  .head-text { min-width: 0; }
   .head-eyebrow { display: block; color: var(--tech-text-accent); margin-bottom: 6px; }
   h2 {
     margin: 0 0 6px;
@@ -27,6 +33,53 @@
 mat-progress-bar {
   margin-bottom: var(--tech-space-3);
   --mat-progress-bar-active-indicator-color: var(--tech-accent);
+}
+
+/* ---- Email-reveal toggle (page toolbar) ---- */
+.head-tools { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.reveal-toggle {
+  /* >=44px tap target. */
+  min-height: 44px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  color: var(--tech-text-secondary);
+  --mdc-outlined-button-outline-color: var(--tech-border-strong);
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  .reveal-spinner { --mdc-circular-progress-active-indicator-color: currentColor; margin-right: 4px; }
+
+  &.revealed {
+    color: var(--tech-accent);
+    --mdc-outlined-button-outline-color: color-mix(in srgb, var(--tech-accent) 60%, transparent);
+  }
+  &:disabled { opacity: 0.6; }
+}
+
+/* ---- Masked-email placeholder (table rows + audit log) ---- */
+.email-hidden {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px 1px 6px;
+  border-radius: var(--tech-r-pill, 999px);
+  font-family: var(--tech-font-mono);
+  letter-spacing: 0.12em;
+  color: var(--tech-text-tertiary);
+  background: color-mix(in srgb, var(--tech-text-tertiary) 14%, transparent);
+
+  .email-hidden-icon { font-size: 13px; width: 13px; height: 13px; letter-spacing: 0; }
+}
+
+/* ---- Contacts editor locked (emails not revealed) ---- */
+.contacts-locked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--tech-fs-label, 12px);
+  font-style: italic;
+  color: var(--tech-text-tertiary);
+
+  .contacts-locked-icon { font-size: 16px; width: 16px; height: 16px; color: var(--tech-text-tertiary); }
 }
 
 .panel {
@@ -530,6 +583,11 @@ mat-slide-toggle {
 
 @media (max-width: 640px) {
   .panel { padding: 14px 14px; }
+
+  /* Email-reveal toggle goes full-width under the header text on phones. */
+  .head { gap: 12px; }
+  .head-tools { width: 100%; }
+  .reveal-toggle { width: 100%; }
 
   /* Swap the matrix table for the card list. */
   .matrix-desktop { display: none; }

@@ -15,12 +15,63 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import {
+  MatDialog, MatDialogModule, MatDialogRef,
+} from '@angular/material/dialog';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
   AccessPolicy, AuditEntry, ChatContactDto, LoginEvent, ManagedUser, PermissionItem, PERM, PERM_GROUP_OF, PERM_GROUP_ORDER,
 } from '../../core/models';
+
+/**
+ * Tiny modal that prompts for the email-reveal key (single password-style input). Closes with the
+ * trimmed key on submit, or `undefined` on cancel. The key lives only in the caller's memory — this
+ * dialog never persists it. Kept in this file to keep the email-gate feature self-contained.
+ */
+@Component({
+  selector: 'app-email-reveal-dialog',
+  imports: [
+    FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule,
+  ],
+  template: `
+    <h2 mat-dialog-title id="email-reveal-title">Show emails</h2>
+    <mat-dialog-content>
+      <p class="erd-sub">Enter the reveal key to show real email addresses on this page. The key is held in
+        memory only for this session and is never saved.</p>
+      <form (ngSubmit)="submit()">
+        <mat-form-field appearance="outline" class="erd-field" subscriptSizing="dynamic">
+          <mat-label>Reveal key</mat-label>
+          <input matInput #keyInput type="password" name="revealKey" autocomplete="off"
+                 aria-label="Email reveal key" [(ngModel)]="key" cdkFocusInitial />
+          <mat-icon matPrefix>lock</mat-icon>
+        </mat-form-field>
+      </form>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button type="button" (click)="cancel()">Cancel</button>
+      <button mat-flat-button color="primary" type="button" [disabled]="!key.trim()"
+              (click)="submit()">Show emails</button>
+    </mat-dialog-actions>
+  `,
+  styles: [`
+    .erd-sub { margin: 0 0 14px; max-width: 380px; font-size: 13px; line-height: 1.5; color: var(--tech-text-secondary); }
+    .erd-field { width: 320px; max-width: 100%; }
+    [mat-dialog-title] { font-family: var(--tech-font-ui); }
+  `],
+})
+export class EmailRevealDialog {
+  private ref = inject(MatDialogRef<EmailRevealDialog, string | undefined>);
+  key = '';
+
+  submit(): void {
+    const k = this.key.trim();
+    if (k) this.ref.close(k);
+  }
+
+  cancel(): void { this.ref.close(undefined); }
+}
 
 /** Lazy-loaded login-history state for one expanded user row. */
 interface LoginHistory {
@@ -54,6 +105,7 @@ interface PermGroup {
   imports: [
     CommonModule, FormsModule, MatCardModule, MatFormFieldModule, MatInputModule, MatButtonModule,
     MatIconModule, MatCheckboxModule, MatSlideToggleModule, MatProgressBarModule, MatProgressSpinnerModule, MatTooltipModule, MatSnackBarModule,
+    MatDialogModule,
   ],
   templateUrl: './users.html',
   styleUrl: './users.scss',
@@ -61,8 +113,22 @@ interface PermGroup {
 export class Users {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
+  private dialog = inject(MatDialog);
   readonly auth = inject(AuthService);
   readonly PERM = PERM;
+
+  // ---- Email reveal (gated by a key) ----
+  // The key lives in COMPONENT MEMORY ONLY — never localStorage, never a URL. Null => emails are masked.
+  private revealKey: string | null = null;
+  /** True once a key has yielded real emails — drives the toggle label/icon + masked placeholders. */
+  readonly emailsRevealed = signal(false);
+  /** In-flight guard for the reveal/hide re-fetch (disables the toggle, shows progress). */
+  readonly revealing = signal(false);
+
+  /** The caller's own email, used to detect a successful reveal (their own email is always returned real). */
+  private get myEmail(): string | null {
+    return this.auth.session()?.email?.toLowerCase() ?? null;
+  }
 
   readonly perms = signal<PermissionItem[]>([]);
   readonly users = signal<ManagedUser[]>([]);
@@ -86,6 +152,12 @@ export class Users {
   readonly contactsStatus = signal('');
   /** Visible only to contact managers; mirrors the chat.contacts.manage backend gate. */
   readonly canManageContacts = computed(() => this.auth.hasPermission(PERM.chatContactsManage));
+  /**
+   * The in-row contacts editor is email-keyed (it leaks the directory's addresses), so it's shown only
+   * to managers AND only once emails are revealed. When hidden, the row shows a "Reveal emails to manage
+   * contacts." note instead. The login-history part of the expanded row stays visible regardless.
+   */
+  readonly canEditContacts = computed(() => this.canManageContacts() && this.emailsRevealed());
 
   // new-user form
   readonly newEmail = signal('');
@@ -138,7 +210,7 @@ export class Users {
 
   private load(): void {
     this.loading.set(true);
-    forkJoin({ perms: this.api.permissionCatalog(), users: this.api.users() }).subscribe({
+    forkJoin({ perms: this.api.permissionCatalog(), users: this.api.users(this.revealKey ?? undefined) }).subscribe({
       next: r => { this.perms.set(r.perms); this.users.set(r.users); this.loading.set(false); },
       error: () => { this.loading.set(false); this.snack.open('Failed to load users', 'Dismiss', { duration: 4000 }); },
     });
@@ -154,7 +226,72 @@ export class Users {
   }
 
   private loadAudit(): void {
-    this.api.auditLog().subscribe({ next: a => this.audit.set(a), error: () => { /* non-critical */ } });
+    this.api.auditLog(this.revealKey ?? undefined).subscribe({ next: a => this.audit.set(a), error: () => { /* non-critical */ } });
+  }
+
+  // ---- Email-reveal toggle ----
+
+  /** Toggle entry point: prompt for a key when hidden; clear + re-fetch (masked) when revealed. */
+  toggleEmails(): void {
+    if (this.emailsRevealed()) { this.hideEmails(); return; }
+    this.promptForKey();
+  }
+
+  /** Open the key prompt; on submit, re-fetch users + audit WITH the key and verify the reveal worked. */
+  private promptForKey(): void {
+    const ref = this.dialog.open(EmailRevealDialog, { width: '380px', autoFocus: 'dialog', restoreFocus: true });
+    ref.afterClosed().subscribe((key: string | undefined) => {
+      if (!key) return; // cancelled
+      this.applyRevealKey(key);
+    });
+  }
+
+  /**
+   * Re-fetch users + audit with the candidate key. The server returns real emails only when the key is
+   * correct; the caller's OWN email is always real, so we confirm success by checking that SOME OTHER
+   * user's email came back non-null (or, in a single-user tenant, that any audit email did). Wrong key
+   * => everything but our own row stays null => snackbar + stay hidden.
+   */
+  private applyRevealKey(key: string): void {
+    this.revealing.set(true);
+    forkJoin({ users: this.api.users(key), audit: this.api.auditLog(key) }).subscribe({
+      next: ({ users, audit }) => {
+        this.revealing.set(false);
+        if (this.didReveal(users, audit)) {
+          this.revealKey = key;
+          this.users.set(users);
+          this.audit.set(audit);
+          this.emailsRevealed.set(true);
+          this.snack.open('Emails revealed', 'OK', { duration: 2000 });
+        } else {
+          this.revealKey = null;
+          this.snack.open('Incorrect key', 'Dismiss', { duration: 4000 });
+        }
+      },
+      error: () => {
+        this.revealing.set(false);
+        this.snack.open('Incorrect key', 'Dismiss', { duration: 4000 });
+      },
+    });
+  }
+
+  /**
+   * Did the key actually unmask anything? True if any email belonging to someone OTHER than the caller
+   * came back non-null (their own email is always real, so it can't confirm the key). Falls back to the
+   * audit log's actor/target emails so a single-admin tenant can still confirm a correct key.
+   */
+  private didReveal(users: ManagedUser[], audit: AuditEntry[]): boolean {
+    const mine = this.myEmail;
+    const isOther = (e: string | null) => !!e && e.toLowerCase() !== mine;
+    return users.some(u => isOther(u.email))
+      || audit.some(a => isOther(a.actorEmail) || isOther(a.targetEmail));
+  }
+
+  /** Clear the in-memory key and re-fetch masked (emails back to hidden). */
+  private hideEmails(): void {
+    this.revealKey = null;
+    this.emailsRevealed.set(false);
+    this.load();
   }
 
   // ---- Per-user login history (expandable rows, lazy-loaded on first expand) ----
@@ -170,8 +307,9 @@ export class Users {
       next.add(u.id);
       // Lazy-load on first expand only; cached thereafter (and across collapses).
       if (!this.logins().has(u.id)) this.loadLogins(u.id);
-      // Contacts editor only loads for managers; same lazy-once pattern.
-      if (this.canManageContacts()) {
+      // Contacts editor only loads for managers AND only when emails are revealed (it's email-keyed and
+      // would otherwise leak the directory's addresses); same lazy-once pattern.
+      if (this.canEditContacts()) {
         if (!this.contacts().has(u.id)) this.loadContacts(u);
         this.ensureDirectory();
       }
@@ -202,6 +340,8 @@ export class Users {
   }
 
   private loadContacts(u: ManagedUser): void {
+    // Email-keyed; only invoked when emails are revealed (the editor is hidden otherwise), so u.email is real.
+    if (!u.email) return;
     this.setContactsState(u.id, { loading: true, loaded: false, error: false, contacts: [], query: '', busyEmail: null });
     this.api.userContacts(u.email).subscribe({
       next: contacts => this.setContactsState(u.id, { loading: false, loaded: true, error: false, contacts }),
@@ -227,15 +367,17 @@ export class Users {
    */
   addCandidates(u: ManagedUser): ChatContactDto[] {
     const state = this.contactsState(u.id);
-    const have = new Set((state?.contacts ?? []).map(c => c.email.toLowerCase()));
-    const self = u.email.toLowerCase();
+    const have = new Set((state?.contacts ?? []).map(c => (c.email ?? '').toLowerCase()));
+    const self = (u.email ?? '').toLowerCase();
     const q = (state?.query ?? '').trim().toLowerCase();
     return this.directory()
-      .filter(c => c.email.toLowerCase() !== self && !have.has(c.email.toLowerCase()))
-      .filter(c => !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
+      .filter(c => (c.email ?? '').toLowerCase() !== self && !have.has((c.email ?? '').toLowerCase()))
+      .filter(c => !q || c.name.toLowerCase().includes(q) || (c.email ?? '').toLowerCase().includes(q));
   }
 
   addContact(u: ManagedUser, contactEmail: string): void {
+    // The contacts editor is email-keyed; it's only shown when emails are revealed, so u.email is real here.
+    if (!u.email) return;
     const added = this.directory().find(c => c.email === contactEmail);
     this.setContactsState(u.id, { busyEmail: contactEmail });
     this.api.addUserContact(u.email, contactEmail).subscribe({
@@ -252,6 +394,7 @@ export class Users {
   }
 
   removeContact(u: ManagedUser, contactEmail: string): void {
+    if (!u.email) return;
     const removed = this.contactsState(u.id)?.contacts.find(c => c.email === contactEmail);
     this.setContactsState(u.id, { busyEmail: contactEmail });
     this.api.removeUserContact(u.email, contactEmail).subscribe({
@@ -267,11 +410,22 @@ export class Users {
     });
   }
 
-  /** Two-letter initials for a contact avatar fallback. */
+  /** Two-letter initials for a contact avatar fallback (name first; email is the fallback when present). */
   contactInitials(c: ChatContactDto): string {
-    const parts = (c.name || c.email).split(/[\s@.]+/).filter(Boolean);
+    const parts = (c.name || c.email || '').split(/[\s@.]+/).filter(Boolean);
     return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U';
   }
+
+  /** First-letter avatar fallback for a managed user (name first, email next, else "?"). Null-safe. */
+  userInitial(u: ManagedUser): string {
+    return ((u.name || u.email || '?').charAt(0) || '?').toUpperCase();
+  }
+
+  /** Whether a managed user's email is currently masked (null) — drives the masked-chip placeholder. */
+  isMasked(u: ManagedUser): boolean { return u.email == null; }
+
+  /** A human label for a user in toasts/confirms that never shows null — email if present, else name, else id. */
+  private userLabel(u: ManagedUser): string { return u.email || u.name || `user #${u.id}`; }
 
   hasPerm(u: ManagedUser, key: string): boolean { return u.permissions.includes(key); }
 
@@ -288,7 +442,7 @@ export class Users {
         this.savingId.set(null);
         this.users.update(list => list.map(x => x.id === updated.id ? updated : x));
         this.loadAudit();
-        this.snack.open(`Saved ${u.email}`, 'OK', { duration: 2500 });
+        this.snack.open(`Saved ${this.userLabel(u)}`, 'OK', { duration: 2500 });
       },
       error: (err: HttpErrorResponse) => {
         this.savingId.set(null);
@@ -308,7 +462,7 @@ export class Users {
       next: () => {
         this.loggingOutId.set(null);
         this.loadAudit();
-        this.snack.open(`Signed ${u.name || u.email} out of their sessions.`, 'OK', { duration: 2500 });
+        this.snack.open(`Signed ${u.name || this.userLabel(u)} out of their sessions.`, 'OK', { duration: 2500 });
       },
       error: (err: HttpErrorResponse) => {
         this.loggingOutId.set(null);
@@ -318,12 +472,12 @@ export class Users {
   }
 
   remove(u: ManagedUser): void {
-    if (!confirm(`Remove ${u.email}? They will lose access immediately.`)) return;
+    if (!confirm(`Remove ${this.userLabel(u)}? They will lose access immediately.`)) return;
     this.api.deleteUser(u.id).subscribe({
       next: () => {
         this.users.update(list => list.filter(x => x.id !== u.id));
         this.loadAudit();
-        this.snack.open(`Removed ${u.email}`, 'OK', { duration: 2500 });
+        this.snack.open(`Removed ${this.userLabel(u)}`, 'OK', { duration: 2500 });
       },
       error: (err: HttpErrorResponse) => this.snack.open(err.error?.message ?? 'Delete failed', 'Dismiss', { duration: 5000 }),
     });
@@ -344,7 +498,7 @@ export class Users {
     this.api.createUser({ email, isEnabled: this.newEnabled(), permissions: [...this.newPerms()] }).subscribe({
       next: u => {
         this.adding.set(false);
-        this.users.update(list => [...list, u].sort((a, b) => a.email.localeCompare(b.email)));
+        this.users.update(list => [...list, u].sort((a, b) => (a.email ?? a.name).localeCompare(b.email ?? b.name)));
         this.newEmail.set('');
         this.newEnabled.set(true);
         this.newPerms.set(new Set([PERM.dashboardView]));

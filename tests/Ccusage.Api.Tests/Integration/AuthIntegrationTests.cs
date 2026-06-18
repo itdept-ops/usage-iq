@@ -233,6 +233,19 @@ public class AuthIntegrationTests(WebAppFactory factory)
         return c;
     }
 
+    /// <summary>
+    /// Reads /api/audit as the admin WITH the email-reveal key, so the audit log returns real actor/target
+    /// emails (the email-visibility gate masks OTHER users' emails to null without the X-Email-Reveal-Key
+    /// header). The default key is "Starbucks" (appsettings.json); the test host runs with SkipLocalSettings
+    /// and no override. Used by the audit assertions that match on a non-caller user's targetEmail.
+    /// </summary>
+    private async Task<JsonElement> ReadAuditRevealed(HttpClient admin)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/audit");
+        req.Headers.Add("X-Email-Reveal-Key", "Starbucks");
+        return await (await admin.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
+    }
+
     [Fact]
     public async Task Force_logout_bumps_session_version_and_writes_an_audit_entry()
     {
@@ -250,8 +263,8 @@ public class AuthIntegrationTests(WebAppFactory factory)
             (await db.Users.FirstAsync(u => u.Id == id)).SessionVersion.Should().Be(1);
         }
 
-        // Audit entry written with actor + target.
-        var audit = await (await admin.GetAsync("/api/audit")).Content.ReadFromJsonAsync<JsonElement>();
+        // Audit entry written with actor + target. Read WITH the reveal key so the target email is unmasked.
+        var audit = await ReadAuditRevealed(admin);
         audit.EnumerateArray().ToList().Should().Contain(e =>
             e.GetProperty("action").GetString() == "user.forcedlogout" &&
             e.GetProperty("targetEmail").GetString() == email &&
@@ -354,7 +367,7 @@ public class AuthIntegrationTests(WebAppFactory factory)
         await admin.PostAsJsonAsync("/api/users",
             new { email, isEnabled = true, permissions = new[] { "dashboard.view" } });
 
-        var audit = await (await admin.GetAsync("/api/audit")).Content.ReadFromJsonAsync<JsonElement>();
+        var audit = await ReadAuditRevealed(admin);
         audit.EnumerateArray().ToList().Should().Contain(e =>
             e.GetProperty("action").GetString() == "user.created" &&
             e.GetProperty("targetEmail").GetString() == email &&
@@ -485,7 +498,7 @@ public class AuthIntegrationTests(WebAppFactory factory)
             var email = $"autoaudit-{Guid.NewGuid():N}@test.local";
             (await GoogleLogin($"{email}|sub-{Guid.NewGuid():N}")).StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var audit = await (await admin.GetAsync("/api/audit")).Content.ReadFromJsonAsync<JsonElement>();
+            var audit = await ReadAuditRevealed(admin);
             audit.EnumerateArray().ToList().Should().Contain(e =>
                 e.GetProperty("action").GetString() == "user.autoprovisioned" &&
                 e.GetProperty("targetEmail").GetString() == email);
@@ -780,7 +793,7 @@ public class AuthIntegrationTests(WebAppFactory factory)
 
         (await GoogleLogin($"{email}|sub-d")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        var audit = await (await admin.GetAsync("/api/audit")).Content.ReadFromJsonAsync<JsonElement>();
+        var audit = await ReadAuditRevealed(admin);
         audit.EnumerateArray().ToList().Should().Contain(e =>
             e.GetProperty("action").GetString() == "auth.denied" &&
             e.GetProperty("targetEmail").GetString() == email);
