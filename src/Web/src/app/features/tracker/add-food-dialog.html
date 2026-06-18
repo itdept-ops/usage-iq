@@ -6,7 +6,7 @@
     @if (manual()) {
       <div class="af-manual">
         <p class="af-manual__lead">
-          Enter the food and its totals.
+          Enter the food and its per-serving totals.
           <span class="af-manual__hint"><mat-icon aria-hidden="true">bookmark_add</mat-icon> Saved to My foods for next time.</span>
         </p>
         <mat-form-field appearance="outline" class="af-field">
@@ -42,6 +42,13 @@
             <span matTextSuffix>g</span>
           </mat-form-field>
         </div>
+
+        <mat-form-field appearance="outline" class="af-field af-qty">
+          <mat-label>Quantity (servings)</mat-label>
+          <input matInput type="number" min="0" step="any" inputmode="decimal"
+                 [ngModel]="quantity()" (ngModelChange)="quantity.set($event)" />
+          <span matTextSuffix>servings</span>
+        </mat-form-field>
       </div>
     } @else {
       <div class="af-chosen">
@@ -136,6 +143,24 @@
       }
     } @else if (mode() === 'scan') {
       <app-barcode-scanner (detected)="onBarcode($event)" />
+      @if (searching()) { <mat-progress-bar mode="indeterminate" aria-label="Looking up barcode" /> }
+      @if (barcodeNotFound(); as code) {
+        <!-- Distinct barcode "no product" state: clearly different from idle/scanning + empty search. -->
+        <div class="af-notice af-notice--warn" role="alert">
+          <mat-icon aria-hidden="true">search_off</mat-icon>
+          <div class="af-notice__body">
+            <p class="af-notice__msg">No product found for that barcode (<span class="mono-num">{{ code }}</span>). Try a name search or add it manually.</p>
+            <div class="af-notice__actions">
+              <button mat-stroked-button type="button" (click)="searchByName()">
+                <mat-icon>search</mat-icon> Search by name
+              </button>
+              <button mat-stroked-button type="button" (click)="startManual()">
+                <mat-icon>edit</mat-icon> Enter manually
+              </button>
+            </div>
+          </div>
+        </div>
+      }
       @if (searchError(); as e) { <p class="af-error" role="alert"><mat-icon>error_outline</mat-icon> {{ e }}</p> }
     } @else {
       <!-- "My foods": the caller's per-user saved library, searchable + pickable. -->

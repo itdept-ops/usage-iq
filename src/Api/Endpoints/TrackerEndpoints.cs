@@ -163,6 +163,8 @@ public static class TrackerEndpoints
             // Saved "My foods" upkeep. A MANUAL log (no provider source AND no FdcId) is auto-saved /
             // bumped; an explicit "custom" re-log bumps the matching saved row; usda/fatsecret logs are
             // never saved (they're searchable upstream already).
+            // The saved row stores PER-UNIT (unscaled) values so re-picking it at any quantity scales
+            // correctly with no compounding — divide the (scaled) entry by its quantity.
             var source = (req.Source ?? "").Trim().ToLowerInvariant();
             var isManual = source.Length == 0 && req.FdcId is null;
             if (isManual || source == "custom")
@@ -581,6 +583,8 @@ public static class TrackerEndpoints
             UserEmail = email,
             Goal = TrackerGoal.Maintain,
             ShareWithContacts = false,
+            // New users default to Imperial (lb + ft/in); existing rows keep their stored preference.
+            UnitSystem = UnitSystem.Imperial,
             UpdatedUtc = DateTime.UtcNow,
         };
         db.TrackerProfiles.Add(profile);
@@ -608,13 +612,26 @@ public static class TrackerEndpoints
     /// <paramref name="bumpOnly"/> is for an explicit "custom" re-log (a pick of an existing saved food):
     /// it must never create a new row — if no match exists it is a no-op. The unique-index violation
     /// catch handles a concurrent insert racing the same identity.
+    ///
+    /// The stored macros are PER-UNIT (unscaled): the logged <paramref name="entry"/> carries the SCALED
+    /// totals (per-serving × quantity), so we divide back out by the quantity. This keeps a re-pick at any
+    /// quantity scaling correctly with no compounding. The dedupe key uses a quantity-INDEPENDENT serving
+    /// description (an auto-generated "N servings" collapses to "1 serving") so logging the same food at
+    /// different quantities still bumps one row rather than spawning duplicates.
     /// </summary>
     private static async Task UpsertCustomFoodAsync(
         UsageDbContext db, string email, FoodEntry entry, bool bumpOnly, CancellationToken ct)
     {
         var description = entry.Description; // already trimmed + capped at log time
         var brand = NormalizeKey(entry.Brand);
-        var servingDesc = NormalizeKey(entry.ServingDesc);
+        var qty = entry.Quantity > 0 ? entry.Quantity : 1;
+        var servingDesc = PerUnitServingDesc(entry.ServingDesc, qty);
+
+        // Per-unit (unscaled) macros = the scaled snapshot ÷ quantity, with sane rounding.
+        var calories = (int)Math.Round(entry.Calories / qty, MidpointRounding.AwayFromZero);
+        var proteinG = Math.Round(entry.ProteinG / qty, 1);
+        var carbG = Math.Round(entry.CarbG / qty, 1);
+        var fatG = Math.Round(entry.FatG / qty, 1);
 
         var existing = await db.CustomFoods.FirstOrDefaultAsync(f =>
             f.UserEmail == email && f.Description == description
@@ -626,10 +643,10 @@ public static class TrackerEndpoints
             existing.LastUsedUtc = DateTime.UtcNow;
             if (!bumpOnly)
             {
-                existing.Calories = entry.Calories;
-                existing.ProteinG = entry.ProteinG;
-                existing.CarbG = entry.CarbG;
-                existing.FatG = entry.FatG;
+                existing.Calories = calories;
+                existing.ProteinG = proteinG;
+                existing.CarbG = carbG;
+                existing.FatG = fatG;
             }
             await db.SaveChangesAsync(ct);
             return;
@@ -645,10 +662,10 @@ public static class TrackerEndpoints
             Description = description,
             Brand = brand,
             ServingDesc = servingDesc,
-            Calories = entry.Calories,
-            ProteinG = entry.ProteinG,
-            CarbG = entry.CarbG,
-            FatG = entry.FatG,
+            Calories = calories,
+            ProteinG = proteinG,
+            CarbG = carbG,
+            FatG = fatG,
             UseCount = 1,
             CreatedUtc = now,
             LastUsedUtc = now,
@@ -667,12 +684,29 @@ public static class TrackerEndpoints
             if (winner is null) return;
             winner.UseCount += 1;
             winner.LastUsedUtc = DateTime.UtcNow;
-            winner.Calories = entry.Calories;
-            winner.ProteinG = entry.ProteinG;
-            winner.CarbG = entry.CarbG;
-            winner.FatG = entry.FatG;
+            winner.Calories = calories;
+            winner.ProteinG = proteinG;
+            winner.CarbG = carbG;
+            winner.FatG = fatG;
             await db.SaveChangesAsync(ct);
         }
+    }
+
+    /// <summary>
+    /// The quantity-independent (per-unit) serving description used for a saved food's key/snapshot. An
+    /// auto-generated count like "2 servings" collapses to "1 serving" so the same food saved at different
+    /// quantities dedupes onto one row; any other text (e.g. "1 bowl") describes a single unit already and
+    /// is kept verbatim.
+    /// </summary>
+    private static string PerUnitServingDesc(string? servingDesc, double quantity)
+    {
+        var s = NormalizeKey(servingDesc);
+        if (s.Length == 0) return s;
+        // Match a leading numeric count followed by "serving"/"servings" (the dialog's manual default).
+        var m = System.Text.RegularExpressions.Regex.Match(
+            s, @"^\s*\d+(?:\.\d+)?\s+servings?\s*$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return m.Success ? "1 serving" : s;
     }
 
     /// <summary>Normalize a nullable key part to the empty string so null/empty collapse to one row.</summary>

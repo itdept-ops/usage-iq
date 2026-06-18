@@ -77,7 +77,7 @@ export class ProfileDialog {
   readonly dateOfBirth = signal<string | null>(this.data.profile.dateOfBirth ?? null);
   readonly sex = signal<Sex>(this.data.profile.sex ?? 'Unspecified');
   readonly activityLevel = signal<ActivityLevel>(this.data.profile.activityLevel ?? 'Sedentary');
-  readonly unitSystem = signal<UnitSystem>(this.data.profile.unitSystem ?? 'Metric');
+  readonly unitSystem = signal<UnitSystem>(this.data.profile.unitSystem ?? 'Imperial');
 
   readonly imperial = computed(() => this.unitSystem() === 'Imperial');
 

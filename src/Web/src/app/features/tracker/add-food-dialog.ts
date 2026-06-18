@@ -65,6 +65,13 @@ export class AddFoodDialog {
   readonly searchError = signal<string | null>(null);
   private readonly queryStream = new Subject<string>();
 
+  /**
+   * The barcode (scanned or typed) whose lookup returned NO product, or null. Drives a distinct
+   * "not found" notice in the scan panel — explicitly different from the idle/scanning state and from
+   * an empty name-search — with affordances to switch to a name search or to manual entry.
+   */
+  readonly barcodeNotFound = signal<string | null>(null);
+
   // ---- "My foods" (per-user saved library) ----
   readonly savedQuery = signal('');
   readonly savedLoading = signal(false);
@@ -98,25 +105,29 @@ export class AddFoodDialog {
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
 
-  /** Unit hint for the quantity field, driven by the selected food's basis. */
-  readonly quantityUnit = computed(() => this.selected()?.basis === 'per100g' ? 'grams' : 'servings');
+  /** Unit hint for the quantity field, driven by the selected food's basis (manual = servings). */
+  readonly quantityUnit = computed(() =>
+    !this.manual() && this.selected()?.basis === 'per100g' ? 'grams' : 'servings');
 
   /**
-   * The scaled calories/macros for the current selection + quantity. perServing scales by the serving
-   * count; per100g scales grams ÷ 100. Manual entries are taken verbatim (no scaling — the user typed
-   * the totals they want logged).
+   * The scaled calories/macros for the current selection/manual entry + quantity. A picked food's
+   * perServing scales by the serving count, per100g by grams ÷ 100. A MANUAL entry's calories/macros
+   * are PER ONE serving and scale by the quantity — exactly like the picked-food path — so the logged
+   * total matches what the user sees here.
    */
   readonly scaled = computed(() => {
+    const q = this.quantity();
     if (this.manual()) {
+      if (!(q > 0)) return { calories: 0, proteinG: 0, carbG: 0, fatG: 0 };
+      const round = (n: number | null) => Math.round((n ?? 0) * q * 10) / 10;
       return {
-        calories: this.mCalories() ?? 0,
-        proteinG: this.mProtein() ?? 0,
-        carbG: this.mCarb() ?? 0,
-        fatG: this.mFat() ?? 0,
+        calories: Math.round((this.mCalories() ?? 0) * q),
+        proteinG: round(this.mProtein()),
+        carbG: round(this.mCarb()),
+        fatG: round(this.mFat()),
       };
     }
     const f = this.selected();
-    const q = this.quantity();
     if (!f || !(q > 0)) return { calories: 0, proteinG: 0, carbG: 0, fatG: 0 };
     const factor = f.basis === 'per100g' ? q / 100 : q;
     const round = (n: number) => Math.round(n * factor * 10) / 10;
@@ -130,7 +141,10 @@ export class AddFoodDialog {
 
   /** A short human serving description for the entry ("2 servings" / "150 grams"). */
   readonly servingDesc = computed(() => {
-    if (this.manual()) return undefined;
+    if (this.manual()) {
+      const q = this.quantity();
+      return `${q} ${q === 1 ? 'serving' : 'servings'}`;
+    }
     const f = this.selected();
     if (!f) return undefined;
     // A re-picked saved food at quantity 1 keeps its original serving text verbatim.
@@ -143,7 +157,10 @@ export class AddFoodDialog {
 
   readonly canSave = computed(() => {
     if (this.saving()) return false;
-    if (this.manual()) return this.mDesc().trim().length > 0 && (this.mCalories() ?? 0) >= 0 && this.mCalories() != null;
+    if (this.manual()) {
+      return this.mDesc().trim().length > 0 && this.mCalories() != null
+        && (this.mCalories() ?? 0) >= 0 && this.quantity() > 0;
+    }
     return !!this.selected() && this.quantity() > 0;
   });
 
@@ -197,6 +214,7 @@ export class AddFoodDialog {
   setMode(m: Mode): void {
     this.mode.set(m);
     this.saveError.set(null);
+    this.barcodeNotFound.set(null);
     // Lazy-load the saved library the first time the "My foods" tab is opened.
     if (m === 'saved' && !this.savedLoadedOnce) {
       this.savedLoadedOnce = true;
@@ -246,6 +264,8 @@ export class AddFoodDialog {
     this.selected.set(null);
     this.selectedSource.set(null);
     this.pickedServingDesc.set(undefined);
+    this.barcodeNotFound.set(null);
+    this.quantity.set(1);
     this.mode.set('search');
   }
 
@@ -257,10 +277,15 @@ export class AddFoodDialog {
     this.manual.set(false);
   }
 
-  /** A scanned/typed barcode → look it up; prefill on a hit, else steer to manual. */
+  /**
+   * A scanned/typed barcode → look it up. On a hit, prefill the quantity step. On NO match (neither
+   * provider matched, not a 503), stay on the scan panel and raise a distinct {@link barcodeNotFound}
+   * notice with affordances to switch to name search or manual entry — never silently show nothing.
+   */
   onBarcode(code: string): void {
     this.searching.set(true);
     this.searchError.set(null);
+    this.barcodeNotFound.set(null);
     this.api.searchFoods({ barcode: code }).pipe(
       catchError((e: HttpErrorResponse) => {
         if (e.status === 503) this.searchUnavailable.set(true);
@@ -268,15 +293,24 @@ export class AddFoodDialog {
       }),
     ).subscribe(list => {
       this.searching.set(false);
-      this.mode.set('search');
       if (list && list.length > 0) {
+        this.mode.set('search');
         this.pick(list[0]);
+      } else if (this.searchUnavailable()) {
+        // Lookup unavailable (503) — fall back to the existing "search isn't configured" steer.
+        this.mode.set('search');
       } else {
-        this.searchError.set(`No product found for ${code}. Try a name search or enter it manually.`);
-        this.startManual();
-        this.mDesc.set('');
+        // A genuine empty barcode lookup: surface the explicit not-found notice (stays on scan).
+        this.barcodeNotFound.set(code);
       }
     });
+  }
+
+  /** Switch from the barcode not-found notice to a fresh name search. */
+  searchByName(): void {
+    this.barcodeNotFound.set(null);
+    this.query.set('');
+    this.mode.set('search');
   }
 
   basisLabel(f: FoodSearchItemDto): string {
@@ -295,7 +329,7 @@ export class AddFoodDialog {
       fdcId: (!this.manual() && src === 'usda') ? f?.fdcId : undefined,
       description: this.manual() ? this.mDesc().trim() : (f?.description ?? ''),
       brand: this.manual() ? (this.mBrand().trim() || undefined) : f?.brand,
-      quantity: this.manual() ? 1 : this.quantity(),
+      quantity: this.quantity(),
       servingDesc: this.servingDesc(),
       calories: s.calories,
       proteinG: s.proteinG,

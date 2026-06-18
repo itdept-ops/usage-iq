@@ -47,6 +47,27 @@
   background: var(--tech-bg-sunken);
   color: var(--tech-text-secondary);
   mat-icon { color: var(--tech-accent); font-size: 18px; width: 18px; height: 18px; }
+
+  /* Distinct barcode "no product found" state (warmer, alert-toned). */
+  &--warn {
+    align-items: flex-start;
+    border-color: color-mix(in srgb, var(--tech-warn, var(--tech-accent)) 45%, transparent);
+    background: color-mix(in srgb, var(--tech-warn, var(--tech-accent)) 8%, var(--tech-bg-sunken));
+    mat-icon { color: var(--tech-warn, var(--tech-accent)); flex: 0 0 auto; margin-top: 1px; }
+  }
+
+  &__body { display: flex; flex-direction: column; gap: var(--tech-space-2); min-width: 0; }
+  &__msg { margin: 0; }
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    button {
+      min-height: 40px;
+      border-radius: var(--tech-r-control);
+      mat-icon { color: inherit; margin-right: 4px; font-size: 16px; width: 16px; height: 16px; }
+    }
+  }
 }
 
 .af-error {

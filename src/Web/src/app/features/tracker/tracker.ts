@@ -232,7 +232,7 @@ export class Tracker {
   openProfile(): void {
     if (this.store.readOnly()) return;
     const profile: TrackerProfileDto = this.store.profile()
-      ?? { goal: 'Maintain', shareWithContacts: false, sex: 'Unspecified', activityLevel: 'Sedentary', unitSystem: 'Metric' };
+      ?? { goal: 'Maintain', shareWithContacts: false, sex: 'Unspecified', activityLevel: 'Sedentary', unitSystem: 'Imperial' };
     const data: ProfileData = { profile };
     this.dialog.open(ProfileDialog, { data, width: '460px', maxWidth: '95vw', autoFocus: false })
       .afterClosed().subscribe((req: TrackerProfileDto | undefined) => {
@@ -248,7 +248,7 @@ export class Tracker {
     const p = this.store.profile();
     const data: LogWeightData = {
       date: this.store.date(),
-      unitSystem: (p?.unitSystem ?? 'Metric'),
+      unitSystem: (p?.unitSystem ?? 'Imperial'),
       currentKg: p?.weightKg ?? null,
     };
     this.dialog.open(LogWeightDialog, { data, width: '360px', maxWidth: '95vw', autoFocus: false })

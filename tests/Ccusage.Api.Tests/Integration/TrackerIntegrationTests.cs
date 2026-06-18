@@ -616,6 +616,51 @@ public class TrackerIntegrationTests(WebAppFactory factory)
     }
 
     [Fact]
+    public async Task Manual_food_log_with_quantity_stores_per_unit_macros_and_logs_scaled_totals()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        // Manual log of a food at quantity 3: the dialog sends the SCALED totals (per-serving × 3) plus
+        // the quantity, so the logged entry is the full total but "My foods" stores the per-unit values.
+        (await user.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "dinner", description = "Protein shake", brand = "",
+            quantity = 3.0, servingDesc = "3 servings",
+            calories = 360, proteinG = 90.0, carbG = 30.0, fatG = 9.0,
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // The logged day entry carries the SCALED total.
+        var day = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        var food = day.GetProperty("foods").EnumerateArray().Single();
+        food.GetProperty("calories").GetInt32().Should().Be(360);
+        food.GetProperty("quantity").GetDouble().Should().Be(3.0);
+        day.GetProperty("caloriesIn").GetInt32().Should().Be(360);
+
+        // The saved "My foods" row stores the PER-UNIT (unscaled) macros so re-picking scales cleanly.
+        var saved = (await Json(await user.GetAsync("/api/tracker/foods/saved"))).EnumerateArray().ToList();
+        saved.Should().ContainSingle();
+        saved[0].GetProperty("calories").GetInt32().Should().Be(120);   // 360 / 3
+        saved[0].GetProperty("proteinG").GetDouble().Should().Be(30.0); // 90 / 3
+        saved[0].GetProperty("carbG").GetDouble().Should().Be(10.0);    // 30 / 3
+        saved[0].GetProperty("fatG").GetDouble().Should().Be(3.0);      // 9 / 3
+        saved[0].GetProperty("useCount").GetInt32().Should().Be(1);
+
+        // Logging the SAME per-serving food at a DIFFERENT quantity dedupes onto the one row (the key is
+        // quantity-independent) and bumps UseCount rather than spawning a duplicate.
+        (await user.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "lunch", description = "Protein shake", brand = "",
+            quantity = 2.0, servingDesc = "2 servings",
+            calories = 240, proteinG = 60.0, carbG = 20.0, fatG = 6.0,
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var saved2 = (await Json(await user.GetAsync("/api/tracker/foods/saved"))).EnumerateArray().ToList();
+        saved2.Should().ContainSingle();
+        saved2[0].GetProperty("useCount").GetInt32().Should().Be(2);
+        saved2[0].GetProperty("calories").GetInt32().Should().Be(120); // still per-unit, no compounding
+    }
+
+    [Fact]
     public async Task A_usda_or_fatsecret_sourced_log_does_not_create_a_saved_food()
     {
         var (_, user) = await ProvisionUser("tracker.self");
