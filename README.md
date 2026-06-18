@@ -2,13 +2,13 @@
 
 # Usage IQ
 
-A self-hosted dashboard for **filtering and visualizing your AI coding-agent token usage** — your "ccusage", across **multiple tools** (Claude Code + OpenAI Codex), with charts, cost, and drill-down. It reads each tool's local `*.jsonl` logs directly, de-duplicates and prices every message, stores it in **PostgreSQL**, and serves a filterable **Angular** dashboard from a **.NET 9** API.
+A self-hosted **workspace** built around **AI usage intelligence** — and grown into the team app around it. At its core it **filters and visualizes your AI coding-agent token usage** — your "ccusage", across **multiple tools** (Claude Code + OpenAI Codex), with charts, cost, and drill-down. It reads each tool's local `*.jsonl` logs directly, de-duplicates and prices every message, stores it in **PostgreSQL**, and serves a filterable **Angular** dashboard from a **.NET 9** API. Around that anchor it adds **real-time team chat & notifications** and a **food & fitness tracker** — all behind one Google sign-in and one granular permission catalog.
 
 [![CI](https://github.com/itdept-ops/usage-iq/actions/workflows/ci.yml/badge.svg)](https://github.com/itdept-ops/usage-iq/actions/workflows/ci.yml)
 
 <a href="https://www.buymeacoffee.com/itdept"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=itdept&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" alt="Buy me a coffee" /></a>
 
-> Built with Angular 21 · .NET 9 · EF Core · PostgreSQL · Docker · ECharts.
+> Built with Angular 21 · .NET 9 · EF Core · PostgreSQL · SignalR · Docker · ECharts · AWS.
 
 ![Usage IQ dashboard](docs/screenshots/dashboard.png)
 
@@ -24,6 +24,8 @@ A self-hosted dashboard for **filtering and visualizing your AI coding-agent tok
 | ![Activity](docs/screenshots/activity.png) | ![Calendar](docs/screenshots/calendar.png) |
 | **Pop-out widget** — Claude | **Pop-out widget** — Codex |
 | ![Claude widget](docs/screenshots/widget-claude.png) | ![Codex widget](docs/screenshots/widget-codex.png) |
+| **Team chat** — channels, DMs, reactions, unread | **Food & fitness tracker** — calories, macros, exercise |
+| ![Team chat](docs/screenshots/chat.png) | ![Tracker](docs/screenshots/tracker.png) |
 
 **Public share link** (read-only, no login, time-limited) and its management dialog (copy anytime, edit expiry, per-view IP, revoke):
 
@@ -71,6 +73,42 @@ Each source is enable/disable-able with an editable path on the **Settings** pag
 - **Action log** — every API request & response captured by middleware (truncated, with auth routes / secret fields / query-string tokens redacted; health and polling skipped), browsable and filterable on an admin **Activity** page.
 - **Discord notifications** — daily/weekly spend digests (with **trend ▲▼** vs the previous period and a **top project/model breakdown**), a daily spend-threshold alert, **security alerts** (user changes + denied sign-ins), an on-demand **"send usage now"** snapshot (today / 7d / month / all-time), and optional **@here/role mentions** on critical alerts — all via an incoming webhook (validated to genuine Discord hosts, redirects refused, stored masked, redacted from the action log).
 
+## Team chat & notifications
+
+Real-time, in-app messaging on a **SignalR** hub (`/api/hubs/chat`) — no third-party chat service.
+
+- **Channels & direct messages** — create channels (public or private) or open a 1:1 DM with another user; message history is cursor-paged and every conversation carries a live **unread count**.
+- **Live & lively** — **emoji reactions**, **typing indicators**, and instant delivery over a WebSocket; a new DM/channel surfaces to the other party in real time.
+- **Notifications everywhere** — an in-app **bell** with unread badge, in-app **toasts**, and opt-in **browser notifications** (the SPA asks for permission on a real click), with **per-user triggers** so nobody drowns in noise.
+- **Moderation** — anyone can edit/delete their own messages; a `chat.moderate` holder can edit/delete **other people's** messages and **archive** channels.
+- **Curated circles** — admins (`chat.contacts.manage`) maintain each user's **contacts** (their circle of who they can DM); contact pairs are mutual.
+- Permission-gated end to end: `chat.read` (see + read), `chat.send` (post, create channels, start DMs, react), `chat.moderate`, `chat.contacts.manage`. The hub re-checks the DB permission on **every** call, so a revoked grant takes effect immediately.
+
+## Food & fitness tracker
+
+A per-user **food & fitness log** with a daily calorie/macro roll-up against a goal — gated by `tracker.self` (own log) and `tracker.viewall` (coach/admin read-everyone).
+
+- **Meal logging** — breakfast / lunch / dinner / snacks, each with **calories + macros** (protein/carbs/fat), backed by **USDA FoodData Central** with a **FatSecret** fallback search, **barcode scanning** (UPC/GTIN), and auto-saved **"My foods"** for manual entries. Nutrition is snapshotted at log time, so editing a source later never rewrites history.
+- **Exercise logging** — pick from a built-in **exercise library** (MET-based **calories-burned** estimate from your weight + duration) or the **WorkoutX** catalog (animated GIF demos, a **per-minute** calories-burned auto-estimate), with **manual override**; reuse your saved **"My exercises"**.
+- **Body stats** — **BMI**, **BMR/TDEE**, and a **weight trend** from your private weight history (visible only to you).
+- **Hydration** — a daily fluid counter with quick-add and a goal ring.
+- **Watch activity** — daily **steps, distance, and active calories** that factor into the day's **net calories** (add-on or override).
+- **Sharing** — flip on *share with contacts* to let your **chat circle** view your log read-only; coaches/admins with `tracker.viewall` can view everyone. **Writes are owner-only** — a viewer can look but never edit — and private body metrics (weight, BMI/BMR/TDEE) are never exposed to a viewer.
+
+## External APIs / integrations
+
+Usage IQ talks to a few external providers; each is **optional** and **degrades gracefully** (the feature returns **HTTP 503** "not configured" while the rest of the app keeps working).
+
+| Provider | Used for |
+| --- | --- |
+| **Google Identity** | Sign-in (SSO) — validates the ID token and pins each account to its Google `sub`. |
+| **USDA FoodData Central** | Primary food search + details (text + barcode) for the tracker. |
+| **FatSecret** | Fallback food search/barcode, used only when USDA is unconfigured or returns nothing. |
+| **WorkoutX** | Exercise library, animated demos, and per-minute rates for the calorie estimate; the GIF demo is proxied server-side so the key never reaches the browser. |
+| **Discord** | Outbound spend/security notifications via an incoming webhook. |
+
+**Data posture.** Prompt/response **content never leaves the machine** — only usage **metadata** (token counts, model, project, timing) is ever stored or sent. Provider keys live in **git-ignored `appsettings.Local.json`** locally and in **AWS SSM Parameter Store** in production (injected at deploy time), never in the repo. Outbound provider hosts are fixed (no user-chosen URLs → no SSRF), and keys are never logged.
+
 ## How it handles the data correctly
 
 These are the traps the ingestion pipeline is built around (validated against a real 2,264-file / 218k-line corpus):
@@ -89,7 +127,9 @@ These are the traps the ingestion pipeline is built around (validated against a 
 
 Sign-in is **Google** (Google Identity Services, with the "Continue as…" One-Tap). The server validates the Google ID token's signature, audience (your client id), issuer, and expiry, requires a **verified email**, and **pins each account to its Google subject id** (`sub`) — bound on first login, so a later login with the same email but a different Google account is rejected (a recycled address can't inherit access). Authorization is a **per-user permission set**, enforced **on every request**: the app JWT only proves *who* you are; the server re-loads your user row from the DB on each call and checks `IsEnabled` + the required permission. Disabling a user or removing a permission takes effect on their **next request** — no waiting for a token to expire.
 
-Authorization is a **granular, per-page permission catalog** — 19 capabilities, a *view* plus *action* permission per page: `dashboard.view`/`dashboard.export`, `sync.run`, `calendar.view`, `pricing.view`/`pricing.manage`, `settings.view`/`settings.manage`, `sources.manage`, `reporter.view`/`reporter.manage`/`reporter.self`, `notifications.view`/`notifications.manage`, `shares.view`/`shares.manage`, `users.view`/`users.manage`, `activity.view`. Endpoints that serve more than one page accept *any-of* the relevant permissions. Admins manage everyone from the **Users** page (a user × permission matrix grouped by area, enable toggles, add/remove) — gated by `users.manage`, with last-admin lockout protection.
+Authorization is a **granular, per-capability permission catalog** — **25 capabilities across 10 groups** (Dashboard, Calendar, Pricing, Settings, Reporter, Notifications, Chat, Tracker, Shares, Administration), typically a *view* plus *action* permission per page: `dashboard.view`/`dashboard.export`, `sync.run`, `calendar.view`, `pricing.view`/`pricing.manage`, `settings.view`/`settings.manage`, `sources.manage`, `reporter.view`/`reporter.manage`/`reporter.self`, `notifications.view`/`notifications.manage`, `chat.read`/`chat.send`/`chat.moderate`/`chat.contacts.manage`, `tracker.self`/`tracker.viewall`, `shares.view`/`shares.manage`, `users.view`/`users.manage`, `activity.view`. Endpoints that serve more than one page accept *any-of* the relevant permissions. Admins manage everyone from the **Users** page (a user × permission matrix grouped by area, enable toggles, add/remove) — gated by `users.manage`, with last-admin lockout protection.
+
+**Real-time force-logout.** From the Users page an admin can sign a user out of their **current** session — without disabling the account — via `POST /api/users/{id}/logout` (`users.manage`). A per-user **session version** is baked into the JWT (`sv` claim); bumping it makes every outstanding token stale, so the next request (or the periodic `/me` poll) is rejected, and a **`SessionRevoked`** event is pushed over SignalR so the SPA logs them out **immediately** rather than waiting for the token to be re-checked. Unlike *Disable*, the user can simply sign in again to get a fresh token.
 
 **Open sign-up (optional).** An admin **Access policy** controls onboarding: with open sign-up on, any Google account is **auto-provisioned** on first sign-in with a configurable **default permission set** (an empty default behaves as an approval queue); a kill switch turns it off. `users.manage` can never be a default, so open sign-up can't mint an admin, and bootstrap admin emails are promoted to full access on every startup so the owner can't be locked out.
 
@@ -111,12 +151,16 @@ Authorization is a **granular, per-page permission catalog** — 19 capabilities
 ```
 ┌─────────────┐     /api (proxy)     ┌──────────────┐   EF Core / Npgsql   ┌────────────┐
 │  Angular 21 │ ───────────────────▶ │   .NET 9 API │ ───────────────────▶ │ PostgreSQL │
-│  (ECharts)  │                      │  ingest+query│                      │  (Docker)  │
-└─────────────┘                      └──────┬───────┘                      └────────────┘
-                                            │ reads *.jsonl
-                                            ▼
-                                 ~/.claude/projects/**/*.jsonl
+│  (ECharts)  │ ◀╌╌╌ SignalR (WS) ╌╌▶│ ingest+query │                      │  (Docker)  │
+└─────────────┘   /api/hubs/chat     │ chat+tracker │                      └────────────┘
+                                     └──┬────────┬──┘
+                        reads *.jsonl   │        │   HTTPS (optional, graceful 503)
+                                        ▼        ▼
+                      ~/.claude/projects/**     Google · USDA · FatSecret · WorkoutX · Discord
 ```
+
+- The browser holds a live **SignalR** WebSocket (`/api/hubs/chat`) for chat, notifications, and real-time force-logout.
+- The API reaches out to external providers (Google, USDA, FatSecret, WorkoutX, Discord) only when each is configured — every one degrades to a 503 otherwise.
 
 - **Dev**: Postgres in Docker; API (`dotnet run`) and Angular (`ng serve`) on the host so the API can read your local `.claude` folder.
 - **Full stack**: `docker compose --profile full up` runs all three; the API container reads the logs from a read-only bind mount.
@@ -198,6 +242,7 @@ The reporter de-dupes locally before sending (one billed turn spans several iden
 | `POST` | `/api/auth/google` | Exchange a Google ID token for an app JWT (allowlist enforced). |
 | `GET` | `/api/auth/me`, `/api/auth/config` | Current user + live permissions / public Google client id. |
 | `GET`/`POST`/`PUT`/`DELETE` | `/api/users`, `/api/permissions` | User management (requires `users.manage`). |
+| `POST` | `/api/users/{id}/logout` | **Force-logout** — bump the user's session version + push `SessionRevoked` (real-time sign-out; `users.manage`). |
 | `POST` | `/api/sync` | Ingest new/changed JSONL files; returns counts + timing. |
 | `POST` | `/api/ingest` | **Ingest-key authenticated** push of parsed usage from a remote reporter (anonymous to user auth; rate-limited). |
 | `GET`/`POST`/`DELETE` | `/api/ingest-keys` | Reporter ingest keys — `reporter.manage` sees/revokes all, `reporter.self` manages only the caller's own; raw key shown once. |
@@ -212,7 +257,14 @@ The reporter de-dupes locally before sending (one billed turn spans several iden
 | `GET`/`PUT` | `/api/access-policy` | Open-sign-up toggle + default permission set (requires `users.manage`). |
 | `GET`/`POST`/`DELETE` | `/api/shares` | Manage public share links (requires `dashboard.view`). |
 | `GET` | `/api/share/{token}` | **Anonymous** read of a valid share — scoped aggregates only; 404 if expired/invalid. |
-| `GET` / `PUT` / `POST` | `/api/notifications`, `/api/notifications/test`, `/api/notifications/snapshot` | Discord webhook config + test + send-now snapshot (requires `settings.manage`). |
+| `GET` / `PUT` / `POST` | `/api/notifications`, `/api/notifications/test`, `/api/notifications/snapshot` | Discord webhook config + test + send-now snapshot (`notifications.view`/`notifications.manage`). |
+| `WS` | `/api/hubs/chat` | **SignalR** chat hub — send/react/typing/mark-read + server-pushed messages, notifications, `SessionRevoked` (`chat.*`). |
+| `GET`/`POST` | `/api/chat/channels`, `/api/chat/direct` | List my channels + DMs (with unread counts); create a channel; open a DM (`chat.read`/`chat.send`). |
+| `GET`/`POST` | `/api/chat/channels/{id}/messages`, `/api/chat/channels/{id}/read`, `/api/chat/channels/{id}` | Message history, send, mark-read; `DELETE` archives a channel (`chat.moderate`). |
+| `PATCH`/`DELETE`/`POST` | `/api/chat/messages/{id}`, `/api/chat/messages/{id}/reactions` | Edit/delete a message (owner or `chat.moderate`); toggle an emoji reaction. |
+| `GET`/`POST`/`DELETE` | `/api/chat/contacts/*`, `/api/chat/directory` | View the user directory + curate a user's contacts/circle (`chat.contacts.manage`). |
+| `GET`/`POST`/`DELETE` | `/api/tracker/*` | Tracker day, food/exercise/weight/hydration/activity logging, profile, saved foods/exercises, library, sharing (`tracker.self`; read-others `tracker.viewall`). |
+| `GET` | `/api/foods/search`, `/api/foods/{fdcId}` | Food lookup proxy — USDA primary, FatSecret fallback (text + barcode; `tracker.self`). |
 | `GET` | `/api/audit` | Recent user-management audit entries (requires `users.manage`). |
 | `GET` | `/api/logs` | Recent request/response action log; filter by `method`/`status`/`q` (requires `users.manage`). |
 | `GET` | `/api/projects`, `/api/models`, `/api/sources` | Filter options with totals. |
@@ -257,15 +309,16 @@ usage-iq/
    ├─ Api/                     # .NET 9 minimal API
    │  ├─ Data/                 # EF entities, DbContext, pricing seed
    │  ├─ Ingestion/            # sync, dedup, cost, project/timezone resolve, HTTP ingest write path
-   │  ├─ Services/             # queries, recompute, sync coordinator, audit, Discord notifier
-   │  ├─ Auth/                 # JWT, per-request permission filter, ingest-key filter
+   │  ├─ Services/             # queries, recompute, sync coordinator, audit, Discord/chat notifiers, USDA/FatSecret/WorkoutX clients
+   │  ├─ Auth/                 # JWT (+ session version), per-request permission filter, ingest-key filter
+   │  ├─ Hubs/                 # SignalR ChatHub (chat, notifications, real-time force-logout)
    │  ├─ Infrastructure/       # global exception handler, request-logging middleware
-   │  └─ Endpoints/            # API surface
+   │  └─ Endpoints/            # API surface (usage, chat, tracker, users, …)
    ├─ ReporterCore/            # shared reporter engine: scan/parse/push, structured events, config loader
    ├─ Reporter/                # console app on ReporterCore: parse local logs, push to /api/ingest
    ├─ Agent/                   # Windows system-tray desktop app on ReporterCore (WPF + tray NotifyIcon)
-   └─ Web/                     # Angular 21 (standalone + signals, ECharts)
-      └─ src/app/{features/{dashboard,calendar,pricing,settings,reporter,users,logs,login},core,shared}
+   └─ Web/                     # Angular 21 (standalone + signals, ECharts, SignalR)
+      └─ src/app/{features/{dashboard,calendar,pricing,settings,reporter,fleet,chat,tracker,notifications,users,logs,login},core,shared}
 ```
 
 ## License

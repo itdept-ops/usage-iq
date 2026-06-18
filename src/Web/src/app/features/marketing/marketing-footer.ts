@@ -17,6 +17,7 @@ export class MarketingFooter {
         { label: 'Home', path: '/login' },
         { label: 'Features', path: '/features' },
         { label: 'How it works', path: '/how-it-works' },
+        { label: 'Technology', path: '/technology' },
         { label: 'About', path: '/about' },
       ],
     },

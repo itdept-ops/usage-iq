@@ -101,7 +101,7 @@
     text-transform: uppercase;
     color: var(--tech-text-accent, #3fd8d0);
   }
-  h2 {
+  h2, h3 {
     margin: 0 0 12px;
     font-family: var(--tech-font-ui);
     font-size: clamp(1.5rem, 3vw, 2.1rem);
@@ -111,6 +111,30 @@
     color: var(--tech-text);
   }
   p { margin: 0; font-size: 1.02rem; line-height: 1.65; color: var(--tech-text-secondary); }
+}
+
+/* ───────────────────────── Feature group heading ───────────────────────── */
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: clamp(16px, 3vw, 32px);
+  &:first-child { margin-top: 0; }
+  h2 {
+    margin: 0;
+    flex: 0 0 auto;
+    font-family: var(--tech-font-ui);
+    font-size: clamp(1.15rem, 2.4vw, 1.55rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--tech-text);
+  }
+  .group-rule {
+    flex: 1 1 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--tech-border-strong), transparent);
+    opacity: 0.7;
+  }
 }
 .block-points {
   display: flex;

@@ -1,0 +1,114 @@
+<app-marketing-nav />
+
+<main class="mpage">
+  <div class="bg-fx" aria-hidden="true"><div class="grid-fade"></div><div class="orb orb-a"></div><div class="orb orb-b"></div></div>
+
+  <header class="mpage-hero">
+    <span class="page-eyebrow">Technology</span>
+    <h1>What Usage IQ is built on.</h1>
+    <p>An Angular SPA, a .NET 9 API with a SignalR hub, and PostgreSQL — packaged with Docker and self-hosted by design. Your data stays on your infrastructure; secrets stay out of the repo.</p>
+  </header>
+
+  <!-- (1) The stack -->
+  <section class="tech-section">
+    <header class="section-head">
+      <span class="section-eyebrow">The stack</span>
+      <h2>The pieces, and what each does.</h2>
+    </header>
+    <ul class="tech-grid">
+      @for (t of stack; track t.name) {
+        <li class="tech-card panel">
+          <span class="tech-card-icon" aria-hidden="true"><mat-icon>{{ t.icon }}</mat-icon></span>
+          <h3>{{ t.name }}</h3>
+          <p>{{ t.role }}</p>
+        </li>
+      }
+    </ul>
+  </section>
+
+  <!-- (2) Integrations & APIs -->
+  <section class="tech-section">
+    <header class="section-head">
+      <span class="section-eyebrow">Integrations &amp; APIs</span>
+      <h2>What we call out to — and what stays put.</h2>
+    </header>
+    <ul class="api-grid">
+      @for (a of integrations; track a.name) {
+        <li class="api-card panel">
+          <h3>{{ a.name }}</h3>
+          <p class="api-powers">{{ a.powers }}</p>
+          <p class="api-posture"><mat-icon aria-hidden="true">lock</mat-icon><span>{{ a.posture }}</span></p>
+        </li>
+      }
+    </ul>
+    <p class="api-note">
+      Provider keys live in git-ignored config or AWS SSM, and every provider degrades gracefully —
+      returning <code>HTTP 503</code> — when it isn't configured.
+    </p>
+  </section>
+
+  <!-- (3) Architecture -->
+  <section class="tech-section">
+    <header class="section-head">
+      <span class="section-eyebrow">Architecture</span>
+      <h2>Angular ⇄ .NET API (+ SignalR) ⇄ PostgreSQL.</h2>
+    </header>
+
+    <ol class="arch-flow">
+      @for (node of arch; track node.title; let last = $last) {
+        <li class="arch-node panel">
+          <span class="arch-node-icon" aria-hidden="true"><mat-icon>{{ node.icon }}</mat-icon></span>
+          <div class="arch-node-body">
+            <h3>{{ node.title }}</h3>
+            <p>{{ node.text }}</p>
+          </div>
+        </li>
+        @if (!last) {
+          <li class="arch-link" aria-hidden="true"><mat-icon>swap_vert</mat-icon></li>
+        }
+      }
+    </ol>
+
+    <aside class="arch-providers panel">
+      <h3>External providers, called server-side</h3>
+      <p>The API reaches out to these on your behalf — your front end never holds a provider key.</p>
+      <ul class="arch-provider-pills">
+        @for (p of archProviders; track p) {
+          <li>{{ p }}</li>
+        }
+      </ul>
+    </aside>
+  </section>
+
+  <!-- (4) Self-hosted by design -->
+  <section class="tech-section">
+    <header class="section-head">
+      <span class="section-eyebrow">Self-hosted by design</span>
+      <h2>It runs on your infrastructure.</h2>
+    </header>
+    <ul class="tech-grid">
+      @for (pr of principles; track pr.title) {
+        <li class="tech-card panel">
+          <span class="tech-card-icon" aria-hidden="true"><mat-icon>{{ pr.icon }}</mat-icon></span>
+          <h3>{{ pr.title }}</h3>
+          <p>{{ pr.text }}</p>
+        </li>
+      }
+    </ul>
+  </section>
+
+  <!-- (5) CTA -->
+  <section class="mpage-cta">
+    <div class="cta-card panel">
+      <div class="cta-glow" aria-hidden="true"></div>
+      <h2>See it running.</h2>
+      <p>Sign in to your dashboard, or browse the full feature list.</p>
+      <div class="cta-row">
+        <a class="cta-pill" routerLink="/signin">Sign in <span>→</span></a>
+        <a class="ghost-link" routerLink="/features">See features <span>→</span></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<app-marketing-footer />

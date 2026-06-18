@@ -8,6 +8,7 @@ interface Feature { icon: string; title: string; text: string; }
 interface Stat { value: number; suffix: string; label: string; }
 interface Source { name: string; tag: string; }
 interface Step { n: string; title: string; text: string; }
+interface Module { icon: string; eyebrow: string; title: string; text: string; }
 
 @Component({
   selector: 'app-login',
@@ -33,17 +34,28 @@ export class Login {
     { name: 'PostgreSQL', tag: 'Your data' },
   ];
 
-  /** Marquee of the stack Usage IQ speaks to — duplicated in the template for a seamless loop. */
+  /** Marquee of the stack Usage IQ runs on and speaks to — duplicated in the template for a seamless loop. */
   readonly marquee: string[] = [
-    'Claude Code', 'OpenAI Codex', 'Anthropic API', 'PostgreSQL', 'Self-hosted',
-    'Token tiers', 'Cache classes', 'Role-based access', 'Activity heatmap', 'Share links',
+    'Claude Code', 'OpenAI Codex', 'Anthropic API', 'Angular 21', '.NET 9', 'PostgreSQL',
+    'SignalR', 'Team chat', 'Fitness tracker', 'USDA', 'FatSecret', 'WorkoutX',
+    'Activity heatmap', 'Share links', 'Discord', 'Self-hosted',
+  ];
+
+  /** The three layers that grew around the namesake usage dashboard. */
+  readonly modules: Module[] = [
+    { icon: 'monitoring', eyebrow: 'The namesake', title: 'AI usage intelligence',
+      text: 'Unify Claude Code and Codex spend, price it from an editable table, and slice it by day, project, model or session.' },
+    { icon: 'forum', eyebrow: 'Grew around it', title: 'Team chat',
+      text: 'Real-time SignalR channels and DMs with reactions, curated contacts, and notifications across an in-app bell, toasts and the browser.' },
+    { icon: 'fitness_center', eyebrow: 'Grew around it', title: 'Food & fitness tracker',
+      text: 'Meals and macros, an exercise library, hydration and watch activity — with BMI/BMR/TDEE, a weight trend, and coach sharing.' },
   ];
 
   /** Animated counter band — values count up when scrolled into view. */
   readonly stats: Stat[] = [
-    { value: 2, suffix: '', label: 'Agents unified' },
+    { value: 3, suffix: '', label: 'Modules, one app' },
     { value: 14, suffix: 'M+', label: 'Tokens tracked' },
-    { value: 6, suffix: '', label: 'Token tiers priced' },
+    { value: 25, suffix: '', label: 'Permission scopes' },
     { value: 100, suffix: '%', label: 'Self-hosted' },
   ];
 
@@ -51,20 +63,24 @@ export class Login {
   readonly counts = signal<number[]>(this.stats.map(() => 0));
 
   readonly features: Feature[] = [
-    { icon: 'hub', title: 'Multi-source', text: 'Claude Code and OpenAI Codex usage, de-duplicated and unified into one view.' },
+    { icon: 'hub', title: 'Unified usage', text: 'Claude Code and OpenAI Codex usage, de-duplicated and unified into one view.' },
     { icon: 'insights', title: 'Cost & tokens', text: 'Break spend down by day, project, model, or session — with an editable pricing table.' },
     { icon: 'calendar_month', title: 'Activity calendar', text: 'A GitHub-style heatmap of every active hour, with session-level drill-down.' },
-    { icon: 'shield_person', title: 'Role-based access', text: 'Google sign-in with per-user permissions, re-checked on every request.' },
+    { icon: 'forum', title: 'Real-time team chat', text: 'SignalR channels and DMs with emoji reactions and curated contacts and circles.' },
+    { icon: 'notifications_active', title: 'Notifications', text: 'Customizable alerts across an in-app bell, toasts, and the browser — never miss a mention.' },
+    { icon: 'fitness_center', title: 'Food & fitness tracker', text: 'Meals, macros, exercises, hydration and watch activity, with BMI/BMR/TDEE and a weight trend.' },
+    { icon: 'shield_person', title: 'Role-based access', text: 'Google sign-in with a 25-capability permission catalog, re-checked on every request.' },
     { icon: 'ios_share', title: 'Shareable views', text: 'Public, time-limited links to a read-only dashboard — revoke them anytime.' },
-    { icon: 'sync', title: 'Always fresh', text: 'A background reporter posts new usage on a timer; the bar shows when it last ran.' },
+    { icon: 'sync', title: 'Always fresh', text: 'A background reporter posts new usage on a timer; only metadata, never your prompts.' },
     { icon: 'forum', title: 'Discord digests', text: 'Scheduled usage summaries pushed straight to your team Discord channel.' },
-    { icon: 'fact_check', title: 'Audit & activity log', text: 'Every request and permission change is recorded — full accountability.' },
+    { icon: 'fact_check', title: 'Audit & force-logout', text: 'Every request and permission change is logged; revoke a session in real time.' },
+    { icon: 'dns', title: 'Self-hosted, no telemetry', text: 'Your infra, your Postgres, no seat pricing — nothing phones home.' },
   ];
 
   readonly steps: Step[] = [
-    { n: '01', title: 'Run the reporter', text: 'A tiny agent on your machine reads Claude Code & Codex logs and posts new usage to your server.' },
+    { n: '01', title: 'Run the reporter', text: 'A tiny agent on your machine reads Claude Code & Codex logs and posts new usage metadata — never prompt or response content.' },
     { n: '02', title: 'It lands in Postgres', text: 'Records are de-duplicated, priced from your editable rate table, and bucketed by your timezone.' },
-    { n: '03', title: 'You see everything', text: 'Filter by date, project, model or session. Cost, tokens, cache tiers — all on one screen.' },
+    { n: '03', title: 'The workspace opens up', text: 'See cost, tokens and cache tiers on one screen — then chat with the team and track meals, workouts and weight alongside it.' },
   ];
 
   readonly terminal: string[] = [
@@ -73,6 +89,7 @@ export class Login {
     '  + 318 new records  (412 deduped)',
     '  posting → https://usageiq.online/api/ingest',
     '  ✓ synced 14.15M tokens · $182.4',
+    '  ✓ chat live · tracker synced',
     '  next run in 30:00 …',
   ];
 

@@ -18,13 +18,14 @@
         <span class="eyebrow-arrow">→</span>
       </a>
       <h1 class="hero-title">
-        Every token your<br />
-        <span class="grad">AI agents</span> burn,<br />
-        on one screen.
+        Your AI usage,<br />
+        your <span class="grad">team</span>,<br />
+        one command center.
       </h1>
       <p class="hero-sub">
-        Usage IQ unifies <strong>Claude Code</strong> and <strong>OpenAI Codex</strong> usage into one
-        command center — cost, tokens, projects and models, filtered any way you like.
+        Usage IQ started by unifying <strong>Claude Code</strong> and <strong>OpenAI Codex</strong> spend on
+        one screen — then grew a real-time <strong>team chat</strong> and a <strong>food &amp; fitness tracker</strong>
+        around it. Self-hosted, open source, nothing phoning home.
       </p>
 
       <div class="hero-cta">
@@ -91,6 +92,26 @@
     </div>
   </section>
 
+  <!-- ───────────────────────── Three modules ───────────────────────── -->
+  <section class="modules-section">
+    <header class="section-head" #reveal>
+      <span class="section-eyebrow">One workspace, three layers</span>
+      <h2>It grew past token usage.</h2>
+      <p>The namesake usage dashboard at the core — with team chat and a fitness tracker built around it.</p>
+    </header>
+    <div class="modules">
+      @for (m of modules; track m.title; let i = $index) {
+        <article class="module panel" #reveal [style.--d]="i">
+          <span class="module-num" aria-hidden="true">{{ '0' + (i + 1) }}</span>
+          <span class="module-icon"><mat-icon>{{ m.icon }}</mat-icon></span>
+          <span class="module-kicker">{{ m.eyebrow }}</span>
+          <h3>{{ m.title }}</h3>
+          <p>{{ m.text }}</p>
+        </article>
+      }
+    </div>
+  </section>
+
   <!-- ───────────────────────── Animated metric band ───────────────────────── -->
   <section class="stats" #reveal aria-label="Key metrics">
     @for (s of stats; track s.label; let i = $index) {
@@ -106,7 +127,7 @@
     <header class="section-head" #reveal>
       <span class="section-eyebrow">Features</span>
       <h2>Built like a command center.</h2>
-      <p>Everything you need to understand AI-agent spend — and nothing phoning home.</p>
+      <p>Everything to understand AI-agent spend, keep the team in sync, and stay on top of your health — all in one self-hosted app.</p>
     </header>
     <div class="features">
       @for (f of features; track f.title; let i = $index) {
@@ -145,7 +166,7 @@
       <div class="cta-glow" aria-hidden="true"></div>
       <div class="cta-grid" aria-hidden="true"></div>
       <h2>See where your tokens go.</h2>
-      <p>Sign in with an approved Google account to open your dashboard.</p>
+      <p>Sign in with an approved Google account to open the dashboard, the chat, and your tracker.</p>
       <div class="cta-actions">
         <a class="cta-pill" routerLink="/signin" [queryParams]="signinParams()">Sign in <span>→</span></a>
         <a class="cta-link" href="#top" (click)="scrollTop($event)">Back to top <span>↑</span></a>

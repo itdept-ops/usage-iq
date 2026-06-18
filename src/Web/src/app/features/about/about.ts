@@ -187,6 +187,10 @@ export class About implements AfterViewInit, OnDestroy {
       return;
     }
 
+    // Arm the hidden→reveal state only now that we know JS + IntersectionObserver are available, so a
+    // no-JS render (or this code never running) can never leave a chapter stuck at opacity:0.
+    this.host.nativeElement.classList.add('js-reveal');
+
     this.zone.runOutsideAngular(() => {
       this.observer = new IntersectionObserver(
         entries => {
@@ -200,6 +204,9 @@ export class About implements AfterViewInit, OnDestroy {
         { threshold: 0.16, rootMargin: '0px 0px -8% 0px' },
       );
       els.forEach(el => this.observer!.observe(el));
+      // Failsafe: if the observer never delivers (throttled/backgrounded tab), reveal everything so
+      // no chapter can stay hidden. Idempotent with the per-element reveals above.
+      setTimeout(() => els.forEach(el => el.classList.add('is-in')), 2500);
     });
   }
 

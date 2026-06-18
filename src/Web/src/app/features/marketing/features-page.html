@@ -6,16 +6,23 @@
   <header class="mpage-hero">
     <span class="page-eyebrow">Features</span>
     <h1>Everything Usage IQ does, in detail.</h1>
-    <p>A self-hosted command center for AI-agent spend. No telemetry, no seat pricing — just your data, on your infrastructure.</p>
+    <p>A self-hosted command center that ties AI-usage intelligence, real-time team chat, and a food &amp; fitness tracker together. No telemetry, no seat pricing — just your data, on your infrastructure.</p>
   </header>
 
   <section class="blocks">
     @for (b of blocks; track b.title; let i = $index) {
+      @if (i === 0 || b.group !== blocks[i - 1].group) {
+        <header class="group-head">
+          <span class="group-rule" aria-hidden="true"></span>
+          <h2>{{ b.group }}</h2>
+          <span class="group-rule" aria-hidden="true"></span>
+        </header>
+      }
       <article class="block" [class.flip]="i % 2 === 1">
         <div class="block-copy">
           <span class="block-icon"><mat-icon>{{ b.icon }}</mat-icon></span>
           <span class="block-kicker">{{ b.kicker }}</span>
-          <h2>{{ b.title }}</h2>
+          <h3>{{ b.title }}</h3>
           <p>{{ b.text }}</p>
         </div>
         <ul class="block-points panel">

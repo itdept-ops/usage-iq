@@ -1,0 +1,181 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Technology page — page-specific styles only.
+   Shared classes (.mpage, .bg-fx, .panel, .section-head, .mpage-hero,
+   .cta-card, etc.) come from marketing-page.scss; --tech-* vars are global.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* shared container width, matching the other marketing sections */
+.tech-section {
+  max-width: var(--tech-max-width, 1280px);
+  margin: 0 auto;
+  padding: clamp(32px, 5vw, 56px) clamp(16px, 4vw, 40px) 0;
+}
+
+/* ───────────────────────── Stack / principle cards ───────────────────────── */
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: clamp(16px, 2vw, 22px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tech-card {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(20px, 3vw, 26px);
+  transition: border-color 200ms var(--tech-ease), transform 200ms var(--tech-ease);
+  &:hover { border-color: var(--tech-border-strong); transform: translateY(-2px); }
+
+  .tech-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px; height: 46px;
+    margin-bottom: 16px;
+    border-radius: var(--tech-r-control, 12px);
+    background: color-mix(in srgb, var(--tech-accent) 16%, transparent);
+    color: var(--tech-accent);
+    mat-icon { font-size: 24px; width: 24px; height: 24px; }
+  }
+  h3 {
+    margin: 0 0 8px;
+    font-family: var(--tech-font-ui);
+    font-size: 1.12rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--tech-text);
+  }
+  p { margin: 0; font-size: 0.95rem; line-height: 1.55; color: var(--tech-text-secondary); }
+}
+
+/* ───────────────────────── Integrations grid ───────────────────────── */
+.api-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: clamp(16px, 2vw, 22px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.api-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: clamp(20px, 3vw, 26px);
+  transition: border-color 200ms var(--tech-ease);
+  &:hover { border-color: var(--tech-border-strong); }
+
+  h3 {
+    margin: 0;
+    font-family: var(--tech-font-ui);
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--tech-text);
+  }
+  .api-powers { margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--tech-text-secondary); }
+  .api-posture {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 4px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--tech-border-subtle);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--tech-text-tertiary);
+    mat-icon {
+      flex: 0 0 auto;
+      font-size: 18px; width: 18px; height: 18px;
+      margin-top: 1px;
+      color: var(--tech-accent-cyan, #3fd8d0);
+    }
+  }
+}
+.api-note {
+  max-width: 70ch;
+  margin: clamp(20px, 3vw, 28px) auto 0;
+  text-align: center;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--tech-text-tertiary);
+  code {
+    font-family: var(--tech-font-mono);
+    font-size: 0.86em;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    color: var(--tech-text-secondary);
+  }
+}
+
+/* ───────────────────────── Architecture flow ───────────────────────── */
+.arch-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.arch-node {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  align-items: center;
+  gap: 18px;
+  padding: clamp(18px, 2.5vw, 24px);
+  @media (max-width: 540px) { grid-template-columns: 1fr; }
+
+  .arch-node-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--tech-bg-sunken, #05080f);
+    border: 1.5px solid color-mix(in srgb, var(--tech-accent) 60%, transparent);
+    color: var(--tech-accent-cyan, #3fd8d0);
+    box-shadow: var(--tech-glow, 0 0 24px -8px rgba(99, 140, 255, 0.6));
+    mat-icon { font-size: 26px; width: 26px; height: 26px; }
+  }
+  .arch-node-body {
+    h3 { margin: 0 0 6px; font-size: 1.12rem; font-weight: 700; letter-spacing: -0.02em; color: var(--tech-text); }
+    p { margin: 0; font-size: 0.95rem; line-height: 1.55; color: var(--tech-text-secondary); }
+  }
+}
+.arch-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tech-text-tertiary);
+  mat-icon { font-size: 24px; width: 24px; height: 24px; opacity: 0.7; }
+}
+
+.arch-providers {
+  max-width: 760px;
+  margin: clamp(20px, 3vw, 28px) auto 0;
+  padding: clamp(20px, 3vw, 26px);
+
+  h3 { margin: 0 0 8px; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; color: var(--tech-text); }
+  p { margin: 0 0 16px; font-size: 0.92rem; line-height: 1.55; color: var(--tech-text-secondary); }
+}
+.arch-provider-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  li {
+    padding: 8px 14px;
+    border-radius: var(--tech-r-pill, 999px);
+    border: 1px solid var(--tech-border-subtle);
+    background: color-mix(in srgb, var(--tech-accent-2, #8b7cff) 10%, transparent);
+    font-family: var(--tech-font-mono);
+    font-size: 0.82rem;
+    color: var(--tech-text-secondary);
+  }
+}

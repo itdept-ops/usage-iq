@@ -73,8 +73,11 @@
   padding-right: clamp(16px, 4vw, 40px);
 }
 
-/* ───────────────────────── Scroll-reveal ───────────────────────── */
-[data-reveal] {
+/* ───────────────────────── Scroll-reveal ─────────────────────────
+   The hidden state is gated behind `.js-reveal` (added to the host by about.ts only once JS +
+   IntersectionObserver are confirmed), so a no-JS render — or this code never running — leaves
+   every chapter visible instead of stuck at opacity:0. */
+:host(.js-reveal) [data-reveal] {
   opacity: 0;
   transform: translateY(26px);
   transition:
@@ -306,7 +309,18 @@
   border-bottom: 1px solid var(--tech-border-subtle);
   @media (max-width: 640px) { grid-template-columns: repeat(2, 1fr); gap: 20px 12px; }
 }
-.metric { text-align: center; }
+.metric {
+  position: relative;
+  text-align: center;
+  &:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    right: -8px; top: 14%;
+    width: 1px; height: 72%;
+    background: linear-gradient(180deg, transparent, var(--tech-border-subtle), transparent);
+    @media (max-width: 640px) { display: none; }
+  }
+}
 .metric-value {
   display: inline-flex;
   align-items: baseline;
@@ -335,22 +349,48 @@
   padding-top: clamp(44px, 7vw, 80px);
   padding-bottom: clamp(20px, 4vw, 40px);
   @media (max-width: 820px) { grid-template-columns: 1fr; }
+
+  /* Gentle staggered settle once the section reveals; keyed on each card's --d.
+     Under reduced motion the [data-reveal] override forces these visible with no
+     transition, so the fallback is unaffected. */
+  &.is-in .pillar {
+    animation: card-settle 560ms var(--tech-ease) both;
+    animation-delay: calc(var(--d, 0) * 90ms);
+  }
+}
+@keyframes card-settle {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
 }
 .pillar {
   position: relative;
-  padding: 26px 24px;
+  padding: 28px 24px;
   border: 1px solid var(--tech-border-subtle);
   border-radius: var(--tech-r-panel, 12px);
   background: var(--tech-panel);
   overflow: hidden;
-  transition: border-color 220ms var(--tech-ease), transform 220ms var(--tech-ease);
+  transition: border-color 220ms var(--tech-ease), transform 220ms var(--tech-ease), box-shadow 240ms var(--tech-ease);
   &::before {
     content: "";
     position: absolute; inset: 0;
     background: radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--tech-accent) 12%, transparent), transparent 52%);
     opacity: 0; transition: opacity 240ms var(--tech-ease);
   }
-  &:hover { border-color: var(--tech-border-strong); transform: translateY(-5px); &::before { opacity: 1; } }
+  &::after {
+    content: "";
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 2px;
+    background: var(--tech-border-neon, linear-gradient(100deg, #3d8bff, #8b7cff 52%, #3fd8d0));
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 320ms var(--tech-ease);
+  }
+  &:hover {
+    border-color: var(--tech-border-strong);
+    transform: translateY(-5px);
+    box-shadow: 0 24px 50px -28px rgba(0, 0, 0, 0.7);
+    &::before { opacity: 1; }
+    &::after { transform: scaleX(1); }
+  }
 
   .pillar-icon {
     position: relative;
@@ -360,8 +400,10 @@
     border-radius: var(--tech-r-control, 8px);
     background: color-mix(in srgb, var(--tech-accent, #3d8bff) 16%, transparent);
     color: var(--tech-accent, #3d8bff);
+    transition: transform 240ms var(--tech-ease);
     mat-icon { font-size: 24px; width: 24px; height: 24px; }
   }
+  &:hover .pillar-icon { transform: scale(1.08) rotate(-3deg); }
   .pillar-kicker {
     position: relative;
     display: block;
@@ -691,7 +733,8 @@
   .portrait-orbit,
   .eyebrow .dot,
   .proof-dot,
-  .marquee-track {
+  .marquee-track,
+  .pillars.is-in .pillar {
     animation: none !important;
   }
   [data-reveal] {
