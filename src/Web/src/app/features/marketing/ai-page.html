@@ -1,0 +1,113 @@
+<app-marketing-nav />
+
+<main class="mpage">
+  <div class="bg-fx" aria-hidden="true"><div class="grid-fade"></div><div class="orb orb-a"></div><div class="orb orb-b"></div></div>
+
+  <header class="mpage-hero">
+    <span class="page-eyebrow">AI</span>
+    <h1>Talk to your tracker. Get structured data back.</h1>
+    <p>Usage IQ weaves Google Gemini through the food &amp; fitness tracker. You describe a meal, snap a plate, or say a workout — it returns clean, clamped, editable numbers you confirm before anything is logged.</p>
+  </header>
+
+  <!-- (2) How it works -->
+  <section class="ai-section">
+    <header class="section-head">
+      <span class="section-eyebrow">How it works</span>
+      <h2>One careful pattern behind every assist.</h2>
+    </header>
+    <ul class="pillar-grid">
+      @for (p of pillars; track p.title) {
+        <li class="pillar-card panel">
+          <span class="pillar-icon" aria-hidden="true"><mat-icon>{{ p.icon }}</mat-icon></span>
+          <h3>{{ p.title }}</h3>
+          <p>{{ p.text }}</p>
+        </li>
+      }
+    </ul>
+  </section>
+
+  <!-- (3) The entry points, grouped -->
+  @for (g of groups; track g.group) {
+    <section class="ai-section" [attr.aria-label]="g.group">
+      <header class="group-head">
+        <span class="group-rule" aria-hidden="true"></span>
+        <h2><mat-icon aria-hidden="true">{{ g.icon }}</mat-icon>{{ g.group }}</h2>
+        <span class="group-rule" aria-hidden="true"></span>
+      </header>
+      <p class="group-blurb">{{ g.blurb }}</p>
+
+      <ul class="assist-grid">
+        @for (a of g.assists; track a.title) {
+          <li class="assist-card panel">
+            <div class="assist-head">
+              <span class="assist-icon" aria-hidden="true"><mat-icon>{{ a.icon }}</mat-icon></span>
+              <div class="assist-titles">
+                <h3>{{ a.title }}</h3>
+                @if (a.multimodal) {
+                  <span class="badge-multimodal"><mat-icon aria-hidden="true">photo_camera</mat-icon>Multimodal</span>
+                }
+              </div>
+            </div>
+
+            <p class="assist-where"><mat-icon aria-hidden="true">place</mat-icon><span>{{ a.where }}</span></p>
+
+            <!-- input → output flow -->
+            <div class="assist-flow">
+              <div class="flow-io flow-in">
+                <span class="io-label">{{ a.youSayVerb }}</span>
+                <p class="io-value">{{ a.youSay }}</p>
+              </div>
+
+              <div class="flow-arrow">
+                <span class="prompt-gist"><span class="prompt-gist-prefix">The prompt asks Gemini to </span>{{ a.promptAsks }}</span>
+                <mat-icon aria-hidden="true">arrow_downward</mat-icon>
+              </div>
+
+              <div class="flow-io flow-out">
+                <span class="io-label">What comes back</span>
+                <p class="returns-type"><code>{{ a.returnsType }}</code></p>
+                <ul class="returns-fields">
+                  @for (f of a.returnsFields; track f) {
+                    <li>{{ f }}</li>
+                  }
+                </ul>
+                <pre class="returns-json"><code>{{ a.exampleReturn }}</code></pre>
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  <!-- (4) Privacy / gate posture -->
+  <section class="ai-section">
+    <aside class="ai-privacy panel">
+      <span class="ai-privacy-icon" aria-hidden="true"><mat-icon>shield</mat-icon></span>
+      <div class="ai-privacy-body">
+        <h2>Multimodal, and private by posture.</h2>
+        <p>
+          The two camera features — <strong>Snap a meal</strong> and <strong>Scan label</strong> — send your photo to Google
+          Gemini to read the food; it is not stored by Usage IQ, and a one-time notice tells you so before the first use.
+          Images are downscaled in your browser first. Every AI feature is gated by the <code>tracker.ai</code> permission,
+          <strong>off by default</strong> — when it is off, the assists simply disappear and the tracker still works.
+        </p>
+      </div>
+    </aside>
+  </section>
+
+  <!-- (5) CTA -->
+  <section class="mpage-cta">
+    <div class="cta-card panel">
+      <div class="cta-glow" aria-hidden="true"></div>
+      <h2>See the AI in action.</h2>
+      <p>Sign in to your dashboard, or browse the full feature list.</p>
+      <div class="cta-row">
+        <a class="cta-pill" routerLink="/signin">Sign in <span>→</span></a>
+        <a class="ghost-link" routerLink="/features">See features <span>→</span></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<app-marketing-footer />

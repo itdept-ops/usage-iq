@@ -25,6 +25,7 @@ export class MarketingNav {
     { path: '/features', label: 'Features', opts: SUBSET_IGNORING_QUERY },
     { path: '/how-it-works', label: 'How it works', opts: SUBSET_IGNORING_QUERY },
     { path: '/technology', label: 'Technology', opts: SUBSET_IGNORING_QUERY },
+    { path: '/ai', label: 'AI', opts: SUBSET_IGNORING_QUERY },
     { path: '/about', label: 'About', opts: SUBSET_IGNORING_QUERY },
   ];
 

@@ -18,6 +18,7 @@ export class MarketingFooter {
         { label: 'Features', path: '/features' },
         { label: 'How it works', path: '/how-it-works' },
         { label: 'Technology', path: '/technology' },
+        { label: 'AI', path: '/ai' },
         { label: 'About', path: '/about' },
       ],
     },

@@ -26,6 +26,11 @@ export const routes: Routes = [
     title: 'Usage IQ · Technology',
   },
   {
+    path: 'ai',
+    loadComponent: () => import('./features/marketing/ai-page').then(m => m.AiPage),
+    title: 'Usage IQ · AI',
+  },
+  {
     path: 'signin',
     loadComponent: () => import('./features/signin/signin').then(m => m.SignIn),
     title: 'Usage IQ - Sign in',
