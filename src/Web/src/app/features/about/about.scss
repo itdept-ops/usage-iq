@@ -85,7 +85,10 @@
     transform 640ms var(--tech-ease);
   will-change: opacity, transform;
 }
-[data-reveal].is-in {
+/* Must be gated by the same `:host(.js-reveal)` as the hide rule above, so the revealed state has
+   HIGHER specificity than the hide and actually wins once `.is-in` lands (otherwise content stays
+   stuck at opacity:0). */
+:host(.js-reveal) [data-reveal].is-in {
   opacity: 1;
   transform: none;
 }
