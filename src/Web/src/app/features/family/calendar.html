@@ -1,0 +1,170 @@
+<section class="family">
+  <!-- Hero -->
+  <header class="family__hero family__hero--today">
+    <div class="family__hero-id">
+      <span class="family__crest" aria-hidden="true"><mat-icon>calendar_month</mat-icon></span>
+      <div>
+        <p class="family__eyebrow">Family Hub</p>
+        <h1 class="family__name">Calendar</h1>
+        <p class="family__sub">The family calendar in one place</p>
+      </div>
+    </div>
+    <a mat-stroked-button class="family__settings-btn" routerLink="/family">
+      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+      Home
+    </a>
+  </header>
+
+  @if (loadingStatus()) {
+    <div class="family__loading">
+      <mat-spinner [diameter]="28" />
+      <span>Checking your calendar…</span>
+    </div>
+  } @else if (statusError()) {
+    <div class="family__error">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <p>We couldn't reach the calendar just now. Please try again in a moment.</p>
+    </div>
+  } @else if (!configured()) {
+    <!-- Server has no OAuth secret yet -->
+    <article class="cal-connect">
+      <mat-icon class="cal-connect__icon" aria-hidden="true">event_busy</mat-icon>
+      <h2 class="cal-connect__title">Calendar isn't set up on the server yet</h2>
+      <p class="cal-connect__blurb">
+        Once Google Calendar is configured for this household's hub, you'll be able to connect your calendar
+        and see your week right here.
+      </p>
+    </article>
+  } @else if (!connected()) {
+    <!-- Connect panel -->
+    <article class="cal-connect">
+      <mat-icon class="cal-connect__icon" aria-hidden="true">calendar_add_on</mat-icon>
+      <h2 class="cal-connect__title">Connect your Google Calendar</h2>
+      <p class="cal-connect__blurb">
+        See your week and add events without leaving the Family Hub. We'll ask Google for permission to view
+        and manage your events — nothing else. You can disconnect any time.
+      </p>
+      <button mat-flat-button color="primary" class="cal-connect__btn"
+              [disabled]="connecting()" (click)="connect()">
+        @if (connecting()) {
+          <mat-spinner [diameter]="18" />
+          <span>Connecting…</span>
+        } @else {
+          <ng-container>
+            <mat-icon aria-hidden="true">link</mat-icon>
+            <span>Connect Google Calendar</span>
+          </ng-container>
+        }
+      </button>
+    </article>
+  } @else {
+    <!-- Connected: toolbar + week / agenda -->
+    <div class="cal-toolbar">
+      <div class="cal-toolbar__nav">
+        <button mat-icon-button aria-label="Previous week" (click)="prevWeek()">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <button mat-stroked-button class="cal-toolbar__today" (click)="today()">Today</button>
+        <button mat-icon-button aria-label="Next week" (click)="nextWeek()">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+        <span class="cal-toolbar__range">{{ rangeLabel() }}</span>
+        @if (loadingEvents()) {
+          <mat-spinner class="cal-toolbar__spin" [diameter]="16" />
+        }
+      </div>
+
+      <div class="cal-toolbar__actions">
+        <mat-button-toggle-group class="cal-toolbar__view" [value]="view()" hideSingleSelectionIndicator>
+          <mat-button-toggle value="week" (click)="setView('week')" aria-label="Week view">
+            <mat-icon>view_week</mat-icon>
+          </mat-button-toggle>
+          <mat-button-toggle value="agenda" (click)="setView('agenda')" aria-label="Agenda view">
+            <mat-icon>view_agenda</mat-icon>
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+        <button mat-flat-button color="primary" (click)="create()">
+          <mat-icon aria-hidden="true">add</mat-icon> Event
+        </button>
+        <button mat-icon-button class="cal-toolbar__more" matTooltip="Disconnect calendar"
+                aria-label="Disconnect calendar" (click)="disconnect()">
+          <mat-icon>link_off</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    @if (eventsError()) {
+      <div class="family__error">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        <p>We couldn't load this week's events. Try the navigation again in a moment.</p>
+      </div>
+    }
+
+    @if (view() === 'week') {
+      <!-- Week grid -->
+      <div class="cal-week" role="grid" aria-label="Week view">
+        @for (col of days(); track col.iso) {
+          <div class="cal-day" [class.cal-day--today]="col.isToday" role="gridcell">
+            <button class="cal-day__head" type="button" (click)="create(col.iso)"
+                    [matTooltip]="'Add an event on ' + dayHeading(col)">
+              <span class="cal-day__weekday">{{ col.weekdayLabel }}</span>
+              <span class="cal-day__num">{{ col.dayNum }}</span>
+            </button>
+            <div class="cal-day__events">
+              @for (de of col.events; track de.ev.id) {
+                <button class="cal-event" type="button" (click)="edit(de.ev)"
+                        [class.cal-event--allday]="de.ev.allDay" [matTooltip]="de.ev.title">
+                  <span class="cal-event__time">{{ de.timeLabel }}</span>
+                  <span class="cal-event__title">{{ de.ev.title }}</span>
+                </button>
+              }
+              @if (!col.events.length) {
+                <span class="cal-day__empty" aria-hidden="true">·</span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    } @else {
+      <!-- Agenda list -->
+      @if (agendaDays().length) {
+        <div class="cal-agenda">
+          @for (col of agendaDays(); track col.iso) {
+            <section class="cal-agenda__day">
+              <h3 class="cal-agenda__heading" [class.cal-agenda__heading--today]="col.isToday">
+                {{ dayHeading(col) }}
+                @if (col.isToday) { <span class="cal-agenda__today">Today</span> }
+              </h3>
+              <ul class="cal-agenda__list">
+                @for (de of col.events; track de.ev.id) {
+                  <li>
+                    <button class="cal-agenda__item" type="button" (click)="edit(de.ev)">
+                      <span class="cal-agenda__time">{{ rangeFor(de.ev) }}</span>
+                      <span class="cal-agenda__body">
+                        <span class="cal-agenda__title">{{ de.ev.title }}</span>
+                        @if (de.ev.location) {
+                          <span class="cal-agenda__loc">
+                            <mat-icon aria-hidden="true">place</mat-icon>{{ de.ev.location }}
+                          </span>
+                        }
+                      </span>
+                      <mat-icon class="cal-agenda__chev" aria-hidden="true">chevron_right</mat-icon>
+                    </button>
+                  </li>
+                }
+              </ul>
+            </section>
+          }
+        </div>
+      } @else {
+        <div class="cal-empty">
+          <mat-icon aria-hidden="true">event_available</mat-icon>
+          <p>Nothing on the calendar this week. Add an event to get started.</p>
+          <button mat-stroked-button (click)="create()">
+            <mat-icon aria-hidden="true">add</mat-icon> New event
+          </button>
+        </div>
+      }
+    }
+  }
+</section>

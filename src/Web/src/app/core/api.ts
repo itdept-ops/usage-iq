@@ -2,7 +2,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, CacheEfficiency, CalendarDay, ChatChannelDto, ChatContactDto, ChatMessageDto, CreateChannelRequest,
+  AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatContactDto, ChatMessageDto, CreateChannelRequest,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
   FamilyChore, FamilyChoreRecurrence, FamilyChores, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyToday, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceSummary, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
   HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
@@ -1007,5 +1007,58 @@ export class Api {
   /** Recent import batches (file, counts, who-by-name, when) for the import-history strip. */
   financeImports(): Observable<FinanceImportBatch[]> {
     return this.http.get<FinanceImportBatch[]>(`${this.base}/family/finance/imports`);
+  }
+
+  // ---- Family Hub F6: Google Calendar (OAuth code flow; the caller's own primary calendar) ----
+  // The server stores the refresh token encrypted and NEVER returns the client secret or any token; these
+  // calls only ever carry a one-time auth code (on connect) and slim event DTOs. Every call degrades
+  // gracefully: status reports configured/connected, and an unconnected caller never triggers a 500.
+
+  /** Whether calendar is configured on the server + whether the caller has connected their Google Calendar. */
+  calendarStatus(): Observable<CalendarStatus> {
+    return this.http.get<CalendarStatus>(`${this.base}/family/calendar/status`);
+  }
+
+  /**
+   * Exchange a one-time Google OAuth auth `code` (from the GIS code client) for offline access; the server
+   * stores the resulting refresh token encrypted. `redirectUri` is "postmessage" for the popup code flow.
+   */
+  connectCalendar(code: string, redirectUri = 'postmessage'): Observable<{ connected: boolean }> {
+    return this.http.post<{ connected: boolean }>(`${this.base}/family/calendar/connect`, { code, redirectUri });
+  }
+
+  /** Remove the caller's calendar connection (idempotent); forgets the stored refresh token. */
+  disconnectCalendar(): Observable<{ connected: boolean }> {
+    return this.http.post<{ connected: boolean }>(`${this.base}/family/calendar/disconnect`, {});
+  }
+
+  /** The caller's own events in [startUtc, endUtc) (ISO UTC instants), ordered by start. */
+  calendarEvents(startUtc: string, endUtc: string): Observable<CalendarEvent[]> {
+    const params = new HttpParams().set('startUtc', startUtc).set('endUtc', endUtc);
+    return this.http.get<CalendarEvent[]>(`${this.base}/family/calendar/events`, { params });
+  }
+
+  /** Create an event on the caller's calendar. Returns the created event. */
+  createEvent(input: CalendarEventInput): Observable<CalendarEvent> {
+    return this.http.post<CalendarEvent>(`${this.base}/family/calendar/events`, input);
+  }
+
+  /** Update (patch) an event on the caller's calendar. Returns the updated event. */
+  updateEvent(id: string, input: CalendarEventInput): Observable<CalendarEvent> {
+    return this.http.put<CalendarEvent>(`${this.base}/family/calendar/events/${encodeURIComponent(id)}`, input);
+  }
+
+  /** Delete an event from the caller's calendar (204; idempotent when already gone). */
+  deleteEvent(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/family/calendar/events/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * Per-member busy blocks across the caller's household for the given window (find-a-time). Members are
+   * identified by userId + display name only — never an email; only connected members are returned.
+   */
+  freeBusy(startUtc: string, endUtc: string, memberUserIds?: number[]): Observable<CalendarMemberBusy[]> {
+    return this.http.post<CalendarMemberBusy[]>(`${this.base}/family/calendar/freebusy`,
+      { startUtc, endUtc, memberUserIds: memberUserIds ?? [] });
   }
 }

@@ -1,0 +1,71 @@
+<h2 mat-dialog-title class="note-edit__title">
+  <mat-icon aria-hidden="true">event</mat-icon>
+  {{ isEdit ? 'Edit event' : 'New event' }}
+</h2>
+
+<mat-dialog-content class="note-edit__body event-edit__body">
+  <mat-form-field appearance="outline" class="note-edit__field">
+    <mat-label>Title</mat-label>
+    <input matInput maxlength="200" cdkFocusInitial placeholder="e.g. Dentist for Mia"
+           [ngModel]="title()" (ngModelChange)="title.set($event)" (keydown.enter)="save()" />
+  </mat-form-field>
+
+  <mat-slide-toggle class="event-edit__allday" [ngModel]="allDay()" (ngModelChange)="allDay.set($event)">
+    All-day
+  </mat-slide-toggle>
+
+  @if (allDay()) {
+    <div class="event-edit__row">
+      <mat-form-field appearance="outline" class="note-edit__field">
+        <mat-label>Starts</mat-label>
+        <input matInput type="date" [ngModel]="date()" (ngModelChange)="date.set($event)" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="note-edit__field">
+        <mat-label>Ends</mat-label>
+        <input matInput type="date" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
+      </mat-form-field>
+    </div>
+  } @else {
+    <mat-form-field appearance="outline" class="note-edit__field">
+      <mat-label>Date</mat-label>
+      <input matInput type="date" [ngModel]="date()" (ngModelChange)="date.set($event)" />
+    </mat-form-field>
+    <div class="event-edit__row">
+      <mat-form-field appearance="outline" class="note-edit__field">
+        <mat-label>From</mat-label>
+        <input matInput type="time" [ngModel]="startTime()" (ngModelChange)="startTime.set($event)" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="note-edit__field">
+        <mat-label>To</mat-label>
+        <input matInput type="time" [ngModel]="endTime()" (ngModelChange)="endTime.set($event)" />
+      </mat-form-field>
+    </div>
+    <p class="event-edit__hint">Times are in your local zone.</p>
+  }
+
+  <mat-form-field appearance="outline" class="note-edit__field">
+    <mat-label>Location</mat-label>
+    <input matInput maxlength="500" placeholder="Optional"
+           [ngModel]="location()" (ngModelChange)="location.set($event)" />
+    <mat-icon matPrefix aria-hidden="true">place</mat-icon>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="note-edit__field">
+    <mat-label>Notes</mat-label>
+    <textarea matInput rows="3" maxlength="2000" placeholder="Optional"
+              [ngModel]="notes()" (ngModelChange)="notes.set($event)"></textarea>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions class="note-edit__actions event-edit__actions">
+  @if (isEdit) {
+    <button mat-button color="warn" type="button" class="event-edit__delete" (click)="requestDelete()">
+      <mat-icon aria-hidden="true">delete_outline</mat-icon> Delete
+    </button>
+  }
+  <span class="event-edit__spacer"></span>
+  <button mat-stroked-button type="button" (click)="ref.close()">Cancel</button>
+  <button mat-flat-button color="primary" type="button" [disabled]="!canSave()" (click)="save()">
+    {{ isEdit ? 'Save' : 'Add event' }}
+  </button>
+</mat-dialog-actions>

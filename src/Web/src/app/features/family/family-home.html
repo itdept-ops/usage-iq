@@ -77,6 +77,31 @@
           }
         </article>
 
+        <!-- Calendar: today's events from the caller's connected Google Calendar (only when there are any) -->
+        @if (events().length) {
+          <article class="today-card today-card--calendar" aria-label="Today's calendar">
+            <div class="today-card__head">
+              <h2 class="today-card__title"><mat-icon aria-hidden="true">calendar_month</mat-icon> Calendar</h2>
+              <a class="family__card-link" routerLink="/family/calendar">Open <mat-icon aria-hidden="true">chevron_right</mat-icon></a>
+            </div>
+            @if (nextEvent(); as ne) {
+              <a class="today-next" routerLink="/family/calendar">
+                <span class="today-next__eyebrow">Next up</span>
+                <span class="today-next__title">{{ ne.title }}</span>
+                <span class="today-next__time">{{ ne.localTime }}</span>
+              </a>
+            }
+            <ul class="today-events">
+              @for (e of events(); track e.id) {
+                <li class="today-event">
+                  <span class="today-event__time">{{ e.localTime }}</span>
+                  <span class="today-event__title">{{ e.title }}</span>
+                </li>
+              }
+            </ul>
+          </article>
+        }
+
         <!-- Lists peek -->
         <article class="today-card" aria-label="Lists">
           <div class="today-card__head">

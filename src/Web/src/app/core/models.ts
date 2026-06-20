@@ -1434,6 +1434,20 @@ export interface FamilyTodayNote {
 }
 
 /**
+ * One of today's calendar events on the Today snapshot (mirrors TodayEventDto). `localTime` is pre-formatted
+ * in the household timezone (e.g. "3:30 PM" or "All day"). These come from the caller's connected Google
+ * Calendar and are present only when a calendar is connected; otherwise the list is simply empty.
+ */
+export interface FamilyTodayEvent {
+  id: string;
+  title: string;
+  startUtc: string | null;
+  endUtc: string | null;
+  allDay: boolean;
+  localTime: string;
+}
+
+/**
  * The household's "Today" snapshot (GET /api/family/today; mirrors TodayDto). A warm, time-of-day
  * `greeting` addressed to the caller by first name + the household-local `dateLocal` (ISO date), then the
  * glance cards: today's `reminders` (by local time), active `timers`, list summaries, `pinnedNotes`, and an
@@ -1447,6 +1461,63 @@ export interface FamilyToday {
   lists: FamilyTodayList[];
   pinnedNotes: FamilyTodayNote[];
   weather: FamilyWeather | null;
+  /** Today's events from the caller's connected Google Calendar; empty when no calendar is connected. */
+  events: FamilyTodayEvent[];
+}
+
+/**
+ * Whether Google Calendar is usable for the caller (GET /api/family/calendar/status; mirrors StatusDto).
+ * `configured` is false when the server has no OAuth client secret yet (nothing to connect to); `connected`
+ * is true once the caller has linked their own Google Calendar via the OAuth code flow. The server never
+ * returns the client secret or the user's refresh token — only these two booleans.
+ */
+export interface CalendarStatus {
+  configured: boolean;
+  connected: boolean;
+}
+
+/**
+ * A single event on the caller's connected Google Calendar (mirrors EventDto). Times are ISO UTC instants
+ * (null only for malformed source events); `allDay` events span whole days. `htmlLink`/`hangoutLink` are
+ * Google-provided links for the caller's own event. No other-person identity is ever carried here.
+ */
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  startUtc: string | null;
+  endUtc: string | null;
+  allDay: boolean;
+  location: string | null;
+  description: string | null;
+  htmlLink: string | null;
+  hangoutLink: string | null;
+}
+
+/** Create/update payload for a calendar event. `startUtc`/`endUtc` are ISO UTC instants (local→UTC on the client). */
+export interface CalendarEventInput {
+  title: string;
+  startUtc: string;
+  endUtc: string;
+  allDay: boolean;
+  location?: string | null;
+  description?: string | null;
+}
+
+/** One busy block on a member's calendar for the find-a-time helper (mirrors BusyBlockDto). */
+export interface CalendarBusyBlock {
+  startUtc: string;
+  endUtc: string;
+}
+
+/**
+ * A household member's busy blocks for the find-a-time helper (mirrors MemberBusyDto). Identity is
+ * `userId` + display `name` only — NEVER an email (email-privacy). Only members who have connected a
+ * calendar appear; unconnected members are omitted entirely.
+ */
+export interface CalendarMemberBusy {
+  userId: number;
+  name: string;
+  busy: CalendarBusyBlock[];
 }
 
 /**

@@ -130,6 +130,18 @@ builder.Services.AddScoped<WeatherService>();
 builder.Services.AddScoped<FamilyTodayService>();
 builder.Services.AddScoped<FamilyBriefingService>();
 
+// Family Hub F6: Google Calendar via the OAuth 2.0 authorization-CODE flow (offline access) — a separate
+// concern from Google sign-in. The OAuth CLIENT SECRET (Google:ClientSecret, blank in dev → calendar is
+// "not configured") and the per-user REFRESH TOKEN are secrets that never appear in any response/log; the
+// refresh token is stored AES-GCM-encrypted via TokenProtector. All HTTP targets are FIXED Google
+// endpoints (oauth2.googleapis.com token + www.googleapis.com calendar), never user-controlled — no SSRF.
+builder.Services.AddHttpClient(GoogleCalendarService.HttpClientName, c =>
+{
+    c.BaseAddress = new Uri("https://www.googleapis.com");
+    c.Timeout = TimeSpan.FromSeconds(15);
+});
+builder.Services.AddScoped<GoogleCalendarService>();
+
 // Real-time chat + in-app notifications. The hub addresses individual users by their email claim
 // (EmailUserIdProvider) so per-user pushes work across all of a user's connections; the fan-out
 // service is the shared broadcast/notify path used by both the REST endpoints and the hub.
@@ -444,6 +456,7 @@ app.MapFamilyRemindersTimersEndpoints();
 app.MapFamilyTodayEndpoints();
 app.MapFamilyMealsChoresEndpoints();
 app.MapFamilyFinanceEndpoints();
+app.MapFamilyCalendarEndpoints();
 app.MapHub<ChatHub>("/api/hubs/chat");
 app.MapGet("/", () => app.Environment.IsDevelopment()
     ? Results.Redirect("/swagger")

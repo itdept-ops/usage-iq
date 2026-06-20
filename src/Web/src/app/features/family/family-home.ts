@@ -10,7 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
-import { FamilyToday, Household, HouseholdMember, PERM } from '../../core/models';
+import { FamilyToday, FamilyTodayEvent, Household, HouseholdMember, PERM } from '../../core/models';
 import { FamilyTimerWidget } from './timer';
 
 /** One feature tile on the Family home grid. `route` is null for a not-yet-built ("Coming soon") tile. */
@@ -38,7 +38,7 @@ const TILES: FeatureTile[] = [
   { key: 'meals', label: 'Meal Planner', icon: 'restaurant', blurb: 'Plan the week around the table', route: '/family/meals' },
   { key: 'chores', label: 'Chores', icon: 'cleaning_services', blurb: 'Share the load, fairly', route: '/family/chores' },
   { key: 'finance', label: 'Finance', icon: 'savings', blurb: 'Budgets, bills, and balances', route: '/family/finance', perm: PERM.familyFinance },
-  { key: 'calendar', label: 'Calendar', icon: 'calendar_month', blurb: 'The family calendar in one place', route: null },
+  { key: 'calendar', label: 'Calendar', icon: 'calendar_month', blurb: 'The family calendar in one place', route: '/family/calendar' },
 ];
 
 /**
@@ -75,6 +75,22 @@ export class FamilyHome {
 
   /** The household's members in server order (owner first), or empty until loaded. */
   readonly members = computed<HouseholdMember[]>(() => this.household()?.members ?? []);
+
+  /** Today's calendar events from the snapshot (empty when no calendar is connected). */
+  readonly events = computed<FamilyTodayEvent[]>(() => this.today()?.events ?? []);
+
+  /** The caller's next upcoming event today (the soonest timed event still ahead, else the first all-day). */
+  readonly nextEvent = computed<FamilyTodayEvent | null>(() => {
+    const evs = this.events();
+    if (!evs.length) return null;
+    const now = Date.now();
+    const upcoming = evs
+      .filter(e => !e.allDay && e.startUtc && Date.parse(e.startUtc) >= now)
+      .sort((a, b) => (a.startUtc ?? '').localeCompare(b.startUtc ?? ''));
+    if (upcoming.length) return upcoming[0];
+    // No more timed events ahead — surface an all-day event (or the last item) so the card still feels live.
+    return evs.find(e => e.allDay) ?? null;
+  });
 
   /** The local date, parsed from the snapshot's ISO date for a friendly "Thursday, June 20" rendering. */
   readonly dateLabel = computed<string>(() => {

@@ -53,6 +53,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<FinanceAccount> FinanceAccounts => Set<FinanceAccount>();
     public DbSet<FinanceTransaction> FinanceTransactions => Set<FinanceTransaction>();
     public DbSet<FinanceImport> FinanceImports => Set<FinanceImport>();
+    public DbSet<GoogleCalendarConnection> GoogleCalendarConnections => Set<GoogleCalendarConnection>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -621,6 +622,18 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
             // The imports list reads one household's recent batches newest-first.
             e.HasIndex(x => new { x.HouseholdId, x.CreatedUtc });
+        });
+
+        b.Entity<GoogleCalendarConnection>(e =>
+        {
+            // The encrypted refresh token is a base64 AES-GCM blob (nonce|tag|ciphertext) — generous cap.
+            e.Property(x => x.EncryptedRefreshToken).HasMaxLength(2048);
+            e.Property(x => x.Scope).HasMaxLength(512);
+            e.Property(x => x.GoogleCalendarId).HasMaxLength(256);
+            e.Property(x => x.ConnectedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.LastUsedUtc).HasColumnType("timestamp with time zone");
+            // One calendar connection per user; also the lookup for "is this caller connected".
+            e.HasIndex(x => x.UserId).IsUnique();
         });
     }
 }

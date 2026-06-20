@@ -16,7 +16,9 @@ namespace Ccusage.Api.Services;
 /// household-local date. Weather degrades gracefully (null when unconfigured) and never blocks the build.
 /// The same aggregate also feeds the daily briefing's text.
 /// </summary>
-public sealed class FamilyTodayService(UsageDbContext db, WeatherService weather)
+public sealed class FamilyTodayService(
+    UsageDbContext db, WeatherService weather, GoogleCalendarService calendar,
+    ILogger<FamilyTodayService> logger)
 {
     // ---- DTOs (people/items by userId + name; never email) ----
 
@@ -33,13 +35,18 @@ public sealed class FamilyTodayService(UsageDbContext db, WeatherService weather
 
     public sealed record TodayNoteDto(long Id, string Title);
 
+    /// <summary>A calendar event on today's agenda (title + local time window). Never carries an email.</summary>
+    public sealed record TodayEventDto(
+        string Id, string Title, DateTime? StartUtc, DateTime? EndUtc, bool AllDay, string LocalTime);
+
     public sealed record TodayDto(
         string Greeting, string DateLocal,
         IReadOnlyList<TodayReminderDto> Reminders,
         IReadOnlyList<TodayTimerDto> Timers,
         IReadOnlyList<TodayListDto> Lists,
         IReadOnlyList<TodayNoteDto> PinnedNotes,
-        WeatherDto? Weather);
+        WeatherDto? Weather,
+        IReadOnlyList<TodayEventDto> Events);
 
     /// <summary>How many open items to preview per list in the Today card / briefing.</summary>
     private const int PreviewItems = 4;
@@ -62,6 +69,9 @@ public sealed class FamilyTodayService(UsageDbContext db, WeatherService weather
         var pinnedNotes = await PinnedNotesAsync(household.Id, ct);
         // Weather is best-effort: null (card hides) when unconfigured / location missing / any failure.
         var w = await weather.GetCurrentAsync(household.WeatherLocation, ct);
+        // Calendar is best-effort + optional: today's events only when the caller has a connected calendar;
+        // wrapped so a calendar hiccup (or no connection) never breaks /today (events simply omitted).
+        var events = await TodayEventsAsync(caller.Id, tz, localDate, ct);
 
         return new TodayDto(
             Greeting: GreetingFor(localNow, caller),
@@ -70,7 +80,50 @@ public sealed class FamilyTodayService(UsageDbContext db, WeatherService weather
             Timers: timers,
             Lists: lists,
             PinnedNotes: pinnedNotes,
-            Weather: w);
+            Weather: w,
+            Events: events);
+    }
+
+    // ---- Today's calendar events (caller's connected Google Calendar; best-effort/optional) ----
+
+    /// <summary>
+    /// The caller's calendar events that fall on the household-local date, as a slim agenda (title + local
+    /// time), ordered by start. Returns an EMPTY list when the caller has no connected calendar, when
+    /// calendar isn't configured, or on ANY error — a calendar hiccup must never break /today.
+    /// </summary>
+    private async Task<List<TodayEventDto>> TodayEventsAsync(
+        int userId, TimeZoneInfo tz, DateOnly localDate, CancellationToken ct)
+    {
+        try
+        {
+            var localMidnight = localDate.ToDateTime(TimeOnly.MinValue);
+            var startUtc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localMidnight, DateTimeKind.Unspecified), tz);
+            var endUtc = TimeZoneInfo.ConvertTimeToUtc(
+                DateTime.SpecifyKind(localMidnight.AddDays(1), DateTimeKind.Unspecified), tz);
+
+            var result = await calendar.ListEventsAsync(userId, startUtc, endUtc, ct);
+            if (!result.Ok || result.Value is null) return new();
+
+            return result.Value
+                .OrderBy(e => e.StartUtc ?? DateTime.MaxValue)
+                .Select(e =>
+                {
+                    string localTime;
+                    if (e.AllDay) localTime = "All day";
+                    else if (e.StartUtc is { } s)
+                        localTime = TimeZoneInfo.ConvertTimeFromUtc(
+                            DateTime.SpecifyKind(s, DateTimeKind.Utc), tz).ToString("h:mm tt");
+                    else localTime = "";
+                    return new TodayEventDto(e.Id, e.Title, e.StartUtc, e.EndUtc, e.AllDay, localTime);
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            // Never let a calendar problem break the Today home.
+            logger.LogWarning("Today calendar events lookup failed: {Reason}", ex.Message);
+            return new();
+        }
     }
 
     // ---- Today's reminders (DueUtc lands on the household-local date), ordered by local time ----

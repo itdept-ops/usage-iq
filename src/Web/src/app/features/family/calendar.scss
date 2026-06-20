@@ -1,0 +1,336 @@
+/* Family Hub F6 — calendar page. Reuses the family tech tokens (soft surfaces, gentle accents). A clean
+   week grid + an agenda list, plus the connect/disconnect surfaces. Mobile-friendly: the week grid scrolls
+   horizontally on narrow screens; the agenda is a comfortable single column. No email is ever rendered. */
+
+/* ── Connect / not-configured panel ─────────────────────────────────── */
+.cal-connect {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-8, 32px) var(--tech-space-6, 24px);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius, 12px);
+  background:
+    radial-gradient(120% 140% at 50% 0%, rgba(63, 216, 208, 0.08), transparent 60%),
+    var(--tech-panel);
+}
+
+.cal-connect__icon {
+  width: 48px; height: 48px; font-size: 48px;
+  color: var(--tech-accent-cyan);
+}
+
+.cal-connect__title {
+  margin: 0;
+  font-size: var(--tech-fs-h1, 18px);
+  font-weight: 700;
+  color: var(--tech-text);
+}
+
+.cal-connect__blurb {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text-secondary);
+}
+
+.cal-connect__btn {
+  margin-top: var(--tech-space-2, 8px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+}
+
+/* ── Toolbar ────────────────────────────────────────────────────────── */
+.cal-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tech-space-3, 12px);
+}
+
+.cal-toolbar__nav,
+.cal-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2, 8px);
+}
+
+.cal-toolbar__today {
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+}
+
+.cal-toolbar__range {
+  margin-left: var(--tech-space-2, 8px);
+  font-size: var(--tech-fs-h1, 18px);
+  font-weight: 700;
+  color: var(--tech-text);
+}
+
+.cal-toolbar__spin { margin-left: 4px; }
+
+.cal-toolbar__view {
+  border-radius: var(--tech-r-control);
+  ::ng-deep .mat-button-toggle-label-content {
+    display: inline-flex; align-items: center;
+    line-height: 36px; padding: 0 10px;
+  }
+  mat-icon { width: 20px; height: 20px; font-size: 20px; }
+}
+
+/* ── Week grid ──────────────────────────────────────────────────────── */
+.cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--tech-space-2, 8px);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius, 12px);
+  background: var(--tech-panel);
+  padding: var(--tech-space-3, 12px);
+  overflow-x: auto;
+}
+
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 140px;
+  border-radius: var(--tech-r-control, 10px);
+  background: var(--tech-bg-sunken);
+  border: 1px solid var(--tech-border-subtle);
+
+  &--today {
+    border-color: var(--tech-accent);
+    background: color-mix(in srgb, var(--tech-accent) 8%, var(--tech-bg-sunken));
+  }
+}
+
+.cal-day__head {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 8px 10px 6px;
+  border-radius: var(--tech-r-control, 10px) var(--tech-r-control, 10px) 0 0;
+  color: var(--tech-text-secondary);
+  &:hover { background: color-mix(in srgb, var(--tech-accent) 10%, transparent); }
+}
+
+.cal-day__weekday {
+  font-size: var(--tech-fs-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tech-text-tertiary);
+}
+
+.cal-day__num {
+  font-size: var(--tech-fs-h1, 18px);
+  font-weight: 700;
+  color: var(--tech-text);
+  .cal-day--today & { color: var(--tech-accent); }
+}
+
+.cal-day__events {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 6px 8px;
+  flex: 1;
+}
+
+.cal-day__empty {
+  margin: auto;
+  color: var(--tech-text-tertiary);
+  opacity: 0.4;
+}
+
+.cal-event {
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  border: 0;
+  border-left: 3px solid var(--tech-accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--tech-accent) 12%, var(--tech-panel));
+  color: var(--tech-text);
+  transition: filter 0.12s ease;
+  &:hover { filter: brightness(1.08); }
+
+  &--allday {
+    border-left-color: var(--tech-accent-cyan);
+    background: color-mix(in srgb, var(--tech-accent-cyan) 14%, var(--tech-panel));
+  }
+}
+
+.cal-event__time {
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  color: var(--tech-text-secondary);
+}
+
+.cal-event__title {
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Agenda list ────────────────────────────────────────────────────── */
+.cal-agenda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-5, 20px);
+}
+
+.cal-agenda__heading {
+  margin: 0 0 var(--tech-space-2, 8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--tech-fs-body);
+  font-weight: 700;
+  color: var(--tech-text);
+  &--today { color: var(--tech-accent); }
+}
+
+.cal-agenda__today {
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tech-accent) 16%, transparent);
+  color: var(--tech-accent);
+}
+
+.cal-agenda__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-2, 8px);
+}
+
+.cal-agenda__item {
+  appearance: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-3, 12px) var(--tech-space-4, 16px);
+  border: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-r-control, 10px);
+  background: var(--tech-panel);
+  color: var(--tech-text);
+  transition: border-color 0.12s ease, background 0.12s ease;
+  &:hover {
+    border-color: var(--tech-accent);
+    background: color-mix(in srgb, var(--tech-accent) 6%, var(--tech-panel));
+  }
+}
+
+.cal-agenda__time {
+  flex: 0 0 auto;
+  min-width: 6.5rem;
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  color: var(--tech-text-secondary);
+}
+
+.cal-agenda__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cal-agenda__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-agenda__loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-tertiary);
+  mat-icon { width: 14px; height: 14px; font-size: 14px; }
+}
+
+.cal-agenda__chev {
+  flex: 0 0 auto;
+  color: var(--tech-text-tertiary);
+}
+
+/* ── Empty state ────────────────────────────────────────────────────── */
+.cal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-8, 32px);
+  border: 1px dashed var(--tech-border);
+  border-radius: var(--tech-radius, 12px);
+  color: var(--tech-text-secondary);
+  mat-icon { width: 36px; height: 36px; font-size: 36px; color: var(--tech-accent-cyan); }
+  p { margin: 0; max-width: 36ch; }
+}
+
+/* ── Event editor dialog bits ───────────────────────────────────────── */
+.event-edit__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.event-edit__allday {
+  margin-bottom: var(--tech-space-3, 12px);
+}
+
+.event-edit__row {
+  display: flex;
+  gap: var(--tech-space-3, 12px);
+  .note-edit__field { flex: 1; min-width: 0; }
+}
+
+.event-edit__hint {
+  margin: -4px 0 var(--tech-space-2, 8px);
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-tertiary);
+}
+
+.event-edit__actions { display: flex; align-items: center; }
+.event-edit__spacer { flex: 1; }
+
+/* ── Mobile ─────────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .cal-week {
+    grid-template-columns: repeat(7, minmax(120px, 1fr));
+  }
+  .cal-toolbar__range { width: 100%; order: 5; margin-left: 0; }
+  .cal-agenda__item { flex-wrap: wrap; }
+  .cal-agenda__time { min-width: 100%; }
+  .event-edit__row { flex-direction: column; gap: 0; }
+}
