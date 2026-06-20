@@ -1,0 +1,167 @@
+<section class="family">
+  <a class="family__back" routerLink="/family">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon> Family Hub
+  </a>
+
+  <header class="family__hero family__hero--page family__hero--chores">
+    <div class="family__hero-id">
+      <span class="family__crest" aria-hidden="true"><mat-icon>cleaning_services</mat-icon></span>
+      <div>
+        <p class="family__eyebrow">Family Hub</p>
+        <h1 class="family__name">Chores</h1>
+        <p class="family__sub">Share the load, earn some stars</p>
+      </div>
+    </div>
+    <button mat-flat-button color="primary" class="family__settings-btn" (click)="create()">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      New chore
+    </button>
+  </header>
+
+  @if (loading()) {
+    <div class="family__loading">
+      <mat-spinner [diameter]="28" />
+      <span>Tidying up the board…</span>
+    </div>
+  } @else if (error()) {
+    <div class="family__error">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <p>We couldn't load the chore board just now. Please try again in a moment.</p>
+    </div>
+  } @else {
+    <!-- ── Stars tally strip (the kid-reward foundation) ───────────────── -->
+    @if (tally().length > 0) {
+      <section class="stars" aria-label="Stars earned">
+        <div class="stars__head">
+          <h2 class="stars__title"><mat-icon aria-hidden="true">auto_awesome</mat-icon> Stars earned</h2>
+          <span class="stars__total">{{ totalStars() }} total</span>
+        </div>
+        <ul class="stars__strip">
+          @for (entry of tally(); track entry.userId) {
+            <li class="star-chip" [class.star-chip--leader]="isLeader(entry)"
+                [matTooltip]="entry.name + ' · ' + entry.points + ' stars'">
+              <span class="star-chip__avatar" aria-hidden="true">{{ initials(entry.name) }}</span>
+              <span class="star-chip__name">{{ entry.name }}</span>
+              <span class="star-chip__points">
+                {{ entry.points }} <mat-icon aria-hidden="true">star</mat-icon>
+              </span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    @if (open().length === 0 && done().length === 0) {
+      <div class="family__empty">
+        <mat-icon aria-hidden="true">checklist</mat-icon>
+        <h2>No chores yet</h2>
+        <p>Add a chore, assign it to someone (or leave it for anyone), and set how many stars it's worth.</p>
+        <button mat-flat-button color="primary" (click)="create()">
+          <mat-icon aria-hidden="true">add</mat-icon> New chore
+        </button>
+      </div>
+    } @else {
+      <!-- ── Open chores ───────────────────────────────────────────────── -->
+      @if (open().length > 0) {
+        <ul class="chore-list">
+          @for (chore of open(); track chore.id) {
+            <li class="chore">
+              <mat-checkbox class="chore__check" [checked]="false" [disabled]="busyId() === chore.id"
+                            (change)="toggle(chore)" [matTooltip]="'Mark done'" />
+
+              <div class="chore__main">
+                <p class="chore__title">{{ chore.title }}</p>
+                <div class="chore__meta">
+                  <span class="chore__stars" [matTooltip]="chore.points + ' stars when finished'">
+                    @for (pip of starPips(chore.points); track pip) {
+                      <mat-icon aria-hidden="true">star</mat-icon>
+                    }
+                    <span class="chore__stars-n">{{ chore.points }}</span>
+                  </span>
+                  @if (chore.recurrence !== 'none') {
+                    <span class="chore__chip">
+                      <mat-icon aria-hidden="true">repeat</mat-icon> {{ recurrenceLabel(chore.recurrence) }}
+                    </span>
+                  }
+                  @if (chore.assignedToName) {
+                    <span class="chore__assignee" [matTooltip]="'For ' + chore.assignedToName">
+                      <span class="chore__avatar" aria-hidden="true">{{ initials(chore.assignedToName) }}</span>
+                      {{ chore.assignedToName }}
+                    </span>
+                  } @else {
+                    <span class="chore__assignee chore__assignee--anyone">
+                      <mat-icon aria-hidden="true">groups</mat-icon> Anyone
+                    </span>
+                  }
+                </div>
+              </div>
+
+              <div class="chore__actions">
+                @if (busyId() === chore.id) {
+                  <mat-spinner [diameter]="20" />
+                } @else {
+                  <button mat-icon-button matTooltip="Edit" (click)="edit(chore)">
+                    <mat-icon aria-hidden="true">edit</mat-icon>
+                  </button>
+                  <button mat-icon-button matTooltip="Delete" class="chore__delete" (click)="remove(chore)">
+                    <mat-icon aria-hidden="true">delete_outline</mat-icon>
+                  </button>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      }
+
+      <!-- ── Done chores ───────────────────────────────────────────────── -->
+      @if (done().length > 0) {
+        <section class="chore-done">
+          <h2 class="family__card-title chore-done__title">Done</h2>
+          <ul class="chore-list">
+            @for (chore of done(); track chore.id) {
+              <li class="chore chore--done">
+                <mat-checkbox class="chore__check" [checked]="true" [disabled]="busyId() === chore.id"
+                              (change)="toggle(chore)" [matTooltip]="'Mark not done'" />
+
+                <div class="chore__main">
+                  <p class="chore__title">{{ chore.title }}</p>
+                  <div class="chore__meta">
+                    @if (chore.doneByName) {
+                      <span class="chore__done-by">
+                        <mat-icon aria-hidden="true">verified</mat-icon>
+                        Done by
+                        <span class="chore__avatar" aria-hidden="true">{{ initials(chore.doneByName) }}</span>
+                        {{ chore.doneByName }}
+                      </span>
+                    }
+                    <span class="chore__stars chore__stars--earned" [matTooltip]="chore.points + ' stars earned'">
+                      +{{ chore.points }} <mat-icon aria-hidden="true">star</mat-icon>
+                    </span>
+                    @if (chore.recurrence !== 'none') {
+                      <span class="chore__chip">
+                        <mat-icon aria-hidden="true">repeat</mat-icon> {{ recurrenceLabel(chore.recurrence) }}
+                      </span>
+                    }
+                  </div>
+                </div>
+
+                <div class="chore__actions">
+                  @if (busyId() === chore.id) {
+                    <mat-spinner [diameter]="20" />
+                  } @else {
+                    <button mat-icon-button matTooltip="Edit" (click)="edit(chore)">
+                      <mat-icon aria-hidden="true">edit</mat-icon>
+                    </button>
+                    <button mat-icon-button matTooltip="Delete" class="chore__delete" (click)="remove(chore)">
+                      <mat-icon aria-hidden="true">delete_outline</mat-icon>
+                    </button>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
+  }
+</section>

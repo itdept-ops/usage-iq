@@ -442,6 +442,7 @@ app.MapFamilyEndpoints();
 app.MapFamilyNotesListsEndpoints();
 app.MapFamilyRemindersTimersEndpoints();
 app.MapFamilyTodayEndpoints();
+app.MapFamilyMealsChoresEndpoints();
 app.MapHub<ChatHub>("/api/hubs/chat");
 app.MapGet("/", () => app.Environment.IsDevelopment()
     ? Results.Redirect("/swagger")

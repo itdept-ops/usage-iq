@@ -1,0 +1,48 @@
+<h2 mat-dialog-title class="note-edit__title">
+  <mat-icon aria-hidden="true">restaurant</mat-icon>
+  {{ isEdit ? 'Edit meal' : 'Add a meal' }}
+</h2>
+
+<mat-dialog-content class="note-edit__body meal-edit__body">
+  <p class="meal-edit__day">{{ data.dayLabel }}</p>
+
+  <mat-form-field appearance="outline" class="note-edit__field">
+    <mat-label>Meal</mat-label>
+    <mat-select [ngModel]="slot()" (ngModelChange)="slot.set($event)">
+      @for (s of slots; track s.value) {
+        <mat-option [value]="s.value">
+          <span class="meal-edit__slot-opt">
+            <mat-icon aria-hidden="true">{{ s.icon }}</mat-icon> {{ s.label }}
+          </span>
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="note-edit__field">
+    <mat-label>Dish</mat-label>
+    <input matInput maxlength="200" cdkFocusInitial placeholder="e.g. Sheet-pan chicken & veggies"
+           [ngModel]="title()" (ngModelChange)="title.set($event)" (keydown.enter)="save()" />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="note-edit__field">
+    <mat-label>Ingredients</mat-label>
+    <textarea matInput rows="6" maxlength="4000" placeholder="One per line, e.g.&#10;2 chicken breasts&#10;1 head broccoli&#10;Olive oil"
+              [ngModel]="ingredients()" (ngModelChange)="ingredients.set($event)"></textarea>
+    <mat-hint>
+      One ingredient per line —
+      @if (ingredientCount() > 0) {
+        {{ ingredientCount() }} {{ ingredientCount() === 1 ? 'line' : 'lines' }} ready for the grocery list
+      } @else {
+        these can be added to your grocery list later
+      }
+    </mat-hint>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="note-edit__actions">
+  <button mat-stroked-button type="button" (click)="ref.close()">Cancel</button>
+  <button mat-flat-button color="primary" type="button" [disabled]="!canSave()" (click)="save()">
+    {{ isEdit ? 'Save' : 'Add meal' }}
+  </button>
+</mat-dialog-actions>

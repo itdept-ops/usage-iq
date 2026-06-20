@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, CacheEfficiency, CalendarDay, ChatChannelDto, ChatContactDto, ChatMessageDto, CreateChannelRequest,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
-  FamilyList, FamilyListKind, FamilyNote, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyToday, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
+  FamilyChore, FamilyChoreRecurrence, FamilyChores, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyToday, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
   HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
@@ -873,5 +873,81 @@ export class Api {
   /** Update the household's settings (OWNER only; non-owners get 403). Omitted fields are unchanged. Returns the saved settings. */
   updateFamilySettings(body: FamilySettingsUpdate): Observable<FamilySettings> {
     return this.http.put<FamilySettings>(`${this.base}/family/settings`, body);
+  }
+
+  // ---- Family Hub F4: weekly meal planner (dishes per day; ingredients → grocery list) ----
+
+  /**
+   * The 7 local days of a week, each with its planned meals (ordered by slot). `weekStart` is a plain
+   * "YYYY-MM-DD" date (the week's Monday); omit it for the current local week (server-resolved).
+   */
+  familyMeals(weekStart?: string): Observable<FamilyMealDay[]> {
+    const params = weekStart ? new HttpParams().set('weekStart', weekStart) : undefined;
+    return this.http.get<FamilyMealDay[]>(`${this.base}/family/meals`, { params });
+  }
+
+  /** Add a meal to a day/slot. `localDate` is "YYYY-MM-DD"; `ingredients` is newline-separated text. Returns the created meal. */
+  createFamilyMeal(req: {
+    localDate: string; slot: FamilyMealSlot; title: string; ingredients?: string;
+  }): Observable<FamilyMeal> {
+    return this.http.post<FamilyMeal>(`${this.base}/family/meals`, req);
+  }
+
+  /** Edit a meal (any household member). Omitted fields are unchanged. Returns the updated meal. */
+  updateFamilyMeal(id: number, req: {
+    localDate?: string; slot?: FamilyMealSlot; title?: string; ingredients?: string;
+  }): Observable<FamilyMeal> {
+    return this.http.put<FamilyMeal>(`${this.base}/family/meals/${id}`, req);
+  }
+
+  /** Delete a meal (any household member). */
+  deleteFamilyMeal(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/family/meals/${id}`);
+  }
+
+  /**
+   * Append the chosen meals' ingredient lines to a shopping list. Pass `mealIds` for a specific set, else
+   * `weekStart` ("YYYY-MM-DD") to take the whole week (defaults to the current local week). Omit `listId`
+   * to find-or-create the household's "Groceries" list. Skips blanks + duplicates already on the list.
+   * Returns the updated F1 list (the page reads `items` length before/after to report how many were added).
+   */
+  mealsToGrocery(req: {
+    weekStart?: string; mealIds?: number[]; listId?: number;
+  }): Observable<FamilyList> {
+    return this.http.post<FamilyList>(`${this.base}/family/meals/to-grocery`, req);
+  }
+
+  // ---- Family Hub F4: chore board (assignee; stars/points; recurrence; the stars tally) ----
+
+  /** The household's chores (open first, then done) + the per-member all-time stars tally. */
+  familyChores(): Observable<FamilyChores> {
+    return this.http.get<FamilyChores>(`${this.base}/family/chores`);
+  }
+
+  /**
+   * Add a chore. `assignedToUserId` must be a household member (omit/null = unassigned); `points` are the
+   * stars per completion (default 1); `recurrence` is none/daily/weekly. Returns the full updated board.
+   */
+  createFamilyChore(req: {
+    title: string; assignedToUserId?: number | null; points?: number; recurrence?: FamilyChoreRecurrence;
+  }): Observable<FamilyChores> {
+    return this.http.post<FamilyChores>(`${this.base}/family/chores`, req);
+  }
+
+  /**
+   * Patch a chore (any household member): edit title/assignee/points/recurrence, or toggle `done`. Checking
+   * it (done:true) stamps the caller and stars them in the ledger; un-checking clears the stamp but keeps
+   * the stars. Omitted fields are unchanged. Returns the full updated board.
+   */
+  patchFamilyChore(id: number, req: {
+    title?: string; assignedToUserId?: number | null; points?: number;
+    recurrence?: FamilyChoreRecurrence; done?: boolean;
+  }): Observable<FamilyChores> {
+    return this.http.patch<FamilyChores>(`${this.base}/family/chores/${id}`, req);
+  }
+
+  /** Delete a chore (any household member); its completion ledger cascades. Returns nothing (the page reloads). */
+  deleteFamilyChore(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/family/chores/${id}`);
   }
 }

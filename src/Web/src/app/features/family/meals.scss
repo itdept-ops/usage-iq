@@ -1,0 +1,204 @@
+/* Family Meal Planner — a warm weekly grid of day cards. Reuses the family design tokens. */
+
+.family__hero--meals {
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(255, 138, 76, 0.12), transparent 55%),
+    radial-gradient(120% 140% at 100% 0%, rgba(63, 216, 208, 0.12), transparent 55%),
+    var(--tech-panel);
+  .family__crest mat-icon { color: var(--tech-accent-cyan); }
+}
+
+.meals__grocery-btn {
+  mat-spinner { margin: 0 4px; }
+}
+
+/* ── Week navigator ─────────────────────────────────────────────────── */
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-2, 8px);
+  border: 1px solid var(--tech-border);
+  border-radius: 999px;
+  background: var(--tech-panel);
+  width: fit-content;
+  margin: 0 auto;
+}
+.week-nav__label { display: flex; flex-direction: column; align-items: center; min-width: 160px; }
+.week-nav__range {
+  font-size: var(--tech-fs-body);
+  font-weight: 700;
+  color: var(--tech-text);
+  font-variant-numeric: tabular-nums;
+}
+.week-nav__this {
+  font-size: var(--tech-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tech-accent);
+}
+.week-nav__reset {
+  min-height: 0;
+  padding: 0 6px;
+  line-height: 1.4;
+  font-size: var(--tech-fs-micro);
+  font-weight: 600;
+  color: var(--tech-accent);
+}
+
+/* ── Week grid (a card per day) ─────────────────────────────────────── */
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--tech-space-4, 16px);
+  align-items: start;
+}
+
+.day-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-4, 16px);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius, 12px);
+  background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-raised);
+
+  &--today {
+    border-color: color-mix(in srgb, var(--tech-accent) 50%, var(--tech-border));
+    background:
+      radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--tech-accent) 10%, transparent), transparent 55%),
+      var(--tech-panel);
+  }
+}
+
+.day-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.day-card__date { display: flex; flex-direction: column; }
+.day-card__weekday { font-size: var(--tech-fs-body); font-weight: 700; color: var(--tech-text); }
+.day-card__day {
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.day-card__today-tag {
+  flex: 0 0 auto;
+  font-size: var(--tech-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tech-accent);
+  background: color-mix(in srgb, var(--tech-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 35%, transparent);
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+
+.day-card__empty {
+  margin: 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-tertiary);
+  font-style: italic;
+}
+
+.day-card__add {
+  margin-top: auto;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  mat-icon { width: 18px; height: 18px; font-size: 18px; }
+}
+
+/* ── Meals within a day ─────────────────────────────────────────────── */
+.meal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--tech-space-2, 8px); }
+
+.meal {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-r-control, 8px);
+  background: var(--tech-bg-sunken);
+
+  /* Dinner is the primary slot — give it a touch more presence. */
+  &--primary {
+    border-color: color-mix(in srgb, var(--tech-accent-cyan) 35%, var(--tech-border-subtle));
+    background: color-mix(in srgb, var(--tech-accent-cyan) 7%, var(--tech-bg-sunken));
+  }
+}
+
+.meal__slot {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(255, 138, 76, 0.18), rgba(63, 216, 208, 0.16));
+  mat-icon { color: var(--tech-accent-cyan); width: 18px; height: 18px; font-size: 18px; }
+}
+
+.meal__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.meal__title {
+  margin: 0;
+  font-size: var(--tech-fs-body);
+  font-weight: 600;
+  color: var(--tech-text);
+  line-height: 1.3;
+  word-break: break-word;
+}
+.meal__slot-label {
+  font-size: var(--tech-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--tech-text-tertiary);
+}
+
+.meal__actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 0; }
+.meal__btn {
+  width: 32px; height: 32px; line-height: 32px;
+  mat-icon { width: 18px; height: 18px; font-size: 18px; }
+}
+.meal__delete mat-icon { color: var(--tech-error, #e5484d); }
+
+/* ── Empty-week hint ────────────────────────────────────────────────── */
+.meals__hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--tech-r-control, 8px);
+  background: var(--tech-bg-sunken);
+  border: 1px solid var(--tech-border-subtle);
+  color: var(--tech-text-secondary);
+  font-size: var(--tech-fs-label);
+  line-height: 1.45;
+  mat-icon { width: 20px; height: 20px; font-size: 20px; color: var(--tech-accent-cyan); flex: 0 0 auto; }
+}
+
+/* ── Meal editor dialog bits ────────────────────────────────────────── */
+.meal-edit__body { min-width: min(420px, 84vw); }
+.meal-edit__day {
+  margin: 0;
+  font-size: var(--tech-fs-label);
+  font-weight: 700;
+  color: var(--tech-accent);
+}
+.meal-edit__slot-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  mat-icon { width: 18px; height: 18px; font-size: 18px; color: var(--tech-text-secondary); }
+}
+
+@media (max-width: 600px) {
+  .week-grid { grid-template-columns: 1fr; }
+  .meals__grocery-btn { white-space: normal; line-height: 1.3; }
+}

@@ -1,0 +1,75 @@
+<h2 mat-dialog-title class="note-edit__title">
+  <mat-icon aria-hidden="true">cleaning_services</mat-icon>
+  {{ isEdit ? 'Edit chore' : 'Add a chore' }}
+</h2>
+
+<mat-dialog-content class="note-edit__body chore-edit__body">
+  <mat-form-field appearance="outline" class="note-edit__field">
+    <mat-label>Chore</mat-label>
+    <input matInput maxlength="200" cdkFocusInitial placeholder="e.g. Take out the trash"
+           [ngModel]="title()" (ngModelChange)="title.set($event)" (keydown.enter)="save()" />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="note-edit__field">
+    <mat-label>Who's it for?</mat-label>
+    <mat-select [ngModel]="assignee()" (ngModelChange)="assignee.set($event)">
+      <mat-option [value]="unassigned">
+        <span class="picker-opt">
+          <span class="picker-opt__avatar picker-opt__avatar--init" aria-hidden="true">
+            <mat-icon class="chore-edit__anyone-icon">groups</mat-icon>
+          </span>
+          <span class="picker-opt__name">Anyone</span>
+        </span>
+      </mat-option>
+      @for (m of data.members; track m.userId) {
+        <mat-option [value]="m.userId">
+          <span class="picker-opt">
+            @if (m.picture) {
+              <img class="picker-opt__avatar" [src]="m.picture" [alt]="m.name" referrerpolicy="no-referrer" />
+            } @else {
+              <span class="picker-opt__avatar picker-opt__avatar--init" aria-hidden="true">{{ initials(m.name) }}</span>
+            }
+            <span class="picker-opt__name">{{ m.name }}{{ m.isSelf ? ' (you)' : '' }}</span>
+          </span>
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <!-- Stars / points -->
+  <div class="chore-edit__points">
+    <span class="chore-edit__points-label"><mat-icon aria-hidden="true">star</mat-icon> Stars per finish</span>
+    <div class="chore-edit__stepper">
+      <button mat-icon-button type="button" matTooltip="Fewer" [disabled]="points() <= 0" (click)="stepPoints(-1)">
+        <mat-icon aria-hidden="true">remove</mat-icon>
+      </button>
+      <span class="chore-edit__points-value">{{ points() }}</span>
+      <button mat-icon-button type="button" matTooltip="More" [disabled]="points() >= 1000" (click)="stepPoints(1)">
+        <mat-icon aria-hidden="true">add</mat-icon>
+      </button>
+    </div>
+    <div class="chore-edit__presets">
+      @for (p of pointPresets; track p) {
+        <button mat-stroked-button type="button" class="chore-edit__preset"
+                [class.is-on]="points() === p" (click)="setPoints(p)">{{ p }}★</button>
+      }
+    </div>
+  </div>
+
+  <mat-form-field appearance="outline" class="note-edit__field">
+    <mat-label>Repeats</mat-label>
+    <mat-select [ngModel]="recurrence()" (ngModelChange)="recurrence.set($event)">
+      @for (r of recurrences; track r.value) {
+        <mat-option [value]="r.value">{{ r.label }}</mat-option>
+      }
+    </mat-select>
+    <mat-hint>Daily / weekly chores come back on their own each period.</mat-hint>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="note-edit__actions">
+  <button mat-stroked-button type="button" (click)="ref.close()">Cancel</button>
+  <button mat-flat-button color="primary" type="button" [disabled]="!canSave()" (click)="save()">
+    {{ isEdit ? 'Save' : 'Add chore' }}
+  </button>
+</mat-dialog-actions>

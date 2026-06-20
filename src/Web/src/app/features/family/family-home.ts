@@ -35,8 +35,8 @@ const TILES: FeatureTile[] = [
   { key: 'lists', label: 'Lists', icon: 'checklist', blurb: 'Groceries, to-dos, and wish lists', route: '/family/lists' },
   { key: 'reminders', label: 'Reminders', icon: 'notifications_active', blurb: 'Nudges so nothing slips', route: '/family/reminders' },
   { key: 'timer', label: 'Timer', icon: 'timer', blurb: 'Shared timers and countdowns', route: '/family/timer' },
-  { key: 'meals', label: 'Meal Planner', icon: 'restaurant', blurb: 'Plan the week around the table', route: null },
-  { key: 'chores', label: 'Chores', icon: 'cleaning_services', blurb: 'Share the load, fairly', route: null },
+  { key: 'meals', label: 'Meal Planner', icon: 'restaurant', blurb: 'Plan the week around the table', route: '/family/meals' },
+  { key: 'chores', label: 'Chores', icon: 'cleaning_services', blurb: 'Share the load, fairly', route: '/family/chores' },
   { key: 'finance', label: 'Finance', icon: 'savings', blurb: 'Budgets, bills, and balances', route: null, perm: PERM.familyFinance },
   { key: 'calendar', label: 'Calendar', icon: 'calendar_month', blurb: 'The family calendar in one place', route: null },
 ];

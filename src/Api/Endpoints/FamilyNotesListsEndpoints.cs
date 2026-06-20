@@ -653,6 +653,15 @@ public static class FamilyNotesListsEndpoints
         return ToNoteDto(note, callerId, callerHouseholdId, shares, names);
     }
 
+    /// <summary>
+    /// Re-load + project a single list into the F1 <see cref="ListDto"/> shape, as seen by the given caller
+    /// in the given household. Public so sibling Family endpoints (e.g. F4 meals → grocery list) can return
+    /// the exact same list DTO without duplicating the projection.
+    /// </summary>
+    public static Task<ListDto> LoadListDtoAsync(
+        UsageDbContext db, long listId, int callerId, int callerHouseholdId, CancellationToken ct) =>
+        SingleListDtoAsync(db, listId, callerId, callerHouseholdId, ct);
+
     /// <summary>Re-load + project a single list (after a mutation) using the caller's household for access.</summary>
     private static async Task<ListDto> SingleListDtoAsync(
         UsageDbContext db, long listId, int callerId, int callerHouseholdId, CancellationToken ct)

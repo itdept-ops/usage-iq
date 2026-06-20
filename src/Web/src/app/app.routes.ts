@@ -136,6 +136,16 @@ export const routes: Routes = [
         loadComponent: () => import('./features/family/timer').then(m => m.FamilyTimerWidget),
         title: 'Usage IQ · Family Timer',
       },
+      {
+        path: 'meals',
+        loadComponent: () => import('./features/family/meals').then(m => m.FamilyMeals),
+        title: 'Usage IQ · Meal Planner',
+      },
+      {
+        path: 'chores',
+        loadComponent: () => import('./features/family/chores').then(m => m.FamilyChores),
+        title: 'Usage IQ · Chores',
+      },
     ],
   },
   {

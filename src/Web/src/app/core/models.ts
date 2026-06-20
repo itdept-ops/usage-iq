@@ -1473,6 +1473,76 @@ export interface FamilySettingsUpdate {
   weatherLocation?: string | null;
 }
 
+// ---- Family Hub F4: meal planner & chore board ----
+
+/** Which meal of the day a planned dish sits in (mirrors the backend's lowercase slots). */
+export type FamilyMealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+/** How a chore repeats (mirrors the backend's lowercase strings). Note: chores have no "weekdays". */
+export type FamilyChoreRecurrence = 'none' | 'daily' | 'weekly';
+
+/**
+ * One planned meal on the weekly plan (mirrors MealDto). `localDate` is an ISO date in the household
+ * timezone; `slot` is the meal-of-day. `ingredients` is raw newline-separated text (one per line) that
+ * feeds the grocery-list tie-in. The author is `createdByUserId` + `createdByName` only — never an email.
+ */
+export interface FamilyMeal {
+  id: number;
+  localDate: string;
+  slot: FamilyMealSlot;
+  title: string;
+  ingredients: string;
+  createdByUserId: number;
+  createdByName: string;
+}
+
+/**
+ * One day of the weekly plan (mirrors MealDayDto): its `localDate` (ISO date) + the meals planned on it,
+ * already ordered by slot. The week view renders one of these per day.
+ */
+export interface FamilyMealDay {
+  localDate: string;
+  meals: FamilyMeal[];
+}
+
+/**
+ * A household chore on the shared board (mirrors ChoreDto). Optionally assigned to a member
+ * (`assignedToUserId` + name; null = unassigned/anyone). `done` checks it off for the current period and
+ * stamps `doneByUserId`/`doneByName`/`doneUtc`. `points` are the stars earned each completion; `recurrence`
+ * drives the chip and the background reset. Everyone is by userId + name only — never an email.
+ */
+export interface FamilyChore {
+  id: number;
+  title: string;
+  assignedToUserId?: number | null;
+  assignedToName?: string | null;
+  done: boolean;
+  doneByUserId?: number | null;
+  doneByName?: string | null;
+  doneUtc?: string | null;
+  points: number;
+  recurrence: FamilyChoreRecurrence;
+}
+
+/**
+ * A member's all-time stars tally (mirrors TallyEntryDto) — the sum of their completion ledger. Identity
+ * is `userId` + `name` only; never an email. The board's "stars" strip renders these, highest first.
+ */
+export interface FamilyChoreTally {
+  userId: number;
+  name: string;
+  points: number;
+}
+
+/**
+ * The chore board response (mirrors ChoresDto): the household's `chores` (open first, then done) and the
+ * per-member all-time `tally` of stars earned. People throughout are by userId + name only — never email.
+ */
+export interface FamilyChores {
+  chores: FamilyChore[];
+  tally: FamilyChoreTally[];
+}
+
 /** Canonical permission keys (mirror of the backend catalog — all 29 keys). */
 export const PERM = {
   dashboardView: 'dashboard.view',

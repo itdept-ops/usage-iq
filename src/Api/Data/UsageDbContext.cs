@@ -47,6 +47,9 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<FamilyShare> FamilyShares => Set<FamilyShare>();
     public DbSet<FamilyReminder> FamilyReminders => Set<FamilyReminder>();
     public DbSet<FamilyTimer> FamilyTimers => Set<FamilyTimer>();
+    public DbSet<FamilyMeal> FamilyMeals => Set<FamilyMeal>();
+    public DbSet<FamilyChore> FamilyChores => Set<FamilyChore>();
+    public DbSet<FamilyChoreCompletion> FamilyChoreCompletions => Set<FamilyChoreCompletion>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -536,6 +539,41 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => x.HouseholdId);
             // The tick scans not-yet-done, past-end timers across all households.
             e.HasIndex(x => new { x.Done, x.EndsUtc });
+        });
+
+        b.Entity<FamilyMeal>(e =>
+        {
+            e.Property(x => x.Slot).HasMaxLength(16).HasDefaultValue("dinner");
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Ingredients).HasMaxLength(4000).HasDefaultValue("");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // The weekly plan reads one household's meals over a date window.
+            e.HasIndex(x => new { x.HouseholdId, x.LocalDate });
+        });
+
+        b.Entity<FamilyChore>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Points).HasDefaultValue(1);
+            e.Property(x => x.Recurrence).HasMaxLength(16).HasDefaultValue("none");
+            e.Property(x => x.DoneUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // The family's chore board reads one household's chores.
+            e.HasIndex(x => x.HouseholdId);
+            // The tick scans recurring, currently-done chores across all households for a period reset.
+            e.HasIndex(x => new { x.Done, x.Recurrence });
+        });
+
+        b.Entity<FamilyChoreCompletion>(e =>
+        {
+            e.Property(x => x.AtUtc).HasColumnType("timestamp with time zone");
+            // The points tally sums completions per (chore's household via the chore) — load by chore.
+            e.HasIndex(x => x.ChoreId);
+            // The per-member tally aggregates a member's completions.
+            e.HasIndex(x => x.ByUserId);
+            // A completion belongs to a chore; cascade-deletes with it (the chore owns its ledger).
+            e.HasOne(x => x.Chore).WithMany()
+                .HasForeignKey(x => x.ChoreId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

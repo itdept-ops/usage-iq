@@ -60,11 +60,14 @@ public sealed class FamilyReminderService(
         var reminders = await FireDueRemindersAsync(db, notifier, now, ct);
         var timers = await CompleteFinishedTimersAsync(db, notifier, now, ct);
         var briefings = briefing is null ? 0 : await DeliverDueBriefingsAsync(db, briefing, now, ct);
-        return new TickResult(reminders, timers, briefings);
+        var choreResets = await ResetRecurringChoresAsync(db, now, ct);
+        return new TickResult(reminders, timers, briefings, choreResets);
     }
 
-    /// <summary>The count of reminders fired, timers completed, and briefings delivered in a tick.</summary>
-    public readonly record struct TickResult(int RemindersFired, int TimersCompleted, int BriefingsDelivered);
+    /// <summary>The count of reminders fired, timers completed, briefings delivered, and recurring chores
+    /// reset for the new period in a tick.</summary>
+    public readonly record struct TickResult(
+        int RemindersFired, int TimersCompleted, int BriefingsDelivered, int ChoresReset);
 
     // ---- Daily briefing ----
 
@@ -96,6 +99,75 @@ public sealed class FamilyReminderService(
             }
         }
         return delivered;
+    }
+
+    // ---- Recurring chore reset (F4) ----
+
+    /// <summary>
+    /// Reset every Done, recurring (<c>daily</c>/<c>weekly</c>) <see cref="FamilyChore"/> whose
+    /// <see cref="FamilyChore.DoneUtc"/> falls BEFORE the current period start — so it reappears as not-done
+    /// for the new day/week. The period start is computed in the owning household's
+    /// <see cref="Household.TimeZone"/> (today-local for daily, the local week start (Monday) for weekly),
+    /// then converted to UTC for the comparison. The completion ledger (and thus the points tally) is left
+    /// intact — only the chore's Done/DoneBy/DoneUtc stamps are cleared. Idempotent: a chore done within the
+    /// current period is untouched, and once reset its DoneUtc is null so it won't reset again.
+    /// </summary>
+    private static async Task<int> ResetRecurringChoresAsync(UsageDbContext db, DateTime now, CancellationToken ct)
+    {
+        var candidates = await db.FamilyChores
+            .Where(c => c.Done && c.Recurrence != "none" && c.DoneUtc != null)
+            .ToListAsync(ct);
+        if (candidates.Count == 0) return 0;
+
+        // Each chore's period start depends on its household timezone — resolve timezones once per household.
+        var householdIds = candidates.Select(c => c.HouseholdId).Distinct().ToList();
+        var zones = await db.Households.AsNoTracking()
+            .Where(h => householdIds.Contains(h.Id))
+            .Select(h => new { h.Id, h.TimeZone })
+            .ToDictionaryAsync(h => h.Id, h => h.TimeZone, ct);
+
+        var reset = 0;
+        foreach (var chore in candidates)
+        {
+            var tzId = zones.GetValueOrDefault(chore.HouseholdId);
+            var tz = ResolveChoreTimeZone(tzId);
+            var periodStartUtc = PeriodStartUtc(chore.Recurrence, now, tz);
+            if (chore.DoneUtc!.Value < periodStartUtc)
+            {
+                chore.Done = false;
+                chore.DoneByUserId = null;
+                chore.DoneUtc = null;
+                reset++;
+            }
+        }
+        if (reset > 0) await db.SaveChangesAsync(ct);
+        return reset;
+    }
+
+    /// <summary>
+    /// The UTC instant the current chore period began as of <paramref name="now"/>, in zone
+    /// <paramref name="tz"/>: local midnight today for "daily", local midnight of this week's Monday for
+    /// "weekly". A done chore stamped before this counts as last period's and is reset.
+    /// </summary>
+    private static DateTime PeriodStartUtc(string recurrence, DateTime now, TimeZoneInfo tz)
+    {
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(now, DateTimeKind.Utc), tz);
+        var localDate = localNow.Date;
+        if (string.Equals(recurrence, "weekly", StringComparison.OrdinalIgnoreCase))
+        {
+            // ISO week start = Monday. DayOfWeek Sunday=0..Saturday=6 → map to Mon=0..Sun=6.
+            var offset = ((int)localDate.DayOfWeek + 6) % 7;
+            localDate = localDate.AddDays(-offset);
+        }
+        return TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localDate, DateTimeKind.Unspecified), tz);
+    }
+
+    /// <summary>Resolve an IANA id to a <see cref="TimeZoneInfo"/>, falling back to UTC on anything odd.</summary>
+    private static TimeZoneInfo ResolveChoreTimeZone(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return TimeZoneInfo.Utc;
+        try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
+        catch { return TimeZoneInfo.Utc; }
     }
 
     // ---- Reminders ----
