@@ -194,7 +194,7 @@ public static class UsersEndpoints
         // poll) is rejected 401 and the SPA logs them out. They can sign in again to get a fresh token —
         // this is distinct from Disable, which blocks re-login.
         users.MapPost("/{id:int}/logout", async (int id, UsageDbContext db, AuditLogger audit,
-            IHubContext<ChatHub> hub, CancellationToken ct) =>
+            IHubContext<ChatHub> hub, PresenceTracker presence, CancellationToken ct) =>
         {
             var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
             if (user is null) return Results.NotFound();
@@ -210,6 +210,10 @@ public static class UsersEndpoints
             // is still rejected on the next call.
             try { await hub.Clients.User(user.Email).SendAsync("SessionRevoked", ct); }
             catch { /* non-fatal: the version bump + per-request token re-check already invalidates the session */ }
+
+            // Drop the target from presence so the admin sees them go offline immediately, rather than
+            // lingering "online" until their stale presence entry ages out of the window.
+            presence.Remove(user.Email);
 
             return Results.Ok(new { ok = true });
         }).RequirePermission(Permissions.UsersManage);

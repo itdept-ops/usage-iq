@@ -481,13 +481,19 @@ public sealed class MeDto
     public string[] Permissions { get; set; } = Array.Empty<string>();
 }
 
-/// <summary>One teammate currently online (active within the presence window).</summary>
+/// <summary>One teammate currently online (active within the presence window). Carries public identity
+/// only — the raw email is NEVER exposed (email-privacy). <see cref="UserId"/> is the matching AppUser id
+/// (null when the online email has no AppUser row); <see cref="IsSelf"/> marks the caller's own row.</summary>
 public sealed class PresenceDto
 {
-    public string Email { get; set; } = "";
+    /// <summary>The matching AppUser id, or null when the online email has no AppUser row.</summary>
+    public int? UserId { get; set; }
     public string Name { get; set; } = "";
     public string? Picture { get; set; }
     public DateTime LastSeenUtc { get; set; }
+    /// <summary>True for the row whose email matches the caller's (server-resolved; the email itself is
+    /// never put in the response).</summary>
+    public bool IsSelf { get; set; }
 }
 
 public sealed class UserDto

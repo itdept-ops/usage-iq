@@ -10,8 +10,10 @@ namespace Ccusage.Api.Services;
 /// </summary>
 public sealed class PresenceTracker
 {
-    /// <summary>How long after a user's last seen request they are still considered "online".</summary>
-    public static readonly TimeSpan DefaultWindow = TimeSpan.FromMinutes(2);
+    /// <summary>How long after a user's last seen request they are still considered "online".
+    /// The SPA polls every ~15-20s, so 45s tolerates a single missed poll while clearing a closed or
+    /// crashed tab (and a signed-out/force-logged-out user, who is also removed explicitly) fast.</summary>
+    public static readonly TimeSpan DefaultWindow = TimeSpan.FromSeconds(45);
 
     public sealed record Entry(string Email, string Name, string? Picture, DateTime LastSeenUtc);
 
@@ -29,6 +31,18 @@ public sealed class PresenceTracker
 
         var entry = new Entry(key, name?.Trim() ?? "", string.IsNullOrWhiteSpace(picture) ? null : picture, DateTime.UtcNow);
         _entries[key] = entry;
+    }
+
+    /// <summary>
+    /// Drop <paramref name="email"/> from the live set immediately (used on sign-out and force-logout so a
+    /// departed user goes offline at once instead of lingering until their entry ages out of the window).
+    /// Keyed by the same lowercased email as <see cref="Touch"/>. No-op for a blank email.
+    /// </summary>
+    public void Remove(string? email)
+    {
+        var key = email?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(key)) return;
+        _entries.TryRemove(key, out _);
     }
 
     /// <summary>

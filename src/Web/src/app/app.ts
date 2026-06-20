@@ -126,17 +126,15 @@ export class App {
 
   /**
    * Online teammates projected for the indicator: each enriched with display initials and a "you"
-   * flag (matched on the current session's email, case-insensitively). The server orders them, so
-   * we preserve that order and just tag the caller.
+   * flag taken straight from the server's `isSelf` (no client-side email comparison). The server
+   * orders them, so we preserve that order and just tag the caller.
    */
-  readonly onlineUsers = computed<OnlineUser[]>(() => {
-    const me = this.auth.session()?.email?.toLowerCase() ?? null;
-    return this.online().map(u => ({
+  readonly onlineUsers = computed<OnlineUser[]>(() =>
+    this.online().map(u => ({
       ...u,
-      initials: App.initialsOf(u.name, u.email),
-      isYou: !!me && u.email.toLowerCase() === me,
-    }));
-  });
+      initials: App.initialsOf(u.name),
+      isYou: u.isSelf,
+    })));
 
   /** How many teammates are online right now. */
   readonly onlineCount = computed(() => this.onlineUsers().length);

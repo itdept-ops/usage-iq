@@ -83,7 +83,7 @@
         <span class="presence__dot" aria-hidden="true"></span>
         <span class="presence__count mono-num">{{ onlineCount() }}</span>
         <span class="presence__stack" aria-hidden="true">
-          @for (u of onlineAvatars(); track u.email) {
+          @for (u of onlineAvatars(); track u.userId ?? u.name + $index) {
             @if (u.picture) {
               <img class="presence__avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
             } @else {
@@ -102,7 +102,7 @@
           <span class="pres-head__count mono-num">{{ onlineCount() }}</span>
         </div>
         <div class="pres-list" role="presentation">
-          @for (u of onlineUsers(); track u.email) {
+          @for (u of onlineUsers(); track u.userId ?? u.name + $index) {
             <div class="pres-item" role="presentation">
               @if (u.picture) {
                 <img class="pres-item__avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
@@ -111,7 +111,7 @@
               }
               <div class="pres-item__id">
                 <div class="pres-item__name">
-                  {{ u.name || u.email }}
+                  {{ u.name }}
                   @if (u.isYou) { <span class="pres-item__you">you</span> }
                 </div>
                 <div class="pres-item__seen">active {{ timeAgo(u.lastSeenUtc, now()) }}</div>

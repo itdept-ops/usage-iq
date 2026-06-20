@@ -342,11 +342,14 @@ export interface SyncResult {
  * only polls this endpoint. Mirrors PresenceDto on the API. The caller themselves is included.
  */
 export interface Presence {
-  email: string;
+  /** The matching AppUser id, or null when the online email has no AppUser row. */
+  userId?: number | null;
   name: string;
   picture: string | null;
   /** ISO-8601 UTC timestamp of the user's last authenticated request. */
   lastSeenUtc: string;
+  /** True for the caller's own row (server-resolved; the email itself is never in the response). */
+  isSelf: boolean;
 }
 
 export interface AuthSession {

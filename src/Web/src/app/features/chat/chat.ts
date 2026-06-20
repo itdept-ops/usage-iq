@@ -100,12 +100,16 @@ export class Chat implements AfterViewChecked, OnDestroy {
   private readonly presence = signal<Presence[]>([]);
   /** Heartbeat for relative timestamps + presence staleness; refreshed on every presence poll. */
   readonly now = signal(Date.now());
-  /** Set of lower-cased emails seen as online within the staleness window. */
-  private readonly onlineEmails = computed(() => {
+  /**
+   * Set of lower-cased display NAMES seen as online within the staleness window. The presence feed no
+   * longer carries emails (email-privacy), so the online dot is cross-referenced by display name — the
+   * only stable key shared between a presence row and a chat member/contact.
+   */
+  private readonly onlineNames = computed(() => {
     const cutoff = this.now() - PRESENCE_STALE_MS;
     const set = new Set<string>();
     for (const p of this.presence()) {
-      if (new Date(p.lastSeenUtc).getTime() >= cutoff) set.add(p.email.toLowerCase());
+      if (p.name && new Date(p.lastSeenUtc).getTime() >= cutoff) set.add(p.name.toLowerCase());
     }
     return set;
   });
@@ -251,14 +255,15 @@ export class Chat implements AfterViewChecked, OnDestroy {
   // Selection + history
   // =========================================================================
 
-  isOnline(email: string): boolean {
-    return this.onlineEmails().has(email.toLowerCase());
+  /** Online by display name (presence carries no email anymore — email-privacy). */
+  isOnline(name: string): boolean {
+    return !!name && this.onlineNames().has(name.toLowerCase());
   }
 
   /** A DM's online state = the OTHER member online (DMs have exactly two members). */
   dmOnline(ch: ChatChannelDto): boolean {
     const me = this.myEmail();
-    return ch.members.some(m => m.email.toLowerCase() !== me && this.isOnline(m.email));
+    return ch.members.some(m => m.email.toLowerCase() !== me && this.isOnline(m.name));
   }
 
   unread(id: number): number {
@@ -668,14 +673,14 @@ export class Chat implements AfterViewChecked, OnDestroy {
    */
   private pickablePeople(): ChatPickPerson[] {
     const me = this.myEmail();
-    const online = this.onlineEmails();
+    const online = this.onlineNames();
     return this.contacts()
       .filter(c => c.email.toLowerCase() !== me)
       .map(c => ({
         email: c.email,
         name: c.name,
         picture: c.picture,
-        online: online.has(c.email.toLowerCase()),
+        online: !!c.name && online.has(c.name.toLowerCase()),
       }))
       .sort((a, b) => Number(b.online) - Number(a.online) || (a.name || a.email).localeCompare(b.name || b.email));
   }

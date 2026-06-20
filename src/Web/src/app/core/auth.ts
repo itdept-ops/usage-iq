@@ -86,6 +86,20 @@ export class AuthService {
   }
 
   logout(): void {
+    // Best-effort sign-out ping so the server drops us from presence immediately rather than waiting
+    // for our tracker entry to age out. Fire BEFORE clearing the session (we need the token), with
+    // keepalive so it survives the navigation that follows logout. Raw fetch on purpose: injecting
+    // HttpClient here would create a circular dep through the auth interceptor.
+    const token = this.token;
+    if (token) {
+      try {
+        fetch('/api/presence/offline', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token },
+          keepalive: true,
+        }).catch(() => { /* ignore */ });
+      } catch { /* ignore */ }
+    }
     this._session.set(null);
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
     try { (window as unknown as { google?: any }).google?.accounts?.id?.disableAutoSelect?.(); } catch { /* ignore */ }
