@@ -325,9 +325,9 @@ export class ChatRealtime {
   // Hub server-method calls
   // =========================================================================
 
-  /** Send a message over the hub. mentionedEmails is null when there are no @mentions. */
-  async sendMessage(channelId: number, body: string, mentionedEmails: string[] | null = null): Promise<void> {
-    await this.invoke('SendMessage', channelId, body, mentionedEmails);
+  /** Send a message over the hub. mentionedUserIds is null when there are no @mentions (sent by AppUser id). */
+  async sendMessage(channelId: number, body: string, mentionedUserIds: number[] | null = null): Promise<void> {
+    await this.invoke('SendMessage', channelId, body, mentionedUserIds);
   }
 
   async startTyping(channelId: number): Promise<void> {
@@ -427,17 +427,17 @@ export class ChatRealtime {
    * Create a channel, fold it into the cache, and join it. ChannelAdded may also arrive over the
    * hub; both paths dedupe by id.
    */
-  async createChannel(name: string, memberEmails: string[], opts: { topic?: string; isPrivate?: boolean } = {}): Promise<ChatChannelDto> {
+  async createChannel(name: string, memberUserIds: number[], opts: { topic?: string; isPrivate?: boolean } = {}): Promise<ChatChannelDto> {
     const ch = await firstValueFrom(this.api.createChannel({
-      name, memberEmails, topic: opts.topic, isPrivate: opts.isPrivate ?? false,
+      name, memberUserIds, topic: opts.topic, isPrivate: opts.isPrivate ?? false,
     }));
     this.onChannelAdded(ch);
     return ch;
   }
 
-  /** Open (or fetch the existing) DM with a user; folds it into the cache and joins it. */
-  async openDirect(userEmail: string): Promise<ChatChannelDto> {
-    const ch = await firstValueFrom(this.api.openDirect(userEmail));
+  /** Open (or fetch the existing) DM with a user by AppUser id; folds it into the cache and joins it. */
+  async openDirect(userId: number): Promise<ChatChannelDto> {
+    const ch = await firstValueFrom(this.api.openDirect(userId));
     this.onChannelAdded(ch);
     return ch;
   }

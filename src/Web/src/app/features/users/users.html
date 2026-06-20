@@ -193,15 +193,9 @@
                     }
                   }
 
-                  <!-- Admin chat-contacts editor (chat.contacts.manage only; email-keyed, so reveal-gated) -->
-                  @if (canManageContacts() && !emailsRevealed()) {
-                    <div class="contacts-block contacts-locked">
-                      <mat-icon class="contacts-locked-icon">lock</mat-icon>
-                      <span>Reveal emails to manage contacts.</span>
-                    </div>
-                  }
+                  <!-- Admin chat-contacts editor (chat.contacts.manage only; userId-keyed, name-only) -->
                   @if (canEditContacts()) {
-                    <div class="contacts-block" [attr.aria-busy]="contactsState(u.id)?.busyEmail ? true : null">
+                    <div class="contacts-block" [attr.aria-busy]="contactsState(u.id)?.busyUserId != null ? true : null">
                       <span class="contacts-sr-status" aria-live="polite" aria-atomic="true">{{ contactsStatus() }}</span>
                       <div class="logins-head">
                         <mat-icon class="logins-head-icon">group</mat-icon>
@@ -217,7 +211,7 @@
                         } @else {
                           @if (cs.contacts.length) {
                             <ul class="contacts-chips" aria-label="Current contacts">
-                              @for (c of cs.contacts; track c.email) {
+                              @for (c of cs.contacts; track c.userId) {
                                 <li class="contact-chip">
                                   @if (c.picture) {
                                     <img class="contact-chip-avatar" [src]="c.picture" alt="" referrerpolicy="no-referrer" />
@@ -225,13 +219,12 @@
                                     <span class="contact-chip-avatar contact-chip-avatar--init">{{ contactInitials(c) }}</span>
                                   }
                                   <span class="contact-chip-id">
-                                    <span class="contact-chip-name">{{ c.name || c.email }}</span>
-                                    <span class="contact-chip-email mono-num">{{ c.email }}</span>
+                                    <span class="contact-chip-name">{{ c.name }}</span>
                                   </span>
                                   <button mat-icon-button class="contact-chip-remove" type="button"
-                                          [disabled]="cs.busyEmail === c.email"
-                                          [attr.aria-label]="'Remove ' + (c.name || c.email)"
-                                          matTooltip="Remove from circle" (click)="removeContact(u, c.email)">
+                                          [disabled]="cs.busyUserId === c.userId"
+                                          [attr.aria-label]="'Remove ' + c.name"
+                                          matTooltip="Remove from circle" (click)="removeContact(u, c.userId)">
                                     <mat-icon>close</mat-icon>
                                   </button>
                                 </li>
@@ -251,17 +244,16 @@
 
                             @if (cs.query.trim()) {
                               <div class="contacts-results" role="list" aria-label="People to add">
-                                @for (cand of addCandidates(u); track cand.email) {
+                                @for (cand of addCandidates(u); track cand.userId) {
                                   <button type="button" class="contact-result" role="listitem"
-                                          [disabled]="cs.busyEmail === cand.email" (click)="addContact(u, cand.email)">
+                                          [disabled]="cs.busyUserId === cand.userId" (click)="addContact(u, cand.userId)">
                                     @if (cand.picture) {
                                       <img class="contact-chip-avatar" [src]="cand.picture" alt="" referrerpolicy="no-referrer" />
                                     } @else {
                                       <span class="contact-chip-avatar contact-chip-avatar--init">{{ contactInitials(cand) }}</span>
                                     }
                                     <span class="contact-chip-id">
-                                      <span class="contact-chip-name">{{ cand.name || cand.email }}</span>
-                                      <span class="contact-chip-email mono-num">{{ cand.email }}</span>
+                                      <span class="contact-chip-name">{{ cand.name }}</span>
                                     </span>
                                     <mat-icon class="contact-result-add">add_circle_outline</mat-icon>
                                   </button>
@@ -385,16 +377,10 @@
             }
           </div>
 
-          <!-- Admin chat-contacts editor (mobile, chat.contacts.manage only; email-keyed, so reveal-gated) -->
-          @if (canManageContacts() && !emailsRevealed()) {
-            <div class="logins-panel ucard-logins contacts-block contacts-locked">
-              <mat-icon class="contacts-locked-icon">lock</mat-icon>
-              <span>Reveal emails to manage contacts.</span>
-            </div>
-          }
+          <!-- Admin chat-contacts editor (mobile, chat.contacts.manage only; userId-keyed, name-only) -->
           @if (canEditContacts()) {
             <div class="logins-panel ucard-logins contacts-block"
-                 [attr.aria-busy]="contactsState(u.id)?.busyEmail ? true : null">
+                 [attr.aria-busy]="contactsState(u.id)?.busyUserId != null ? true : null">
               <span class="contacts-sr-status" aria-live="polite" aria-atomic="true">{{ contactsStatus() }}</span>
               <div class="logins-head">
                 <mat-icon class="logins-head-icon">group</mat-icon>
@@ -410,7 +396,7 @@
                 } @else {
                   @if (cs.contacts.length) {
                     <ul class="contacts-chips" aria-label="Current contacts">
-                      @for (c of cs.contacts; track c.email) {
+                      @for (c of cs.contacts; track c.userId) {
                         <li class="contact-chip">
                           @if (c.picture) {
                             <img class="contact-chip-avatar" [src]="c.picture" alt="" referrerpolicy="no-referrer" />
@@ -418,13 +404,12 @@
                             <span class="contact-chip-avatar contact-chip-avatar--init">{{ contactInitials(c) }}</span>
                           }
                           <span class="contact-chip-id">
-                            <span class="contact-chip-name">{{ c.name || c.email }}</span>
-                            <span class="contact-chip-email mono-num">{{ c.email }}</span>
+                            <span class="contact-chip-name">{{ c.name }}</span>
                           </span>
                           <button mat-icon-button class="contact-chip-remove" type="button"
-                                  [disabled]="cs.busyEmail === c.email"
-                                  [attr.aria-label]="'Remove ' + (c.name || c.email)"
-                                  matTooltip="Remove from circle" (click)="removeContact(u, c.email)">
+                                  [disabled]="cs.busyUserId === c.userId"
+                                  [attr.aria-label]="'Remove ' + c.name"
+                                  matTooltip="Remove from circle" (click)="removeContact(u, c.userId)">
                             <mat-icon>close</mat-icon>
                           </button>
                         </li>
@@ -444,17 +429,16 @@
 
                     @if (cs.query.trim()) {
                       <div class="contacts-results" role="list" aria-label="People to add">
-                        @for (cand of addCandidates(u); track cand.email) {
+                        @for (cand of addCandidates(u); track cand.userId) {
                           <button type="button" class="contact-result" role="listitem"
-                                  [disabled]="cs.busyEmail === cand.email" (click)="addContact(u, cand.email)">
+                                  [disabled]="cs.busyUserId === cand.userId" (click)="addContact(u, cand.userId)">
                             @if (cand.picture) {
                               <img class="contact-chip-avatar" [src]="cand.picture" alt="" referrerpolicy="no-referrer" />
                             } @else {
                               <span class="contact-chip-avatar contact-chip-avatar--init">{{ contactInitials(cand) }}</span>
                             }
                             <span class="contact-chip-id">
-                              <span class="contact-chip-name">{{ cand.name || cand.email }}</span>
-                              <span class="contact-chip-email mono-num">{{ cand.email }}</span>
+                              <span class="contact-chip-name">{{ cand.name }}</span>
                             </span>
                             <mat-icon class="contact-result-add">add_circle_outline</mat-icon>
                           </button>

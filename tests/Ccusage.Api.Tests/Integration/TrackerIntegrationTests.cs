@@ -2,7 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Ccusage.Api.Data;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Ccusage.Api.Tests.Integration;
 
@@ -43,11 +46,23 @@ public class TrackerIntegrationTests(WebAppFactory factory)
     private static async Task<JsonElement> Json(HttpResponseMessage resp) =>
         await resp.Content.ReadFromJsonAsync<JsonElement>();
 
-    /// <summary>Make A and B mutual chat contacts (admin-managed, writes both directions).</summary>
+    /// <summary>Make A and B mutual chat contacts (admin-managed, writes both directions). The contacts
+    /// admin endpoint is keyed by AppUser id (email-privacy), so resolve each email -> id first.</summary>
     private async Task MakeContacts(string aEmail, string bEmail)
     {
-        var res = await Admin().PostAsJsonAsync($"/api/chat/contacts/user/{aEmail}", new { contactEmail = bEmail });
+        var aId = await UserIdFor(aEmail);
+        var bId = await UserIdFor(bEmail);
+        var res = await Admin().PostAsJsonAsync($"/api/chat/contacts/user/{aId}", new { contactUserId = bId });
         res.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    /// <summary>Resolve a provisioned user's AppUser id by their email (the contacts/DM endpoints now
+    /// address users by id, never email).</summary>
+    private async Task<int> UserIdFor(string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        return await db.Users.AsNoTracking().Where(u => u.Email == email).Select(u => u.Id).FirstAsync();
     }
 
     private const string Today = "2026-06-17";

@@ -655,7 +655,7 @@ public sealed class ChatChannelDto
     public bool IsPrivate { get; set; }
     public bool Archived { get; set; }
 
-    /// <summary>For a direct message, the OTHER member's name (or email); for a channel, the channel name.</summary>
+    /// <summary>For a direct message, the OTHER member's name ("Unknown user" when unresolved); for a channel, the channel name.</summary>
     public string DisplayName { get; set; } = "";
 
     public MemberDto[] Members { get; set; } = Array.Empty<MemberDto>();
@@ -702,18 +702,26 @@ public sealed class CreateChannelRequest
     public string Name { get; set; } = "";
     public string? Topic { get; set; }
     public bool IsPrivate { get; set; }
-    public string[] MemberEmails { get; set; } = Array.Empty<string>();
+    /// <summary>The requested members by AppUser id (email-privacy: the client holds no other-user
+    /// emails). The server resolves each id to its internal email, validates it's an enabled user, and
+    /// builds the membership; unknown/disabled ids are silently dropped (the creator is always added).</summary>
+    public int[] MemberUserIds { get; set; } = Array.Empty<int>();
 }
 
 public sealed class SendMessageRequest
 {
     public string Body { get; set; } = "";
-    public string[]? MentionedEmails { get; set; }
+    /// <summary>The mentioned members by AppUser id (email-privacy). The server resolves each id to its
+    /// internal email, intersects with channel membership, and fires the mention notification for them.</summary>
+    public int[]? MentionedUserIds { get; set; }
 }
 
 public sealed class OpenDirectRequest
 {
-    public string UserEmail { get; set; } = "";
+    /// <summary>The other participant's AppUser id (email-privacy: the client holds no other-user email).
+    /// The server resolves it to the internal email, validates the user exists + is enabled, then
+    /// get-or-creates the DM.</summary>
+    public int UserId { get; set; }
 }
 
 public sealed class EditMessageRequest
@@ -737,18 +745,22 @@ public sealed class MarkNotificationsReadRequest
     public long[] Ids { get; set; } = Array.Empty<long>();
 }
 
-/// <summary>One person in a user's chat contacts (their circle), with display identity for the picker.</summary>
+/// <summary>One person in a user's chat contacts (their circle), with display identity for the picker.
+/// Identity is the server-resolved <see cref="UserId"/> + <see cref="Name"/> — the raw email is NEVER
+/// exposed (email-privacy). The contact picker drives DM-open / channel-create by this <see cref="UserId"/>.</summary>
 public sealed class ChatContactDto
 {
-    public string Email { get; set; } = "";
+    /// <summary>The matching AppUser id (the picker sends this back to open a DM / add a channel member).</summary>
+    public int UserId { get; set; }
     public string Name { get; set; } = "";
     public string? Picture { get; set; }
 }
 
-/// <summary>Add a person to a user's chat contacts (mutual: writes both directions).</summary>
+/// <summary>Add a person to a user's chat contacts (mutual: writes both directions). The contact is
+/// identified by AppUser id (email-privacy); the server resolves it to the internal email.</summary>
 public sealed class AddContactRequest
 {
-    public string ContactEmail { get; set; } = "";
+    public int ContactUserId { get; set; }
 }
 
 // ---------------------------------------------------------------------------

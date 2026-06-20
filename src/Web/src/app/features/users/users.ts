@@ -90,8 +90,8 @@ interface ContactsState {
   contacts: ChatContactDto[];
   /** Search box for the add-control (filters the directory). */
   query: string;
-  /** Email currently being added/removed (disables that control + shows progress). */
-  busyEmail: string | null;
+  /** AppUser id currently being added/removed (disables that control + shows progress). */
+  busyUserId: number | null;
 }
 
 /** A catalog group with its ordered permission items — drives the grouped matrix columns. */
@@ -153,11 +153,11 @@ export class Users {
   /** Visible only to contact managers; mirrors the chat.contacts.manage backend gate. */
   readonly canManageContacts = computed(() => this.auth.hasPermission(PERM.chatContactsManage));
   /**
-   * The in-row contacts editor is email-keyed (it leaks the directory's addresses), so it's shown only
-   * to managers AND only once emails are revealed. When hidden, the row shows a "Reveal emails to manage
-   * contacts." note instead. The login-history part of the expanded row stays visible regardless.
+   * The in-row contacts editor is now keyed by AppUser id and renders only display names (email-privacy
+   * slice 3B) — no other-user address is fetched or shown — so it no longer needs the email-reveal gate.
+   * It's shown to any contact manager; the login-history part of the expanded row stays visible regardless.
    */
-  readonly canEditContacts = computed(() => this.canManageContacts() && this.emailsRevealed());
+  readonly canEditContacts = computed(() => this.canManageContacts());
 
   // new-user form
   readonly newEmail = signal('');
@@ -307,8 +307,8 @@ export class Users {
       next.add(u.id);
       // Lazy-load on first expand only; cached thereafter (and across collapses).
       if (!this.logins().has(u.id)) this.loadLogins(u.id);
-      // Contacts editor only loads for managers AND only when emails are revealed (it's email-keyed and
-      // would otherwise leak the directory's addresses); same lazy-once pattern.
+      // Contacts editor loads for any contact manager (now userId-keyed, name-only — no email reveal
+      // needed); same lazy-once pattern.
       if (this.canEditContacts()) {
         if (!this.contacts().has(u.id)) this.loadContacts(u);
         this.ensureDirectory();
@@ -334,16 +334,15 @@ export class Users {
 
   private setContactsState(id: number, patch: Partial<ContactsState>): void {
     this.contacts.update(m => {
-      const prev = m.get(id) ?? { loading: false, loaded: false, error: false, contacts: [], query: '', busyEmail: null };
+      const prev = m.get(id) ?? { loading: false, loaded: false, error: false, contacts: [], query: '', busyUserId: null };
       return new Map(m).set(id, { ...prev, ...patch });
     });
   }
 
   private loadContacts(u: ManagedUser): void {
-    // Email-keyed; only invoked when emails are revealed (the editor is hidden otherwise), so u.email is real.
-    if (!u.email) return;
-    this.setContactsState(u.id, { loading: true, loaded: false, error: false, contacts: [], query: '', busyEmail: null });
-    this.api.userContacts(u.email).subscribe({
+    // Addressed by AppUser id (email-privacy); the editor renders display names only.
+    this.setContactsState(u.id, { loading: true, loaded: false, error: false, contacts: [], query: '', busyUserId: null });
+    this.api.userContacts(u.id).subscribe({
       next: contacts => this.setContactsState(u.id, { loading: false, loaded: true, error: false, contacts }),
       error: () => this.setContactsState(u.id, { loading: false, loaded: true, error: true, contacts: [] }),
     });
@@ -363,56 +362,53 @@ export class Users {
 
   /**
    * Directory candidates for a user's add-control: everyone in the directory except the user themselves
-   * and anyone already in their circle, filtered by the search box.
+   * and anyone already in their circle, filtered by the search box. Identity is by AppUser id; the
+   * filter matches display name only (no email is carried).
    */
   addCandidates(u: ManagedUser): ChatContactDto[] {
     const state = this.contactsState(u.id);
-    const have = new Set((state?.contacts ?? []).map(c => (c.email ?? '').toLowerCase()));
-    const self = (u.email ?? '').toLowerCase();
+    const have = new Set((state?.contacts ?? []).map(c => c.userId));
     const q = (state?.query ?? '').trim().toLowerCase();
     return this.directory()
-      .filter(c => (c.email ?? '').toLowerCase() !== self && !have.has((c.email ?? '').toLowerCase()))
-      .filter(c => !q || c.name.toLowerCase().includes(q) || (c.email ?? '').toLowerCase().includes(q));
+      .filter(c => c.userId !== u.id && !have.has(c.userId))
+      .filter(c => !q || c.name.toLowerCase().includes(q));
   }
 
-  addContact(u: ManagedUser, contactEmail: string): void {
-    // The contacts editor is email-keyed; it's only shown when emails are revealed, so u.email is real here.
-    if (!u.email) return;
-    const added = this.directory().find(c => c.email === contactEmail);
-    this.setContactsState(u.id, { busyEmail: contactEmail });
-    this.api.addUserContact(u.email, contactEmail).subscribe({
+  addContact(u: ManagedUser, contactUserId: number): void {
+    const added = this.directory().find(c => c.userId === contactUserId);
+    this.setContactsState(u.id, { busyUserId: contactUserId });
+    this.api.addUserContact(u.id, contactUserId).subscribe({
       next: contacts => {
-        this.setContactsState(u.id, { contacts, query: '', busyEmail: null });
-        this.contactsStatus.set(`Added ${added?.name || contactEmail} to circle.`);
+        this.setContactsState(u.id, { contacts, query: '', busyUserId: null });
+        this.contactsStatus.set(`Added ${added?.name || 'contact'} to circle.`);
         this.loadAudit();
       },
       error: (err: HttpErrorResponse) => {
-        this.setContactsState(u.id, { busyEmail: null });
+        this.setContactsState(u.id, { busyUserId: null });
         this.snack.open(err.error?.message ?? 'Could not add contact', 'Dismiss', { duration: 5000 });
       },
     });
   }
 
-  removeContact(u: ManagedUser, contactEmail: string): void {
-    if (!u.email) return;
-    const removed = this.contactsState(u.id)?.contacts.find(c => c.email === contactEmail);
-    this.setContactsState(u.id, { busyEmail: contactEmail });
-    this.api.removeUserContact(u.email, contactEmail).subscribe({
+  removeContact(u: ManagedUser, contactUserId: number): void {
+    const removed = this.contactsState(u.id)?.contacts.find(c => c.userId === contactUserId);
+    this.setContactsState(u.id, { busyUserId: contactUserId });
+    this.api.removeUserContact(u.id, contactUserId).subscribe({
       next: contacts => {
-        this.setContactsState(u.id, { contacts, busyEmail: null });
-        this.contactsStatus.set(`Removed ${removed?.name || contactEmail} from circle.`);
+        this.setContactsState(u.id, { contacts, busyUserId: null });
+        this.contactsStatus.set(`Removed ${removed?.name || 'contact'} from circle.`);
         this.loadAudit();
       },
       error: (err: HttpErrorResponse) => {
-        this.setContactsState(u.id, { busyEmail: null });
+        this.setContactsState(u.id, { busyUserId: null });
         this.snack.open(err.error?.message ?? 'Could not remove contact', 'Dismiss', { duration: 5000 });
       },
     });
   }
 
-  /** Two-letter initials for a contact avatar fallback (name first; email is the fallback when present). */
+  /** Two-letter initials for a contact avatar fallback (display name only — no email). */
   contactInitials(c: ChatContactDto): string {
-    const parts = (c.name || c.email || '').split(/[\s@.]+/).filter(Boolean);
+    const parts = (c.name || '').split(/[\s@.]+/).filter(Boolean);
     return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U';
   }
 

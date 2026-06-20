@@ -52,16 +52,10 @@ public static class ChatEndpoints
                 CreatedUtc = now,
             };
 
-            // Validate requested members against existing enabled users; always include the creator.
-            var requested = (req.MemberEmails ?? Array.Empty<string>())
-                .Select(e => e.Trim().ToLowerInvariant()).Where(e => e.Length > 0)
-                .Distinct(StringComparer.Ordinal).ToArray();
-            var valid = requested.Length == 0
-                ? new List<string>()
-                : await db.Users.AsNoTracking()
-                    .Where(u => u.IsEnabled && requested.Contains(u.Email))
-                    .Select(u => u.Email).ToListAsync(ct);
-            var emails = valid.Append(user.Email).Distinct(StringComparer.Ordinal);
+            // Resolve requested member IDs -> internal emails (enabled-only); unknown/disabled ids drop out.
+            // Always include the creator. The client holds no other-user emails (email-privacy).
+            var resolved = await ChatNotificationService.ResolveEmailsByIdAsync(db, req.MemberUserIds ?? Array.Empty<int>(), ct);
+            var emails = resolved.Values.Append(user.Email).Distinct(StringComparer.Ordinal);
 
             channel.Members = emails.Select(e => new ChatChannelMember
             {
@@ -89,11 +83,16 @@ public static class ChatEndpoints
         g.MapPost("/direct", async (OpenDirectRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
         {
             var user = (await me.GetUserAsync(ct))!;
-            var target = (req.UserEmail ?? "").Trim().ToLowerInvariant();
-            if (target.Length == 0 || target == user.Email)
-                return Results.BadRequest(new { message = "Pick a different user to message." });
-            if (!await db.Users.AsNoTracking().AnyAsync(u => u.Email == target && u.IsEnabled, ct))
+            // The other participant is sent by AppUser id (email-privacy); resolve it to the internal email,
+            // validating the user exists + is enabled.
+            var target = req.UserId <= 0
+                ? null
+                : await db.Users.AsNoTracking()
+                    .Where(u => u.Id == req.UserId && u.IsEnabled).Select(u => u.Email).FirstOrDefaultAsync(ct);
+            if (target is null)
                 return Results.BadRequest(new { message = "That user doesn't exist." });
+            if (target == user.Email)
+                return Results.BadRequest(new { message = "Pick a different user to message." });
 
             var channelId = await GetOrCreateDirectAsync(db, user.Email, target, ct);
             var dto = (await BuildChannelDtosForMemberAsync(db, user.Email, channelId, ct)).First();
@@ -156,7 +155,7 @@ public static class ChatEndpoints
             await db.SaveChangesAsync(ct);
 
             var sender = await SenderInfoAsync(db, user.Email, ct);
-            var mentions = (req.MentionedEmails ?? Array.Empty<string>());
+            var mentions = (req.MentionedUserIds ?? Array.Empty<int>());
             await fanout.FanOutMessageAsync(channel, msg, sender, mentions, ct);
 
             return Results.Ok(ChatNotificationService.ToDto(msg, sender));

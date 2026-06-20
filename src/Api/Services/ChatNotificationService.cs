@@ -25,11 +25,13 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
     /// <summary>
     /// Broadcast a freshly persisted message to the channel group and fan notifications out to every
     /// OTHER member (gated by their preferences + mute window). At most one notification row per
-    /// (recipient, message). <paramref name="mentionedEmails"/> is validated against channel membership.
+    /// (recipient, message). <paramref name="mentionedUserIds"/> are AppUser ids (email-privacy: the
+    /// client holds no other-user emails); they're resolved to emails here and intersected with channel
+    /// membership, so only mentions of actual members fire a "you were mentioned" notification.
     /// </summary>
     public async Task FanOutMessageAsync(
         ChatChannel channel, ChatMessage message, SenderIdentity sender,
-        IReadOnlyCollection<string> mentionedEmails, CancellationToken ct = default)
+        IReadOnlyCollection<int> mentionedUserIds, CancellationToken ct = default)
     {
         var senderName = sender.Name;
         var dto = ToDto(message, sender);
@@ -45,10 +47,13 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
 
         var memberEmails = members.Select(m => m.UserEmail).ToHashSet(StringComparer.Ordinal);
 
-        // Only mentions of actual channel members count — never notify outsiders.
-        var validMentions = (mentionedEmails ?? Array.Empty<string>())
-            .Select(e => e.Trim().ToLowerInvariant())
-            .Where(e => e.Length > 0 && memberEmails.Contains(e))
+        // Resolve the mentioned AppUser ids -> internal email, then keep only those who are actual channel
+        // members — never notify outsiders, and the raw email never came from the client (email-privacy).
+        var mentionedEmails = (mentionedUserIds is { Count: > 0 })
+            ? await ResolveEmailsByIdAsync(db, mentionedUserIds, ct)
+            : new Dictionary<int, string>();
+        var validMentions = mentionedEmails.Values
+            .Where(e => memberEmails.Contains(e))
             .ToHashSet(StringComparer.Ordinal);
 
         // Preferences for the affected recipients (defaults where no row exists).
@@ -382,6 +387,24 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
         return await db.Users.AsNoTracking()
             .Where(u => distinct.Contains(u.Email))
             .ToDictionaryAsync(u => u.Email, u => u.Id, StringComparer.Ordinal, ct);
+    }
+
+    /// <summary>
+    /// The INBOUND counterpart of <see cref="ResolveUserIdsAsync"/>: resolve a set of AppUser ids to their
+    /// internal (lower-cased) email in ONE query, keeping only ENABLED users. Ids that don't exist or are
+    /// disabled are simply absent from the map. Used by the chat inbound paths (open-DM, create-channel,
+    /// mention fan-out, contacts admin) where the client sends ids and the server must recover the email
+    /// it keys storage/membership/addressing by — the email never crosses the wire (email-privacy).
+    /// </summary>
+    public static async Task<Dictionary<int, string>> ResolveEmailsByIdAsync(
+        UsageDbContext db, IEnumerable<int> userIds, CancellationToken ct = default)
+    {
+        var distinct = userIds.Where(id => id > 0).Distinct().ToArray();
+        if (distinct.Length == 0) return new Dictionary<int, string>();
+
+        return await db.Users.AsNoTracking()
+            .Where(u => u.IsEnabled && distinct.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.Email, ct);
     }
 
     /// <summary>The camelCase wire name for a notification type (matches the enum member name).</summary>

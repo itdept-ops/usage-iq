@@ -297,9 +297,9 @@ export class Api {
     return this.http.post<ChatChannelDto>(`${this.base}/chat/channels`, body);
   }
 
-  /** Open (or fetch the existing) 1:1 direct-message conversation with a user (requires chat.send). */
-  openDirect(userEmail: string): Observable<ChatChannelDto> {
-    return this.http.post<ChatChannelDto>(`${this.base}/chat/direct`, { userEmail });
+  /** Open (or fetch the existing) 1:1 direct-message conversation with a user by AppUser id (requires chat.send). */
+  openDirect(userId: number): Observable<ChatChannelDto> {
+    return this.http.post<ChatChannelDto>(`${this.base}/chat/direct`, { userId });
   }
 
   /**
@@ -313,9 +313,9 @@ export class Api {
     return this.http.get<ChatMessageDto[]>(`${this.base}/chat/channels/${channelId}/messages`, { params: p });
   }
 
-  /** Post a message via REST (the realtime hub is preferred; this is the fallback). */
-  sendChatMessage(channelId: number, body: string, mentionedEmails: string[] | null = null): Observable<ChatMessageDto> {
-    return this.http.post<ChatMessageDto>(`${this.base}/chat/channels/${channelId}/messages`, { body, mentionedEmails });
+  /** Post a message via REST (the realtime hub is preferred; this is the fallback). Mentions are sent by AppUser id. */
+  sendChatMessage(channelId: number, body: string, mentionedUserIds: number[] | null = null): Observable<ChatMessageDto> {
+    return this.http.post<ChatMessageDto>(`${this.base}/chat/channels/${channelId}/messages`, { body, mentionedUserIds });
   }
 
   /** Edit a message's body (own message, or any with chat.moderate). */
@@ -354,20 +354,25 @@ export class Api {
     return this.http.get<ChatContactDto[]>(`${this.base}/chat/directory`);
   }
 
-  /** A specific user's chat contacts (admin editor). Gated by chat.contacts.manage. */
-  userContacts(email: string): Observable<ChatContactDto[]> {
-    return this.http.get<ChatContactDto[]>(`${this.base}/chat/contacts/user/${encodeURIComponent(email)}`);
+  /** A specific user's chat contacts (admin editor), addressed by owner AppUser id. Gated by chat.contacts.manage. */
+  userContacts(userId: number): Observable<ChatContactDto[]> {
+    return this.http.get<ChatContactDto[]>(`${this.base}/chat/contacts/user/${userId}`);
   }
 
-  /** Add a contact to a user's circle (mutual, idempotent); returns the updated list. Gated by chat.contacts.manage. */
-  addUserContact(email: string, contactEmail: string): Observable<ChatContactDto[]> {
-    return this.http.post<ChatContactDto[]>(`${this.base}/chat/contacts/user/${encodeURIComponent(email)}`, { contactEmail });
+  /**
+   * Add a contact to a user's circle (mutual, idempotent); returns the updated list. Both the owner and
+   * the contact are addressed by AppUser id (email-privacy). Gated by chat.contacts.manage.
+   */
+  addUserContact(userId: number, contactUserId: number): Observable<ChatContactDto[]> {
+    return this.http.post<ChatContactDto[]>(`${this.base}/chat/contacts/user/${userId}`, { contactUserId });
   }
 
-  /** Remove a contact from a user's circle (mutual, no-op if absent); returns the updated list. Gated by chat.contacts.manage. */
-  removeUserContact(email: string, contactEmail: string): Observable<ChatContactDto[]> {
-    return this.http.delete<ChatContactDto[]>(
-      `${this.base}/chat/contacts/user/${encodeURIComponent(email)}/${encodeURIComponent(contactEmail)}`);
+  /**
+   * Remove a contact from a user's circle (mutual, no-op if absent); returns the updated list. Both the
+   * owner and the contact are addressed by AppUser id (email-privacy). Gated by chat.contacts.manage.
+   */
+  removeUserContact(userId: number, contactUserId: number): Observable<ChatContactDto[]> {
+    return this.http.delete<ChatContactDto[]>(`${this.base}/chat/contacts/user/${userId}/${contactUserId}`);
   }
 
   // ---- Inbox / notifications (bell UI is Phase 2b; methods provided now for the realtime service) ----

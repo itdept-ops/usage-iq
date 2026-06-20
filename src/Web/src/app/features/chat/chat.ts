@@ -545,14 +545,32 @@ export class Chat implements AfterViewChecked, OnDestroy {
   }
 
   /**
-   * Resolve "@Name" tokens in the body to the backend's mentionedEmails contract. Member payloads no
-   * longer carry emails (email-privacy slice 3A), so the client can't map a mentioned member to an
-   * email here — the mention→id contract is reworked in slice 3B. Until then we send no explicit mention
-   * list: the message still posts and every member still gets the normal channel-message notification;
-   * only the dedicated "you were mentioned" trigger is deferred. The "@Name" text is preserved in the body.
+   * Resolve "@Name" tokens in the body to the mentioned members' AppUser ids (the backend's
+   * mentionedUserIds contract — email-privacy slice 3B). Members carry `userId` + `name`, so we match
+   * each member by their display name appearing as an "@Name" token in the body (case-insensitive,
+   * preceded by whitespace or start-of-text; multi-word names are matched whole). The caller is excluded
+   * (you can't mention yourself). Returns the de-duplicated ids; the server intersects with membership
+   * and fires the "you were mentioned" notification for them.
    */
-  private extractMentions(_body: string, _ch: ChatChannelDto | null): string[] {
-    return [];
+  private extractMentions(body: string, ch: ChatChannelDto | null): number[] {
+    if (!ch) return [];
+    const me = this.myUserId();
+    const lower = body.toLowerCase();
+    const ids = new Set<number>();
+    for (const m of ch.members) {
+      if (m.userId === me || !m.name) continue;
+      const needle = `@${m.name.toLowerCase()}`;
+      // Match "@Name" only at a token boundary: start-of-text or preceded by whitespace.
+      let from = 0;
+      while (true) {
+        const at = lower.indexOf(needle, from);
+        if (at < 0) break;
+        const prev = at === 0 ? '' : lower[at - 1];
+        if (at === 0 || /\s/.test(prev)) { ids.add(m.userId); break; }
+        from = at + 1;
+      }
+    }
+    return [...ids];
   }
 
   // =========================================================================
@@ -614,7 +632,7 @@ export class Chat implements AfterViewChecked, OnDestroy {
 
   /**
    * Human-readable tooltip listing who reacted (display names resolved from the active channel's
-   * members, falling back to the email), e.g. "Ada, Grace and Linus reacted with 👍".
+   * members by AppUser id, falling back to "Someone"), e.g. "Ada, Grace and Linus reacted with 👍".
    */
   reactionTooltip(r: ReactionGroupDto): string {
     const ch = this.selectedChannel();
@@ -664,34 +682,21 @@ export class Chat implements AfterViewChecked, OnDestroy {
 
   /**
    * The picker's candidate list: the caller's curated contacts (or, for an admin, the full directory),
-   * minus the caller, with presence cross-referenced ONLY to set the online dot and sort online-first.
-   * Presence is no longer the candidate source.
+   * minus the caller, with presence cross-referenced by AppUser id ONLY to set the online dot and sort
+   * online-first. Contacts now carry `userId` (slice 3B), so the picker keys on id — the picker's old
+   * name-based presence join is retired. Presence is not the candidate source.
    */
   private pickablePeople(): ChatPickPerson[] {
-    const me = this.auth.session()?.email?.toLowerCase() ?? '';
-    // The contact picker still works in emails (slice 3B): contacts carry no userId, so its online dot is
-    // cross-referenced by display name against presence — a picker-local fallback, distinct from the
-    // id-keyed member/DM presence above. This isn't the retired member name-join; it's the picker source.
-    const online = this.onlineNamesForPicker();
+    const me = this.myUserId();
     return this.contacts()
-      .filter(c => c.email.toLowerCase() !== me)
+      .filter(c => c.userId !== me)
       .map(c => ({
-        email: c.email,
+        userId: c.userId,
         name: c.name,
         picture: c.picture,
-        online: !!c.name && online.has(c.name.toLowerCase()),
+        online: this.isOnline(c.userId),
       }))
-      .sort((a, b) => Number(b.online) - Number(a.online) || (a.name || a.email).localeCompare(b.name || b.email));
-  }
-
-  /** Picker-only online-by-name set (contacts have no userId; presence still carries a display name). */
-  private onlineNamesForPicker(): Set<string> {
-    const cutoff = this.now() - PRESENCE_STALE_MS;
-    const set = new Set<string>();
-    for (const p of this.presence()) {
-      if (p.name && new Date(p.lastSeenUtc).getTime() >= cutoff) set.add(p.name.toLowerCase());
-    }
-    return set;
+      .sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
   }
 
   // =========================================================================
@@ -704,12 +709,12 @@ export class Chat implements AfterViewChecked, OnDestroy {
   }
 
   channelInitial(ch: ChatChannelDto): string {
-    if (ch.kind === 'direct') return this.initialsOf(ch.displayName, ch.displayName);
+    if (ch.kind === 'direct') return this.initialsOf(ch.displayName);
     return (ch.displayName?.[0] ?? '#').toUpperCase();
   }
 
-  private initialsOf(name: string | null | undefined, email?: string | null): string {
-    const parts = (name || email || '').split(/[\s@.]+/).filter(Boolean);
+  private initialsOf(name: string | null | undefined): string {
+    const parts = (name || '').split(/\s+/).filter(Boolean);
     return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U';
   }
 

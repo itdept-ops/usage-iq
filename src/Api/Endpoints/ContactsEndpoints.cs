@@ -2,6 +2,7 @@ using Ccusage.Api.Auth;
 using Ccusage.Api.Data;
 using Ccusage.Api.Data.Entities;
 using Ccusage.Api.Dtos;
+using Ccusage.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ccusage.Api.Endpoints;
@@ -38,8 +39,8 @@ public static class ContactsEndpoints
                 .OrderBy(u => u.Name == "" ? u.Email : u.Name)
                 .Select(u => new ChatContactDto
                 {
-                    Email = u.Email,
-                    Name = string.IsNullOrEmpty(u.Name) ? u.Email : u.Name,
+                    UserId = u.Id,
+                    Name = string.IsNullOrEmpty(u.Name) ? "Unknown user" : u.Name,
                     Picture = u.Picture,
                 })
                 .ToListAsync(ct);
@@ -47,36 +48,31 @@ public static class ContactsEndpoints
         }).RequirePermission(Permissions.ChatContactsManage);
 
         // ---- A specific user's contacts (admin editor) ----
-        g.MapGet("/contacts/user/{email}", async (string email, UsageDbContext db, CancellationToken ct) =>
+        // The circle OWNER is addressed by AppUser id (email-privacy); resolved to its internal email.
+        g.MapGet("/contacts/user/{userId:int}", async (int userId, UsageDbContext db, CancellationToken ct) =>
         {
-            var owner = (email ?? "").Trim().ToLowerInvariant();
-            if (owner.Length == 0) return Results.BadRequest(new { message = "A user email is required." });
-            if (!await db.Users.AsNoTracking().AnyAsync(u => u.Email == owner, ct))
-                return Results.NotFound(new { message = "That user doesn't exist." });
+            var owner = await db.Users.AsNoTracking()
+                .Where(u => u.Id == userId).Select(u => u.Email).FirstOrDefaultAsync(ct);
+            if (owner is null) return Results.NotFound(new { message = "That user doesn't exist." });
             return Results.Ok(await ContactsForAsync(db, owner, ct));
         }).RequirePermission(Permissions.ChatContactsManage);
 
         // ---- Add a contact to a user's circle (MUTUAL; idempotent; self-add ignored) ----
-        g.MapPost("/contacts/user/{email}", async (
-            string email, AddContactRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        // Both the OWNER and the CONTACT are addressed by AppUser id (email-privacy); resolved server-side.
+        g.MapPost("/contacts/user/{userId:int}", async (
+            int userId, AddContactRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
         {
             var actor = (await me.GetUserAsync(ct))!;
-            var owner = (email ?? "").Trim().ToLowerInvariant();
-            var contact = (req.ContactEmail ?? "").Trim().ToLowerInvariant();
-            if (owner.Length == 0 || contact.Length == 0)
-                return Results.BadRequest(new { message = "Both the user and the contact email are required." });
 
-            // Both ends must be existing, enabled users.
-            var existing = await db.Users.AsNoTracking()
-                .Where(u => u.IsEnabled && (u.Email == owner || u.Email == contact))
-                .Select(u => u.Email)
-                .ToListAsync(ct);
-            if (!existing.Contains(owner))
+            // Resolve both ids -> internal email in ONE query, keeping only enabled users.
+            var byId = await ChatNotificationService.ResolveEmailsByIdAsync(db, new[] { userId, req.ContactUserId }, ct);
+            if (!byId.TryGetValue(userId, out var owner))
                 return Results.NotFound(new { message = "That user doesn't exist or is disabled." });
+
             // A self-contact is silently ignored (no-op), returning the unchanged list.
-            if (owner != contact)
+            if (userId != req.ContactUserId)
             {
-                if (!existing.Contains(contact))
+                if (!byId.TryGetValue(req.ContactUserId, out var contact))
                     return Results.BadRequest(new { message = "That contact doesn't exist or is disabled." });
                 await EnsurePairAsync(db, owner, contact, actor.Email, ct);
             }
@@ -84,15 +80,16 @@ public static class ContactsEndpoints
         }).RequirePermission(Permissions.ChatContactsManage);
 
         // ---- Remove a contact from a user's circle (MUTUAL; no-op if absent) ----
-        g.MapDelete("/contacts/user/{email}/{contactEmail}", async (
-            string email, string contactEmail, UsageDbContext db, CancellationToken ct) =>
+        // Both the OWNER and the CONTACT are addressed by AppUser id (email-privacy); resolved server-side.
+        g.MapDelete("/contacts/user/{userId:int}/{contactUserId:int}", async (
+            int userId, int contactUserId, UsageDbContext db, CancellationToken ct) =>
         {
-            var owner = (email ?? "").Trim().ToLowerInvariant();
-            var contact = (contactEmail ?? "").Trim().ToLowerInvariant();
-            if (owner.Length == 0 || contact.Length == 0)
-                return Results.BadRequest(new { message = "Both the user and the contact email are required." });
-            if (!await db.Users.AsNoTracking().AnyAsync(u => u.Email == owner, ct))
+            // The owner must exist; resolve to internal email (enabled-only — a disabled owner can't be edited).
+            var byId = await ChatNotificationService.ResolveEmailsByIdAsync(db, new[] { userId, contactUserId }, ct);
+            if (!byId.TryGetValue(userId, out var owner))
                 return Results.NotFound(new { message = "That user doesn't exist." });
+            // The contact id may not resolve (e.g. since disabled) — a missing pair is a harmless no-op.
+            var contact = byId.GetValueOrDefault(contactUserId, "");
 
             // Remove BOTH directions; absent rows are simply a no-op.
             await db.ChatContacts
@@ -144,7 +141,8 @@ public static class ContactsEndpoints
         }
     }
 
-    /// <summary>Resolve a user's contacts to display identity (name/picture from AppUser), name-sorted.</summary>
+    /// <summary>Resolve a user's contacts to display identity (id/name/picture from AppUser), name-sorted.
+    /// The contact is exposed by AppUser id only — the raw email is NEVER put on the wire (email-privacy).</summary>
     private static async Task<List<ChatContactDto>> ContactsForAsync(
         UsageDbContext db, string owner, CancellationToken ct) =>
         await db.ChatContacts.AsNoTracking()
@@ -154,8 +152,8 @@ public static class ContactsEndpoints
             .OrderBy(u => u.Name == "" ? u.Email : u.Name)
             .Select(u => new ChatContactDto
             {
-                Email = u.Email,
-                Name = string.IsNullOrEmpty(u.Name) ? u.Email : u.Name,
+                UserId = u.Id,
+                Name = string.IsNullOrEmpty(u.Name) ? "Unknown user" : u.Name,
                 Picture = u.Picture,
             })
             .ToListAsync(ct);

@@ -58,11 +58,12 @@ public class ChatIntegrationTests(WebAppFactory factory)
         return el.ValueKind == JsonValueKind.Object && el.TryGetProperty(name, out _);
     }
 
-    /// <summary>Create a channel as a chat.send user, with the given member emails.</summary>
-    private static async Task<int> CreateChannel(HttpClient owner, string name, params string[] memberEmails)
+    /// <summary>Create a channel as a chat.send user, with the given member AppUser ids (email-privacy:
+    /// members are addressed by id, never email).</summary>
+    private static async Task<int> CreateChannel(HttpClient owner, string name, params int[] memberUserIds)
     {
         var resp = await owner.PostAsJsonAsync("/api/chat/channels",
-            new { name, topic = (string?)null, isPrivate = false, memberEmails });
+            new { name, topic = (string?)null, isPrivate = false, memberUserIds });
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         return (await Json(resp)).GetProperty("id").GetInt32();
     }
@@ -88,7 +89,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
         var (_, readOnly) = await ProvisionUser("chat.read");
         (await readOnly.GetAsync("/api/chat/channels")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await readOnly.PostAsJsonAsync("/api/chat/channels",
-                new { name = "x", isPrivate = false, memberEmails = Array.Empty<string>() }))
+                new { name = "x", isPrivate = false, memberUserIds = Array.Empty<int>() }))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -98,12 +99,12 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Member_can_send_and_read_messages_in_a_channel()
     {
         var (_, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
 
-        var channelId = await CreateChannel(alice, "general-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var channelId = await CreateChannel(alice, "general-" + Guid.NewGuid().ToString("N")[..6], bobId);
 
         var send = await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages",
-            new { body = "hello team", mentionedEmails = (string[]?)null });
+            new { body = "hello team", mentionedUserIds = (int[]?)null });
         send.StatusCode.Should().Be(HttpStatusCode.OK);
         var sent = await Json(send);
         sent.GetProperty("body").GetString().Should().Be("hello team");
@@ -149,7 +150,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     {
         var (_, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
-        var channelId = await CreateChannel(alice, "members-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var channelId = await CreateChannel(alice, "members-" + Guid.NewGuid().ToString("N")[..6], bobId);
         await Send(alice, channelId, "latest");
 
         var mine = (await Json(await alice.GetAsync("/api/chat/channels"))).EnumerateArray()
@@ -199,7 +200,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
 
         // POST to that channel is likewise 404 for a non-member.
         (await outsider.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages",
-                new { body = "let me in", mentionedEmails = (string[]?)null }))
+                new { body = "let me in", mentionedUserIds = (int[]?)null }))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -208,21 +209,22 @@ public class ChatIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Opening_a_direct_returns_the_same_channel_for_the_same_pair()
     {
-        var (aliceEmail, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
+        var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
 
-        var first = await alice.PostAsJsonAsync("/api/chat/direct", new { userEmail = bobEmail });
+        // Open a DM by the other participant's AppUser id (email-privacy: no email on the wire).
+        var first = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         var firstJson = await Json(first);
         var firstId = firstJson.GetProperty("id").GetInt32();
         firstJson.GetProperty("kind").GetString().Should().Be("direct");
 
         // Alice opening again → same channel.
-        var againJson = await Json(await alice.PostAsJsonAsync("/api/chat/direct", new { userEmail = bobEmail }));
+        var againJson = await Json(await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId }));
         againJson.GetProperty("id").GetInt32().Should().Be(firstId);
 
         // Bob opening from the other side → still the same channel (unordered pair).
-        var fromBobJson = await Json(await bob.PostAsJsonAsync("/api/chat/direct", new { userEmail = aliceEmail }));
+        var fromBobJson = await Json(await bob.PostAsJsonAsync("/api/chat/direct", new { userId = aliceId }));
         fromBobJson.GetProperty("id").GetInt32().Should().Be(firstId);
 
         // The DM's display name for Alice is the OTHER member (Bob), by NAME — never his email.
@@ -235,11 +237,13 @@ public class ChatIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Opening_a_direct_with_self_or_unknown_user_is_rejected()
     {
-        var (selfEmail, me) = await ProvisionUser("chat.read", "chat.send");
+        var (selfEmail, me, selfId) = await ProvisionUserWithId("chat.read", "chat.send");
 
-        (await me.PostAsJsonAsync("/api/chat/direct", new { userEmail = selfEmail }))
+        // Opening a DM with yourself (by your own id) is rejected.
+        (await me.PostAsJsonAsync("/api/chat/direct", new { userId = selfId }))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await me.PostAsJsonAsync("/api/chat/direct", new { userEmail = "ghost@nowhere.local" }))
+        // An unknown user id is rejected.
+        (await me.PostAsJsonAsync("/api/chat/direct", new { userId = 99999999 }))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -252,7 +256,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
         var channelId = await CreateChannel(alice, "del-" + Guid.NewGuid().ToString("N")[..6]);
 
         var send = await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages",
-            new { body = "secret words", mentionedEmails = (string[]?)null });
+            new { body = "secret words", mentionedUserIds = (int[]?)null });
         var messageId = (await Json(send)).GetProperty("id").GetInt64();
 
         var del = await alice.DeleteAsync($"/api/chat/messages/{messageId}");
@@ -271,11 +275,11 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Owner_can_edit_but_a_plain_member_cannot_edit_anothers_message()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
-        var channelId = await CreateChannel(alice, "edit-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "edit-" + Guid.NewGuid().ToString("N")[..6], bobId);
 
         var send = await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages",
-            new { body = "typo heer", mentionedEmails = (string[]?)null });
+            new { body = "typo heer", mentionedUserIds = (int[]?)null });
         var messageId = (await Json(send)).GetProperty("id").GetInt64();
 
         // Owner edits → 200, EditedUtc set.
@@ -294,11 +298,11 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Moderator_can_delete_another_members_message()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (modEmail, mod) = await ProvisionUser("chat.read", "chat.send", "chat.moderate");
-        var channelId = await CreateChannel(alice, "mod-" + Guid.NewGuid().ToString("N")[..6], modEmail);
+        var (modEmail, mod, modId) = await ProvisionUserWithId("chat.read", "chat.send", "chat.moderate");
+        var channelId = await CreateChannel(alice, "mod-" + Guid.NewGuid().ToString("N")[..6], modId);
 
         var send = await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages",
-            new { body = "moderate me", mentionedEmails = (string[]?)null });
+            new { body = "moderate me", mentionedUserIds = (int[]?)null });
         var messageId = (await Json(send)).GetProperty("id").GetInt64();
 
         (await mod.DeleteAsync($"/api/chat/messages/{messageId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -314,8 +318,8 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Unread_count_reflects_others_messages_and_clears_on_read()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
-        var channelId = await CreateChannel(alice, "unread-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "unread-" + Guid.NewGuid().ToString("N")[..6], bobId);
 
         // Alice posts two messages; Bob's unread should become 2.
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages", new { body = "one" });
@@ -335,7 +339,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     // ---- Channel create: unknown members silently dropped ----
 
     [Fact]
-    public async Task Create_channel_drops_unknown_member_emails_and_keeps_the_creator()
+    public async Task Create_channel_drops_unknown_member_ids_and_keeps_the_creator()
     {
         var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (realEmail, _, realId) = await ProvisionUserWithId("chat.read");
@@ -344,18 +348,19 @@ public class ChatIntegrationTests(WebAppFactory factory)
         {
             name = "drop-" + Guid.NewGuid().ToString("N")[..6],
             isPrivate = false,
-            memberEmails = new[] { realEmail, "nobody@void.local" },
+            // A valid member id + an unknown id (no such user) — the unknown is silently dropped.
+            memberUserIds = new[] { realId, 99999999 },
         });
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Email-privacy: members carry userId (server-resolved), never an email. The creator + the valid
-        // requested member are present by id; the unknown email is dropped (and "nobody" never resolves).
+        // requested member are present by id; the unknown id is dropped.
         var members = (await Json(resp)).GetProperty("members").EnumerateArray().ToList();
         members.Should().OnlyContain(m => !HasProperty(m, "email")); // no email property at all
         var memberIds = members.Select(m => m.GetProperty("userId").GetInt32()).ToList();
         memberIds.Should().Contain(aliceId);
         memberIds.Should().Contain(realId);
-        memberIds.Should().HaveCount(2); // only the two real users — the unknown email produced no member
+        memberIds.Should().HaveCount(2); // only the two real users — the unknown id produced no member
     }
 
     // ---- Archive (moderation) ----
@@ -385,9 +390,9 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Direct_message_creates_a_notification_for_the_recipient()
     {
         var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
 
-        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userEmail = bobEmail });
+        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
         var channelId = (await Json(dm)).GetProperty("id").GetInt32();
 
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages", new { body = "hi bob" });
@@ -411,15 +416,36 @@ public class ChatIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Mention_in_a_channel_notifies_the_mentioned_member()
     {
-        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
-        var channelId = await CreateChannel(alice, "mention-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var (_, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "mention-" + Guid.NewGuid().ToString("N")[..6], bobId);
 
+        // Mentions are sent by AppUser id (email-privacy); the server resolves id -> member email and
+        // fires the dedicated "you were mentioned" notification for that member.
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages",
-            new { body = "hey @bob look", mentionedEmails = new[] { bobEmail } });
+            new { body = "hey @bob look", mentionedUserIds = new[] { bobId } });
 
         var inbox = (await Json(await bob.GetAsync("/api/inbox"))).EnumerateArray().ToList();
-        inbox.Should().Contain(n => n.GetProperty("type").GetString() == "mention");
+        var mention = inbox.Single(n => n.GetProperty("type").GetString() == "mention");
+        // The actor (Alice) is exposed by id, never by email.
+        mention.TryGetProperty("actorEmail", out _).Should().BeFalse();
+        mention.GetProperty("actorUserId").GetInt32().Should().Be(aliceId);
+    }
+
+    [Fact]
+    public async Task Mention_of_a_non_member_id_does_not_notify_anyone()
+    {
+        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var (_, outsider, outsiderId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "ment-out-" + Guid.NewGuid().ToString("N")[..6], bobId);
+
+        // Mention an id that is NOT a member of the channel — they must NOT get a mention notification.
+        await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages",
+            new { body = "hey @outsider", mentionedUserIds = new[] { outsiderId } });
+
+        var outsiderInbox = (await Json(await outsider.GetAsync("/api/inbox"))).EnumerateArray().ToList();
+        outsiderInbox.Should().NotContain(n => n.GetProperty("type").GetString() == "mention");
     }
 
     // ---- Inbox read / read-all ----
@@ -428,8 +454,8 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Marking_notifications_read_only_touches_the_callers_own_and_updates_count()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
-        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userEmail = bobEmail });
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
         var channelId = (await Json(dm)).GetProperty("id").GetInt32();
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages", new { body = "ping" });
 
@@ -453,8 +479,8 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Read_all_clears_the_unread_count()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
-        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userEmail = bobEmail });
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
         var channelId = (await Json(dm)).GetProperty("id").GetInt32();
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages", new { body = "a" });
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages", new { body = "b" });
@@ -503,7 +529,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Disabling_direct_message_notifications_suppresses_the_notification()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
 
         // Bob turns OFF direct-message notifications.
         await bob.PutAsJsonAsync("/api/inbox/preferences", new
@@ -516,7 +542,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
             surfaceBrowser = false,
         });
 
-        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userEmail = bobEmail });
+        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
         var channelId = (await Json(dm)).GetProperty("id").GetInt32();
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages", new { body = "quiet" });
 
@@ -528,12 +554,12 @@ public class ChatIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Concurrent_get_or_create_direct_returns_one_channel_and_no_duplicates()
     {
-        var (aliceEmail, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
+        var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
 
         // Fire both sides at once: the partial unique index on DirectKey must collapse this to ONE row.
-        var fromAlice = alice.PostAsJsonAsync("/api/chat/direct", new { userEmail = bobEmail });
-        var fromBob = bob.PostAsJsonAsync("/api/chat/direct", new { userEmail = aliceEmail });
+        var fromAlice = alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
+        var fromBob = bob.PostAsJsonAsync("/api/chat/direct", new { userId = aliceId });
         await Task.WhenAll(fromAlice, fromBob);
 
         var aId = (await Json(await fromAlice)).GetProperty("id").GetInt32();
@@ -557,9 +583,9 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Read_cursor_with_a_message_id_from_another_channel_does_not_change_unread()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
-        var target = await CreateChannel(alice, "target-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
-        var other = await CreateChannel(alice, "other-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var target = await CreateChannel(alice, "target-" + Guid.NewGuid().ToString("N")[..6], bobId);
+        var other = await CreateChannel(alice, "other-" + Guid.NewGuid().ToString("N")[..6], bobId);
 
         // One unread message in the target channel for Bob.
         await alice.PostAsJsonAsync($"/api/chat/channels/{target}/messages", new { body = "unread" });
@@ -583,7 +609,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task JoinChannel_makes_a_new_members_group_membership_effective_for_live_broadcasts()
     {
         var (_, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
 
         // Bob connects to the hub BEFORE any shared channel exists.
         await using var bobHub = await ConnectHub(bobEmail);
@@ -592,7 +618,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
         bobHub.On<JsonElement>("ReceiveMessage", m => { lock (received) received.Add(m); gate.TrySetResult(); });
 
         // Alice creates a channel that includes Bob (created mid-session, after Bob connected).
-        var channelId = await CreateChannel(alice, "live-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var channelId = await CreateChannel(alice, "live-" + Guid.NewGuid().ToString("N")[..6], bobId);
 
         // Bob acts on ChannelAdded by joining the live group; now membership is effective.
         await bobHub.InvokeAsync("JoinChannel", channelId);
@@ -615,8 +641,8 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task TypingChanged_carries_the_typists_user_id_not_email()
     {
         var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
-        var channelId = await CreateChannel(alice, "typing-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "typing-" + Guid.NewGuid().ToString("N")[..6], bobId);
 
         // Both connect; Bob listens for TypingChanged(channelId, userId, userName, isTyping).
         await using var aliceHub = await ConnectHub(aliceEmail);
@@ -658,10 +684,10 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Per_channel_UnreadChanged_message_count_and_inbox_total_are_distinct_events()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
 
         // A DM (so Bob gets a directMessage notification by default) — exercises both events at once.
-        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userEmail = bobEmail });
+        var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
         var channelId = (await Json(dm)).GetProperty("id").GetInt32();
 
         await using var bobHub = await ConnectHub(bobEmail);
@@ -704,7 +730,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     private static async Task<long> Send(HttpClient sender, int channelId, string body)
     {
         var send = await sender.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages",
-            new { body, mentionedEmails = (string[]?)null });
+            new { body, mentionedUserIds = (int[]?)null });
         send.StatusCode.Should().Be(HttpStatusCode.OK);
         return (await Json(send)).GetProperty("id").GetInt64();
     }
@@ -738,7 +764,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     {
         var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
-        var channelId = await CreateChannel(alice, "react2-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var channelId = await CreateChannel(alice, "react2-" + Guid.NewGuid().ToString("N")[..6], bobId);
         var messageId = await Send(alice, channelId, "double react");
 
         await alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "❤️" });
@@ -759,8 +785,8 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task Reactions_appear_in_the_message_history_dto()
     {
         var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
-        var (bobEmail, bob) = await ProvisionUser("chat.read", "chat.send");
-        var channelId = await CreateChannel(alice, "histreact-" + Guid.NewGuid().ToString("N")[..6], bobEmail);
+        var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        var channelId = await CreateChannel(alice, "histreact-" + Guid.NewGuid().ToString("N")[..6], bobId);
         var messageId = await Send(alice, channelId, "history reaction");
 
         await alice.PostAsJsonAsync($"/api/chat/messages/{messageId}/reactions", new { emoji = "🔥" });
@@ -789,8 +815,8 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task A_read_only_member_without_chat_send_cannot_react()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (readerEmail, reader) = await ProvisionUser("chat.read"); // member, but no chat.send
-        var channelId = await CreateChannel(alice, "ro-react-" + Guid.NewGuid().ToString("N")[..6], readerEmail);
+        var (readerEmail, reader, readerId) = await ProvisionUserWithId("chat.read"); // member, but no chat.send
+        var channelId = await CreateChannel(alice, "ro-react-" + Guid.NewGuid().ToString("N")[..6], readerId);
         var messageId = await Send(alice, channelId, "look but don't touch");
 
         // The read-only member is a member of the channel but lacks chat.send → 403 (not 404).

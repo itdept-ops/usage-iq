@@ -46,8 +46,9 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
         await base.OnConnectedAsync();
     }
 
-    /// <summary>Persist + broadcast + fan out a message — the hub mirror of the REST send endpoint.</summary>
-    public async Task SendMessage(int channelId, string body, string[]? mentionedEmails)
+    /// <summary>Persist + broadcast + fan out a message — the hub mirror of the REST send endpoint.
+    /// Mentions are AppUser ids (email-privacy); the fan-out resolves them to emails server-side.</summary>
+    public async Task SendMessage(int channelId, string body, int[]? mentionedUserIds)
     {
         var email = Email;
         if (string.IsNullOrEmpty(email)) throw new HubException("Not authenticated.");
@@ -77,7 +78,7 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
 
         var sender = await SenderInfoAsync(db, email);
         await fanout.FanOutMessageAsync(
-            channel, msg, sender, mentionedEmails ?? Array.Empty<string>(), Context.ConnectionAborted);
+            channel, msg, sender, mentionedUserIds ?? Array.Empty<int>(), Context.ConnectionAborted);
     }
 
     /// <summary>Toggle the caller's emoji reaction on a message — the hub mirror of the REST reactions endpoint.</summary>

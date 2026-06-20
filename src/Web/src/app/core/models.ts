@@ -593,21 +593,26 @@ export interface NotificationPreferenceDto {
   surfaceBrowser: boolean;
 }
 
-/** Create-a-channel payload (POST /api/chat/channels). */
+/**
+ * Create-a-channel payload (POST /api/chat/channels). Members are sent by AppUser id (email-privacy):
+ * the client holds no other-user emails; the server resolves each id to its internal email. Mirrors
+ * CreateChannelRequest.
+ */
 export interface CreateChannelRequest {
   name: string;
   topic?: string;
   isPrivate: boolean;
-  memberEmails: string[];
+  memberUserIds: number[];
 }
 
 /**
  * One person in a chat contact circle — the curated, admin-managed candidate list the New-DM /
- * channel-member picker draws from. Identity is resolved server-side from the AppUser. Mirrors
- * ChatContactDto (camelCase JSON).
+ * channel-member picker draws from. Identity is the server-resolved `userId` + `name`; the raw email
+ * is NEVER exposed (email-privacy). The picker drives DM-open / channel-create by this `userId`.
+ * Mirrors ChatContactDto (camelCase JSON).
  */
 export interface ChatContactDto {
-  email: string;
+  userId: number;
   name: string;
   picture?: string | null;
 }

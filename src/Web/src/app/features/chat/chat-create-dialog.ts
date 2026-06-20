@@ -15,11 +15,12 @@ import { ChatChannelDto } from '../../core/models';
 
 /**
  * One pickable teammate in the member/DM picker. Candidates come from the caller's curated chat
- * contacts (their circle) — or, for an admin, the full directory — never the live presence roster;
- * `online` is the presence-derived dot, cross-referenced only for the indicator + online-first sort.
+ * contacts (their circle) — or, for an admin, the full directory — never the live presence roster.
+ * Identity is the AppUser `userId` (email-privacy: no email is carried); `online` is the
+ * presence-derived dot, cross-referenced by id only for the indicator + online-first sort.
  */
 export interface ChatPickPerson {
-  email: string;
+  userId: number;
   name: string;
   picture?: string | null;
   online: boolean;
@@ -66,17 +67,16 @@ export class ChatCreateDialog {
   readonly topic = signal('');
   readonly isPrivate = signal(false);
 
-  // ---- shared member/DM selection (set of lower-cased emails) ----
-  private readonly selected = signal<Set<string>>(new Set());
+  // ---- shared member/DM selection (set of AppUser ids) ----
+  private readonly selected = signal<Set<number>>(new Set());
   readonly query = signal('');
 
-  /** People filtered by the search box (case-insensitive over name + email). */
+  /** People filtered by the search box (case-insensitive over name). */
   readonly filteredPeople = computed<ChatPickPerson[]>(() => {
     const q = this.query().trim().toLowerCase();
     const people = this.data.people;
     if (!q) return people;
-    return people.filter(p =>
-      p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q));
+    return people.filter(p => p.name.toLowerCase().includes(q));
   });
 
   /** How many members are picked (drives the channel create button + chip count). */
@@ -90,19 +90,18 @@ export class ChatCreateDialog {
     ? 'No other teammates available yet.'
     : 'No contacts yet — ask an admin to add some to your circle.');
 
-  isSelected(email: string): boolean {
-    return this.selected().has(email.toLowerCase());
+  isSelected(userId: number): boolean {
+    return this.selected().has(userId);
   }
 
-  toggle(email: string): void {
-    const key = email.toLowerCase();
+  toggle(userId: number): void {
     if (this.mode() === 'direct') {
       // DM: single selection — picking one replaces any prior pick.
-      this.selected.set(this.isSelected(key) ? new Set() : new Set([key]));
+      this.selected.set(this.isSelected(userId) ? new Set() : new Set([userId]));
       return;
     }
     const next = new Set(this.selected());
-    next.has(key) ? next.delete(key) : next.add(key);
+    next.has(userId) ? next.delete(userId) : next.add(userId);
     this.selected.set(next);
   }
 
@@ -131,8 +130,8 @@ export class ChatCreateDialog {
     };
 
     if (this.mode() === 'direct') {
-      const email = [...this.selected()][0];
-      this.chat.openDirect(email)
+      const userId = [...this.selected()][0];
+      this.chat.openDirect(userId)
         .then(ch => this.ref.close(ch))
         .catch(fail);
       return;
@@ -153,7 +152,7 @@ export class ChatCreateDialog {
 
   /** Two-letter initials for the avatar fallback. */
   initials(p: ChatPickPerson): string {
-    const parts = (p.name || p.email).split(/[\s@.]+/).filter(Boolean);
+    const parts = (p.name || '').split(/[\s@.]+/).filter(Boolean);
     return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U';
   }
 }

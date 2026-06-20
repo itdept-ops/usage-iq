@@ -50,11 +50,11 @@
     }
 
     <div class="cc-people" role="listbox" [attr.aria-multiselectable]="mode() === 'channel'">
-      @for (p of filteredPeople(); track p.email) {
+      @for (p of filteredPeople(); track p.userId) {
         <button type="button" class="cc-person" role="option"
-                [class.selected]="isSelected(p.email)"
-                [attr.aria-selected]="isSelected(p.email)"
-                (click)="toggle(p.email)">
+                [class.selected]="isSelected(p.userId)"
+                [attr.aria-selected]="isSelected(p.userId)"
+                (click)="toggle(p.userId)">
           <span class="cc-person__avatar-wrap">
             @if (p.picture) {
               <img class="cc-person__avatar" [src]="p.picture" alt="" referrerpolicy="no-referrer" />
@@ -64,10 +64,9 @@
             @if (p.online) { <span class="cc-person__dot" aria-hidden="true"></span> }
           </span>
           <span class="cc-person__id">
-            <span class="cc-person__name">{{ p.name || p.email }}</span>
-            <span class="cc-person__email">{{ p.email }}</span>
+            <span class="cc-person__name">{{ p.name }}</span>
           </span>
-          @if (isSelected(p.email)) {
+          @if (isSelected(p.userId)) {
             <mat-icon class="cc-person__check">check_circle</mat-icon>
           } @else {
             <mat-icon class="cc-person__add">

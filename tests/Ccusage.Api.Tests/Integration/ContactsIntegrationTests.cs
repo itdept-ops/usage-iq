@@ -30,19 +30,26 @@ public class ContactsIntegrationTests(WebAppFactory factory)
         return c;
     }
 
-    private async Task<(string email, HttpClient client)> ProvisionUser(params string[] permissions)
+    private async Task<(string email, HttpClient client, int id)> ProvisionUser(params string[] permissions)
     {
         var email = $"contact-{Guid.NewGuid():N}@test.local";
         var res = await Admin().PostAsJsonAsync("/api/users", new { email, isEnabled = true, permissions });
         res.StatusCode.Should().Be(HttpStatusCode.Created);
-        return (email, Client(email));
+        var id = (await Json(res)).GetProperty("id").GetInt32();
+        return (email, Client(email), id);
     }
 
     private static async Task<JsonElement> Json(HttpResponseMessage resp) =>
         await resp.Content.ReadFromJsonAsync<JsonElement>();
 
-    private static List<string> Emails(JsonElement arr) =>
-        arr.EnumerateArray().Select(c => c.GetProperty("email").GetString()!).ToList();
+    /// <summary>The contact userIds in a contacts/directory payload — email-privacy: the wire carries
+    /// userId, never an email.</summary>
+    private static List<int> UserIds(JsonElement arr) =>
+        arr.EnumerateArray().Select(c => c.GetProperty("userId").GetInt32()).ToList();
+
+    /// <summary>True when the JSON object has a property with the given name (for asserting NO email leaks).</summary>
+    private static bool HasProperty(JsonElement el, string name) =>
+        el.ValueKind == JsonValueKind.Object && el.TryGetProperty(name, out _);
 
     // ---- Permission gating: a non-manager gets 403 on the manage endpoints ----
 
@@ -50,14 +57,14 @@ public class ContactsIntegrationTests(WebAppFactory factory)
     public async Task Manage_endpoints_require_chat_contacts_manage()
     {
         // chat.read + chat.send is NOT enough to manage contacts.
-        var (someoneEmail, _) = await ProvisionUser("chat.read");
-        var (_, plain) = await ProvisionUser("chat.read", "chat.send");
+        var (_, _, someoneId) = await ProvisionUser("chat.read");
+        var (_, plain, _) = await ProvisionUser("chat.read", "chat.send");
 
         (await plain.GetAsync("/api/chat/directory")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await plain.GetAsync($"/api/chat/contacts/user/{someoneEmail}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await plain.PostAsJsonAsync($"/api/chat/contacts/user/{someoneEmail}", new { contactEmail = someoneEmail }))
+        (await plain.GetAsync($"/api/chat/contacts/user/{someoneId}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await plain.PostAsJsonAsync($"/api/chat/contacts/user/{someoneId}", new { contactUserId = someoneId }))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await plain.DeleteAsync($"/api/chat/contacts/user/{someoneEmail}/{someoneEmail}"))
+        (await plain.DeleteAsync($"/api/chat/contacts/user/{someoneId}/{someoneId}"))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         // But /contacts/me only needs chat.read.
@@ -77,21 +84,26 @@ public class ContactsIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Adding_a_contact_is_mutual_both_users_see_each_other()
     {
-        var (_, admin) = await ProvisionUser("chat.read", "chat.contacts.manage");
-        var (aliceEmail, alice) = await ProvisionUser("chat.read");
-        var (bobEmail, bob) = await ProvisionUser("chat.read");
+        var (_, admin, _) = await ProvisionUser("chat.read", "chat.contacts.manage");
+        var (_, alice, aliceId) = await ProvisionUser("chat.read");
+        var (_, bob, bobId) = await ProvisionUser("chat.read");
 
-        var added = await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceEmail}", new { contactEmail = bobEmail });
+        // The owner + contact are addressed by AppUser id (email-privacy).
+        var added = await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceId}", new { contactUserId = bobId });
         added.StatusCode.Should().Be(HttpStatusCode.OK);
-        Emails(await Json(added)).Should().ContainSingle().Which.Should().Be(bobEmail);
+        var addedJson = await Json(added);
+        UserIds(addedJson).Should().ContainSingle().Which.Should().Be(bobId);
+        // The contacts payload carries userId, never an email.
+        addedJson.EnumerateArray().Should().OnlyContain(c => !HasProperty(c, "email"));
+        addedJson.GetRawText().Should().NotContain("@");
 
-        // Alice's own contacts now include Bob...
-        Emails(await Json(await alice.GetAsync("/api/chat/contacts/me"))).Should().Contain(bobEmail);
+        // Alice's own contacts now include Bob (by id)...
+        UserIds(await Json(await alice.GetAsync("/api/chat/contacts/me"))).Should().Contain(bobId);
         // ...and Bob's own contacts include Alice (the mutual / reverse row).
-        Emails(await Json(await bob.GetAsync("/api/chat/contacts/me"))).Should().Contain(aliceEmail);
+        UserIds(await Json(await bob.GetAsync("/api/chat/contacts/me"))).Should().Contain(aliceId);
 
         // The admin view of each user's contacts agrees.
-        Emails(await Json(await admin.GetAsync($"/api/chat/contacts/user/{bobEmail}"))).Should().Contain(aliceEmail);
+        UserIds(await Json(await admin.GetAsync($"/api/chat/contacts/user/{bobId}"))).Should().Contain(aliceId);
     }
 
     // ---- Mutual remove: deletes BOTH rows ----
@@ -99,22 +111,22 @@ public class ContactsIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Removing_a_contact_is_mutual_both_directions_disappear()
     {
-        var (_, admin) = await ProvisionUser("chat.read", "chat.contacts.manage");
-        var (aliceEmail, alice) = await ProvisionUser("chat.read");
-        var (bobEmail, bob) = await ProvisionUser("chat.read");
+        var (_, admin, _) = await ProvisionUser("chat.read", "chat.contacts.manage");
+        var (_, alice, aliceId) = await ProvisionUser("chat.read");
+        var (_, bob, bobId) = await ProvisionUser("chat.read");
 
-        await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceEmail}", new { contactEmail = bobEmail });
+        await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceId}", new { contactUserId = bobId });
 
-        // Remove from Alice's side; Bob must lose Alice too.
-        var removed = await admin.DeleteAsync($"/api/chat/contacts/user/{aliceEmail}/{bobEmail}");
+        // Remove from Alice's side (owner + contact by id); Bob must lose Alice too.
+        var removed = await admin.DeleteAsync($"/api/chat/contacts/user/{aliceId}/{bobId}");
         removed.StatusCode.Should().Be(HttpStatusCode.OK);
-        Emails(await Json(removed)).Should().NotContain(bobEmail);
+        UserIds(await Json(removed)).Should().NotContain(bobId);
 
-        Emails(await Json(await alice.GetAsync("/api/chat/contacts/me"))).Should().NotContain(bobEmail);
-        Emails(await Json(await bob.GetAsync("/api/chat/contacts/me"))).Should().NotContain(aliceEmail);
+        UserIds(await Json(await alice.GetAsync("/api/chat/contacts/me"))).Should().NotContain(bobId);
+        UserIds(await Json(await bob.GetAsync("/api/chat/contacts/me"))).Should().NotContain(aliceId);
 
         // Removing again is a harmless no-op (still 200).
-        (await admin.DeleteAsync($"/api/chat/contacts/user/{aliceEmail}/{bobEmail}"))
+        (await admin.DeleteAsync($"/api/chat/contacts/user/{aliceId}/{bobId}"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -123,20 +135,23 @@ public class ContactsIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Me_returns_only_the_callers_own_contacts()
     {
-        var (_, admin) = await ProvisionUser("chat.read", "chat.contacts.manage");
-        var (aliceEmail, alice) = await ProvisionUser("chat.read");
-        var (bobEmail, _) = await ProvisionUser("chat.read");
-        var (carolEmail, carol) = await ProvisionUser("chat.read");
+        var (_, admin, _) = await ProvisionUser("chat.read", "chat.contacts.manage");
+        var (_, alice, aliceId) = await ProvisionUser("chat.read");
+        var (_, _, bobId) = await ProvisionUser("chat.read");
+        var (_, carol, carolId) = await ProvisionUser("chat.read");
 
         // Alice <-> Bob are contacts; Carol is unrelated.
-        await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceEmail}", new { contactEmail = bobEmail });
+        await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceId}", new { contactUserId = bobId });
 
-        var aliceContacts = Emails(await Json(await alice.GetAsync("/api/chat/contacts/me")));
-        aliceContacts.Should().Contain(bobEmail);
-        aliceContacts.Should().NotContain(carolEmail);
+        var meResp = await Json(await alice.GetAsync("/api/chat/contacts/me"));
+        var aliceContacts = UserIds(meResp);
+        aliceContacts.Should().Contain(bobId);
+        aliceContacts.Should().NotContain(carolId);
+        // The /me payload carries userId + name, never an email (email-privacy).
+        meResp.EnumerateArray().Should().OnlyContain(c => !HasProperty(c, "email"));
 
         // Carol, who has no contacts, sees an empty circle (not Alice's or Bob's).
-        Emails(await Json(await carol.GetAsync("/api/chat/contacts/me"))).Should().BeEmpty();
+        UserIds(await Json(await carol.GetAsync("/api/chat/contacts/me"))).Should().BeEmpty();
     }
 
     // ---- Self-add ignored ----
@@ -144,14 +159,14 @@ public class ContactsIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Adding_yourself_is_ignored_no_self_contact()
     {
-        var (_, admin) = await ProvisionUser("chat.read", "chat.contacts.manage");
-        var (aliceEmail, alice) = await ProvisionUser("chat.read");
+        var (_, admin, _) = await ProvisionUser("chat.read", "chat.contacts.manage");
+        var (_, alice, aliceId) = await ProvisionUser("chat.read");
 
-        var resp = await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceEmail}", new { contactEmail = aliceEmail });
+        var resp = await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceId}", new { contactUserId = aliceId });
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        Emails(await Json(resp)).Should().BeEmpty(); // self-contact never written
+        UserIds(await Json(resp)).Should().BeEmpty(); // self-contact never written
 
-        Emails(await Json(await alice.GetAsync("/api/chat/contacts/me"))).Should().NotContain(aliceEmail);
+        UserIds(await Json(await alice.GetAsync("/api/chat/contacts/me"))).Should().NotContain(aliceId);
     }
 
     // ---- Idempotent add: re-adding an existing pair is a no-op ----
@@ -159,16 +174,16 @@ public class ContactsIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Adding_the_same_pair_twice_is_idempotent()
     {
-        var (_, admin) = await ProvisionUser("chat.read", "chat.contacts.manage");
-        var (aliceEmail, _) = await ProvisionUser("chat.read");
-        var (bobEmail, _) = await ProvisionUser("chat.read");
+        var (_, admin, _) = await ProvisionUser("chat.read", "chat.contacts.manage");
+        var (_, _, aliceId) = await ProvisionUser("chat.read");
+        var (_, _, bobId) = await ProvisionUser("chat.read");
 
-        await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceEmail}", new { contactEmail = bobEmail });
-        var again = await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceEmail}", new { contactEmail = bobEmail });
+        await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceId}", new { contactUserId = bobId });
+        var again = await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceId}", new { contactUserId = bobId });
         again.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Exactly one entry — no duplicate row created.
-        Emails(await Json(again)).Where(e => e == bobEmail).Should().ContainSingle();
+        UserIds(await Json(again)).Where(id => id == bobId).Should().ContainSingle();
     }
 
     // ---- Directory: all enabled users except the caller ----
@@ -176,12 +191,16 @@ public class ContactsIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Directory_lists_enabled_users_except_the_caller()
     {
-        var (adminEmail, admin) = await ProvisionUser("chat.read", "chat.contacts.manage");
-        var (otherEmail, _) = await ProvisionUser("chat.read");
+        var (_, admin, adminId) = await ProvisionUser("chat.read", "chat.contacts.manage");
+        var (_, _, otherId) = await ProvisionUser("chat.read");
 
-        var dir = Emails(await Json(await admin.GetAsync("/api/chat/directory")));
-        dir.Should().Contain(otherEmail);
-        dir.Should().NotContain(adminEmail); // never include the caller
+        var dirResp = await Json(await admin.GetAsync("/api/chat/directory"));
+        var dir = UserIds(dirResp);
+        dir.Should().Contain(otherId);
+        dir.Should().NotContain(adminId); // never include the caller
+        // The directory carries userId + name, never an email (email-privacy).
+        dirResp.EnumerateArray().Should().OnlyContain(c => !HasProperty(c, "email"));
+        dirResp.GetRawText().Should().NotContain("@");
     }
 
     // ---- Unknown / disabled users rejected ----
@@ -189,34 +208,17 @@ public class ContactsIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Adding_to_or_for_an_unknown_user_is_rejected()
     {
-        var (_, admin) = await ProvisionUser("chat.read", "chat.contacts.manage");
-        var (aliceEmail, _) = await ProvisionUser("chat.read");
+        var (_, admin, _) = await ProvisionUser("chat.read", "chat.contacts.manage");
+        var (_, _, aliceId) = await ProvisionUser("chat.read");
 
-        // Unknown OWNER → 404.
-        (await admin.PostAsJsonAsync("/api/chat/contacts/user/ghost@nowhere.local", new { contactEmail = aliceEmail }))
+        // Unknown OWNER id → 404.
+        (await admin.PostAsJsonAsync("/api/chat/contacts/user/99999999", new { contactUserId = aliceId }))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await admin.GetAsync("/api/chat/contacts/user/ghost@nowhere.local"))
+        (await admin.GetAsync("/api/chat/contacts/user/99999999"))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        // Unknown CONTACT → 400.
-        (await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceEmail}", new { contactEmail = "ghost@nowhere.local" }))
+        // Unknown CONTACT id → 400.
+        (await admin.PostAsJsonAsync($"/api/chat/contacts/user/{aliceId}", new { contactUserId = 99999999 }))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    // ---- Email casing is normalized ----
-
-    [Fact]
-    public async Task Emails_are_matched_case_insensitively()
-    {
-        var (_, admin) = await ProvisionUser("chat.read", "chat.contacts.manage");
-        var (aliceEmail, alice) = await ProvisionUser("chat.read");
-        var (bobEmail, _) = await ProvisionUser("chat.read");
-
-        // Add using an UPPER-cased contact email; it should resolve to the lower-cased user.
-        var resp = await admin.PostAsJsonAsync(
-            $"/api/chat/contacts/user/{aliceEmail.ToUpperInvariant()}", new { contactEmail = bobEmail.ToUpperInvariant() });
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        Emails(await Json(await alice.GetAsync("/api/chat/contacts/me"))).Should().Contain(bobEmail);
     }
 }
