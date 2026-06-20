@@ -458,6 +458,11 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
         {
             e.Property(x => x.Name).HasMaxLength(120);
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // F3 settings: defaults match the entity so an existing row migrates with sane values.
+            e.Property(x => x.TimeZone).HasMaxLength(64).HasDefaultValue("America/New_York");
+            e.Property(x => x.BriefingEnabled).HasDefaultValue(true);
+            e.Property(x => x.BriefingHourLocal).HasDefaultValue(7);
+            e.Property(x => x.WeatherLocation).HasMaxLength(120);
             e.HasMany(x => x.Members).WithOne(m => m.Household!)
                 .HasForeignKey(m => m.HouseholdId).OnDelete(DeleteBehavior.Cascade);
         });

@@ -1371,6 +1371,108 @@ export interface FamilyTimer {
   startedByName: string;
 }
 
+// ---- Family Hub F3: Today snapshot & settings ----
+
+/**
+ * Current-conditions for the Today weather card (mirrors WeatherDto). All server-resolved + clamped;
+ * the whole card only renders when the server returns weather (non-null) — i.e. an OpenWeather key AND
+ * a household location are configured. `icon` is the OpenWeather icon code (e.g. "04d").
+ */
+export interface FamilyWeather {
+  location: string;
+  tempF: number;
+  feelsLikeF: number;
+  description: string;
+  icon: string;
+  humidityPct: number;
+}
+
+/**
+ * One of today's reminders on the Today snapshot (mirrors TodayReminderDto). `localTime` is the due time
+ * pre-formatted in the household timezone (e.g. "3:30 PM"); the target person is `targetUserId` +
+ * `targetName` only — never an email (email-privacy).
+ */
+export interface FamilyTodayReminder {
+  id: number;
+  text: string;
+  dueUtc: string;
+  localTime: string;
+  recurrence: FamilyRecurrence;
+  targetUserId: number;
+  targetName: string;
+}
+
+/**
+ * An active timer on the Today snapshot (mirrors TodayTimerDto). `endsUtc` is the instant to tick down to;
+ * the starter is `startedByUserId` + `startedByName` only.
+ */
+export interface FamilyTodayTimer {
+  id: number;
+  label: string;
+  endsUtc: string;
+  startedByUserId: number;
+  startedByName: string;
+}
+
+/**
+ * A list summary on the Today snapshot (mirrors TodayListDto): the open/done counts plus the first few
+ * still-open item texts for a glanceable shopping/to-do peek.
+ */
+export interface FamilyTodayList {
+  id: number;
+  name: string;
+  kind: FamilyListKind;
+  openCount: number;
+  doneCount: number;
+  firstFewOpenItems: string[];
+}
+
+/** A pinned note on the Today snapshot (mirrors TodayNoteDto) — id + title only. */
+export interface FamilyTodayNote {
+  id: number;
+  title: string;
+}
+
+/**
+ * The household's "Today" snapshot (GET /api/family/today; mirrors TodayDto). A warm, time-of-day
+ * `greeting` addressed to the caller by first name + the household-local `dateLocal` (ISO date), then the
+ * glance cards: today's `reminders` (by local time), active `timers`, list summaries, `pinnedNotes`, and an
+ * optional `weather` card (null — and hidden — when unconfigured). Everyone is by userId + name, never email.
+ */
+export interface FamilyToday {
+  greeting: string;
+  dateLocal: string;
+  reminders: FamilyTodayReminder[];
+  timers: FamilyTodayTimer[];
+  lists: FamilyTodayList[];
+  pinnedNotes: FamilyTodayNote[];
+  weather: FamilyWeather | null;
+}
+
+/**
+ * The household's Family Hub settings (GET /api/family/settings; mirrors SettingsDto). Every member may
+ * read; only the OWNER may edit (`canEdit`). `timeZone` is an IANA id used for all "today" math; the daily
+ * `briefingEnabled` morning briefing posts at `briefingHourLocal` (0–23) in that zone. `weatherLocation`
+ * is free text (e.g. "Tampa,FL,US"); the weather card only appears once an OpenWeather key is configured
+ * server-side (`weatherConfigured`).
+ */
+export interface FamilySettings {
+  timeZone: string;
+  briefingEnabled: boolean;
+  briefingHourLocal: number;
+  weatherLocation: string | null;
+  weatherConfigured: boolean;
+  canEdit: boolean;
+}
+
+/** Patch for PUT /api/family/settings (owner only). Every field is optional — omitted ones are unchanged. */
+export interface FamilySettingsUpdate {
+  timeZone?: string;
+  briefingEnabled?: boolean;
+  briefingHourLocal?: number;
+  weatherLocation?: string | null;
+}
+
 /** Canonical permission keys (mirror of the backend catalog — all 29 keys). */
 export const PERM = {
   dashboardView: 'dashboard.view',

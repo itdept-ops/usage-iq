@@ -47,11 +47,17 @@ public sealed class CurrentHouseholdAccessor(UsageDbContext db)
         if (!caller.Permissions.Contains(Permissions.FamilyUse)) return null;
 
         var now = DateTime.UtcNow;
+        // Seed the household timezone from the app's display timezone so the Today view + briefing land on
+        // the right local day out of the box (owner can change it later in family settings).
+        var appTz = await db.AppConfigs.AsNoTracking()
+            .Select(c => c.DisplayTimeZone)
+            .FirstOrDefaultAsync(ct);
         var household = new Household
         {
             Name = $"{DisplayName(caller)}’s Family",
             CreatedByUserId = caller.Id,
             CreatedUtc = now,
+            TimeZone = string.IsNullOrWhiteSpace(appTz) ? "America/New_York" : appTz,
             Members =
             {
                 new HouseholdMember { UserId = caller.Id, Role = "owner", JoinedUtc = now },

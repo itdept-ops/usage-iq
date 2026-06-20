@@ -22,4 +22,7 @@ public enum NotificationType
 
     /// <summary>A Family Hub shared timer finished (pings the whole household).</summary>
     FamilyTimer = 7,
+
+    /// <summary>The Family Hub daily morning briefing (pings every household member's bell).</summary>
+    FamilyBriefing = 8,
 }

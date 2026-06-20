@@ -116,6 +116,20 @@ builder.Services.AddHttpClient(GeminiService.HttpClientName, c =>
 });
 builder.Services.AddScoped<GeminiService>();
 
+// OpenWeather powers the Family Hub "Today" weather card. The ApiKey is a secret (appsettings.Local.json
+// locally / OpenWeather__ApiKey env var in prod); when blank the card simply hides and /today still works.
+// The BaseAddress is FIXED below (not user-controlled), so the location/key can never redirect the call.
+builder.Services.Configure<OpenWeatherOptions>(builder.Configuration.GetSection(OpenWeatherOptions.SectionName));
+builder.Services.AddHttpClient(WeatherService.HttpClientName, c =>
+{
+    c.BaseAddress = new Uri("https://api.openweathermap.org");
+    c.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddScoped<WeatherService>();
+// Family Hub F3: the Today aggregator + the daily-briefing composer/deliverer (driven by the reminder tick).
+builder.Services.AddScoped<FamilyTodayService>();
+builder.Services.AddScoped<FamilyBriefingService>();
+
 // Real-time chat + in-app notifications. The hub addresses individual users by their email claim
 // (EmailUserIdProvider) so per-user pushes work across all of a user's connections; the fan-out
 // service is the shared broadcast/notify path used by both the REST endpoints and the hub.
@@ -427,6 +441,7 @@ app.MapAiEndpoints();
 app.MapFamilyEndpoints();
 app.MapFamilyNotesListsEndpoints();
 app.MapFamilyRemindersTimersEndpoints();
+app.MapFamilyTodayEndpoints();
 app.MapHub<ChatHub>("/api/hubs/chat");
 app.MapGet("/", () => app.Environment.IsDevelopment()
     ? Results.Redirect("/swagger")

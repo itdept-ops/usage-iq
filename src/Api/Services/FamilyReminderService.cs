@@ -37,7 +37,8 @@ public sealed class FamilyReminderService(
                 using var scope = scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
                 var notifier = scope.ServiceProvider.GetRequiredService<ChatNotificationService>();
-                await TickAsync(db, notifier, DateTime.UtcNow, stoppingToken);
+                var briefing = scope.ServiceProvider.GetRequiredService<FamilyBriefingService>();
+                await TickAsync(db, notifier, DateTime.UtcNow, stoppingToken, briefing);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex) { logger.LogError(ex, "Family reminder/timer tick failed."); }
@@ -46,20 +47,56 @@ public sealed class FamilyReminderService(
     }
 
     /// <summary>
-    /// One deterministic tick: fire due reminders and complete finished timers as of <paramref name="now"/>.
-    /// Public + parameterized so tests can drive a single cycle with a fixed clock and the resolved
-    /// services. Returns a small summary of what fired (handy for assertions).
+    /// One deterministic tick: fire due reminders, complete finished timers, and deliver any due daily
+    /// briefings as of <paramref name="now"/>. Public + parameterized so tests can drive a single cycle with
+    /// a fixed clock and the resolved services. The <paramref name="briefing"/> service is optional so the
+    /// existing reminder/timer tests can call this without it (briefings then simply don't run). Returns a
+    /// small summary of what fired (handy for assertions).
     /// </summary>
     public async Task<TickResult> TickAsync(
-        UsageDbContext db, ChatNotificationService notifier, DateTime now, CancellationToken ct = default)
+        UsageDbContext db, ChatNotificationService notifier, DateTime now, CancellationToken ct = default,
+        FamilyBriefingService? briefing = null)
     {
         var reminders = await FireDueRemindersAsync(db, notifier, now, ct);
         var timers = await CompleteFinishedTimersAsync(db, notifier, now, ct);
-        return new TickResult(reminders, timers);
+        var briefings = briefing is null ? 0 : await DeliverDueBriefingsAsync(db, briefing, now, ct);
+        return new TickResult(reminders, timers, briefings);
     }
 
-    /// <summary>The count of reminders fired and timers completed in a tick.</summary>
-    public readonly record struct TickResult(int RemindersFired, int TimersCompleted);
+    /// <summary>The count of reminders fired, timers completed, and briefings delivered in a tick.</summary>
+    public readonly record struct TickResult(int RemindersFired, int TimersCompleted, int BriefingsDelivered);
+
+    // ---- Daily briefing ----
+
+    /// <summary>
+    /// Deliver the daily morning briefing for every household whose local time has reached its briefing hour
+    /// and that hasn't been briefed yet today-local. The per-household guard
+    /// (<see cref="Household.LastBriefingLocalDate"/>) makes this idempotent within a local day. Each
+    /// household is independent — one failing must not stop the rest.
+    /// </summary>
+    private static async Task<int> DeliverDueBriefingsAsync(
+        UsageDbContext db, FamilyBriefingService briefing, DateTime now, CancellationToken ct)
+    {
+        var households = await db.Households.AsNoTracking()
+            .Where(h => h.BriefingEnabled)
+            .ToListAsync(ct);
+        if (households.Count == 0) return 0;
+
+        var delivered = 0;
+        foreach (var h in households)
+        {
+            try
+            {
+                if (await briefing.RunIfDueAsync(h, now, ct)) delivered++;
+            }
+            catch (Exception)
+            {
+                // Swallow per-household so one bad household can't block the others; the background
+                // ExecuteAsync wrapper logs unexpected tick failures.
+            }
+        }
+        return delivered;
+    }
 
     // ---- Reminders ----
 

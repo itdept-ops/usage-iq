@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, CacheEfficiency, CalendarDay, ChatChannelDto, ChatContactDto, ChatMessageDto, CreateChannelRequest,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
-  FamilyList, FamilyListKind, FamilyNote, FamilyRecurrence, FamilyReminder, FamilyTimer, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
+  FamilyList, FamilyListKind, FamilyNote, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyToday, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
   HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
@@ -852,5 +852,26 @@ export class Api {
   /** Cancel a timer (any household member). */
   deleteFamilyTimer(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/family/timers/${id}`);
+  }
+
+  // ---- Family Hub F3: Today snapshot & settings ----
+
+  /**
+   * The household's "Today" snapshot: greeting + local date, today's reminders, active timers, list
+   * summaries (open/done + a peek), pinned notes, and an optional weather card (null when unconfigured).
+   * People are by userId + display name only — never an email (email-privacy).
+   */
+  familyToday(): Observable<FamilyToday> {
+    return this.http.get<FamilyToday>(`${this.base}/family/today`);
+  }
+
+  /** The household's Family Hub settings (every member may read; `canEdit` is true only for the owner). */
+  familySettings(): Observable<FamilySettings> {
+    return this.http.get<FamilySettings>(`${this.base}/family/settings`);
+  }
+
+  /** Update the household's settings (OWNER only; non-owners get 403). Omitted fields are unchanged. Returns the saved settings. */
+  updateFamilySettings(body: FamilySettingsUpdate): Observable<FamilySettings> {
+    return this.http.put<FamilySettings>(`${this.base}/family/settings`, body);
   }
 }

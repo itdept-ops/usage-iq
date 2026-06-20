@@ -10,23 +10,163 @@
       <p>We couldn't reach the Family Hub just now. Please try again in a moment.</p>
     </div>
   } @else if (household(); as home) {
-    <!-- Hero: a warm welcome with the household name + a doorway to settings -->
-    <header class="family__hero">
+    <!-- Today hero: a warm, time-of-day greeting + the local date + a doorway to settings -->
+    <header class="family__hero family__hero--today">
       <div class="family__hero-id">
-        <span class="family__crest" aria-hidden="true"><mat-icon>cottage</mat-icon></span>
+        <span class="family__crest" aria-hidden="true"><mat-icon>wb_sunny</mat-icon></span>
         <div>
-          <p class="family__eyebrow">Welcome home</p>
-          <h1 class="family__name">{{ home.name }}</h1>
-          <p class="family__sub">
-            {{ members().length }} {{ members().length === 1 ? 'person' : 'people' }} in this household
-          </p>
+          <p class="family__eyebrow">{{ home.name }}</p>
+          <h1 class="family__name">{{ today()?.greeting || 'Welcome home' }}</h1>
+          @if (dateLabel()) {
+            <p class="family__sub">{{ dateLabel() }}</p>
+          } @else {
+            <p class="family__sub">
+              {{ members().length }} {{ members().length === 1 ? 'person' : 'people' }} in this household
+            </p>
+          }
         </div>
       </div>
       <a mat-stroked-button class="family__settings-btn" routerLink="/family/household">
         <mat-icon aria-hidden="true">settings</mat-icon>
-        Household settings
+        Household
       </a>
     </header>
+
+    <!-- Today dashboard: glance cards from GET /family/today -->
+    @if (today(); as t) {
+      <section class="today-grid" aria-label="Today at a glance">
+        <!-- Weather (only when the server returns it) -->
+        @if (t.weather; as w) {
+          <article class="today-card today-card--weather" aria-label="Weather">
+            <div class="weather">
+              <img class="weather__icon" [src]="weatherIconUrl(w.icon)" [alt]="w.description"
+                   referrerpolicy="no-referrer" width="64" height="64" />
+              <div class="weather__main">
+                <span class="weather__temp">{{ roundTemp(w.tempF) }}°</span>
+                <span class="weather__desc">{{ w.description }}</span>
+              </div>
+            </div>
+            <p class="weather__meta">
+              <span>{{ w.location }}</span>
+              <span class="weather__dot" aria-hidden="true">·</span>
+              <span>Feels {{ roundTemp(w.feelsLikeF) }}°</span>
+              <span class="weather__dot" aria-hidden="true">·</span>
+              <span>{{ roundTemp(w.humidityPct) }}% humidity</span>
+            </p>
+          </article>
+        }
+
+        <!-- Today's reminders -->
+        <article class="today-card" aria-label="Today's reminders">
+          <div class="today-card__head">
+            <h2 class="today-card__title"><mat-icon aria-hidden="true">notifications_active</mat-icon> Today</h2>
+            <a class="family__card-link" routerLink="/family/reminders">All <mat-icon aria-hidden="true">chevron_right</mat-icon></a>
+          </div>
+          @if (t.reminders.length) {
+            <ul class="today-reminders">
+              @for (r of t.reminders; track r.id) {
+                <li class="today-reminder">
+                  <span class="today-reminder__time">{{ r.localTime }}</span>
+                  <span class="today-reminder__text">{{ r.text }}</span>
+                  <span class="today-reminder__who" [matTooltip]="'For ' + r.targetName">{{ r.targetName }}</span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="today-card__empty">Nothing scheduled for today — enjoy the day.</p>
+          }
+        </article>
+
+        <!-- Lists peek -->
+        <article class="today-card" aria-label="Lists">
+          <div class="today-card__head">
+            <h2 class="today-card__title"><mat-icon aria-hidden="true">checklist</mat-icon> Lists</h2>
+            <a class="family__card-link" routerLink="/family/lists">Open <mat-icon aria-hidden="true">chevron_right</mat-icon></a>
+          </div>
+          @if (t.lists.length) {
+            <ul class="today-lists">
+              @for (l of t.lists; track l.id) {
+                <li class="today-list">
+                  <div class="today-list__head">
+                    <mat-icon class="today-list__kind" aria-hidden="true">
+                      {{ l.kind === 'shopping' ? 'shopping_cart' : 'task_alt' }}
+                    </mat-icon>
+                    <span class="today-list__name">{{ l.name }}</span>
+                    <span class="today-list__count">{{ l.openCount }} open</span>
+                  </div>
+                  @if (l.firstFewOpenItems.length) {
+                    <p class="today-list__peek">
+                      @for (item of l.firstFewOpenItems; track $index) {
+                        <span class="today-list__item">{{ item }}</span>
+                      }
+                      @if (l.openCount > l.firstFewOpenItems.length) {
+                        <span class="today-list__more">+{{ l.openCount - l.firstFewOpenItems.length }} more</span>
+                      }
+                    </p>
+                  } @else if (l.doneCount > 0) {
+                    <p class="today-list__done">All done — {{ l.doneCount }} checked off.</p>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="today-card__empty">No lists yet. Start a shopping or to-do list.</p>
+          }
+        </article>
+
+        <!-- Active timers: reuse the F2 timer widget (live countdowns the whole house sees) -->
+        @if (t.timers.length) {
+          <article class="today-card today-card--timers" aria-label="Active timers">
+            <div class="today-card__head">
+              <h2 class="today-card__title"><mat-icon aria-hidden="true">timer</mat-icon> Timers</h2>
+              <a class="family__card-link" routerLink="/family/timer">Open <mat-icon aria-hidden="true">chevron_right</mat-icon></a>
+            </div>
+            <app-family-timer [embedded]="true" />
+          </article>
+        }
+
+        <!-- Pinned notes -->
+        @if (t.pinnedNotes.length) {
+          <article class="today-card" aria-label="Pinned notes">
+            <div class="today-card__head">
+              <h2 class="today-card__title"><mat-icon aria-hidden="true">push_pin</mat-icon> Pinned</h2>
+              <a class="family__card-link" routerLink="/family/notes">Notes <mat-icon aria-hidden="true">chevron_right</mat-icon></a>
+            </div>
+            <ul class="today-notes">
+              @for (n of t.pinnedNotes; track n.id) {
+                <li class="today-note">
+                  <mat-icon aria-hidden="true">sticky_note_2</mat-icon>
+                  <a routerLink="/family/notes">{{ n.title || 'Untitled note' }}</a>
+                </li>
+              }
+            </ul>
+          </article>
+        }
+      </section>
+    }
+
+    <!-- Feature tiles: the rooms of the home. Live ones link out; the rest are gentle "Coming soon". -->
+    <section class="family__rooms" aria-label="Family Hub features">
+      <h2 class="family__card-title">Around the house</h2>
+      <div class="tile-grid">
+        @for (t of tiles(); track t.key) {
+          @if (t.route) {
+            <a class="tile" [routerLink]="t.route">
+              <span class="tile__icon" aria-hidden="true"><mat-icon>{{ t.icon }}</mat-icon></span>
+              <span class="tile__label">{{ t.label }}</span>
+              <span class="tile__blurb">{{ t.blurb }}</span>
+            </a>
+          } @else {
+            <div class="tile tile--soon" aria-disabled="true">
+              <span class="tile__icon" aria-hidden="true"><mat-icon>{{ t.icon }}</mat-icon></span>
+              <span class="tile__label">{{ t.label }}</span>
+              <span class="tile__blurb">{{ t.blurb }}</span>
+              <span class="tile__soon">Coming soon</span>
+            </div>
+          }
+        }
+      </div>
+    </section>
 
     <!-- Members: avatar + name only (NO email, ever) -->
     <section class="family__card family__members" aria-label="Family members">
@@ -51,38 +191,6 @@
           </li>
         }
       </ul>
-    </section>
-
-    <!-- Live shared timers: a glanceable embed so both parents see what's counting down right now. -->
-    <section class="family__card family__timers" aria-label="Family timers">
-      <div class="family__card-head">
-        <h2 class="family__card-title">Timers</h2>
-        <a class="family__card-link" routerLink="/family/timer">Open <mat-icon aria-hidden="true">chevron_right</mat-icon></a>
-      </div>
-      <app-family-timer [embedded]="true" />
-    </section>
-
-    <!-- Feature tiles: the rooms of the home. Live ones link out; the rest are gentle "Coming soon". -->
-    <section class="family__rooms" aria-label="Family Hub features">
-      <h2 class="family__card-title">Around the house</h2>
-      <div class="tile-grid">
-        @for (t of tiles(); track t.key) {
-          @if (t.route) {
-            <a class="tile" [routerLink]="t.route">
-              <span class="tile__icon" aria-hidden="true"><mat-icon>{{ t.icon }}</mat-icon></span>
-              <span class="tile__label">{{ t.label }}</span>
-              <span class="tile__blurb">{{ t.blurb }}</span>
-            </a>
-          } @else {
-            <div class="tile tile--soon" aria-disabled="true">
-              <span class="tile__icon" aria-hidden="true"><mat-icon>{{ t.icon }}</mat-icon></span>
-              <span class="tile__label">{{ t.label }}</span>
-              <span class="tile__blurb">{{ t.blurb }}</span>
-              <span class="tile__soon">Coming soon</span>
-            </div>
-          }
-        }
-      </div>
     </section>
   }
 </section>

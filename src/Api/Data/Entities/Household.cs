@@ -19,5 +19,37 @@ public class Household
 
     public DateTime CreatedUtc { get; set; }
 
+    // ---- F3 settings: the "Today" view + the daily briefing (owner-editable) ----
+
+    /// <summary>
+    /// IANA timezone id (e.g. "America/New_York") the household lives in. All "today"/briefing-hour math
+    /// is done in this zone; storage stays UTC. Defaults to the app's display timezone on creation.
+    /// </summary>
+    public string TimeZone { get; set; } = "America/New_York";
+
+    /// <summary>Whether the daily morning briefing is delivered. Owner-editable; default on.</summary>
+    public bool BriefingEnabled { get; set; } = true;
+
+    /// <summary>Local hour-of-day (0–23) the briefing is composed and delivered. Default 7am.</summary>
+    public int BriefingHourLocal { get; set; } = 7;
+
+    /// <summary>
+    /// OpenWeather location for the Today weather card, e.g. "Tampa,FL,US". Null/blank hides the card
+    /// (the weather lookup also degrades to null when the API key is missing).
+    /// </summary>
+    public string? WeatherLocation { get; set; }
+
+    /// <summary>
+    /// The last household-local date a briefing was delivered. Guards "once per local day": a briefing
+    /// only fires when this is not today-local. Null until the first briefing ever runs.
+    /// </summary>
+    public DateOnly? LastBriefingLocalDate { get; set; }
+
+    /// <summary>
+    /// Id of the household's private "Family" chat channel (ensured on first briefing). The briefing
+    /// posts into it; null until the channel has been ensured.
+    /// </summary>
+    public int? FamilyChannelId { get; set; }
+
     public List<HouseholdMember> Members { get; set; } = new();
 }

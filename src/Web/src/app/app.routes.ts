@@ -112,6 +112,11 @@ export const routes: Routes = [
         title: 'Usage IQ · Household',
       },
       {
+        path: 'settings',
+        loadComponent: () => import('./features/family/family-settings').then(m => m.FamilySettingsPanel),
+        title: 'Usage IQ · Family Settings',
+      },
+      {
         path: 'notes',
         loadComponent: () => import('./features/family/notes').then(m => m.FamilyNotes),
         title: 'Usage IQ · Family Notes',

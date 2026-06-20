@@ -470,6 +470,7 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
         NotificationType.SystemFleetOffline => "systemFleetOffline",
         NotificationType.FamilyReminder => "familyReminder",
         NotificationType.FamilyTimer => "familyTimer",
+        NotificationType.FamilyBriefing => "familyBriefing",
         _ => "channelMessage",
     };
 }

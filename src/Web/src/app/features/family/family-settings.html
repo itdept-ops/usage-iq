@@ -1,0 +1,105 @@
+<section class="family family--settings">
+  <a class="family__back" routerLink="/family">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    Back to Family
+  </a>
+
+  @if (loading()) {
+    <div class="family__loading">
+      <mat-spinner [diameter]="28" />
+      <span>Loading family settings…</span>
+    </div>
+  } @else if (error()) {
+    <div class="family__error">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <p>We couldn't load the settings just now. Please try again in a moment.</p>
+    </div>
+  } @else if (settings()) {
+    <header class="family__settings-head">
+      <h1 class="family__name">Family settings</h1>
+      <p class="family__sub">How the hub greets you each day and where weather comes from.</p>
+    </header>
+
+    @if (!canEdit()) {
+      <p class="family__hint family__hint--banner">
+        <mat-icon aria-hidden="true">lock</mat-icon>
+        Only the household owner can change these. You're seeing them read-only.
+      </p>
+    }
+
+    <!-- Morning briefing -->
+    <section class="family__card">
+      <h2 class="family__card-title">Morning briefing</h2>
+      <div class="setting-row">
+        <mat-slide-toggle
+          [checked]="briefingEnabled()" (change)="briefingEnabled.set($event.checked)"
+          [disabled]="!canEdit()">
+          Post a daily briefing to the family chat
+        </mat-slide-toggle>
+      </div>
+
+      <div class="setting-row">
+        <mat-form-field appearance="outline" class="setting-row__field">
+          <mat-label>Briefing time</mat-label>
+          <mat-select [value]="briefingHour()" (selectionChange)="briefingHour.set($event.value)"
+                      [disabled]="!canEdit() || !briefingEnabled()">
+            @for (h of hours; track h.value) {
+              <mat-option [value]="h.value">{{ h.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <p class="family__hint">
+        At this hour (in your household timezone) the hub posts a warm rundown of the day to your family chat.
+      </p>
+    </section>
+
+    <!-- Timezone -->
+    <section class="family__card">
+      <h2 class="family__card-title">Household timezone</h2>
+      <div class="setting-row">
+        <mat-form-field appearance="outline" class="setting-row__field">
+          <mat-label>Timezone</mat-label>
+          <mat-select [value]="timeZone()" (selectionChange)="timeZone.set($event.value)"
+                      [disabled]="!canEdit()">
+            @for (tz of tzOptions(); track tz.id) {
+              <mat-option [value]="tz.id">{{ tz.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <p class="family__hint">Everything "today" — reminders, the briefing, the local date — uses this zone.</p>
+    </section>
+
+    <!-- Weather -->
+    <section class="family__card">
+      <h2 class="family__card-title">Weather</h2>
+      <div class="setting-row">
+        <mat-form-field appearance="outline" class="setting-row__field setting-row__field--wide">
+          <mat-label>Weather location</mat-label>
+          <input matInput [ngModel]="weatherLocation()" (ngModelChange)="weatherLocation.set($event)"
+                 maxlength="120" placeholder="Tampa,FL,US" [disabled]="!canEdit()" />
+          <mat-icon matSuffix aria-hidden="true">place</mat-icon>
+        </mat-form-field>
+      </div>
+      @if (weatherConfigured()) {
+        <p class="family__hint">A city like “Tampa,FL,US” or “London,GB”. Leave blank to hide the weather card.</p>
+      } @else {
+        <p class="family__hint family__hint--warn">
+          <mat-icon aria-hidden="true">info</mat-icon>
+          Weather only appears once an OpenWeather key is configured on the server. You can set the location now.
+        </p>
+      }
+    </section>
+
+    @if (canEdit()) {
+      <div class="settings-actions">
+        <button mat-stroked-button (click)="reset()" [disabled]="!dirty() || saving()">Reset</button>
+        <button mat-flat-button color="primary" class="settings-actions__save"
+                [disabled]="!dirty() || saving()" (click)="save()">
+          @if (saving()) { <mat-spinner [diameter]="18" /> } @else { Save changes }
+        </button>
+      </div>
+    }
+  }
+</section>
