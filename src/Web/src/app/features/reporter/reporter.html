@@ -12,33 +12,33 @@
 <mat-card appearance="outlined" class="panel flow">
   <div class="flow-row">
     <div class="flow-node">
-      <mat-icon>computer</mat-icon>
+      <mat-icon aria-hidden="true">computer</mat-icon>
       <div class="flow-node-title">Your machine</div>
       <div class="flow-node-sub">~/.claude · ~/.codex</div>
     </div>
     <div class="flow-arrow">
       <span class="flow-arrow-line"></span>
       <span class="flow-arrow-label">reporter · parses locally</span>
-      <mat-icon>arrow_forward</mat-icon>
+      <mat-icon aria-hidden="true">arrow_forward</mat-icon>
     </div>
     <div class="flow-node">
-      <mat-icon>vpn_key</mat-icon>
+      <mat-icon aria-hidden="true">vpn_key</mat-icon>
       <div class="flow-node-title">POST /api/ingest</div>
       <div class="flow-node-sub">X-Ingest-Key · HTTPS</div>
     </div>
     <div class="flow-arrow">
       <span class="flow-arrow-line"></span>
       <span class="flow-arrow-label">prices · resolves · de-dupes</span>
-      <mat-icon>arrow_forward</mat-icon>
+      <mat-icon aria-hidden="true">arrow_forward</mat-icon>
     </div>
     <div class="flow-node">
-      <mat-icon>cloud</mat-icon>
+      <mat-icon aria-hidden="true">cloud</mat-icon>
       <div class="flow-node-title">Usage IQ</div>
       <div class="flow-node-sub">API + Postgres</div>
     </div>
   </div>
   <p class="flow-note">
-    <mat-icon>lock</mat-icon>
+    <mat-icon aria-hidden="true">lock</mat-icon>
     Only parsed usage (timestamps, model, token counts, project from <code>cwd</code>) leaves the machine.
     The server stays authoritative — it prices, resolves the project and de-dupes — so re-runs are idempotent.
   </p>
@@ -48,7 +48,7 @@
 @if (selfServiceOnly()) {
   <mat-card appearance="outlined" class="panel self-explainer">
     <div class="se-head">
-      <mat-icon class="se-icon">badge</mat-icon>
+      <mat-icon class="se-icon" aria-hidden="true">badge</mat-icon>
       <div>
         <div class="se-title">Self-service — get your own reporter token</div>
         <p class="se-sub">You can mint and revoke ingest keys for <strong>your own</strong> usage — no admin needed.
@@ -74,14 +74,14 @@
   <div class="choose-grid">
     <div class="choose-card recommended">
       <div class="cc-badge micro-label">Recommended</div>
-      <mat-icon class="cc-icon">desktop_windows</mat-icon>
+      <mat-icon class="cc-icon" aria-hidden="true">desktop_windows</mat-icon>
       <div class="cc-title">Desktop agent</div>
       <p class="cc-sub">A Windows system-tray app with a one-screen Settings panel, live logs, and a
         run-at-sign-in toggle. The easy, no-terminal option for your own laptop or workstation.</p>
       <span class="cc-link micro-label">→ Step&nbsp;2</span>
     </div>
     <div class="choose-card">
-      <mat-icon class="cc-icon">terminal</mat-icon>
+      <mat-icon class="cc-icon" aria-hidden="true">terminal</mat-icon>
       <div class="cc-title">Console reporter</div>
       <p class="cc-sub">A small cross-platform .NET console app. Best for headless servers, CI, and
         anything you'd run under systemd, Task Scheduler, or cron.</p>
@@ -104,22 +104,22 @@
              [ngModel]="newKeyName()" (ngModelChange)="newKeyName.set($event)" (keyup.enter)="generateKey()" />
     </mat-form-field>
     <button mat-flat-button color="primary" [disabled]="generatingKey()" (click)="generateKey()">
-      <mat-icon>vpn_key</mat-icon> {{ generatingKey() ? 'Generating…' : 'Generate key' }}
+      <mat-icon aria-hidden="true">vpn_key</mat-icon> {{ generatingKey() ? 'Generating…' : 'Generate key' }}
     </button>
   </div>
 
   @if (freshKey(); as fk) {
     <div class="fresh-key">
       <div class="fk-head">
-        <mat-icon class="fk-icon">check_circle</mat-icon>
+        <mat-icon class="fk-icon" aria-hidden="true">check_circle</mat-icon>
         <span class="fk-title">New key “{{ fk.name }}” — copy it now, it won't be shown again.</span>
         <span class="grow"></span>
-        <button mat-icon-button class="fk-x" aria-label="Dismiss" (click)="dismissFreshKey()"><mat-icon>close</mat-icon></button>
+        <button mat-icon-button class="fk-x" aria-label="Dismiss" (click)="dismissFreshKey()"><mat-icon aria-hidden="true">close</mat-icon></button>
       </div>
       <div class="fk-row">
         <code class="fk-value mono">{{ fk.key }}</code>
         <button mat-stroked-button class="fk-copy" (click)="copyKey()">
-          <mat-icon>{{ copied() ? 'done' : 'content_copy' }}</mat-icon> {{ copied() ? 'Copied' : 'Copy' }}
+          <mat-icon aria-hidden="true">{{ copied() ? 'done' : 'content_copy' }}</mat-icon> {{ copied() ? 'Copied' : 'Copy' }}
         </button>
       </div>
     </div>
@@ -138,7 +138,7 @@
           <span class="key-name">{{ k.name }}</span>
           <code class="key-prefix mono">{{ k.prefix }}</code>
           <span class="key-owner" [class.mine]="isMine(k)" [title]="k.ownerName || 'unlinked legacy key'">
-            <mat-icon>person</mat-icon>
+            <mat-icon aria-hidden="true">person</mat-icon>
             {{ k.ownerName || 'unlinked' }}
             @if (isMine(k)) { <span class="you-badge">you</span> }
           </span>
@@ -153,7 +153,7 @@
           </span>
           @if (!k.revoked && (canManage() || isMine(k))) {
             <button mat-button class="danger-btn key-revoke" (click)="revokeKey(k)">
-              <mat-icon>block</mat-icon> Revoke
+              <mat-icon aria-hidden="true">block</mat-icon> Revoke
             </button>
           }
         </div>
@@ -179,9 +179,9 @@
     <strong>live log</strong> of every sync and a <strong>run-at-sign-in</strong> toggle so it comes back after a reboot.</p>
 
   <div class="agent-feats">
-    <div class="agent-feat"><mat-icon>settings</mat-icon><span>One-screen Settings — URL, key, machine label, interval.</span></div>
-    <div class="agent-feat"><mat-icon>article</mat-icon><span>Live logs — watch each pass scan, price, and post in real time.</span></div>
-    <div class="agent-feat"><mat-icon>restart_alt</mat-icon><span>Run at sign-in — starts minimized to the tray after a reboot.</span></div>
+    <div class="agent-feat"><mat-icon aria-hidden="true">settings</mat-icon><span>One-screen Settings — URL, key, machine label, interval.</span></div>
+    <div class="agent-feat"><mat-icon aria-hidden="true">article</mat-icon><span>Live logs — watch each pass scan, price, and post in real time.</span></div>
+    <div class="agent-feat"><mat-icon aria-hidden="true">restart_alt</mat-icon><span>Run at sign-in — starts minimized to the tray after a reboot.</span></div>
   </div>
 
   <div class="agent-how">
@@ -189,17 +189,17 @@
     <div class="cmd">
       <code class="mono">{{ agentRunCommand() }}</code>
       <button mat-icon-button class="cmd-copy" aria-label="Copy" (click)="copy(agentRunCommand(), 'Command copied')">
-        <mat-icon>content_copy</mat-icon>
+        <mat-icon aria-hidden="true">content_copy</mat-icon>
       </button>
     </div>
     <div class="agent-how-title micro-label">…or publish a single, self-contained tray exe to hand out (no .NET install on the target)</div>
     <div class="cmd">
       <code class="mono">{{ agentPublishCommand() }}</code>
       <button mat-icon-button class="cmd-copy" aria-label="Copy" (click)="copy(agentPublishCommand(), 'Command copied')">
-        <mat-icon>content_copy</mat-icon>
+        <mat-icon aria-hidden="true">content_copy</mat-icon>
       </button>
     </div>
-    <div class="cmd-tip micro-label"><mat-icon>info</mat-icon>
+    <div class="cmd-tip micro-label"><mat-icon aria-hidden="true">info</mat-icon>
       The published <code>UsageIq.Agent.exe</code> needs no key on the command line — generate one above,
       then paste it into the agent's Settings screen on first launch.</div>
   </div>
@@ -218,7 +218,7 @@
 dotnet build src/Reporter -c Release</code>
     <button mat-icon-button class="cmd-copy" aria-label="Copy"
             (click)="copy('git clone https://github.com/itdept-ops/usage-iq && cd usage-iq\ndotnet build src/Reporter -c Release', 'Commands copied')">
-      <mat-icon>content_copy</mat-icon>
+      <mat-icon aria-hidden="true">content_copy</mat-icon>
     </button>
   </div>
 
@@ -226,18 +226,18 @@ dotnet build src/Reporter -c Release</code>
   <div class="cmd">
     <code class="mono">{{ runCommand() }}</code>
     <button mat-icon-button class="cmd-copy" aria-label="Copy" (click)="copy(runCommand(), 'Command copied')">
-      <mat-icon>content_copy</mat-icon>
+      <mat-icon aria-hidden="true">content_copy</mat-icon>
     </button>
   </div>
   <div class="cmd-alt micro-label">…or straight from source:</div>
   <div class="cmd">
     <code class="mono">{{ dotnetRunCommand() }}</code>
     <button mat-icon-button class="cmd-copy" aria-label="Copy" (click)="copy(dotnetRunCommand(), 'Command copied')">
-      <mat-icon>content_copy</mat-icon>
+      <mat-icon aria-hidden="true">content_copy</mat-icon>
     </button>
   </div>
   @if (!freshKey()) {
-    <div class="cmd-tip micro-label"><mat-icon>info</mat-icon> Generate a key above to drop it straight into these commands.</div>
+    <div class="cmd-tip micro-label"><mat-icon aria-hidden="true">info</mat-icon> Generate a key above to drop it straight into these commands.</div>
   }
 
   <div class="opts">
@@ -261,7 +261,7 @@ dotnet build src/Reporter -c Release</code>
     of this for you — this section is for headless hosts.)</p>
   <div class="svc-grid">
     <div class="svc">
-      <div class="svc-title"><mat-icon>terminal</mat-icon> Linux (systemd)</div>
+      <div class="svc-title"><mat-icon aria-hidden="true">terminal</mat-icon> Linux (systemd)</div>
       <code class="mono">[Service]
 Environment=REPORTER_URL={{ serverUrl() }}
 Environment=REPORTER_KEY=uiq_…
@@ -269,12 +269,12 @@ ExecStart=/opt/usage-iq/usage-iq-reporter
 Restart=always</code>
     </div>
     <div class="svc">
-      <div class="svc-title"><mat-icon>schedule</mat-icon> Windows (Task Scheduler)</div>
+      <div class="svc-title"><mat-icon aria-hidden="true">schedule</mat-icon> Windows (Task Scheduler)</div>
       <code class="mono">schtasks /create /tn "UsageIQ Reporter" /sc onlogon ^
   /tr "usage-iq-reporter.exe --url {{ serverUrl() }} --key uiq_…"</code>
     </div>
     <div class="svc">
-      <div class="svc-title"><mat-icon>event_repeat</mat-icon> cron (hourly --once)</div>
+      <div class="svc-title"><mat-icon aria-hidden="true">event_repeat</mat-icon> cron (hourly --once)</div>
       <code class="mono">0 * * * * usage-iq-reporter \
   --url {{ serverUrl() }} --key uiq_… --once</code>
     </div>
@@ -288,7 +288,7 @@ Restart=always</code>
 
 <!-- Where it shows up — Fleet attribution -->
 <mat-card appearance="outlined" class="panel where">
-  <mat-icon class="where-icon">hub</mat-icon>
+  <mat-icon class="where-icon" aria-hidden="true">hub</mat-icon>
   <div>
     <div class="where-title">Where your usage shows up</div>
     <p class="where-sub">Whichever reporter you run, the usage it pushes is attributed to its

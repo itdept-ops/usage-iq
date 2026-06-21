@@ -1,4 +1,4 @@
-import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -64,6 +64,7 @@ const TILES: FeatureTile[] = [
 })
 export class FamilyHome implements OnDestroy {
   private api = inject(Api);
+  private destroyRef = inject(DestroyRef);
   readonly auth = inject(AuthService);
 
   readonly household = signal<Household | null>(null);
@@ -146,7 +147,7 @@ export class FamilyHome implements OnDestroy {
   private loadBriefing(): void {
     this.briefingDay = this.localDay();
     this.api.familyBriefing()
-      .pipe(catchError(() => of<FamilyBriefing | null>(null)), takeUntilDestroyed())
+      .pipe(catchError(() => of<FamilyBriefing | null>(null)), takeUntilDestroyed(this.destroyRef))
       .subscribe(b => this.briefing.set(b));
   }
 

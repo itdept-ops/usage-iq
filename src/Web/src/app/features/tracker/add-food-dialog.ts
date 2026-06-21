@@ -677,7 +677,9 @@ export class AddFoodDialog {
     this.barcodeNotFound.set(null);
     this.api.searchFoods({ barcode: code }).pipe(
       catchError((e: HttpErrorResponse) => {
-        if (e.status === 503) this.searchUnavailable.set(true);
+        if (e.status === 503) { this.searchUnavailable.set(true); }
+        // Any other failure (network, 500, timeout) is a lookup error, not a "no such product".
+        else { this.searchError.set('Barcode lookup failed. Try again, or enter the food manually.'); }
         return of<FoodSearchItemDto[] | null>(null);
       }),
     ).subscribe(list => {
@@ -688,6 +690,8 @@ export class AddFoodDialog {
       } else if (this.searchUnavailable()) {
         // Lookup unavailable (503) — fall back to the existing "search isn't configured" steer.
         this.mode.set('search');
+      } else if (this.searchError()) {
+        // The lookup failed (handled above) — leave the error notice, don't claim the product is missing.
       } else {
         // A genuine empty barcode lookup: surface the explicit not-found notice (stays on scan).
         this.barcodeNotFound.set(code);

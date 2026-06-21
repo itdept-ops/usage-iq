@@ -120,6 +120,13 @@ mat-progress-bar {
   }
 }
 
+.grid-empty {
+  grid-column: 1 / -1;
+  padding: var(--tech-space-4);
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text-secondary);
+}
+
 /* =========================================================================
    Rate card — opaque techy config panel
    ========================================================================= */

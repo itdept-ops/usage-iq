@@ -158,7 +158,7 @@
         <span class="user__avatar user__avatar--init">{{ initials() }}</span>
       }
       <span class="user__name">{{ u.name }}</span>
-      <mat-icon class="user__chev">expand_more</mat-icon>
+      <mat-icon class="user__chev" aria-hidden="true">expand_more</mat-icon>
     </button>
     <mat-menu #userMenu="matMenu" class="account-menu" xPosition="before" overlapTrigger="false">
       <div class="acct-head" role="presentation">
@@ -179,7 +179,7 @@
       <div class="acct-section" role="presentation">
         @for (link of quickLinks(); track link.route) {
           <a mat-menu-item class="acct-item" [routerLink]="link.route">
-            <mat-icon class="acct-item__icon">{{ link.icon }}</mat-icon>
+            <mat-icon class="acct-item__icon" aria-hidden="true">{{ link.icon }}</mat-icon>
             <span class="acct-item__label">{{ link.label }}</span>
           </a>
         }
@@ -188,7 +188,7 @@
       <div class="acct-divider" role="separator" aria-hidden="true"></div>
 
       <button mat-menu-item class="acct-item acct-item--danger" (click)="logout()">
-        <mat-icon class="acct-item__icon">logout</mat-icon>
+        <mat-icon class="acct-item__icon" aria-hidden="true">logout</mat-icon>
         <span class="acct-item__label">Sign out</span>
       </button>
     </mat-menu>

@@ -319,7 +319,7 @@ export class Chat implements AfterViewChecked, OnDestroy {
       this.loadingHistory.set(true);
       this.chat.loadHistory(ch.id)
         .then(() => { this.pendingScrollBottom = true; })
-        .catch(() => {})
+        .catch(() => this.snack.open('Could not load messages. Please try again.', 'Dismiss', { duration: 4000 }))
         .finally(() => this.loadingHistory.set(false));
     }
     this.markReadLatest(ch.id, have);
@@ -386,7 +386,10 @@ export class Chat implements AfterViewChecked, OnDestroy {
         .then(count => {
           if (count === 0) this.exhausted.update(s => new Set(s).add(id));
         })
-        .catch(() => { this.preserveFromBottom = null; })
+        .catch(() => {
+          this.preserveFromBottom = null;
+          this.snack.open('Could not load older messages. Please try again.', 'Dismiss', { duration: 4000 });
+        })
         .finally(() => this.loadingHistory.set(false));
     }
   }

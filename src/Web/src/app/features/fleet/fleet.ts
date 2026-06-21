@@ -65,8 +65,9 @@ export class Fleet {
   private readonly expandedMachines = signal<Set<string>>(new Set());
   private readonly expandedUsers = signal<Set<string>>(new Set());
 
-  /** Stable, non-email key for a user row (the userId when present, else the local/orphan bucket). */
-  userKey(u: FleetUser): string { return u.userId != null ? 'u' + u.userId : 'local'; }
+  /** Stable, non-email key for a user row (the userId when present, else keyed by the
+   *  local/orphan bucket name so the local row and each "Unknown user" row stay distinct). */
+  userKey(u: FleetUser): string { return u.userId != null ? 'u' + u.userId : 'n:' + u.name; }
 
   // Cost-desc ordering (the API may already sort, but we enforce it for a stable view).
   readonly machines = computed<FleetMachine[]>(() =>

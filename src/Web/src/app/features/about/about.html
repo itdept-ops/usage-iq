@@ -47,7 +47,7 @@
           See his work — Usage IQ <span class="arrow">→</span>
         </a>
         <a class="cta-ghost" href="https://github.com/itdept-ops/usage-iq" target="_blank" rel="noopener">
-          <mat-icon>code</mat-icon> View the source
+          <mat-icon aria-hidden="true">code</mat-icon> View the source
         </a>
       </div>
     </div>
@@ -69,7 +69,7 @@
   <section class="pillars" data-reveal aria-label="What he does">
     @for (p of pillars; track p.title; let i = $index) {
       <article class="pillar" [style.--d]="i">
-        <span class="pillar-icon"><mat-icon>{{ p.icon }}</mat-icon></span>
+        <span class="pillar-icon"><mat-icon aria-hidden="true">{{ p.icon }}</mat-icon></span>
         <span class="pillar-kicker">{{ p.kicker }}</span>
         <h3>{{ p.title }}</h3>
         <p>{{ p.text }}</p>
@@ -144,7 +144,7 @@
           and the finances.
         </p>
         <div class="founder-feature">
-          <span class="ff-badge"><mat-icon>swap_horiz</mat-icon></span>
+          <span class="ff-badge"><mat-icon aria-hidden="true">swap_horiz</mat-icon></span>
           <div>
             <h4>The differentiator</h4>
             <p>
@@ -172,17 +172,17 @@
 
       <ul class="vet-grid">
         <li class="vet-item">
-          <span class="vet-icon"><mat-icon>settings_input_antenna</mat-icon></span>
+          <span class="vet-icon"><mat-icon aria-hidden="true">settings_input_antenna</mat-icon></span>
           <h4>Full signal chain</h4>
           <p>Managed RF from modem to satellite; configured Cisco and Dell systems, VLANs and subnets.</p>
         </li>
         <li class="vet-item">
-          <span class="vet-icon"><mat-icon>military_tech</mat-icon></span>
+          <span class="vet-icon"><mat-icon aria-hidden="true">military_tech</mat-icon></span>
           <h4>Youngest to lead</h4>
           <p>Became the unit's youngest Senior Wideband Controller, qualifying rapidly across six critical positions.</p>
         </li>
         <li class="vet-item">
-          <span class="vet-icon"><mat-icon>groups</mat-icon></span>
+          <span class="vet-icon"><mat-icon aria-hidden="true">groups</mat-icon></span>
           <h4>Trained the bench</h4>
           <p>Mentored junior controllers, setting the standard for reliability when failure was not an option.</p>
         </li>
@@ -205,7 +205,7 @@
       @for (g of skillGroups; track g.label; let i = $index) {
         <div class="skill-group" [style.--d]="i">
           <header class="skill-head">
-            <span class="skill-group-icon"><mat-icon>{{ g.icon }}</mat-icon></span>
+            <span class="skill-group-icon"><mat-icon aria-hidden="true">{{ g.icon }}</mat-icon></span>
             <span class="skill-group-label">{{ g.label }}</span>
           </header>
           <ul class="skill-list">

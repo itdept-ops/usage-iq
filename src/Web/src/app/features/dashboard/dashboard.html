@@ -103,16 +103,16 @@
           <div class="view-rename" (click)="$event.stopPropagation()">
             <input class="view-rename-input" [ngModel]="renameDraft()" (ngModelChange)="renameDraft.set($event)"
                    (keydown.enter)="commitRename(v, $event)" (keydown.escape)="cancelRename($event)"
-                   placeholder="View name" autofocus />
-            <button mat-icon-button class="rn-ok" matTooltip="Save name" (click)="commitRename(v, $event)"><mat-icon>check</mat-icon></button>
-            <button mat-icon-button class="rn-cancel" matTooltip="Cancel" (click)="cancelRename($event)"><mat-icon>close</mat-icon></button>
+                   placeholder="View name" aria-label="View name" autofocus />
+            <button mat-icon-button type="button" class="rn-ok" aria-label="Save name" matTooltip="Save name" (click)="commitRename(v, $event)"><mat-icon aria-hidden="true">check</mat-icon></button>
+            <button mat-icon-button type="button" class="rn-cancel" aria-label="Cancel rename" matTooltip="Cancel" (click)="cancelRename($event)"><mat-icon aria-hidden="true">close</mat-icon></button>
           </div>
         } @else {
           <div class="view-item" (click)="applyView(v)">
             <mat-icon class="view-ico">filter_alt</mat-icon>
             <span class="view-name" [matTooltip]="'Apply ' + v.name">{{ v.name }}</span>
-            <button mat-icon-button class="view-act" matTooltip="Rename" (click)="startRename(v, $event)"><mat-icon>edit</mat-icon></button>
-            <button mat-icon-button class="view-act danger" matTooltip="Delete" (click)="deleteView(v, $event)"><mat-icon>delete</mat-icon></button>
+            <button mat-icon-button type="button" class="view-act" aria-label="Rename view" matTooltip="Rename" (click)="startRename(v, $event)"><mat-icon aria-hidden="true">edit</mat-icon></button>
+            <button mat-icon-button type="button" class="view-act danger" aria-label="Delete view" matTooltip="Delete" (click)="deleteView(v, $event)"><mat-icon aria-hidden="true">delete</mat-icon></button>
           </div>
         }
       }
@@ -311,6 +311,10 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
       </table>
     </div>
+
+    @if (!r.items.length) {
+      <p class="empty">No messages match these filters yet.</p>
+    }
 
     <mat-paginator [length]="r.total" [pageSize]="pageSize()" [pageIndex]="page() - 1"
                    [pageSizeOptions]="[10, 25, 50, 100]" (page)="onPage($event)" showFirstLastButtons />

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { catchError, firstValueFrom, of } from 'rxjs';
@@ -87,6 +87,7 @@ export class FamilyChores {
   private api = inject(Api);
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
+  private destroyRef = inject(DestroyRef);
 
   readonly chores = signal<FamilyChore[]>([]);
   readonly tally = signal<FamilyChoreTally[]>([]);
@@ -146,7 +147,7 @@ export class FamilyChores {
    */
   private loadSummary(): void {
     this.api.choreSummaryAi()
-      .pipe(catchError(() => of<ChoreSummaryAiResult | null>(null)), takeUntilDestroyed())
+      .pipe(catchError(() => of<ChoreSummaryAiResult | null>(null)), takeUntilDestroyed(this.destroyRef))
       .subscribe(s => this.summary.set(s));
   }
 
@@ -154,7 +155,7 @@ export class FamilyChores {
     if (initial) this.loading.set(true);
     this.api.familyChores()
       .pipe(catchError(() => { if (initial) this.error.set(true); return of<FamilyChoresDto | null>(null); }),
-        takeUntilDestroyed())
+        takeUntilDestroyed(this.destroyRef))
       .subscribe(board => {
         if (board) { this.chores.set(board.chores); this.tally.set(board.tally); }
         this.loading.set(false);

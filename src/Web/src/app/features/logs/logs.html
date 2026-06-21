@@ -31,7 +31,7 @@
     </mat-form-field>
 
     <button mat-stroked-button class="f-refresh" (click)="load()">
-      <mat-icon>refresh</mat-icon> Refresh
+      <mat-icon aria-hidden="true">refresh</mat-icon> Refresh
     </button>
   </div>
 </mat-card>
@@ -56,7 +56,9 @@
       </thead>
       <tbody>
         @for (r of logs(); track r.id) {
-          <tr class="log-row" [class.open]="expandedId() === r.id" (click)="toggle(r.id)">
+          <tr class="log-row" [class.open]="expandedId() === r.id" (click)="toggle(r.id)"
+              tabindex="0" role="button" [attr.aria-expanded]="expandedId() === r.id"
+              (keydown.enter)="toggle(r.id)" (keydown.space)="$event.preventDefault(); toggle(r.id)">
             <td class="c-when mono-num" data-label="Time">{{ r.whenUtc | date: 'HH:mm:ss' }}</td>
             <td class="c-method" data-label="Method"><span class="method-badge" [attr.data-m]="r.method">{{ r.method }}</span></td>
             <td class="c-path mono-num" data-label="Path">
@@ -67,7 +69,7 @@
             <td class="c-dur mono-num" data-label="Duration">{{ r.durationMs }} ms</td>
             <td class="c-user mono-num" data-label="User">{{ r.userName || '—' }}</td>
             <td class="c-ip mono-num" data-label="IP">{{ r.clientIp || '—' }}</td>
-            <td class="c-exp"><mat-icon>{{ expandedId() === r.id ? 'expand_less' : 'expand_more' }}</mat-icon></td>
+            <td class="c-exp"><mat-icon aria-hidden="true">{{ expandedId() === r.id ? 'expand_less' : 'expand_more' }}</mat-icon></td>
           </tr>
           @if (expandedId() === r.id) {
             <tr class="detail-row">

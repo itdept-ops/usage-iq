@@ -83,16 +83,26 @@ export class App {
     return App.barePrefixes.some(p => path === p || path.startsWith(p + '/'));
   }
 
-  /** Page routes that require a specific view permission (for live-revocation enforcement). */
+  /**
+   * Page routes that require a single view permission (for live-revocation enforcement). Keyed by the
+   * exact path, except entries flagged below as subtree roots which also cover their child routes.
+   * `/reporter` and `/fleet` are any-of guarded, so they can't be expressed here and are left to the
+   * page's own 403 — only clean single-permission routes belong in this map.
+   */
   private static readonly routePerm: Record<string, string> = {
     '/': 'dashboard.view',
     '/calendar': 'calendar.view',
     '/pricing': 'pricing.view',
     '/settings': 'settings.view',
-    '/reporter': 'reporter.view',
+    '/chat': 'chat.read',
+    '/tracker': 'tracker.self',
+    '/family': 'family.use',
     '/users': 'users.view',
     '/activity': 'activity.view',
   };
+
+  /** Routes whose required permission also gates every child path (e.g. /family/household). */
+  private static readonly routePermSubtrees: readonly string[] = ['/family'];
 
   readonly state = computed(() => {
     const s = this.status();
@@ -260,7 +270,8 @@ export class App {
    */
   private enforceCurrentRoute(): void {
     const path = this.router.url.split('?')[0];
-    const required = App.routePerm[path];
+    const subtree = App.routePermSubtrees.find(r => path === r || path.startsWith(r + '/'));
+    const required = App.routePerm[subtree ?? path];
     if (required && !this.auth.hasPermission(required)) {
       this.router.navigateByUrl(this.auth.homeRoute());
     }

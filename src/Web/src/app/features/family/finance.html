@@ -64,11 +64,11 @@
 
       <!-- ══ MONTH stepper ══════════════════════════════════════════════ -->
       <div class="fin-monthnav" role="group" aria-label="Choose month">
-        <button mat-icon-button matTooltip="Previous month" (click)="stepMonth(-1)">
+        <button mat-icon-button aria-label="Previous month" matTooltip="Previous month" (click)="stepMonth(-1)">
           <mat-icon aria-hidden="true">chevron_left</mat-icon>
         </button>
         <span class="fin-monthnav__label">{{ monthLabel() }}</span>
-        <button mat-icon-button matTooltip="Next month" (click)="stepMonth(1)">
+        <button mat-icon-button aria-label="Next month" matTooltip="Next month" (click)="stepMonth(1)">
           <mat-icon aria-hidden="true">chevron_right</mat-icon>
         </button>
       </div>
@@ -294,25 +294,25 @@
         </div>
 
         <div class="fin-filters" role="group" aria-label="Filter transactions">
-          <select class="fin-select" [value]="fAccount() ?? ''"
+          <select class="fin-select" aria-label="Account" [value]="fAccount() ?? ''"
                   (change)="setAccountFilter($any($event.target).value ? +$any($event.target).value : null)">
             <option value="">All accounts</option>
             @for (a of accounts(); track a.id) { <option [value]="a.id">{{ a.name }}</option> }
           </select>
 
-          <select class="fin-select" [value]="fCategory() ?? ''"
+          <select class="fin-select" aria-label="Category" [value]="fCategory() ?? ''"
                   (change)="setCategoryFilter($any($event.target).value || null)">
             <option value="">All categories</option>
             @for (c of categories(); track c) { <option [value]="c">{{ c }}</option> }
           </select>
 
-          <select class="fin-select" [value]="fOwner() ?? ''"
+          <select class="fin-select" aria-label="Owner" [value]="fOwner() ?? ''"
                   (change)="setOwnerFilter($any($event.target).value || null)">
             <option value="">His & Hers</option>
             @for (o of ownerOptions; track o) { <option [value]="o">{{ ownerLabel(o) }}</option> }
           </select>
 
-          <select class="fin-select" [value]="fKind() ?? ''"
+          <select class="fin-select" aria-label="Kind" [value]="fKind() ?? ''"
                   (change)="setKindFilter($any($event.target).value || null)">
             <option value="">All kinds</option>
             @for (k of txnKindOptions; track k) { <option [value]="k">{{ k }}</option> }
@@ -369,11 +369,11 @@
           </div>
 
           <div class="fin-pager">
-            <button mat-icon-button matTooltip="Previous page" [disabled]="txnPage() <= 1" (click)="stepPage(-1)">
+            <button mat-icon-button aria-label="Previous page" matTooltip="Previous page" [disabled]="txnPage() <= 1" (click)="stepPage(-1)">
               <mat-icon aria-hidden="true">chevron_left</mat-icon>
             </button>
             <span class="fin-pager__label">Page {{ txnPage() }} of {{ txnPages() }}</span>
-            <button mat-icon-button matTooltip="Next page" [disabled]="txnPage() >= txnPages()" (click)="stepPage(1)">
+            <button mat-icon-button aria-label="Next page" matTooltip="Next page" [disabled]="txnPage() >= txnPages()" (click)="stepPage(1)">
               <mat-icon aria-hidden="true">chevron_right</mat-icon>
             </button>
           </div>

@@ -83,7 +83,10 @@ export class ReporterPage {
   }
 
   private loadIngestKeys(): void {
-    this.api.ingestKeys().subscribe({ next: k => this.ingestKeys.set(k), error: () => { /* non-critical */ } });
+    this.api.ingestKeys().subscribe({
+      next: k => this.ingestKeys.set(k),
+      error: () => this.snack.open('Could not load ingest keys', 'Dismiss', { duration: 4000 }),
+    });
   }
 
   generateKey(): void {

@@ -59,6 +59,13 @@
     </article>
   } @else {
     <!-- Connected: toolbar + week / agenda -->
+    @if (status()?.scopeOk === false) {
+      <div class="family__error" role="status" aria-live="polite">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        <p>Calendar permission wasn't granted — disconnect and reconnect, allowing calendar access so your events can show here.</p>
+      </div>
+    }
+
     <div class="cal-toolbar">
       <div class="cal-toolbar__nav">
         <button mat-icon-button aria-label="Previous week" (click)="prevWeek()">
@@ -275,9 +282,9 @@
 
     @if (view() === 'week') {
       <!-- Week grid -->
-      <div class="cal-week" role="grid" aria-label="Week view">
+      <div class="cal-week" aria-label="Week view">
         @for (col of days(); track col.iso) {
-          <div class="cal-day" [class.cal-day--today]="col.isToday" role="gridcell">
+          <div class="cal-day" [class.cal-day--today]="col.isToday">
             <button class="cal-day__head" type="button" (click)="create(col.iso)"
                     [matTooltip]="'Add an event on ' + dayHeading(col)">
               <span class="cal-day__weekday">{{ col.weekdayLabel }}</span>

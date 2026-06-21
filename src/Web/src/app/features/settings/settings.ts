@@ -112,7 +112,10 @@ export class Settings {
       next: s => { this.model.set(s); this.loading.set(false); },
       error: () => { this.loading.set(false); this.snack.open('Failed to load settings', 'Dismiss', { duration: 4000 }); },
     });
-    this.api.sources().subscribe(s => this.sources.set(s));
+    this.api.sources().subscribe({
+      next: s => this.sources.set(s),
+      error: () => this.snack.open('Failed to load sources', 'Dismiss', { duration: 4000 }),
+    });
     if (this.auth.hasPermission(PERM.settingsManage)) {
       this.api.notifications().subscribe({ next: n => this.notif.set(n), error: () => { /* non-critical */ } });
     }
@@ -204,8 +207,8 @@ export class Settings {
         this.syncing.set(false);
         this.lastSync.set(r);
         this.now.set(Date.now());
-        this.api.sources().subscribe(s => this.sources.set(s));
-        this.api.syncStatus().subscribe(st => this.status.set(st));
+        this.api.sources().subscribe({ next: s => this.sources.set(s), error: () => { /* refreshed by next sync */ } });
+        this.api.syncStatus().subscribe({ next: st => this.status.set(st), error: () => { /* recovered by 15s poll */ } });
         this.snack.open(r.error ? `Sync error: ${r.error}` : `Synced +${r.newRecords.toLocaleString()} rows`, 'OK', { duration: 5000 });
       },
       error: () => { this.syncing.set(false); this.snack.open('Sync failed', 'Dismiss', { duration: 4000 }); },

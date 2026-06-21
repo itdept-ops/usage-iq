@@ -9,6 +9,8 @@
 
 @if (loading()) {
   <div class="w-empty">Loading…</div>
+} @else if (error()) {
+  <div class="w-empty">Couldn't load usage for {{ label() }}.</div>
 } @else if (!models().length) {
   <div class="w-empty">No usage yet for {{ label() }}.</div>
 } @else {

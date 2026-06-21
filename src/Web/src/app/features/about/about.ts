@@ -166,6 +166,7 @@ export class About implements AfterViewInit, OnDestroy {
   ];
 
   private observer?: IntersectionObserver;
+  private revealFailsafe?: ReturnType<typeof setTimeout>;
   private counted = false;
 
   constructor() {
@@ -206,12 +207,13 @@ export class About implements AfterViewInit, OnDestroy {
       els.forEach(el => this.observer!.observe(el));
       // Failsafe: if the observer never delivers (throttled/backgrounded tab), reveal everything so
       // no chapter can stay hidden. Idempotent with the per-element reveals above.
-      setTimeout(() => els.forEach(el => el.classList.add('is-in')), 2500);
+      this.revealFailsafe = setTimeout(() => els.forEach(el => el.classList.add('is-in')), 2500);
     });
   }
 
   ngOnDestroy(): void {
     this.observer?.disconnect();
+    if (this.revealFailsafe !== undefined) clearTimeout(this.revealFailsafe);
   }
 
   /** Lightweight count-up for the hero metrics; respects reduced motion. */

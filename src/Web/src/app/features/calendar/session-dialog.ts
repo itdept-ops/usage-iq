@@ -5,6 +5,7 @@ import type { EChartsOption } from 'echarts';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { SessionDetail } from '../../core/models';
@@ -13,12 +14,13 @@ import { CompactPipe } from '../../shared/format';
 
 @Component({
   selector: 'app-session-dialog',
-  imports: [CommonModule, MatDialogModule, MatButtonModule, MatProgressBarModule, ChartComponent, CompactPipe],
+  imports: [CommonModule, MatDialogModule, MatButtonModule, MatProgressBarModule, MatSnackBarModule, ChartComponent, CompactPipe],
   templateUrl: './session-dialog.html',
   styleUrl: './session-dialog.scss',
 })
 export class SessionDialog {
   private api = inject(Api);
+  private snack = inject(MatSnackBar);
   readonly id = inject<{ sessionId: string }>(MAT_DIALOG_DATA).sessionId;
 
   readonly data = signal<SessionDetail | null>(null);
@@ -27,7 +29,12 @@ export class SessionDialog {
   constructor() {
     this.api.session(this.id).subscribe({
       next: d => { this.data.set(d); this.loading.set(false); },
-      error: () => this.loading.set(false),
+      // On error, leave data() null + loading() false so the template's @else error
+      // block renders; the snackbar adds an explicit notice.
+      error: () => {
+        this.loading.set(false);
+        this.snack.open('Could not load session detail.', 'Dismiss', { duration: 4000 });
+      },
     });
   }
 

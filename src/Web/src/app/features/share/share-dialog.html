@@ -12,7 +12,7 @@
       <div class="sd-created-head"><mat-icon>check_circle</mat-icon>
         Link ready — expires {{ c.expiresUtc | date: 'MMM d, y, HH:mm' }}</div>
       <div class="sd-url-row">
-        <input class="sd-url mono" [value]="fullUrl(c.path)" readonly (focus)="$any($event.target).select()" />
+        <input class="sd-url mono" aria-label="Public share link" [value]="fullUrl(c.path)" readonly (focus)="$any($event.target).select()" />
         <button mat-flat-button color="primary" (click)="copy(c)"><mat-icon>content_copy</mat-icon> Copy</button>
       </div>
       <button mat-button class="sd-another" (click)="reset()"><mat-icon>add</mat-icon> Create another</button>

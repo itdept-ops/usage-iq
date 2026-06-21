@@ -308,9 +308,9 @@ export class FamilyCalendar implements OnDestroy {
       await this.waitForGis();
       const code = await this.requestAuthCode(cfg.googleClientId);
       await firstValueFrom(this.api.connectCalendar(code, 'postmessage'));
-      this.status.set({ configured: true, connected: true });
-      await this.loadEvents();
-      void this.loadMembers();
+      // Re-read status rather than hard-setting it, so we keep the server's scopeOk (a connection that
+      // didn't grant the calendar.events scope needs the reconnect hint) and load events/members from there.
+      await this.loadStatus();
       this.snack.open('Calendar connected.', undefined, { duration: 2000 });
     } catch (e) {
       // A user-cancelled popup is not an error worth shouting about.

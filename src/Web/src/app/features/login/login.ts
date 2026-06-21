@@ -1,4 +1,4 @@
-import { Component, ElementRef, afterNextRender, inject, signal, viewChildren } from '@angular/core';
+import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, viewChildren } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MarketingNav } from '../marketing/marketing-nav';
@@ -20,6 +20,7 @@ export class Login {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private destroyRef = inject(DestroyRef);
 
   /** Elements opted into scroll-reveal via the #reveal template ref. */
   private reveals = viewChildren<ElementRef<HTMLElement>>('reveal');
@@ -144,6 +145,9 @@ export class Login {
       if (armed.classList.contains('in')) { clearTimeout(failsafe); mo.disconnect(); }
     });
     mo.observe(armed, { attributes: true, attributeFilter: ['class'] });
+
+    // Tear down on navigation away so the timer can't fire on detached nodes.
+    this.destroyRef.onDestroy(() => { io.disconnect(); mo.disconnect(); clearTimeout(failsafe); });
   }
 
   private settleCounts(): void {
@@ -169,6 +173,9 @@ export class Login {
     io.observe(band);
     // If the observer never fires (throttled tab), snap to final values.
     const failsafe = setTimeout(() => { io.disconnect(); this.settleCounts(); }, 3000);
+
+    // Tear down on navigation away so the timer can't fire on detached nodes.
+    this.destroyRef.onDestroy(() => { io.disconnect(); clearTimeout(failsafe); });
   }
 
   private runCounters(): void {

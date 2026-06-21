@@ -273,10 +273,17 @@ export class Dashboard {
   }
 
   private loadOptions(): void {
-    this.api.projects().subscribe(p => this.projects.set(p));
-    this.api.models().subscribe(m => this.modelStats.set(m));
-    this.api.sources().subscribe(s => this.sources.set(s));
-    this.api.machines().subscribe(m => this.machines.set(m));
+    // Guard so an all-down API surfaces ONE snackbar, not one per option call.
+    let warned = false;
+    const onErr = () => {
+      if (warned) return;
+      warned = true;
+      this.snack.open('Could not load filter options', 'Dismiss', { duration: 4000 });
+    };
+    this.api.projects().subscribe({ next: p => this.projects.set(p), error: onErr });
+    this.api.models().subscribe({ next: m => this.modelStats.set(m), error: onErr });
+    this.api.sources().subscribe({ next: s => this.sources.set(s), error: onErr });
+    this.api.machines().subscribe({ next: m => this.machines.set(m), error: onErr });
     this.loadSavedViews();
   }
 
@@ -363,12 +370,18 @@ export class Dashboard {
   }
 
   private reloadSummary(): void {
-    this.api.summary(this.filter(), this.groupBy()).subscribe(s => this.summary.set(s));
+    this.api.summary(this.filter(), this.groupBy()).subscribe({
+      next: s => this.summary.set(s),
+      error: () => this.snack.open('Could not update chart', 'Dismiss', { duration: 4000 }),
+    });
   }
 
   private reloadRecords(): void {
     this.api.records(this.filter(), this.page(), this.pageSize(), this.sort(), this.desc())
-      .subscribe(r => this.records.set(r));
+      .subscribe({
+        next: r => this.records.set(r),
+        error: () => this.snack.open('Could not load records', 'Dismiss', { duration: 4000 }),
+      });
   }
 
   onPage(e: PageEvent): void {

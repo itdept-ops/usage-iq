@@ -26,6 +26,7 @@ export class Widget {
   readonly source = signal('');
   readonly summary = signal<SummaryResponse | null>(null);
   readonly loading = signal(true);
+  readonly error = signal(false);
   readonly lastSync = signal<string | null>(null);
   private readonly now = signal(Date.now());
   private lastSeen: string | null | undefined;
@@ -76,8 +77,8 @@ export class Widget {
     this.api
       .summary({ from: null, to: null, projectIds: [], models: [], sources: [src], machine: [], includeSidechain: true }, 'model')
       .subscribe({
-        next: r => { this.summary.set(r); this.loading.set(false); },
-        error: () => this.loading.set(false),
+        next: r => { this.summary.set(r); this.error.set(false); this.loading.set(false); },
+        error: () => { this.error.set(true); this.loading.set(false); },
       });
   }
 

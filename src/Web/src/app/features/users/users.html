@@ -63,6 +63,7 @@
 <!-- Permission matrix -->
 <mat-card appearance="outlined" class="panel table-card">
   <div class="panel-header">{{ users().length }} users</div>
+  <span class="contacts-sr-status" aria-live="polite" aria-atomic="true">{{ contactsStatus() }}</span>
   <div class="table-scroll matrix-desktop">
     <table class="perm-table">
       <thead>
@@ -89,6 +90,7 @@
             <td class="col-expand">
               <button mat-icon-button class="expand-btn" (click)="toggleExpand(u)"
                       [attr.aria-expanded]="isExpanded(u.id)"
+                      [attr.aria-label]="isExpanded(u.id) ? 'Hide sign-in history' : 'Show sign-in history'"
                       [matTooltip]="isExpanded(u.id) ? 'Hide sign-in history' : 'Show sign-in history'">
                 <mat-icon class="expand-chevron" [class.open]="isExpanded(u.id)">chevron_right</mat-icon>
               </button>
@@ -139,7 +141,7 @@
                   }
                 </button>
               }
-              <button mat-icon-button class="del-btn" matTooltip="Remove user" (click)="remove(u)">
+              <button mat-icon-button class="del-btn" [attr.aria-label]="'Remove ' + (u.email || u.name)" matTooltip="Remove user" (click)="remove(u)">
                 <mat-icon>delete_outline</mat-icon>
               </button>
             </td>
@@ -196,7 +198,6 @@
                   <!-- Admin chat-contacts editor (chat.contacts.manage only; userId-keyed, name-only) -->
                   @if (canEditContacts()) {
                     <div class="contacts-block" [attr.aria-busy]="contactsState(u.id)?.busyUserId != null ? true : null">
-                      <span class="contacts-sr-status" aria-live="polite" aria-atomic="true">{{ contactsStatus() }}</span>
                       <div class="logins-head">
                         <mat-icon class="logins-head-icon">group</mat-icon>
                         <span class="logins-head-title">Chat contacts</span>
@@ -332,7 +333,7 @@
               }
             </button>
           }
-          <button mat-icon-button class="del-btn" matTooltip="Remove user" (click)="remove(u)">
+          <button mat-icon-button class="del-btn" [attr.aria-label]="'Remove ' + (u.email || u.name)" matTooltip="Remove user" (click)="remove(u)">
             <mat-icon>delete_outline</mat-icon>
           </button>
           <button mat-button class="ucard-history-btn" (click)="toggleExpand(u)"
@@ -381,7 +382,6 @@
           @if (canEditContacts()) {
             <div class="logins-panel ucard-logins contacts-block"
                  [attr.aria-busy]="contactsState(u.id)?.busyUserId != null ? true : null">
-              <span class="contacts-sr-status" aria-live="polite" aria-atomic="true">{{ contactsStatus() }}</span>
               <div class="logins-head">
                 <mat-icon class="logins-head-icon">group</mat-icon>
                 <span class="logins-head-title">Chat contacts</span>

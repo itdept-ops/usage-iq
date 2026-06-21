@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, firstValueFrom, of } from 'rxjs';
@@ -74,6 +74,7 @@ export class FamilyMeals {
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
 
   readonly days = signal<FamilyMealDay[]>([]);
   readonly loading = signal(true);
@@ -158,7 +159,7 @@ export class FamilyMeals {
     if (initial) this.loading.set(true);
     this.api.familyMeals(this.weekStartIso())
       .pipe(catchError(() => { if (initial) this.error.set(true); return of<FamilyMealDay[]>([]); }),
-        takeUntilDestroyed())
+        takeUntilDestroyed(this.destroyRef))
       .subscribe(days => { this.days.set(days); this.loading.set(false); });
   }
 

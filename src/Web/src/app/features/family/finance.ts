@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { EChartsOption } from 'echarts';
 import { catchError, firstValueFrom, of } from 'rxjs';
@@ -60,6 +60,7 @@ const OWNER_COLOR: Record<FinanceOwner, string> = {
 export class FamilyFinance {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
+  private destroyRef = inject(DestroyRef);
 
   // ---- page state ----
   readonly loading = signal(true);
@@ -152,7 +153,7 @@ export class FamilyFinance {
   private loadSummary(): void {
     this.api.financeSummary(this.month())
       .pipe(catchError(() => { if (this.loading()) this.error.set(true); return of<FinanceSummary | null>(null); }),
-        takeUntilDestroyed())
+        takeUntilDestroyed(this.destroyRef))
       .subscribe(s => {
         if (s) {
           this.summary.set(s);
@@ -169,13 +170,13 @@ export class FamilyFinance {
 
   private loadAccounts(): void {
     this.api.financeAccounts()
-      .pipe(catchError(() => of<FinanceAccount[]>([])), takeUntilDestroyed())
+      .pipe(catchError(() => of<FinanceAccount[]>([])), takeUntilDestroyed(this.destroyRef))
       .subscribe(a => this.accounts.set(a));
   }
 
   private loadImports(): void {
     this.api.financeImports()
-      .pipe(catchError(() => of<FinanceImportBatch[]>([])), takeUntilDestroyed())
+      .pipe(catchError(() => of<FinanceImportBatch[]>([])), takeUntilDestroyed(this.destroyRef))
       .subscribe(i => this.imports.set(i));
   }
 
@@ -191,7 +192,7 @@ export class FamilyFinance {
     this.aiSummaryMonth = month;
     this.aiLoading.set(true);
     this.api.financeSummaryAi(month)
-      .pipe(catchError(() => of<FinanceSummaryAiResult | null>(null)), takeUntilDestroyed())
+      .pipe(catchError(() => of<FinanceSummaryAiResult | null>(null)), takeUntilDestroyed(this.destroyRef))
       .subscribe(s => {
         // Guard against an out-of-order response if the month changed mid-flight.
         if (this.month() === month) {
@@ -213,7 +214,7 @@ export class FamilyFinance {
     if (!force && this.coach()) return;
     this.coachLoading.set(true);
     this.api.financeMoneyCoachAi()
-      .pipe(catchError(() => of<FinanceMoneyCoachResult | null>(null)), takeUntilDestroyed())
+      .pipe(catchError(() => of<FinanceMoneyCoachResult | null>(null)), takeUntilDestroyed(this.destroyRef))
       .subscribe(c => {
         this.coach.set(c);
         this.coachLoading.set(false);
@@ -226,7 +227,7 @@ export class FamilyFinance {
       month: this.month(), accountId: this.fAccount(), category: this.fCategory(),
       owner: this.fOwner(), kind: this.fKind(), page: this.txnPage(),
     })
-      .pipe(catchError(() => of<FinanceTransactionsPage | null>(null)), takeUntilDestroyed())
+      .pipe(catchError(() => of<FinanceTransactionsPage | null>(null)), takeUntilDestroyed(this.destroyRef))
       .subscribe(p => {
         if (p) { this.txns.set(p.items); this.txnTotal.set(p.total); }
         this.txnLoading.set(false);

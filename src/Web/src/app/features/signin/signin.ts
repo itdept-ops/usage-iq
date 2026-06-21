@@ -1,4 +1,4 @@
-import { Component, ElementRef, NgZone, afterNextRender, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, NgZone, afterNextRender, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
@@ -21,7 +21,11 @@ export class SignIn {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private zone = inject(NgZone);
+  private destroyRef = inject(DestroyRef);
   private btn = viewChild.required<ElementRef<HTMLDivElement>>('gbtn');
+
+  /** GIS poll handle, cleared on destroy if the user leaves /signin mid-load. */
+  private gisTimer?: ReturnType<typeof setInterval>;
 
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
@@ -32,6 +36,9 @@ export class SignIn {
       return;
     }
     afterNextRender(() => void this.initGoogle());
+    this.destroyRef.onDestroy(() => {
+      if (this.gisTimer !== undefined) clearInterval(this.gisTimer);
+    });
   }
 
   private returnUrl(): string {
@@ -86,6 +93,7 @@ export class SignIn {
           reject(new Error('Google Identity Services failed to load'));
         }
       }, 100);
+      this.gisTimer = timer;
     });
   }
 

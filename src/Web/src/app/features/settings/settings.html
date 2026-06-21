@@ -12,7 +12,7 @@
   <mat-card appearance="outlined" class="panel s-panel">
     <div class="s-panel-head">
       <span class="panel-header">Ingestion</span>
-      <span class="sync-pill" [attr.data-state]="syncState()">
+      <span class="sync-pill" [attr.data-state]="syncState()" aria-live="polite">
         <span class="sync-pill__dot"></span>
         <span class="micro-label">Synced {{ lastSyncedLabel() }}</span>
         @if (autoSyncLabel()) { <span class="sync-pill__sep">·</span><span class="micro-label">{{ autoSyncLabel() }}</span> }
@@ -42,12 +42,12 @@
     <div class="actions">
       @if (auth.hasPermission(PERM.settingsManage)) {
         <button mat-flat-button color="primary" class="act-save" [disabled]="saving()" (click)="save()">
-          <mat-icon>save</mat-icon> {{ saving() ? 'Saving…' : 'Save settings' }}
+          <mat-icon aria-hidden="true">save</mat-icon> {{ saving() ? 'Saving…' : 'Save settings' }}
         </button>
       }
       @if (auth.hasPermission(PERM.syncRun)) {
         <button mat-stroked-button class="act-sync" [disabled]="syncing()" (click)="sync()">
-          <mat-icon>{{ syncing() ? 'hourglass_top' : 'sync' }}</mat-icon> {{ syncing() ? 'Syncing…' : 'Run sync now' }}
+          <mat-icon aria-hidden="true">{{ syncing() ? 'hourglass_top' : 'sync' }}</mat-icon> {{ syncing() ? 'Syncing…' : 'Run sync now' }}
         </button>
       }
     </div>
@@ -79,11 +79,13 @@
           </mat-form-field>
           @if (auth.hasPermission(PERM.settingsManage)) {
             <button mat-stroked-button class="src-save" [disabled]="savingSourceId() === s.id" (click)="saveSource(s)">
-              <mat-icon>{{ savingSourceId() === s.id ? 'hourglass_top' : 'save' }}</mat-icon> Save
+              <mat-icon aria-hidden="true">{{ savingSourceId() === s.id ? 'hourglass_top' : 'save' }}</mat-icon> Save
             </button>
           }
         </div>
       </div>
+    } @empty {
+      <p class="hint">No sources configured yet.</p>
     }
   </mat-card>
 
@@ -149,17 +151,17 @@
 
       <div class="actions">
         <button mat-flat-button color="primary" [disabled]="savingNotif()" (click)="saveNotif()">
-          <mat-icon>save</mat-icon> {{ savingNotif() ? 'Saving…' : 'Save' }}
+          <mat-icon aria-hidden="true">save</mat-icon> {{ savingNotif() ? 'Saving…' : 'Save' }}
         </button>
         <button mat-stroked-button [disabled]="testingNotif() || !n.webhookConfigured" (click)="testNotif()">
-          <mat-icon>send</mat-icon> {{ testingNotif() ? 'Sending…' : 'Send test' }}
+          <mat-icon aria-hidden="true">send</mat-icon> {{ testingNotif() ? 'Sending…' : 'Send test' }}
         </button>
         <button mat-stroked-button [disabled]="sendingSnapshot() || !n.webhookConfigured" (click)="sendSnapshot()">
-          <mat-icon>insights</mat-icon> {{ sendingSnapshot() ? 'Sending…' : 'Send usage now' }}
+          <mat-icon aria-hidden="true">insights</mat-icon> {{ sendingSnapshot() ? 'Sending…' : 'Send usage now' }}
         </button>
         @if (n.webhookConfigured) {
           <button mat-button class="danger-btn" [disabled]="savingNotif()" (click)="removeWebhook()">
-            <mat-icon>link_off</mat-icon> Remove
+            <mat-icon aria-hidden="true">link_off</mat-icon> Remove
           </button>
         }
       </div>

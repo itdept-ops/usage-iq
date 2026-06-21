@@ -114,13 +114,19 @@ export class NotificationBell {
 
   /** Open a notification: mark it read (if unread) and follow its link when present. */
   open(n: NotificationDto): void {
-    if (!n.isRead) void this.chat.markNotificationsRead([n.id]);
+    if (!n.isRead) {
+      this.chat
+        .markNotificationsRead([n.id])
+        .catch(() => this.snack.open('Could not update notifications', 'Dismiss', { duration: 4000 }));
+    }
     this.navigate(n.link);
   }
 
   /** Mark every notification read (header action). */
   markAllRead(): void {
-    void this.chat.markAllNotificationsRead();
+    this.chat
+      .markAllNotificationsRead()
+      .catch(() => this.snack.open('Could not update notifications', 'Dismiss', { duration: 4000 }));
   }
 
   /**

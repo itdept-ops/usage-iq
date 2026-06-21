@@ -28,12 +28,12 @@
                (keydown.enter)="addWithAi()" maxlength="600"
                placeholder="e.g. call the dentist next Tuesday at 3, every month" [disabled]="aiBusy()" />
         @if (aiText()) {
-          <button mat-icon-button matSuffix aria-label="Clear" (click)="clearAi()" [disabled]="aiBusy()">
+          <button mat-icon-button type="button" matSuffix aria-label="Clear" (click)="clearAi()" [disabled]="aiBusy()">
             <mat-icon>close</mat-icon>
           </button>
         }
       </mat-form-field>
-      <button mat-flat-button color="primary" class="rem-ai__go"
+      <button mat-flat-button type="button" color="primary" class="rem-ai__go"
               [disabled]="aiBusy() || !aiText().trim()" (click)="addWithAi()">
         @if (aiBusy()) {
           <mat-spinner [diameter]="18" />

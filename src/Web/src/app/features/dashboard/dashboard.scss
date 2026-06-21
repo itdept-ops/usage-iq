@@ -596,6 +596,12 @@ mat-button-toggle-group {
 .table-card {
   padding: 16px 16px 4px;
   overflow: hidden;
+
+  .empty {
+    text-align: center;
+    color: var(--tech-text-tertiary);
+    padding: 28px 12px;
+  }
 }
 
 .table-scroll {

@@ -60,7 +60,7 @@
         <div class="quick-timer__confirm" aria-live="polite">
           <span class="quick-timer__chip">
             <mat-icon aria-hidden="true">timer</mat-icon>
-            <span class="quick-timer__chip-label">{{ p.label }}</span>
+            <span class="quick-timer__chip-label">{{ p.label || 'Timer' }}</span>
             <span class="quick-timer__chip-dur">{{ durationLabel(p.durationSeconds) }}</span>
           </span>
           <span class="quick-timer__confirm-actions">

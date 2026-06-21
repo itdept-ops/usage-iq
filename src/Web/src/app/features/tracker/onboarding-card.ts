@@ -1,5 +1,5 @@
 import {
-  AfterViewInit, Component, ElementRef, computed, input, output, signal, viewChild,
+  AfterViewInit, Component, ElementRef, OnInit, computed, input, output, signal, viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -60,7 +60,7 @@ const ACTIVITY_LEVELS: { value: ActivityLevel; label: string }[] = [
   templateUrl: './onboarding-card.html',
   styleUrl: './onboarding-card.scss',
 })
-export class OnboardingCard implements AfterViewInit {
+export class OnboardingCard implements OnInit, AfterViewInit {
   /** Seed profile (existing defaults / partial profile) to prefill the form. */
   readonly profile = input<TrackerProfileDto | null>(null);
 
@@ -105,7 +105,9 @@ export class OnboardingCard implements AfterViewInit {
     return `${d.getFullYear()}-${mm}-${dd}`;
   })();
 
-  constructor() {
+  ngOnInit(): void {
+    // Seed from the partial profile here, NOT in the constructor: the `profile` signal input is bound
+    // after construction, so reading it in the constructor would always see the default `null`.
     const p = this.profile();
     if (p) {
       if (p.goal) this.goal.set(p.goal);
