@@ -871,6 +871,8 @@
   margin: 0;
   padding: 0;
 }
+/* NOTE: the sticky-footer rules for bare pages live in the GLOBAL src/styles.scss, not here — they must
+   reach the router-inserted page component, which doesn't carry this (encapsulated) component's scope. */
 
 /* ---- Responsive ---------------------------------------------------- */
 /* Below this width the inline links overflow the bar, so swap them for the

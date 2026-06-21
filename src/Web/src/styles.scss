@@ -447,3 +447,22 @@ code, pre, kbd, samp {
 }
 
 /* You can add global styles to this file, and also import other style files */
+
+/* ── Sticky footer for bare/marketing pages ───────────────────────────────────────────────────────
+   A bare page that actually has a marketing footer (landing / about / login / share) becomes a
+   full-height flex column so the footer sinks to the bottom of the viewport on short pages instead of
+   floating up into empty space. Scoped with :has() so the chrome-less pop-out widgets (also
+   .content--bare, but with no footer) are untouched. These live in the GLOBAL stylesheet on purpose:
+   the router-inserted page component doesn't carry the app shell's encapsulation attribute, so an
+   app.scss rule can't reach it. The footer itself uses margin-top:auto (in marketing-footer.scss) to
+   sink — a no-op in normal flow. Degrades to the prior behaviour where :has() is unsupported. */
+.content--bare:has(app-marketing-footer) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.content--bare:has(app-marketing-footer) > *:not(router-outlet) {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}

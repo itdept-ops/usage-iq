@@ -1,4 +1,6 @@
-:host { display: block; }
+/* margin-top:auto sinks the footer to the bottom when its page is a full-height flex column (see the
+   .content--bare sticky-footer rule). A no-op in normal block flow, so it's safe everywhere the footer is used. */
+:host { display: block; margin-top: auto; }
 
 .mfoot {
   position: relative;
