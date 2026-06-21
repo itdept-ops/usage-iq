@@ -52,6 +52,16 @@ public static class FamilyCalendarEndpoints
     /// next week, mornings"). <see cref="ReferenceDateUtc"/> anchors relative dates; defaults to now.</summary>
     public sealed record FindTimeAiRequest(string? Text, DateTime? ReferenceDateUtc);
 
+    /// <summary>One attached schedule file for "schedule from image": base64 + its mime
+    /// (image/jpeg|png|webp or application/pdf). The bytes are passed inline to Gemini and DISCARDED — never
+    /// stored. See the endpoint's own validator (which, unlike the food-photo path, also allows PDF).</summary>
+    public sealed record ScheduleImageFile(string? ImageBase64, string? Mime);
+
+    /// <summary>The "schedule from image" request: 1..5 schedule images/PDFs to extract events from.
+    /// <see cref="ReferenceDateUtc"/> anchors relative/implied dates in the document; defaults to now.</summary>
+    public sealed record ScheduleFromImageRequest(
+        IReadOnlyList<ScheduleImageFile>? Files, DateTime? ReferenceDateUtc);
+
     // ---- Response DTOs ----
     public sealed record StatusDto(bool Configured, bool Connected, bool ScopeOk);
     public sealed record ConnectedDto(bool Connected);
@@ -327,6 +337,110 @@ public static class FamilyCalendarEndpoints
                 e.Title, e.StartUtc, e.EndUtc, e.AllDay, e.Location, e.Description, e.Recurrence)).ToList();
             return Results.Ok(new ScheduleAiDto(events, result.Notes));
         }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
+        // ---- POST /ai/from-image : Gemini EXTRACTS proposed events from attached schedule image(s)/PDF(s) ----
+        // (a school calendar, a shift schedule, a sports roster). Returns the SAME ScheduleAiDto shape as
+        // /schedule-ai for the frontend to CONFIRM then create via POST /events. Image-heavy, so it runs under
+        // the tighter ai-photo cap. STORES NOTHING and CREATES NOTHING — the bytes are passed inline to Gemini
+        // and discarded. Its OWN validator additionally allows application/pdf (the GLOBAL food-photo allowlist
+        // is deliberately NOT widened). Graceful: 400 for empty/too-many/oversized/bad-mime; 503 (never 500)
+        // when Gemini is unconfigured or the call fails.
+        g.MapPost("/ai/from-image", async (
+            ScheduleFromImageRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            GeminiService gemini, CancellationToken ct) =>
+        {
+            // Validate the attachments FIRST so a bad/oversized/too-many upload is a clear 400 regardless of
+            // config (and its own allowlist allows PDF, unlike the global food-photo path).
+            if (!TryValidateScheduleFiles(req?.Files, out var files, out var bad)) return bad;
+            if (!gemini.IsConfigured) return AiUnavailable();
+
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var tz = FamilyTodayService.ResolveTimeZone(household.TimeZone);
+
+            // Anchor relative/implied dates to the supplied reference (or now); reject an absurd reference.
+            var reference = req!.ReferenceDateUtc is { } r
+                ? DateTime.SpecifyKind(r, DateTimeKind.Utc) : DateTime.UtcNow;
+            if (reference < DateTime.UtcNow.AddYears(-2) || reference > DateTime.UtcNow.AddYears(2))
+                reference = DateTime.UtcNow;
+
+            var result = await gemini.ScheduleFromImagesAsync(files, reference, tz, ct);
+            if (result is null) return AiUnavailable();
+
+            var events = result.Events.Select(e => new ScheduleEventDto(
+                e.Title, e.StartUtc, e.EndUtc, e.AllDay, e.Location, e.Description, e.Recurrence)).ToList();
+            return Results.Ok(new ScheduleAiDto(events, result.Notes));
+        }).RequireRateLimiting(AiEndpoints.PhotoRateLimitPolicy);
+    }
+
+    // =====================================================================================
+    // "Schedule from image" file validation — its OWN allowlist (adds application/pdf), SCOPED to this
+    // endpoint so the GLOBAL food-photo path is never widened to accept PDFs.
+    // =====================================================================================
+
+    /// <summary>Allowed mime types for a schedule attachment: images PLUS application/pdf (scoped here only).</summary>
+    private static readonly IReadOnlySet<string> ScheduleAllowedMimeTypes =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { "image/jpeg", "image/png", "image/webp", "application/pdf" };
+
+    private const int MaxScheduleFiles = 5;
+    /// <summary>Per-file decoded cap: 5 MB for images, ~10 MB for a PDF (a multi-page calendar is bigger).</summary>
+    private const long MaxScheduleImageBytes = 5L * 1024 * 1024;
+    private const long MaxSchedulePdfBytes = 10L * 1024 * 1024;
+    /// <summary>Total decoded payload cap across all files, to stay under Gemini's inline request limit.</summary>
+    private const long MaxScheduleTotalBytes = 15L * 1024 * 1024;
+
+    /// <summary>
+    /// Validate the attached schedule files: 1..5 present, each a permitted mime (image/* or PDF) whose
+    /// base64 decodes cleanly and is under its per-type cap, and a total under the request cap. On failure,
+    /// <paramref name="bad"/> is a 400 and the method returns false. On success, <paramref name="valid"/> is
+    /// the decoded-and-checked (base64, mime) list ready for the model.
+    /// </summary>
+    private static bool TryValidateScheduleFiles(
+        IReadOnlyList<ScheduleImageFile>? files, out List<(string base64, string mime)> valid, out IResult bad)
+    {
+        valid = new List<(string, string)>();
+        bad = Results.BadRequest(new
+        {
+            message = "Attach 1–5 schedule images (jpeg/png/webp, up to 5 MB each) or PDFs (up to 10 MB), " +
+                      "under 15 MB total.",
+        });
+
+        if (files is null || files.Count == 0) return false;
+        if (files.Count > MaxScheduleFiles) return false;
+
+        long total = 0;
+        foreach (var f in files)
+        {
+            var mime = (f?.Mime ?? "").Trim();
+            var data = (f?.ImageBase64 ?? "").Trim();
+            if (mime.Length == 0 || data.Length == 0) return false;
+            if (!ScheduleAllowedMimeTypes.Contains(mime)) return false;
+
+            // Strip an optional data-URL prefix ("data:application/pdf;base64,...") before decoding.
+            var comma = data.IndexOf(',');
+            if (data.StartsWith("data:", StringComparison.OrdinalIgnoreCase) && comma >= 0)
+                data = data[(comma + 1)..];
+
+            var cap = string.Equals(mime, "application/pdf", StringComparison.OrdinalIgnoreCase)
+                ? MaxSchedulePdfBytes
+                : MaxScheduleImageBytes;
+
+            // Cheap pre-decode bound (base64 ≈ 4 chars per 3 bytes) so an oversized payload is rejected early.
+            if ((long)data.Length / 4 * 3 > cap) return false;
+
+            byte[] decoded;
+            try { decoded = Convert.FromBase64String(data); }
+            catch (FormatException) { return false; }
+            if (decoded.Length == 0 || decoded.Length > cap) return false;
+
+            total += decoded.Length;
+            if (total > MaxScheduleTotalBytes) return false;
+
+            valid.Add((data, mime));
+        }
+
+        return true;
     }
 
     // =====================================================================================

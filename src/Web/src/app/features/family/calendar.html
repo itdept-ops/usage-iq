@@ -131,6 +131,27 @@
         </button>
       </div>
 
+      <!-- 📄 Upload a schedule: drop / pick an image or PDF and pull the events out of it. -->
+      <div class="cal-upload" [class.cal-upload--drag]="uploadDragOver()"
+           (dragover)="onUploadDragOver($event)" (dragleave)="onUploadDragLeave($event)"
+           (drop)="onUploadDrop($event)">
+        <button mat-stroked-button type="button" class="cal-upload__btn"
+                [disabled]="uploadBusy()" (click)="triggerUpload()"
+                aria-label="Upload a schedule image or PDF to pull events out of it">
+          @if (uploadBusy()) {
+            <mat-spinner [diameter]="18" />
+            <span>Reading…</span>
+          } @else {
+            <mat-icon aria-hidden="true">upload_file</mat-icon>
+            <span>Upload a schedule</span>
+          }
+        </button>
+        <span class="cal-upload__hint">
+          Drop a photo or PDF of a school calendar, shift schedule, or roster — we’ll pull the events out.
+          Your file is only read to find the events, never stored.
+        </span>
+      </div>
+
       @if (aiStatus(); as msg) {
         <p class="cal-ai__status" aria-live="polite">{{ msg }}</p>
       }

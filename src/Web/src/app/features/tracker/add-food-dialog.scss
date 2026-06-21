@@ -304,6 +304,13 @@
   .af-ai-btn { flex: 1 1 0; min-width: 0; }
 }
 
+/* Reassurance that an attached/snapped photo is read but never stored. */
+.af-photo-note {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--tech-text-muted, #6b7280);
+}
+
 /* ── Meal-feedback verdict + swaps (read-only helper) ── */
 .af-feedback {
   margin: 0;

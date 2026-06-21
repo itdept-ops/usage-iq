@@ -92,9 +92,70 @@ export function captureImage(): Promise<ImageRequest | null> {
 }
 
 /**
+ * PICK an image from the device gallery / files (the sibling of {@link captureImage}), downscale it to
+ * <= {@link MAX_EDGE}px on the long edge, re-encode as JPEG (~{@link JPEG_QUALITY}), and return the raw
+ * base64 (no `data:` prefix) + mime type ready to POST as an {@link ImageRequest}. Resolves to `null`
+ * when the user cancels the picker (no file chosen).
+ *
+ * Identical to {@link captureImage} EXCEPT it omits the `capture` attribute, so on mobile the OS offers
+ * the photo library / file browser (not just the rear camera) — letting the user attach an existing photo.
+ * Rejects on a non-image file or a decode failure so the caller can surface a friendly error.
+ */
+export function pickImage(): Promise<ImageRequest | null> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    // NOTE: deliberately NO `capture` attribute — mobile then offers the gallery/files, not just the camera.
+    input.style.display = 'none';
+
+    // If the picker is dismissed, most browsers fire no event at all; we resolve(null) on a focus-back
+    // sweep so the promise never hangs. `change` (a real selection) wins the race and clears it.
+    let settled = false;
+    const cleanup = () => {
+      window.removeEventListener('focus', onFocus, true);
+      input.remove();
+    };
+    const onFocus = () => {
+      // Defer: the `change` event fires shortly AFTER focus returns when a file WAS chosen.
+      setTimeout(() => {
+        if (!settled && (!input.files || input.files.length === 0)) {
+          settled = true;
+          cleanup();
+          resolve(null);
+        }
+      }, 400);
+    };
+
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(null);
+        return;
+      }
+      settled = true;
+      window.removeEventListener('focus', onFocus, true);
+      input.remove();
+
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('Please choose an image file.'));
+        return;
+      }
+      downscaleToJpeg(file).then(resolve, reject);
+    });
+
+    window.addEventListener('focus', onFocus, true);
+    input.click();
+  });
+}
+
+/**
  * Decode a File/Blob, downscale so the long edge is <= {@link MAX_EDGE}px (never UP-scaling), re-encode as
- * a JPEG, and return its raw base64 + mime type. Shared by {@link captureImage}; exported for callers that
- * already hold a Blob (e.g. a drag-drop or paste).
+ * a JPEG, and return its raw base64 + mime type. Shared by {@link captureImage} / {@link pickImage};
+ * exported for callers that already hold a Blob (e.g. a drag-drop or paste).
  */
 export async function downscaleToJpeg(file: Blob): Promise<ImageRequest> {
   const { source, cleanup } = await loadBitmap(file);
@@ -120,6 +181,26 @@ export async function downscaleToJpeg(file: Blob): Promise<ImageRequest> {
     // Free the bitmap / revoke the object URL AFTER drawing (revoking earlier can break drawImage).
     cleanup();
   }
+}
+
+/**
+ * Read a Blob/File as raw base64 (NO `data:` prefix) — used for files we forward to the model WITHOUT a
+ * canvas re-encode, e.g. a PDF schedule upload (where there's nothing to downscale). Rejects on a read
+ * failure so the caller can surface a friendly error.
+ */
+export function readFileAsBase64(file: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const comma = result.indexOf(',');
+      const base64 = comma >= 0 ? result.slice(comma + 1) : result;
+      if (!base64) reject(new Error('Could not read that file.'));
+      else resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 /**

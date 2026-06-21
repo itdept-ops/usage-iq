@@ -17,9 +17,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
-import { AddFoodRequest, CustomFoodDto, FoodSearchItemDto, MealItemDto, Meal, PERM } from '../../core/models';
+import { AddFoodRequest, CustomFoodDto, FoodSearchItemDto, ImageRequest, MealItemDto, Meal, PERM } from '../../core/models';
 import { BarcodeScanner } from './barcode-scanner';
-import { captureImage, confirmPhotoNotice } from './ai-image';
+import { captureImage, pickImage, confirmPhotoNotice } from './ai-image';
 
 /** What the dialog opens with: the active day + which meal section the user tapped "Add food" on. */
 export interface AddFoodData {
@@ -378,16 +378,35 @@ export class AddFoodDialog {
   }
 
   /**
-   * 📷 Snap / upload a meal photo → photo-meal. Shows the one-time Google notice on first use, then
-   * (on >=1 item) routes to the multi-item review list. A single item still lands in review so the user
-   * confirms before committing. A 503/error degrades gracefully: snackbar steer, fields stay usable.
+   * 📷 Snap a meal photo (rear camera on mobile) → photo-meal review. Thin wrapper over
+   * {@link runPhotoMeal} with the camera-first {@link captureImage} source.
    */
   async photoMeal(): Promise<void> {
+    await this.runPhotoMeal(captureImage);
+  }
+
+  /**
+   * 🖼️ Attach an existing image from the gallery / files → photo-meal review. Sibling of {@link photoMeal}
+   * that uses the no-`capture` {@link pickImage} source so mobile offers the photo library, not just the
+   * camera. Same downscale + review flow; no backend change.
+   */
+  async attachImage(): Promise<void> {
+    await this.runPhotoMeal(pickImage);
+  }
+
+  /**
+   * Shared meal-photo flow for both {@link photoMeal} (camera) and {@link attachImage} (gallery/files):
+   * show the one-time Google notice on first use, obtain the image via `source`, then (on >=1 item) route
+   * to the multi-item review list. A single item still lands in review so the user confirms before
+   * committing. A 503/error degrades gracefully: snackbar steer, fields stay usable. The image is only
+   * read to identify the food — it is never stored.
+   */
+  private async runPhotoMeal(source: () => Promise<ImageRequest | null>): Promise<void> {
     if (!this.canUseAi || this.photoLoading()) return;
     if (!(await confirmPhotoNotice())) return; // declined the privacy notice → abort, nothing sent.
     let image;
     try {
-      image = await captureImage();
+      image = await source();
     } catch {
       this.snack.open('Could not read that image — try another photo', 'OK', { duration: 4000 });
       return;

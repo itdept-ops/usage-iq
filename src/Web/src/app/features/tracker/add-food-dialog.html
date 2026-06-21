@@ -222,7 +222,7 @@
     @if (canUseAi) {
       <div class="af-photo-actions">
         <button mat-stroked-button type="button" class="af-ai-btn" [disabled]="photoLoading()"
-                (click)="photoMeal()" aria-label="Snap or upload a meal photo to identify foods with AI">
+                (click)="photoMeal()" aria-label="Take a meal photo with the camera to identify foods with AI">
           @if (photoLoading()) {
             <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
             Analysing…
@@ -231,10 +231,15 @@
           }
         </button>
         <button mat-stroked-button type="button" class="af-ai-btn" [disabled]="photoLoading()"
+                (click)="attachImage()" aria-label="Attach an existing meal photo from your gallery to identify foods with AI">
+          <span class="af-ai-btn-label"><mat-icon aria-hidden="true">image</mat-icon> Attach image</span>
+        </button>
+        <button mat-stroked-button type="button" class="af-ai-btn" [disabled]="photoLoading()"
                 (click)="scanLabel()" aria-label="Scan a nutrition label photo to read its macros with AI">
           <span class="af-ai-btn-label"><mat-icon aria-hidden="true">document_scanner</mat-icon> Scan a label</span>
         </button>
       </div>
+      <p class="af-photo-note">Your photo is only read to identify the food — it’s never stored.</p>
       <span class="af-sr-status" role="status" aria-live="polite">{{ photoAnnounce() }}</span>
     }
 

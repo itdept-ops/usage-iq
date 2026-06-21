@@ -2002,6 +2002,28 @@ export interface ScheduleAiResult {
   notes: string | null;
 }
 
+/**
+ * One attached schedule file for "Schedule from image" (mirrors ScheduleImageFile): raw base64 (NO `data:`
+ * prefix) plus its mime. Allowed mimes are image/jpeg|png|webp OR application/pdf (PDF is scoped to this
+ * endpoint only). The bytes are passed inline to Gemini and DISCARDED — never stored.
+ */
+export interface ScheduleImageFile {
+  imageBase64: string;
+  mime: string;
+}
+
+/**
+ * The "Schedule from image" request (POST /api/family/calendar/ai/from-image; mirrors
+ * ScheduleFromImageRequest). 1–5 schedule images/PDFs to EXTRACT events from (a school calendar, a shift
+ * schedule, a sports roster, a flyer). `referenceDateUtc` anchors relative/implied dates in the document
+ * and defaults to the server's now when omitted. Creates + stores NOTHING — the returned events are
+ * confirmed by the user (same {@link ScheduleAiResult} proposal shape as Schedule-with-AI).
+ */
+export interface ScheduleFromImageRequest {
+  files: ScheduleImageFile[];
+  referenceDateUtc?: string | null;
+}
+
 /** One busy block on a member's calendar for the find-a-time helper (mirrors BusyBlockDto). */
 export interface CalendarBusyBlock {
   startUtc: string;

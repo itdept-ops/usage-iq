@@ -17,8 +17,9 @@ import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
   CalendarEvent, CalendarEventInput, CalendarRecurrence, CalendarStatus, FindTimeAiInterpreted,
-  FindTimeConsideredMember, FindTimeSlot, HouseholdMember, ScheduleAiEvent,
+  FindTimeConsideredMember, FindTimeSlot, HouseholdMember, ScheduleAiEvent, ScheduleImageFile,
 } from '../../core/models';
+import { downscaleToJpeg, readFileAsBase64 } from '../tracker/ai-image';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { EventEditorDialog, EventEditorData, EventEditorResult } from './event-editor-dialog';
 import { FindTimeData, FindTimeDialog, FindTimeResultSlot } from './find-time-dialog';
@@ -117,6 +118,19 @@ export class FamilyCalendar implements OnDestroy {
   readonly aiStatus = signal('');
   /** The AI-proposed events awaiting the user's confirmation. */
   readonly proposals = signal<ProposedEvent[]>([]);
+
+  // ---- 📄 Upload a schedule (extract events from an image / PDF) ----
+  /** True while a chosen image/PDF schedule is being prepared + sent for extraction. */
+  readonly uploadBusy = signal(false);
+  /** True while a file is being dragged over the drop zone (drives the highlight). */
+  readonly uploadDragOver = signal(false);
+
+  /** Accepted upload mimes (mirrors the endpoint's scoped allowlist: images + PDF). */
+  private static readonly UPLOAD_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
+  /** Max files per upload (mirrors the endpoint cap). */
+  private static readonly UPLOAD_MAX_FILES = 5;
+  /** Per-PDF decoded cap (~10 MB; mirrors the endpoint's MaxSchedulePdfBytes). */
+  private static readonly UPLOAD_MAX_PDF_BYTES = 10 * 1024 * 1024;
 
   // ---- ✨ Best time for X (AI free-text → find-time form → candidate slots) ----
   /** The free-text "best time" box ("a 45-min slot for the dentist next week, mornings"). */
@@ -508,6 +522,119 @@ export class FamilyCalendar implements OnDestroy {
     this.aiText.set('');
     this.aiStatus.set('');
     this.proposals.set([]);
+  }
+
+  // ---- 📄 Upload a schedule (image / PDF → extracted proposed events) ----
+
+  /** Open a throwaway multi-file picker (images + PDF), then extract events from the chosen files. */
+  triggerUpload(): void {
+    if (this.uploadBusy()) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = FamilyCalendar.UPLOAD_ACCEPT;
+    input.multiple = true;
+    input.style.display = 'none';
+    input.addEventListener('change', () => {
+      const files = input.files ? Array.from(input.files) : [];
+      input.remove();
+      if (files.length) void this.processScheduleFiles(files);
+    });
+    input.click();
+  }
+
+  /** Drag-over the drop zone: highlight + allow the drop (preventDefault so the browser doesn't open the file). */
+  onUploadDragOver(ev: DragEvent): void {
+    ev.preventDefault();
+    if (!this.uploadBusy()) this.uploadDragOver.set(true);
+  }
+
+  /** Drag leaves the drop zone — clear the highlight. */
+  onUploadDragLeave(ev: DragEvent): void {
+    ev.preventDefault();
+    this.uploadDragOver.set(false);
+  }
+
+  /** Drop image/PDF schedule files onto the zone → extract events from them. */
+  onUploadDrop(ev: DragEvent): void {
+    ev.preventDefault();
+    this.uploadDragOver.set(false);
+    if (this.uploadBusy()) return;
+    const files = ev.dataTransfer?.files ? Array.from(ev.dataTransfer.files) : [];
+    if (files.length) void this.processScheduleFiles(files);
+  }
+
+  /**
+   * Prepare the chosen files and send them for extraction. Images are downscaled to a small JPEG (reusing the
+   * tracker's {@link downscaleToJpeg}); PDFs are read as raw base64 and rejected with a friendly note when over
+   * the ~10 MB cap. The extracted events render in the SAME proposal cards as Schedule-with-AI. Creates +
+   * stores NOTHING — the upload is only read to pull out events. Degrades gracefully on 503/400/any error.
+   */
+  private async processScheduleFiles(chosen: File[]): Promise<void> {
+    if (this.uploadBusy()) return;
+
+    // Keep only supported types; cap to the endpoint's max so a friendly note beats a server 400.
+    const supported = chosen.filter(f =>
+      f.type === 'image/jpeg' || f.type === 'image/png' || f.type === 'image/webp' || f.type === 'application/pdf');
+    if (supported.length === 0) {
+      this.aiStatus.set('Please choose schedule images (JPG, PNG, WebP) or a PDF.');
+      return;
+    }
+    const tooMany = supported.length > FamilyCalendar.UPLOAD_MAX_FILES;
+    const files = tooMany ? supported.slice(0, FamilyCalendar.UPLOAD_MAX_FILES) : supported;
+
+    this.uploadBusy.set(true);
+    this.aiStatus.set('Reading your schedule…');
+    this.proposals.set([]);
+    try {
+      const payload: ScheduleImageFile[] = [];
+      for (const file of files) {
+        if (file.type === 'application/pdf') {
+          if (file.size > FamilyCalendar.UPLOAD_MAX_PDF_BYTES) {
+            this.aiStatus.set(`“${file.name}” is too large — PDFs need to be under 10 MB. Try a smaller file.`);
+            return;
+          }
+          const imageBase64 = await readFileAsBase64(file);
+          payload.push({ imageBase64, mime: 'application/pdf' });
+        } else {
+          // Downscale images to a small JPEG to stay well under the cap + cheap on the wire.
+          const img = await downscaleToJpeg(file);
+          payload.push({ imageBase64: img.imageBase64, mime: img.mimeType });
+        }
+      }
+
+      const result = await firstValueFrom(this.api.scheduleFromImage(payload));
+      const proposed = (result.events ?? []).map(ai => this.toProposed(ai));
+      this.proposals.set(proposed);
+
+      const tooManyNote = tooMany
+        ? `I read the first ${FamilyCalendar.UPLOAD_MAX_FILES} files. `
+        : '';
+      if (proposed.length === 0) {
+        this.aiStatus.set(
+          tooManyNote +
+          (result.notes?.trim() || "I couldn't find any events in that. Try a clearer photo or a schedule PDF."));
+      } else {
+        const n = proposed.length;
+        this.aiStatus.set(
+          tooManyNote +
+          (result.notes?.trim() ? result.notes!.trim() + ' ' : '') +
+          `Review ${n === 1 ? 'the event' : `these ${n} events`} below, then add ${n === 1 ? 'it' : 'them'} to your calendar.`);
+      }
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      if (status === 503) {
+        this.aiStatus.set(
+          "AI scheduling isn't available right now. You can add the event yourself with the Event button.");
+      } else if (status === 400) {
+        this.aiStatus.set(this.messageOf(e,
+          'That file didn’t work — attach up to 5 schedule images (under 5 MB each) or PDFs (under 10 MB).'));
+      } else {
+        this.aiStatus.set(this.messageOf(e,
+          "I couldn't read that schedule just now. Please try again, or add the event manually."));
+      }
+    } finally {
+      this.uploadBusy.set(false);
+    }
   }
 
   // ---- ✨ Best time for X ----

@@ -413,4 +413,177 @@ public class FamilyCalendarTests(WebAppFactory factory)
             new { text = "a 45-min slot for a dentist next week, mornings" });
         res.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
+
+    // =====================================================================================
+    // AI FROM-IMAGE — gated by family.use; its OWN validator (allows PDF, unlike the global food path);
+    // 400 for empty/too-many/oversized/bad-mime; valid PDF reaches the Gemini call (503 unconfigured);
+    // and it STORES NOTHING + CREATES NOTHING.
+    // =====================================================================================
+
+    private static string B64(int bytes) => Convert.ToBase64String(new byte[bytes]);
+
+    /// <summary>Total calendar-connection rows (the only thing this endpoint could conceivably persist —
+    /// it must persist NONE). Used to prove the request writes nothing.</summary>
+    private async Task<int> CalendarConnectionCount()
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        return await db.GoogleCalendarConnections.AsNoTracking().CountAsync();
+    }
+
+    [Fact]
+    public async Task FromImage_requires_family_use()
+    {
+        var (_, plain, _) = await ProvisionUser("dashboard.view");
+        var res = await plain.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { new { imageBase64 = B64(64), mime = "image/png" } },
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task FromImage_requires_authentication()
+    {
+        var anon = factory.CreateClient();
+        var res = await anon.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { new { imageBase64 = B64(64), mime = "image/png" } },
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task FromImage_returns_400_for_no_files()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        (await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new { files = Array.Empty<object>() }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new { }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task FromImage_returns_400_for_too_many_files()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var f = new { imageBase64 = B64(64), mime = "image/png" };
+        var res = await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { f, f, f, f, f, f }, // 6 > cap of 5
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task FromImage_returns_400_for_disallowed_mime()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var res = await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { new { imageBase64 = B64(64), mime = "text/plain" } },
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task FromImage_returns_400_for_oversized_image()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // ~6 MB decoded as an IMAGE — over the 5 MB image cap (a PDF would be allowed up to 10 MB).
+        var res = await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { new { imageBase64 = B64(6 * 1024 * 1024), mime = "image/jpeg" } },
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task FromImage_returns_400_for_oversized_pdf()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // ~11 MB decoded PDF — over the 10 MB PDF cap.
+        var res = await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { new { imageBase64 = B64(11 * 1024 * 1024), mime = "application/pdf" } },
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task FromImage_returns_400_when_total_exceeds_request_cap()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // Two 9 MB PDFs each pass the per-file (10 MB) cap, but together exceed the 15 MB request cap.
+        var pdf = new { imageBase64 = B64(9 * 1024 * 1024), mime = "application/pdf" };
+        var res = await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { pdf, pdf },
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task FromImage_accepts_a_valid_pdf_in_validation_then_503_when_gemini_unconfigured()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // A small, well-formed PDF PASSES this endpoint's validation (proving PDF is allowed here) and reaches
+        // the Gemini call — which, unconfigured in the test host, degrades to 503 (NOT 400, NOT 500). If
+        // validation had rejected the PDF we'd see a 400 instead.
+        var res = await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { new { imageBase64 = B64(256), mime = "application/pdf" } },
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task FromImage_accepts_a_valid_image_then_503_when_gemini_unconfigured()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var res = await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { new { imageBase64 = B64(256), mime = "image/png" } },
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task FromImage_creates_no_event_and_persists_nothing()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var before = await CalendarConnectionCount();
+
+        // Both a 400 (bad mime) and the 503 (valid file, Gemini off) paths must write NOTHING. The endpoint
+        // creates no calendar event and persists no connection/image row either way.
+        (await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { new { imageBase64 = B64(64), mime = "text/plain" } },
+        })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        (await owner.PostAsJsonAsync("/api/family/calendar/ai/from-image", new
+        {
+            files = new[] { new { imageBase64 = B64(256), mime = "application/pdf" } },
+        })).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+
+        (await CalendarConnectionCount()).Should().Be(before);
+    }
 }

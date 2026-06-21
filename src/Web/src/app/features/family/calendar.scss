@@ -127,6 +127,41 @@
   color: var(--tech-text-secondary);
 }
 
+/* 📄 Upload-a-schedule drop zone (image / PDF → extracted events). */
+.cal-upload {
+  margin-top: var(--tech-space-3, 12px);
+  padding: var(--tech-space-3, 12px);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--tech-space-2, 8px) var(--tech-space-3, 12px);
+  border: 1px dashed var(--tech-border);
+  border-radius: var(--tech-r-control);
+  background: color-mix(in srgb, var(--tech-accent) 4%, transparent);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.cal-upload--drag {
+  border-color: var(--tech-accent);
+  border-style: solid;
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+}
+
+.cal-upload__btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+}
+
+.cal-upload__hint {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-tertiary);
+}
+
 .cal-ai__cards {
   list-style: none;
   margin: var(--tech-space-3, 12px) 0 0;
