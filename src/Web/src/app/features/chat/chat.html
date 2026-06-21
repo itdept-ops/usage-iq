@@ -144,10 +144,45 @@
             }
           </div>
         </div>
+
+        <!-- ✨ Catch me up: summarise this channel's recent activity (read-only; writes nothing). -->
+        <button type="button" class="cx-ai-btn cx-catchup-btn" (click)="catchMeUp()"
+                [disabled]="catchUpLoading()"
+                matTooltip="Summarise what you missed" aria-label="Catch me up on this conversation">
+          @if (catchUpLoading()) {
+            <span class="cx-spinner cx-spinner--sm" aria-hidden="true"></span>
+          } @else {
+            <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+          }
+          <span class="cx-ai-btn__label">Catch me up</span>
+        </button>
       </header>
 
       <div #scroller class="cx-msgs" (scroll)="onScroll()"
            role="log" aria-label="Messages" aria-live="polite" aria-relevant="additions">
+        <!-- ✨ Catch-me-up recap card (dismissible). Falls back to a calmer style when the AI was off. -->
+        @if (catchUpSummary(); as summary) {
+          <article class="cx-catchup" [class.cx-catchup--plain]="catchUpPlain()"
+                   aria-label="Conversation recap">
+            <mat-icon class="cx-catchup__spark" aria-hidden="true">
+              {{ catchUpPlain() ? 'forum' : 'auto_awesome' }}
+            </mat-icon>
+            <div class="cx-catchup__body">
+              <p class="cx-catchup__eyebrow">{{ catchUpPlain() ? 'Recent activity' : 'Caught you up' }}</p>
+              <p class="cx-catchup__text" aria-live="polite">{{ summary }}</p>
+            </div>
+            <button mat-icon-button class="cx-catchup__close" (click)="dismissCatchUp()"
+                    matTooltip="Dismiss" aria-label="Dismiss recap">
+              <mat-icon>close</mat-icon>
+            </button>
+          </article>
+        }
+        @if (catchUpError(); as err) {
+          <p class="cx-ai-note cx-ai-note--inline" role="alert">
+            <mat-icon aria-hidden="true">cloud_off</mat-icon> {{ err }}
+          </p>
+        }
+
         @if (loadingHistory()) {
           <div class="cx-loading-older"><span class="cx-spinner"></span> Loading earlier messages…</div>
         }
@@ -274,7 +309,83 @@
               }
             </div>
           }
+          <!-- ✨ Suggested-reply chips (tapping fills the composer — never sends). -->
+          @if (replySuggestions().length) {
+            <div class="cx-replies" aria-label="Suggested replies">
+              <span class="cx-replies__spark" aria-hidden="true"><mat-icon>auto_awesome</mat-icon></span>
+              <div class="cx-replies__chips">
+                @for (r of replySuggestions(); track $index) {
+                  <button type="button" class="cx-reply-chip" (click)="useReply(r)">{{ r }}</button>
+                }
+              </div>
+              <button mat-icon-button class="cx-replies__close" (click)="dismissReplies()"
+                      matTooltip="Dismiss" aria-label="Dismiss suggestions">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          }
+
+          <!-- ✨ "Draft from a prompt" sub-input (the compose-menu "Draft" action expands this). -->
+          @if (composePromptOpen()) {
+            <div class="cx-compose__prompt">
+              <textarea class="cx-compose__prompt-input" rows="1"
+                        [ngModel]="composePrompt()" (ngModelChange)="composePrompt.set($event)"
+                        (keydown)="onComposePromptKeydown($event)"
+                        placeholder="Describe the message you want… (Enter to draft, Esc to close)"
+                        aria-label="Describe the message to draft"></textarea>
+              <button mat-flat-button color="primary" class="cx-compose__prompt-go"
+                      (click)="runDraftFromPrompt()" [disabled]="composeBusy() || !composePrompt().trim()">
+                @if (composeBusy()) {
+                  <span class="cx-spinner cx-spinner--sm" aria-hidden="true"></span>
+                } @else {
+                  <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+                }
+                <span>Draft</span>
+              </button>
+            </div>
+          }
+
+          <!-- A gentle inline notice for replies / compose (503 unavailable, empty prompt, etc.). -->
+          @if (repliesError(); as err) {
+            <p class="cx-ai-note" role="alert"><mat-icon aria-hidden="true">cloud_off</mat-icon> {{ err }}</p>
+          }
+          @if (composeError(); as err) {
+            <p class="cx-ai-note" role="alert"><mat-icon aria-hidden="true">cloud_off</mat-icon> {{ err }}</p>
+          }
+
           <div class="cx-composer__row">
+            <!-- ✨ Compose menu: suggest replies + draft/rewrite/shorten/friendlier/formal (all fill, none send). -->
+            <button mat-icon-button type="button" class="cx-ai-trigger"
+                    [matMenuTriggerFor]="composeMenu" [disabled]="composeBusy()"
+                    matTooltip="AI writing help" aria-label="AI writing help">
+              @if (composeBusy() || repliesLoading()) {
+                <span class="cx-spinner cx-spinner--sm" aria-hidden="true"></span>
+              } @else {
+                <mat-icon>auto_awesome</mat-icon>
+              }
+            </button>
+            <mat-menu #composeMenu="matMenu" class="cx-ai-menu" xPosition="before">
+              <button mat-menu-item (click)="suggestReplies()" [disabled]="repliesLoading()">
+                <mat-icon>quickreply</mat-icon><span>Suggest replies</span>
+              </button>
+              <button mat-menu-item (click)="toggleComposePrompt()">
+                <mat-icon>edit_note</mat-icon><span>Draft from a prompt</span>
+              </button>
+              <div class="cx-ai-menu__label" mat-menu-item disabled>Refine my draft</div>
+              <button mat-menu-item (click)="composeFromDraft('rewrite')" [disabled]="!draft().trim()">
+                <mat-icon>autorenew</mat-icon><span>Rewrite</span>
+              </button>
+              <button mat-menu-item (click)="composeFromDraft('shorten')" [disabled]="!draft().trim()">
+                <mat-icon>compress</mat-icon><span>Shorten</span>
+              </button>
+              <button mat-menu-item (click)="composeFromDraft('friendlier')" [disabled]="!draft().trim()">
+                <mat-icon>sentiment_satisfied</mat-icon><span>Friendlier</span>
+              </button>
+              <button mat-menu-item (click)="composeFromDraft('formal')" [disabled]="!draft().trim()">
+                <mat-icon>business_center</mat-icon><span>More formal</span>
+              </button>
+            </mat-menu>
+
             <textarea #composer class="cx-composer__input" rows="1"
                       [ngModel]="draft()" (ngModelChange)="onDraftChange($event)"
                       (keydown)="onComposerKeydown($event)" (blur)="closeMentionsSoon()"

@@ -2,7 +2,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatContactDto, ChatMessageDto, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
+  AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatMessageDto, ChatRepliesResult, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
   FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
   HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
@@ -340,6 +340,37 @@ export class Api {
    */
   toggleReaction(messageId: number, emoji: string): Observable<ReactionGroupDto[]> {
     return this.http.post<ReactionGroupDto[]>(`${this.base}/chat/messages/${messageId}/reactions`, { emoji });
+  }
+
+  // ---- Chat AI assists (Gemini-backed; catch-up always 200, replies/compose 503-graceful) ----
+
+  /**
+   * "✨ Catch me up" — summarise a channel's recent messages (read-only; WRITES NOTHING). Gated
+   * chat.read + membership (non-member 404). ALWAYS 200: a deterministic plain floor covers an
+   * unavailable Gemini (`fellBackToPlain` = true), so this never 503s.
+   */
+  chatCatchUp(channelId: number): Observable<ChatCatchUpResult> {
+    return this.http.post<ChatCatchUpResult>(`${this.base}/chat/channels/${channelId}/ai/catch-up`, {});
+  }
+
+  /**
+   * "✨ Suggest replies" — 2-4 reply suggestions for the caller (read-only; SENDS NOTHING). Gated
+   * chat.send + membership (non-member 404). 503 when Gemini is unavailable (handle gracefully — the
+   * affordance just steps aside).
+   */
+  chatSuggestReplies(channelId: number): Observable<ChatRepliesResult> {
+    return this.http.post<ChatRepliesResult>(`${this.base}/chat/channels/${channelId}/ai/replies`, {});
+  }
+
+  /**
+   * "✨ Compose assist" — draft/rewrite/shorten/friendlier/formal the composer text (SENDS NOTHING).
+   * Gated chat.send. 400 when there's nothing to work from (empty prompt AND empty draft) or an unknown
+   * action; 503 when Gemini is unavailable. The result fills the composer; the user sends via Send.
+   */
+  chatCompose(action: ChatComposeAction, opts: { prompt?: string; currentDraft?: string } = {}): Observable<ChatComposeResult> {
+    return this.http.post<ChatComposeResult>(`${this.base}/chat/ai/compose`, {
+      action, prompt: opts.prompt ?? '', currentDraft: opts.currentDraft ?? '',
+    });
   }
 
   // ---- Chat contacts / circles (admin-managed; the picker draws from these) ----

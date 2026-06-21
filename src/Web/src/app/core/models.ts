@@ -628,6 +628,51 @@ export interface ChatContactDto {
   picture?: string | null;
 }
 
+// ---- Chat AI assists (Gemini-backed; gated chat.read/chat.send, graceful on 503) ----
+
+/**
+ * "✨ Catch me up" result (POST /api/chat/channels/{id}/ai/catch-up). The server ALWAYS returns 200:
+ * a deterministic plain floor (`fellBackToPlain` = true, calmer styling, no AI flourish) covers an
+ * unconfigured/failed Gemini, so this never 503s. The summary is built from message BODY + sender
+ * display NAME only — never an email (email-privacy). Mirrors the catch-up response shape.
+ */
+export interface ChatCatchUpResult {
+  /** The recap of the channel's recent activity (or the deterministic plain floor when fell back). */
+  summary: string;
+  /** True when Gemini was unavailable and the deterministic plain summary was returned instead. */
+  fellBackToPlain: boolean;
+}
+
+/**
+ * "✨ Suggest replies" result (POST /api/chat/channels/{id}/ai/replies). 2-4 short reply suggestions
+ * for the caller; tapping a chip fills the composer (it never sends — the user reviews + hits Send).
+ * Gated chat.send + membership; 503-graceful (no floor — the affordance just steps aside).
+ */
+export interface ChatRepliesResult {
+  replies: string[];
+}
+
+/** The compose-assist actions the /api/chat/ai/compose endpoint accepts (mirrors the server's set). */
+export type ChatComposeAction = 'draft' | 'rewrite' | 'shorten' | 'friendlier' | 'formal';
+
+/**
+ * Compose-assist request (POST /api/chat/ai/compose). `draft` starts from a free-text prompt; the
+ * other actions reshape the current composer draft. 400 when there's nothing to work from (empty
+ * prompt AND empty draft) or an unknown action; 503-graceful otherwise. Mirrors ComposeAssistRequest.
+ */
+export interface ChatComposeRequest {
+  /** The free-text instruction (only used by the "draft" action). */
+  prompt?: string;
+  /** The current composer text (used by rewrite/shorten/friendlier/formal). */
+  currentDraft?: string;
+  action: ChatComposeAction;
+}
+
+/** Compose-assist result (POST /api/chat/ai/compose): the composed text to drop into the composer. */
+export interface ChatComposeResult {
+  body: string;
+}
+
 // ---- Food & fitness tracker (Phase 2) ----
 
 /** Tracker macro/exercise goal preset (mirrors the backend goal enum names). */

@@ -130,6 +130,70 @@ public static class ChatEndpoints
             return Results.Ok(dtos);
         }).RequirePermission(Permissions.ChatRead);
 
+        // ---- AI: "Catch me up" — summarise the channel's recent messages (read-only) ----
+        // Gated chat.read + MEMBERSHIP (non-member 404). Builds a names-only transcript (NO email; deleted
+        // bodies excluded) and asks Gemini to summarise. ALWAYS 200: a deterministic plain floor covers an
+        // unconfigured/failed Gemini (fellBackToPlain=true) — this route NEVER 503/500s. WRITES NOTHING.
+        g.MapPost("/channels/{id:int}/ai/catch-up", async (
+            int id, CurrentUserAccessor me, UsageDbContext db, GeminiService gemini, CancellationToken ct) =>
+        {
+            var user = (await me.GetUserAsync(ct))!;
+            if (!await IsMemberAsync(db, id, user.Email, ct)) return Results.NotFound();
+
+            var (channelName, ordered, namesNewestFirst) = await LoadChatContextAsync(db, id, ct);
+
+            // Try Gemini; on any miss fall back to the guaranteed deterministic plain floor.
+            var summary = await gemini.SummarizeChatAsync(ordered, channelName, ct);
+            if (!string.IsNullOrWhiteSpace(summary))
+                return Results.Ok(new { summary, fellBackToPlain = false });
+
+            return Results.Ok(new { summary = PlainCatchUp(namesNewestFirst), fellBackToPlain = true });
+        }).RequirePermission(Permissions.ChatRead).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
+        // ---- AI: "Smart replies" — suggest reply options for the caller (read-only; SENDS NOTHING) ----
+        // Gated chat.send + MEMBERSHIP (non-member 404). Returns 2-4 suggestions for the composer; the user
+        // sends via the EXISTING path. 503-graceful (no floor — empty/unavailable is fine). WRITES NOTHING.
+        g.MapPost("/channels/{id:int}/ai/replies", async (
+            int id, CurrentUserAccessor me, UsageDbContext db, GeminiService gemini, CancellationToken ct) =>
+        {
+            // Membership is checked FIRST so a non-member always gets 404 (existence never leaked), even when
+            // Gemini is unconfigured — the 503 must never reveal whether the channel exists.
+            var user = (await me.GetUserAsync(ct))!;
+            if (!await IsMemberAsync(db, id, user.Email, ct)) return Results.NotFound();
+            if (!gemini.IsConfigured) return AiUnavailable();
+
+            var (_, ordered, _) = await LoadChatContextAsync(db, id, ct);
+            var myName = (await SenderInfoAsync(db, user.Email, ct)).Name;
+
+            var replies = await gemini.SuggestRepliesAsync(ordered, myName, ct);
+            if (replies is null) return AiUnavailable();
+            return Results.Ok(new { replies });
+        }).RequirePermission(Permissions.ChatSend).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
+        // ---- AI: "Compose assist" — draft/rewrite/shorten/friendlier/formal a message (SENDS NOTHING) ----
+        // Gated chat.send (no channel — the composer hasn't picked one yet). Returns the composed text for the
+        // composer; the user sends via the EXISTING path. 400 when there's nothing to work from (empty prompt
+        // AND empty draft) or an unknown action; 503-graceful otherwise. WRITES NOTHING.
+        g.MapPost("/ai/compose", async (
+            ComposeAssistRequest req, GeminiService gemini, CancellationToken ct) =>
+        {
+            var action = (req.Action ?? "").Trim().ToLowerInvariant();
+            if (!ChatComposeActions.Contains(action))
+                return Results.BadRequest(new { message = "Unknown compose action." });
+
+            var prompt = (req.Prompt ?? "").Trim();
+            var draft = (req.CurrentDraft ?? "").Trim();
+            var hasSomething = action == "draft" ? prompt.Length > 0 : draft.Length > 0;
+            if (!hasSomething)
+                return Results.BadRequest(new { message = "Type a prompt or a draft to work from." });
+
+            if (!gemini.IsConfigured) return AiUnavailable();
+
+            var body = await gemini.ComposeChatAsync(prompt, draft, action, ct);
+            if (string.IsNullOrWhiteSpace(body)) return AiUnavailable();
+            return Results.Ok(new { body });
+        }).RequirePermission(Permissions.ChatSend).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
         // ---- Send a message (persist, broadcast, fan out notifications) ----
         g.MapPost("/channels/{id:int}/messages", async (
             int id, SendMessageRequest req, CurrentUserAccessor me, UsageDbContext db,
@@ -504,4 +568,89 @@ public static class ChatEndpoints
             ? UnknownSender
             : new ChatNotificationService.SenderIdentity(u.Id, string.IsNullOrEmpty(u.Name) ? "Unknown user" : u.Name, u.Picture);
     }
+
+    // ===== Chat-AI helpers (catch-up / smart-replies) =====
+
+    /// <summary>How many newest messages the chat-AI features read for context.</summary>
+    private const int ChatAiContextSize = 60;
+
+    /// <summary>The compose actions the /ai/compose endpoint accepts (mirrors the service's set).</summary>
+    private static readonly IReadOnlySet<string> ChatComposeActions =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "draft", "rewrite", "shorten", "friendlier", "formal" };
+
+    /// <summary>The compose-assist request: a free-text prompt, the current composer draft, and the action.</summary>
+    public sealed record ComposeAssistRequest(string? Prompt, string? CurrentDraft, string? Action);
+
+    /// <summary>
+    /// Load the chat context the AI features summarise/reply from: the channel display name (for context only)
+    /// plus the newest <see cref="ChatAiContextSize"/> non-deleted messages as (display NAME, body) pairs —
+    /// NEVER an email (email-privacy). Soft-deleted messages (null body) are excluded. Returns the messages
+    /// both oldest-first (for the model, so the conversation reads in order) and newest-first names (for the
+    /// deterministic plain floor "N messages from A, B and C.").
+    /// </summary>
+    private static async Task<(string? channelName,
+        IReadOnlyList<(string name, string body)> oldestFirst,
+        IReadOnlyList<string> namesNewestFirst)> LoadChatContextAsync(
+        UsageDbContext db, int channelId, CancellationToken ct)
+    {
+        var channelName = await db.ChatChannels.AsNoTracking()
+            .Where(c => c.Id == channelId).Select(c => c.Name).FirstOrDefaultAsync(ct);
+
+        // Newest ChatAiContextSize, non-deleted only (body non-null). DTO build is the same email-privacy path
+        // used everywhere: the sender is resolved to an AppUser display NAME, never the raw email.
+        var rows = await db.ChatMessages.AsNoTracking()
+            .Where(m => m.ChannelId == channelId && m.DeletedUtc == null && m.Body != null)
+            .OrderByDescending(m => m.Id)
+            .Take(ChatAiContextSize)
+            .Select(m => new { m.SenderEmail, m.Body })
+            .ToListAsync(ct);
+
+        var senders = await SenderLookupAsync(db, rows.Select(r => r.SenderEmail), ct);
+        string NameFor(string email) => senders.GetValueOrDefault(email, UnknownSender).Name;
+
+        // rows are newest-first; the model wants oldest-first so the conversation flows naturally.
+        var oldestFirst = rows
+            .AsEnumerable().Reverse()
+            .Select(r => (name: NameFor(r.SenderEmail), body: r.Body ?? ""))
+            .Where(x => x.body.Length > 0)
+            .ToList();
+
+        var namesNewestFirst = rows.Select(r => NameFor(r.SenderEmail)).ToList();
+
+        return (channelName, oldestFirst, namesNewestFirst);
+    }
+
+    /// <summary>
+    /// The deterministic plain floor for "catch me up" when Gemini is off/failed: "N messages from A, B and
+    /// C." built from the newest names only (distinct, in most-recent order, at most three named). Always a
+    /// sensible non-empty string so the endpoint can return 200 without ever calling the model.
+    /// </summary>
+    private static string PlainCatchUp(IReadOnlyList<string> namesNewestFirst)
+    {
+        var count = namesNewestFirst.Count;
+        if (count == 0) return "Here's what you missed: no new messages.";
+
+        var distinct = new List<string>();
+        foreach (var n in namesNewestFirst)
+        {
+            var name = string.IsNullOrWhiteSpace(n) ? "Unknown user" : n.Trim();
+            if (!distinct.Contains(name)) distinct.Add(name);
+            if (distinct.Count >= 3) break;
+        }
+
+        var who = distinct.Count switch
+        {
+            1 => distinct[0],
+            2 => $"{distinct[0]} and {distinct[1]}",
+            _ => $"{distinct[0]}, {distinct[1]} and {distinct[2]}",
+        };
+        var msgWord = count == 1 ? "message" : "messages";
+        return $"Here's what you missed: {count} {msgWord} from {who}.";
+    }
+
+    /// <summary>503 (never 500) when a chat-AI feature can't run — Gemini unconfigured or the call failed.</summary>
+    private static IResult AiUnavailable() => Results.Problem(
+        title: "Chat AI is not available.",
+        detail: "Chat AI is not available right now. You can do this manually.",
+        statusCode: StatusCodes.Status503ServiceUnavailable);
 }

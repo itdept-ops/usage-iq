@@ -281,6 +281,8 @@
   border-top-color: var(--tech-accent);
   animation: cx-spin 0.7s linear infinite;
   flex: 0 0 auto;
+
+  &--sm { width: 16px; height: 16px; }
 }
 @keyframes cx-spin { to { transform: rotate(360deg); } }
 
@@ -603,6 +605,194 @@
   p { margin: 0; font-size: var(--tech-fs-body); }
 }
 
+/* ───────────────────────── ✨ Chat AI assists ─────────────────────────
+   Catch-me-up button + recap card, suggested-reply chips, and the compose menu/prompt. */
+
+/* The pill button in the conversation header ("Catch me up") and any shared AI affordance. */
+.cx-ai-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 40%, var(--tech-border));
+  background: color-mix(in srgb, var(--tech-accent) 10%, transparent);
+  color: var(--tech-accent);
+  font: inherit;
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  &:hover:not(:disabled) { background: color-mix(in srgb, var(--tech-accent) 18%, transparent); }
+  &:focus-visible { outline: none; box-shadow: var(--tech-glow-blue); }
+  &:disabled { opacity: 0.65; cursor: default; }
+}
+
+/* Catch-me-up recap card pinned at the top of the message log. */
+.cx-catchup {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  margin: 4px 0 12px;
+  padding: 14px 40px 14px 14px;
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 36%, var(--tech-border));
+  border-radius: var(--tech-radius, 12px);
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent) 14%, transparent), transparent 55%),
+    var(--tech-panel-raised);
+
+  /* The deterministic plain fallback drops the accent flourish to a calmer surface. */
+  &--plain {
+    border-color: var(--tech-border);
+    background: var(--tech-panel-raised);
+    .cx-catchup__spark { color: var(--tech-text-secondary); }
+  }
+
+  &__spark { flex: 0 0 auto; color: var(--tech-accent); width: 22px; height: 22px; font-size: 22px; }
+  &__body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  &__eyebrow {
+    margin: 0;
+    font-size: var(--tech-fs-label);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--tech-accent);
+  }
+  &--plain &__eyebrow { color: var(--tech-text-secondary); }
+  &__text {
+    margin: 0;
+    font-size: var(--tech-fs-body);
+    line-height: 1.5;
+    color: var(--tech-text);
+    white-space: pre-line;
+    word-break: break-word;
+  }
+  &__close {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 30px;
+    height: 30px;
+    mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--tech-text-tertiary); }
+  }
+}
+
+/* A gentle inline notice (AI unavailable / empty prompt). Sits above the composer, or inline in the log. */
+.cx-ai-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: var(--tech-r-control);
+  background: color-mix(in srgb, var(--tech-warn, #d8a200) 12%, transparent);
+  color: var(--tech-text-secondary);
+  font-size: var(--tech-fs-label);
+  line-height: 1.4;
+  mat-icon { flex: 0 0 auto; font-size: 16px; width: 16px; height: 16px; color: var(--tech-warn, #d8a200); }
+
+  &--inline { margin: 4px 0 10px; }
+}
+
+/* Suggested-reply chips above the composer. */
+.cx-replies {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+
+  &__spark { flex: 0 0 auto; margin-top: 4px; color: var(--tech-accent); mat-icon { font-size: 18px; width: 18px; height: 18px; } }
+  &__chips { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+  &__close {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--tech-text-tertiary); }
+  }
+}
+
+.cx-reply-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 36%, var(--tech-border));
+  background: color-mix(in srgb, var(--tech-accent) 8%, var(--tech-panel-raised));
+  color: var(--tech-text);
+  font: inherit;
+  font-size: var(--tech-fs-body);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover { background: color-mix(in srgb, var(--tech-accent) 18%, var(--tech-panel-raised)); border-color: var(--tech-accent); }
+  &:focus-visible { outline: none; box-shadow: var(--tech-glow-blue); border-color: transparent; }
+}
+
+/* The ✨ compose-menu trigger sits at the left of the composer row, matching the Send button height. */
+.cx-ai-trigger.mat-mdc-icon-button {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  align-self: flex-end;
+  mat-icon { color: var(--tech-accent); }
+  .cx-spinner { margin: 0 auto; }
+}
+
+/* The "Draft from a prompt" sub-input that the compose menu expands. */
+.cx-compose__prompt {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+
+  &-input {
+    flex: 1 1 auto;
+    min-height: 42px;
+    max-height: 120px;
+    resize: none;
+    padding: 11px 12px;
+    border-radius: var(--tech-r-control);
+    border: 1px solid color-mix(in srgb, var(--tech-accent) 40%, var(--tech-border));
+    background: var(--tech-input);
+    color: var(--tech-text);
+    font: inherit;
+    font-size: var(--tech-fs-body);
+    line-height: 1.5;
+    &::placeholder { color: var(--tech-text-tertiary); }
+    &:focus-visible { outline: none; box-shadow: var(--tech-glow-blue); border-color: transparent; }
+  }
+  &-go.mat-mdc-unelevated-button {
+    flex: 0 0 auto;
+    height: 42px;
+    border-radius: var(--tech-r-control);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    .cx-spinner { margin: 0; }
+  }
+}
+
+/* A non-interactive section label inside the compose menu. */
+.cx-ai-menu .cx-ai-menu__label.mat-mdc-menu-item {
+  min-height: 0;
+  padding-top: 8px;
+  padding-bottom: 2px;
+  font-size: var(--tech-fs-label);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--tech-text-tertiary);
+  opacity: 1;
+  pointer-events: none;
+}
+
 /* ───────────────────────── Responsive: single-pane on phones ─────────────────────────
    Below 760px the two panes overlay: the sidebar shows until a conversation is picked,
    then the conversation pane takes over (with a Back button). */
@@ -628,6 +818,15 @@
     width: 44px;
     height: 44px;
   }
+
+  /* On phones the header is tight — keep the ✨ recap affordance as an icon-only pill. */
+  .cx-catchup-btn {
+    padding: 0;
+    width: 36px;
+    justify-content: center;
+    .cx-ai-btn__label { display: none; }
+  }
+  .cx-reply-chip { padding: 9px 14px; }
   .cx-msg__tool.mat-mdc-icon-button {
     width: 44px;
     height: 44px;

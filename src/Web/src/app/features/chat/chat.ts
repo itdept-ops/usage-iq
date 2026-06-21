@@ -16,7 +16,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { ChatRealtime } from '../../core/chat-realtime';
-import { ChatChannelDto, ChatContactDto, ChatMember, ChatMessageDto, PERM, Presence, ReactionGroupDto } from '../../core/models';
+import { ChatChannelDto, ChatComposeAction, ChatContactDto, ChatMember, ChatMessageDto, PERM, Presence, ReactionGroupDto } from '../../core/models';
 import { timeAgo } from '../../shared/format';
 import { ChatCreateData, ChatCreateDialog, ChatPickPerson } from './chat-create-dialog';
 
@@ -179,6 +179,33 @@ export class Chat implements AfterViewChecked, OnDestroy {
   readonly editingId = signal<number | null>(null);
   readonly editDraft = signal('');
 
+  // =========================================================================
+  // ✨ Chat AI assists (Gemini-backed; graceful, aria-live, NEVER auto-sends)
+  // =========================================================================
+
+  // ---- "Catch me up": a dismissible recap card at the top of the thread ----
+  readonly catchUpLoading = signal(false);
+  /** The recap text for the active channel (null = no card shown). */
+  readonly catchUpSummary = signal<string | null>(null);
+  /** True when the recap fell back to the deterministic plain floor (calmer, no AI flourish). */
+  readonly catchUpPlain = signal(false);
+  /** A gentle inline notice when catch-up couldn't be reached (network blip only — it never 503s). */
+  readonly catchUpError = signal<string | null>(null);
+
+  // ---- "Suggest replies": 2-4 reply chips above the composer ----
+  readonly repliesLoading = signal(false);
+  readonly replySuggestions = signal<string[]>([]);
+  /** A gentle inline notice when replies are unavailable (e.g. Gemini off → 503). */
+  readonly repliesError = signal<string | null>(null);
+
+  // ---- "✨" compose menu: draft from a prompt / rewrite / shorten / friendlier / formal ----
+  readonly composeBusy = signal(false);
+  /** A gentle inline notice when compose is unavailable / the prompt was empty. */
+  readonly composeError = signal<string | null>(null);
+  /** The "draft from a prompt" sub-input is open (the other actions reshape the existing draft in place). */
+  readonly composePromptOpen = signal(false);
+  readonly composePrompt = signal('');
+
   // ---- emoji reactions ----
   /** The curated emoji set the react picker offers (no external dependency). */
   readonly reactionEmojis = REACTION_EMOJIS;
@@ -276,6 +303,7 @@ export class Chat implements AfterViewChecked, OnDestroy {
     this.stopTypingNow(); // flush typing for the OLD channel so it doesn't leak into the new one
     this.cancelEdit();
     this.closeMentions();
+    this.resetAiAssists(); // AI recap / reply chips / compose prompt are per-channel — clear on switch
     this.selectedId.set(ch.id);
     this.lastChannelId = ch.id;
     this.pendingScrollBottom = true;
@@ -658,6 +686,193 @@ export class Chat implements AfterViewChecked, OnDestroy {
   /** Pick an emoji from the curated picker: toggle it (the menu closes itself). */
   pickReaction(m: ChatMessageDto, emoji: string): void {
     this.toggleReaction(m, emoji);
+  }
+
+  // =========================================================================
+  // ✨ Chat AI assists — catch-up / suggest-replies / compose. All graceful on
+  // failure; none of them ever sends — the user acts via the existing Send path.
+  // =========================================================================
+
+  /** Clear every AI-assist surface (called on channel switch + when a card is dismissed). */
+  private resetAiAssists(): void {
+    this.catchUpLoading.set(false);
+    this.catchUpSummary.set(null);
+    this.catchUpPlain.set(false);
+    this.catchUpError.set(null);
+    this.repliesLoading.set(false);
+    this.replySuggestions.set([]);
+    this.repliesError.set(null);
+    this.composeBusy.set(false);
+    this.composeError.set(null);
+    this.composePromptOpen.set(false);
+    this.composePrompt.set('');
+  }
+
+  /**
+   * "✨ Catch me up" — fetch a recap of the active channel and show it in a dismissible card at the top
+   * of the thread. The endpoint always 200s (a deterministic plain floor covers an unavailable Gemini),
+   * so the only failure is a network blip, surfaced as a gentle inline notice.
+   */
+  catchMeUp(): void {
+    const id = this.selectedId();
+    if (id == null || this.catchUpLoading()) return;
+    this.catchUpError.set(null);
+    this.catchUpLoading.set(true);
+    this.api.chatCatchUp(id).subscribe({
+      next: res => {
+        // Guard against a late response after the user switched channels.
+        if (this.selectedId() !== id) return;
+        this.catchUpSummary.set(res.summary?.trim() || 'Nothing new to catch up on.');
+        this.catchUpPlain.set(!!res.fellBackToPlain);
+        this.catchUpLoading.set(false);
+      },
+      error: () => {
+        if (this.selectedId() !== id) return;
+        this.catchUpError.set("Couldn't reach the recap just now. Please try again in a moment.");
+        this.catchUpLoading.set(false);
+      },
+    });
+  }
+
+  /** Dismiss the catch-up card. */
+  dismissCatchUp(): void {
+    this.catchUpSummary.set(null);
+    this.catchUpPlain.set(false);
+    this.catchUpError.set(null);
+  }
+
+  /**
+   * "✨ Suggest replies" — fetch 2-4 reply suggestions for the active channel. Gemini-gated, so a 503
+   * (assist unavailable) steps aside gracefully with a gentle notice. Tapping a chip fills the composer
+   * (it never sends — see {@link useReply}).
+   */
+  suggestReplies(): void {
+    const id = this.selectedId();
+    if (id == null || !this.canSend() || this.repliesLoading()) return;
+    this.repliesError.set(null);
+    this.repliesLoading.set(true);
+    this.api.chatSuggestReplies(id).subscribe({
+      next: res => {
+        if (this.selectedId() !== id) return;
+        const list = (res.replies ?? []).map(r => r.trim()).filter(Boolean);
+        this.replySuggestions.set(list);
+        if (list.length === 0) this.repliesError.set('No suggestions right now — just type a reply.');
+        this.repliesLoading.set(false);
+      },
+      error: (e: unknown) => {
+        if (this.selectedId() !== id) return;
+        this.replySuggestions.set([]);
+        this.repliesError.set(this.aiMessage(e, 'replies'));
+        this.repliesLoading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Use a suggested reply: drop it into the composer (REPLACING the current draft — the chips are a
+   * starting point the user reviews) and focus. NEVER auto-sends; the user reviews + hits Send.
+   */
+  useReply(text: string): void {
+    if (!this.canSend()) return;
+    this.draft.set(text);
+    this.replySuggestions.set([]); // a pick consumes the suggestions; re-ask for a fresh set
+    this.repliesError.set(null);
+    queueMicrotask(() => {
+      const node = this.composerEl()?.nativeElement;
+      if (node) {
+        node.focus();
+        const end = text.length;
+        node.setSelectionRange(end, end);
+      }
+    });
+  }
+
+  /** Dismiss the reply chips without picking one. */
+  dismissReplies(): void {
+    this.replySuggestions.set([]);
+    this.repliesError.set(null);
+  }
+
+  /** Toggle the "draft from a prompt" sub-input in the compose menu. */
+  toggleComposePrompt(): void {
+    this.composeError.set(null);
+    this.composePromptOpen.update(v => !v);
+    if (this.composePromptOpen()) {
+      queueMicrotask(() => {
+        const el = this.host.nativeElement.querySelector<HTMLTextAreaElement>('.cx-compose__prompt-input');
+        el?.focus();
+      });
+    }
+  }
+
+  /** Enter submits the draft prompt; Shift+Enter inserts a newline; Escape closes the sub-input. */
+  onComposePromptKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.runDraftFromPrompt(); }
+    else if (event.key === 'Escape') { event.preventDefault(); this.composePromptOpen.set(false); }
+  }
+
+  /** "Draft from a prompt": compose a fresh message from the prompt and place it in the composer. */
+  runDraftFromPrompt(): void {
+    const prompt = this.composePrompt().trim();
+    if (!prompt) { this.composeError.set('Type a prompt to draft from.'); return; }
+    this.compose('draft', { prompt });
+  }
+
+  /** Rewrite / shorten / friendlier / formal: reshape the CURRENT composer draft in place. */
+  composeFromDraft(action: Exclude<ChatComposeAction, 'draft'>): void {
+    const currentDraft = this.draft().trim();
+    if (!currentDraft) { this.composeError.set('Type a draft first, then I can refine it.'); return; }
+    this.compose(action, { currentDraft });
+  }
+
+  /**
+   * Run a compose-assist action and fill the composer with the result. NEVER sends. On a 503 (Gemini
+   * off) or 400 (nothing to work from) we surface a gentle inline notice and leave the draft untouched.
+   */
+  private compose(action: ChatComposeAction, opts: { prompt?: string; currentDraft?: string }): void {
+    if (!this.canSend() || this.composeBusy()) return;
+    this.composeError.set(null);
+    this.composeBusy.set(true);
+    this.api.chatCompose(action, opts).subscribe({
+      next: res => {
+        const body = res.body?.trim();
+        if (body) {
+          this.draft.set(body);
+          this.composePromptOpen.set(false);
+          this.composePrompt.set('');
+          queueMicrotask(() => this.focusComposerEnd());
+        } else {
+          this.composeError.set("Couldn't compose that just now. Please try again.");
+        }
+        this.composeBusy.set(false);
+      },
+      error: (e: unknown) => {
+        this.composeError.set(this.aiMessage(e, 'compose'));
+        this.composeBusy.set(false);
+      },
+    });
+  }
+
+  /** Focus the composer and place the caret at the end of the current draft. */
+  private focusComposerEnd(): void {
+    const node = this.composerEl()?.nativeElement;
+    if (!node) return;
+    node.focus();
+    const end = this.draft().length;
+    node.setSelectionRange(end, end);
+  }
+
+  /** A gentle, on-brand message from an AI-assist HttpErrorResponse (503 = unavailable; 400 = empty). */
+  private aiMessage(e: unknown, kind: 'replies' | 'compose'): string {
+    const err = e as { status?: number; error?: { message?: string; detail?: string } };
+    if (err?.status === 503) {
+      return kind === 'replies'
+        ? 'Reply suggestions are unavailable right now — just type a reply.'
+        : 'The compose assist is unavailable right now. You can write your message yourself.';
+    }
+    if (err?.status === 400) return err.error?.message ?? 'Type a message to work from.';
+    return err?.error?.detail ?? err?.error?.message
+      ?? "Couldn't do that just now — please try again.";
   }
 
   // =========================================================================
