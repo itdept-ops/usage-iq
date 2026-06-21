@@ -588,6 +588,65 @@ a.tile:focus-visible {
   .family__crest mat-icon { color: var(--tech-warn); }
 }
 
+/* ── AI morning briefing: a warm narrative card at the top of Today ──── */
+.briefing {
+  display: flex;
+  gap: var(--tech-space-4, 16px);
+  padding: var(--tech-space-5, 20px);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius, 12px);
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent) 12%, transparent), transparent 55%),
+    radial-gradient(120% 160% at 100% 0%, rgba(255, 196, 0, 0.10), transparent 55%),
+    var(--tech-panel);
+  box-shadow: var(--tech-shadow-raised);
+
+  /* When the AI fell back to the plain deterministic briefing, drop the accent flourish to a calmer surface. */
+  &--plain {
+    background: var(--tech-panel);
+    .briefing__spark { color: var(--tech-warn); }
+  }
+}
+
+.briefing__spark {
+  flex: 0 0 auto;
+  color: var(--tech-accent);
+  width: 28px; height: 28px; font-size: 28px;
+}
+
+.briefing__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-2, 8px);
+  min-width: 0;
+}
+
+.briefing__text {
+  margin: 0;
+  font-size: var(--tech-fs-body);
+  line-height: 1.5;
+  color: var(--tech-text);
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.briefing__toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  color: var(--tech-accent);
+  mat-icon { width: 18px; height: 18px; font-size: 18px; }
+  &:hover { text-decoration: underline; }
+}
+
 .today-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

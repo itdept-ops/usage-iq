@@ -356,6 +356,61 @@ public class FamilyTodayBriefingTests(WebAppFactory factory)
     }
 
     // =====================================================================================
+    // AI BRIEFING NARRATIVE — GET /today/briefing falls back to the deterministic text
+    // (never 503) when Gemini is off; the briefing JOB still delivers when AI is off.
+    // (No Gemini key is configured in tests, so the AI path always falls back — no real call.)
+    // =====================================================================================
+
+    [Fact]
+    public async Task TodayBriefing_requires_family_use_and_auth()
+    {
+        var (_, plain, _) = await ProvisionUser("dashboard.view");
+        (await plain.GetAsync("/api/family/today/briefing")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var anon = factory.CreateClient();
+        (await anon.GetAsync("/api/family/today/briefing")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task TodayBriefing_falls_back_to_plain_text_when_gemini_off_never_503()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+        // Give the day something to narrate.
+        await owner.PostAsJsonAsync("/api/family/reminders",
+            new { text = "Dentist", dueUtc = DateTime.UtcNow.AddHours(2), recurrence = "none" });
+
+        var res = await owner.GetAsync("/api/family/today/briefing");
+        // ALWAYS 200 — Gemini is unconfigured in tests, so it falls back to the guaranteed composed text.
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await Json(res);
+        dto.GetProperty("fellBackToPlain").GetBoolean().Should().BeTrue();
+        dto.GetProperty("narrative").GetString().Should().NotBeNullOrWhiteSpace();
+        // The deterministic briefing always opens with the household greeting + "Today:".
+        dto.GetProperty("narrative").GetString().Should().Contain("Today:");
+        // No email leaks into the briefing text.
+        dto.GetRawText().Should().NotContain("@");
+    }
+
+    [Fact]
+    public async Task BriefingJob_still_delivers_when_ai_is_off()
+    {
+        // The morning job uses the AI narrative when available and the deterministic Compose() otherwise —
+        // with no Gemini key, it must STILL post the bell + a chat message (AI never blocks delivery).
+        const string tz = "America/New_York";
+        var (selfEmail, owner, selfId) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+        var householdId = await HouseholdIdFor(selfId);
+        await ConfigureHousehold(householdId, tz, briefingHour: 7);
+
+        var before = await NotificationCountFor(selfEmail, NotificationType.FamilyBriefing);
+        (await RunBriefing(householdId, UtcForLocalHour(tz, 7))).Should().BeTrue();
+
+        (await NotificationCountFor(selfEmail, NotificationType.FamilyBriefing)).Should().Be(before + 1);
+        (await FamilyChannelMessageCount(householdId)).Should().Be(1);
+    }
+
+    // =====================================================================================
     // CROSS-HOUSEHOLD ISOLATION
     // =====================================================================================
 

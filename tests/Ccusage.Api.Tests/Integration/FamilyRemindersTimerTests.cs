@@ -386,4 +386,51 @@ public class FamilyRemindersTimerTests(WebAppFactory factory)
         (await Json(await owner.GetAsync("/api/family/reminders"))).EnumerateArray()
             .Select(x => x.GetProperty("id").GetInt64()).Should().NotContain(id);
     }
+
+    // =====================================================================================
+    // AI PARSE (/reminders/ai/parse) — gated by family.use + auth; 400 on empty text;
+    // graceful 503 (never 500) when Gemini is unconfigured. The test host configures NO
+    // Gemini key, so the unconfigured branch returns before any real Gemini/HTTP call.
+    // =====================================================================================
+
+    [Fact]
+    public async Task ReminderAiParse_requires_family_use()
+    {
+        var (_, plain, _) = await ProvisionUser("dashboard.view");
+        var res = await plain.PostAsJsonAsync("/api/family/reminders/ai/parse",
+            new { text = "call the dentist tomorrow at 9am" });
+        res.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ReminderAiParse_requires_authentication()
+    {
+        var anon = factory.CreateClient();
+        var res = await anon.PostAsJsonAsync("/api/family/reminders/ai/parse",
+            new { text = "call the dentist tomorrow at 9am" });
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task ReminderAiParse_returns_400_for_empty_text()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var res = await owner.PostAsJsonAsync("/api/family/reminders/ai/parse", new { text = "   " });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ReminderAiParse_is_unavailable_503_when_gemini_is_unconfigured_never_500()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // No Gemini API key is configured in tests, so AI reminders are gracefully unavailable (503), never
+        // a 500 and never a real Gemini call (the unconfigured branch returns before any HTTP).
+        var res = await owner.PostAsJsonAsync("/api/family/reminders/ai/parse",
+            new { text = "take out the trash every Tuesday night" });
+        res.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
 }

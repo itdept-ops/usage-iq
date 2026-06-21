@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatContactDto, ChatMessageDto, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
-  FamilyChore, FamilyChoreRecurrence, FamilyChores, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyToday, FindTimeRequest, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceSummary, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
+  FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyToday, FindTimeRequest, ReminderAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceSummary, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
   HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
@@ -883,6 +883,18 @@ export class Api {
     return this.http.delete<void>(`${this.base}/family/reminders/${id}`);
   }
 
+  /**
+   * "Add reminder with AI": send free text ("call the dentist next Tuesday at 3, every month") for Gemini to
+   * parse into 0+ PROPOSED reminders (with recurrence) the user then confirms — this creates NOTHING. Each
+   * confirmed proposal is created via the existing {@link createFamilyReminder}. `referenceDateUtc` defaults
+   * to now (the server anchors relative dates in the household timezone). Degrades gracefully: a 503 when AI
+   * is unavailable / not configured, a 400 for empty text — the caller surfaces a friendly message.
+   */
+  parseReminderAi(text: string, referenceDateUtc?: string): Observable<ReminderAiResult> {
+    return this.http.post<ReminderAiResult>(`${this.base}/family/reminders/ai/parse`,
+      { text, referenceDateUtc: referenceDateUtc ?? null });
+  }
+
   // ---- Family Hub F2: shared timers (live countdowns the whole household sees) ----
 
   /** The household's timers (active soonest-ending first, then recently-finished). */
@@ -909,6 +921,15 @@ export class Api {
    */
   familyToday(): Observable<FamilyToday> {
     return this.http.get<FamilyToday>(`${this.base}/family/today`);
+  }
+
+  /**
+   * The warm AI morning-briefing narrative for the top of Today. ALWAYS returns 200: when Gemini is
+   * unconfigured or errors, the guaranteed deterministic briefing text is returned with `fellBackToPlain` =
+   * true (never a 503/500). The numbers come from the server; the model only narrates them.
+   */
+  familyBriefing(): Observable<FamilyBriefing> {
+    return this.http.get<FamilyBriefing>(`${this.base}/family/today/briefing`);
   }
 
   /** The household's Family Hub settings (every member may read; `canEdit` is true only for the owner). */

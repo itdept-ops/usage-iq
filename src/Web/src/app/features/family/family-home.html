@@ -32,8 +32,33 @@
       </a>
     </header>
 
-    <!-- Today dashboard: glance cards from GET /family/today -->
+    <!-- AI morning narrative: a warm card at the top of Today. When it falls back to the plain deterministic
+         briefing we render the same text without the "AI" flourish. The structured cards below stay available
+         via the "show plain list" toggle (additive — never removed). -->
+    @if (briefing(); as b) {
+      @if (b.narrative) {
+        <article class="briefing" [class.briefing--plain]="b.fellBackToPlain" aria-label="Morning briefing">
+          @if (!b.fellBackToPlain) {
+            <mat-icon class="briefing__spark" aria-hidden="true">auto_awesome</mat-icon>
+          } @else {
+            <mat-icon class="briefing__spark" aria-hidden="true">wb_twilight</mat-icon>
+          }
+          <div class="briefing__body">
+            <p class="briefing__text">{{ b.narrative }}</p>
+            <button type="button" class="briefing__toggle" (click)="togglePlainList()"
+                    [attr.aria-expanded]="showPlainList()">
+              <mat-icon aria-hidden="true">{{ showPlainList() ? 'expand_less' : 'expand_more' }}</mat-icon>
+              {{ showPlainList() ? 'Hide details' : 'Show plain list' }}
+            </button>
+          </div>
+        </article>
+      }
+    }
+
+    <!-- Today dashboard: glance cards from GET /family/today. Always shown when there's no narrative; behind
+         the "show plain list" toggle once the narrative card is on screen. -->
     @if (today(); as t) {
+      @if (!briefing()?.narrative || showPlainList()) {
       <section class="today-grid" aria-label="Today at a glance">
         <!-- Weather (only when the server returns it) -->
         @if (t.weather; as w) {
@@ -182,6 +207,7 @@
           </article>
         }
       </section>
+      }
     }
 
     <!-- Feature tiles: the rooms of the home. Live ones link out; the rest are gentle "Coming soon". -->

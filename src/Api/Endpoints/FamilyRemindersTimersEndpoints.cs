@@ -39,6 +39,19 @@ public static class FamilyRemindersTimersEndpoints
     public sealed record SnoozeRequest(int? Minutes);
     public sealed record TimerCreateRequest(string? Label, int? DurationSeconds);
 
+    /// <summary>The "Add reminder with AI" request: the family member's free text ("remind me to call the
+    /// dentist tomorrow at 9am"). <see cref="ReferenceDateUtc"/> anchors relative dates; defaults to now.</summary>
+    public sealed record ReminderAiRequest(string? Text, DateTime? ReferenceDateUtc);
+
+    /// <summary>One AI-proposed reminder the family member CONFIRMS (then the frontend creates it via POST
+    /// /reminders). The due time is UTC + already clamped; <see cref="Recurrence"/> is the supported
+    /// vocabulary (none/daily/weekly/weekdays). targetUserId is implicitly the caller (self) for now.</summary>
+    public sealed record ReminderProposalDto(string Text, DateTime DueUtc, string Recurrence);
+
+    /// <summary>The "Add reminder with AI" response: 0+ proposed reminders to confirm + an optional short note
+    /// (an assumption made, or that an unsupported recurrence was mapped to the closest supported one).</summary>
+    public sealed record ReminderAiDto(IReadOnlyList<ReminderProposalDto> Reminders, string? Notes);
+
     private static readonly string[] Recurrences = { "none", "daily", "weekly", "weekdays" };
 
     public static void MapFamilyRemindersTimersEndpoints(this WebApplication app)
@@ -112,6 +125,38 @@ public static class FamilyRemindersTimersEndpoints
 
             return Results.Ok(await SingleReminderDtoAsync(db, reminder, ct));
         });
+
+        // ---- POST /reminders/ai/parse : Gemini parses free text into PROPOSED reminders the user confirms ----
+        // Creates NOTHING — the frontend creates each confirmed reminder via POST /reminders (targetUserId
+        // stays the caller/self for now). Rate-limited (the shared "ai" policy) because it spends model
+        // tokens, and NOT cached. Graceful: a 503 (never a 500) when Gemini is unconfigured or the call
+        // fails; a 400 for empty text.
+        g.MapPost("/reminders/ai/parse", async (
+            ReminderAiRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            GeminiService gemini, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(req?.Text))
+                return Results.BadRequest(new { message = "Type what you'd like to be reminded of." });
+            if (!gemini.IsConfigured)
+                return AiUnavailable();
+
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var tz = FamilyTodayService.ResolveTimeZone(household.TimeZone);
+
+            // Anchor relative dates to the supplied reference (or now); reject an absurd reference.
+            var reference = req.ReferenceDateUtc is { } r
+                ? DateTime.SpecifyKind(r, DateTimeKind.Utc) : DateTime.UtcNow;
+            if (reference < DateTime.UtcNow.AddYears(-2) || reference > DateTime.UtcNow.AddYears(2))
+                reference = DateTime.UtcNow;
+
+            var result = await gemini.ParseRemindersAsync(req.Text, reference, tz, ct);
+            if (result is null) return AiUnavailable();
+
+            var reminders = result.Reminders
+                .Select(p => new ReminderProposalDto(p.Text, p.DueUtc, p.Recurrence)).ToList();
+            return Results.Ok(new ReminderAiDto(reminders, result.Notes));
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
 
         // ---- PUT /reminders/{id} ----
         g.MapPut("/reminders/{id:long}", async (
@@ -314,4 +359,12 @@ public static class FamilyRemindersTimersEndpoints
 
     private static IResult NotFound() =>
         Results.NotFound(new { message = "That item doesn't exist." });
+
+    /// <summary>503 (never 500) when "Add reminder with AI" can't run — Gemini unconfigured or the call
+    /// failed. One consistent degraded path the frontend shows as "AI reminders aren't available right now;
+    /// you can add the reminder manually".</summary>
+    private static IResult AiUnavailable() => Results.Problem(
+        title: "AI reminders are not available.",
+        detail: "AI reminders are not available right now. You can add the reminder manually.",
+        statusCode: StatusCodes.Status503ServiceUnavailable);
 }

@@ -27,6 +27,11 @@ public static class FamilyTodayEndpoints
         string TimeZone, bool BriefingEnabled, int BriefingHourLocal, string? WeatherLocation,
         bool WeatherConfigured, bool EventHeadsUpEnabled, int EventHeadsUpLeadMinutes, bool CanEdit);
 
+    /// <summary>The Today card's morning-briefing narrative: the warm AI line when available, else the plain
+    /// deterministic briefing (<see cref="FellBackToPlain"/> = true). NEVER a 503 — the plain text is the
+    /// guaranteed floor.</summary>
+    public sealed record BriefingDto(string Narrative, bool FellBackToPlain);
+
     public sealed record SettingsUpdateRequest(
         string? TimeZone, bool? BriefingEnabled, int? BriefingHourLocal, string? WeatherLocation,
         bool? EventHeadsUpEnabled, int? EventHeadsUpLeadMinutes);
@@ -47,6 +52,21 @@ public static class FamilyTodayEndpoints
             var dto = await todayService.BuildAsync(household, caller, ct: ct);
             return Results.Ok(dto);
         });
+
+        // ---- GET /today/briefing : the warm AI morning-briefing narrative for the Today card ----
+        // Rate-limited (the shared "ai" policy) because it may spend model tokens, and CACHED per
+        // (household, local-date) inside the service. It ALWAYS returns 200: when Gemini is unconfigured or
+        // errors, the GUARANTEED deterministic Compose() text is returned with fellBackToPlain=true — never a
+        // 503/500. The numbers come from the server; the model only narrates.
+        g.MapGet("/today/briefing", async (
+            CurrentUserAccessor me, CurrentHouseholdAccessor households, FamilyBriefingService briefing,
+            CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var text = await briefing.BriefingTextForAsync(household, caller, DateTime.UtcNow, ct);
+            return Results.Ok(new BriefingDto(text.Narrative, text.FellBackToPlain));
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
 
         // ---- GET /settings : the household's settings (every member may read; only owner may edit) ----
         g.MapGet("/settings", async (

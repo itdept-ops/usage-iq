@@ -1618,6 +1618,39 @@ export interface FamilyTimer {
   startedByName: string;
 }
 
+/**
+ * The "Add reminder with AI" request (POST /api/family/reminders/ai/parse; mirrors ReminderAiRequest). The
+ * family member's free text ("call the dentist next Tuesday at 3, every month"); `referenceDateUtc` anchors
+ * relative dates and defaults to the server's now when omitted.
+ */
+export interface ReminderAiRequest {
+  text: string;
+  referenceDateUtc?: string | null;
+}
+
+/**
+ * One AI-proposed reminder to CONFIRM before it's created (mirrors ReminderProposalDto). `dueUtc` is an
+ * already-clamped ISO UTC instant (rendered in the viewer's LOCAL time); `recurrence` is the supported
+ * vocabulary (none/daily/weekly/weekdays). The user confirms/edits, then the frontend creates it via the
+ * existing POST /family/reminders (the target stays the caller/self for now).
+ */
+export interface ReminderAiProposal {
+  text: string;
+  dueUtc: string;
+  recurrence: FamilyRecurrence;
+}
+
+/**
+ * The "Add reminder with AI" response (mirrors ReminderAiDto): 0+ proposed `reminders` to confirm plus an
+ * optional short `notes` clarification of any assumption the model made (e.g. a guessed time, or that an
+ * unsupported recurrence like "monthly" was mapped to the closest supported one). An empty `reminders` list
+ * means the AI couldn't find a real thing to be reminded of in the text.
+ */
+export interface ReminderAiResult {
+  reminders: ReminderAiProposal[];
+  notes: string | null;
+}
+
 // ---- Family Hub F3: Today snapshot & settings ----
 
 /**
@@ -1710,6 +1743,17 @@ export interface FamilyToday {
   weather: FamilyWeather | null;
   /** Today's events from the caller's connected Google Calendar; empty when no calendar is connected. */
   events: FamilyTodayEvent[];
+}
+
+/**
+ * The warm AI morning-briefing narrative for the top of Today (GET /api/family/today/briefing; mirrors
+ * BriefingDto). `narrative` is the friendly AI line when available, else the GUARANTEED deterministic
+ * briefing text with `fellBackToPlain` = true. This endpoint NEVER 503s — the plain text is the floor — so
+ * the card always has something warm to show; it just renders plainly (no "AI" flourish) when it fell back.
+ */
+export interface FamilyBriefing {
+  narrative: string;
+  fellBackToPlain: boolean;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -10,7 +10,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
-import { FamilyToday, FamilyTodayEvent, Household, HouseholdMember, PERM } from '../../core/models';
+import {
+  FamilyBriefing, FamilyToday, FamilyTodayEvent, Household, HouseholdMember, PERM,
+} from '../../core/models';
 import { FamilyTimerWidget } from './timer';
 
 /** One feature tile on the Family home grid. `route` is null for a not-yet-built ("Coming soon") tile. */
@@ -59,7 +61,7 @@ const TILES: FeatureTile[] = [
   templateUrl: './family-home.html',
   styleUrl: './family.scss',
 })
-export class FamilyHome {
+export class FamilyHome implements OnDestroy {
   private api = inject(Api);
   readonly auth = inject(AuthService);
 
@@ -67,6 +69,14 @@ export class FamilyHome {
   readonly today = signal<FamilyToday | null>(null);
   readonly loading = signal(true);
   readonly error = signal(false);
+
+  /** The warm AI morning narrative (GET /family/today/briefing); null until loaded (best-effort). */
+  readonly briefing = signal<FamilyBriefing | null>(null);
+  /** Whether the structured Today cards are revealed below the narrative ("show plain list" toggle). */
+  readonly showPlainList = signal(false);
+
+  /** The local "YYYY-MM-DD" the briefing was last loaded for, so we can refresh when the day rolls over. */
+  private briefingDay = '';
 
   /** Feature tiles, filtered to the ones the caller may see (Finance hides without family.finance). */
   readonly tiles = computed<FeatureTile[]>(() => {
@@ -103,6 +113,12 @@ export class FamilyHome {
     return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   });
 
+  /** Re-fetch the briefing when the tab is revealed on a new local day so the narrative tracks the day. */
+  private readonly onVisibility = (): void => {
+    if (document.visibilityState !== 'visible') return;
+    if (this.localDay() !== this.briefingDay) this.loadBriefing();
+  };
+
   constructor() {
     this.api.getHousehold()
       .pipe(catchError(() => { this.error.set(true); return of(null); }), takeUntilDestroyed())
@@ -112,6 +128,37 @@ export class FamilyHome {
     this.api.familyToday()
       .pipe(catchError(() => of<FamilyToday | null>(null)), takeUntilDestroyed())
       .subscribe(t => { if (t) this.today.set(t); });
+
+    this.loadBriefing();
+    document.addEventListener('visibilitychange', this.onVisibility);
+  }
+
+  ngOnDestroy(): void {
+    document.removeEventListener('visibilitychange', this.onVisibility);
+  }
+
+  /**
+   * Load the warm AI morning narrative for the top of Today. ALWAYS 200 server-side (it falls back to the
+   * guaranteed deterministic briefing with `fellBackToPlain` = true), so a network blip is the only failure —
+   * we just leave the narrative card hidden and the structured cards on show. Refreshed when the day rolls.
+   */
+  private loadBriefing(): void {
+    this.briefingDay = this.localDay();
+    this.api.familyBriefing()
+      .pipe(catchError(() => of<FamilyBriefing | null>(null)), takeUntilDestroyed())
+      .subscribe(b => this.briefing.set(b));
+  }
+
+  /** Today's local "YYYY-MM-DD" (browser zone) used to detect a day rollover for the briefing refresh. */
+  private localDay(): string {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  /** Reveal / hide the structured Today cards below the narrative (the additive "show plain list" toggle). */
+  togglePlainList(): void {
+    this.showPlainList.update(v => !v);
   }
 
   /** Two-letter initials for the avatar fallback (from the display name; never an email). */

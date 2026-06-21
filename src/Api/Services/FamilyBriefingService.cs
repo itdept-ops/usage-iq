@@ -1,8 +1,10 @@
+using System.Text;
 using Ccusage.Api.Auth;
 using Ccusage.Api.Data;
 using Ccusage.Api.Data.Entities;
 using Ccusage.Api.Endpoints;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Ccusage.Api.Services;
 
@@ -25,8 +27,14 @@ public sealed class FamilyBriefingService(
     UsageDbContext db,
     FamilyTodayService today,
     ChatNotificationService notifier,
+    GeminiService gemini,
+    IMemoryCache cache,
     ILogger<FamilyBriefingService> logger)
 {
+    /// <summary>The per-household/local-date TTL for the AI narrative so the Today card's briefing call (and
+    /// the morning job) don't re-spend tokens on every load within a local day.</summary>
+    private static readonly TimeSpan NarrativeCacheTtl = TimeSpan.FromHours(12);
+
     /// <summary>
     /// Maybe run the briefing for <paramref name="household"/> as of <paramref name="nowUtc"/>: deliver it
     /// exactly once when briefings are enabled, the household-local time has reached
@@ -72,9 +80,11 @@ public sealed class FamilyBriefingService(
             ?? household.CreatedByUserId;
         var ownerUser = await ResolveCallerAsync(ownerId, ct);
 
-        // Build the aggregate from the same source the Today view uses, then compose friendly text.
+        // Build the aggregate from the same source the Today view uses. The deterministic Compose() is the
+        // GUARANTEED text; we PREFER a warmer AI narrative when Gemini is available (cached per local day),
+        // but a null/error there silently keeps the composed text — the briefing must never fail on AI.
         var snapshot = await today.BuildAsync(household, ownerUser, nowUtc, ct);
-        var text = Compose(snapshot);
+        var (text, _) = await NarrativeOrComposeAsync(household, snapshot, nowUtc, ct);
 
         // Stamp the guard FIRST (idempotency): a retry after a mid-delivery crash won't re-send.
         household.LastBriefingLocalDate = localDate;
@@ -95,6 +105,119 @@ public sealed class FamilyBriefingService(
             // The bell delivery already happened; a chat hiccup must never fail the briefing.
             logger.LogWarning("Family briefing chat post failed for household {Id}: {Reason}", household.Id, ex.Message);
         }
+    }
+
+    // ---- AI narrative (with the deterministic Compose() as the GUARANTEED fallback) ----
+
+    /// <summary>The AI-narrative result for the Today card's briefing endpoint: the text + whether it fell
+    /// back to the plain deterministic <c>Compose()</c> (true when Gemini was unconfigured/errored).</summary>
+    public sealed record BriefingText(string Narrative, bool FellBackToPlain);
+
+    /// <summary>
+    /// Build the briefing text the Today card shows for <paramref name="household"/> as of
+    /// <paramref name="nowUtc"/>: the warm AI narrative when Gemini is available, else the GUARANTEED
+    /// deterministic <c>Compose()</c> text (<c>FellBackToPlain=true</c>). NEVER throws / 503s — an AI hiccup
+    /// silently degrades to the composed line. CACHED per (household, local-date) so repeated Today loads
+    /// don't re-spend tokens. The aggregate is built here from the same source the Today view uses.
+    /// </summary>
+    public async Task<BriefingText> BriefingTextForAsync(
+        Household household, CurrentUserAccessor.CurrentUser caller, DateTime nowUtc, CancellationToken ct = default)
+    {
+        var snapshot = await today.BuildAsync(household, caller, nowUtc, ct);
+        var (text, fellBack) = await NarrativeOrComposeAsync(household, snapshot, nowUtc, ct);
+        return new BriefingText(text, fellBack);
+    }
+
+    /// <summary>
+    /// Resolve the briefing text for a household + snapshot: try the cached AI narrative, falling back to the
+    /// deterministic <c>Compose()</c> on null/error/unconfigured (returning <c>fellBackToPlain=true</c>). The
+    /// AI narrative is cached per (household, household-local date). Compose() is ALWAYS the floor — this
+    /// method never throws and never returns empty.
+    /// </summary>
+    private async Task<(string Text, bool FellBackToPlain)> NarrativeOrComposeAsync(
+        Household household, FamilyTodayService.TodayDto snapshot, DateTime nowUtc, CancellationToken ct)
+    {
+        var plain = Compose(snapshot);
+        if (!gemini.IsConfigured) return (plain, true);
+
+        var tz = FamilyTodayService.ResolveTimeZone(household.TimeZone);
+        var localDate = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(nowUtc, DateTimeKind.Utc), tz));
+        var cacheKey = $"family:briefing-narrative:{household.Id}:{localDate:yyyy-MM-dd}";
+        if (cache.TryGetValue(cacheKey, out string? cached) && !string.IsNullOrWhiteSpace(cached))
+            return (cached!, false);
+
+        try
+        {
+            var narrative = await gemini.BriefingNarrativeAsync(BriefingSummary(snapshot), tz, ct);
+            if (string.IsNullOrWhiteSpace(narrative)) return (plain, true);
+            var capped = narrative.Length > 1000 ? narrative[..1000] : narrative;
+            cache.Set(cacheKey, capped, NarrativeCacheTtl);
+            return (capped, false);
+        }
+        catch (Exception ex)
+        {
+            // The AI path must never fail the briefing — fall back to the guaranteed composed line.
+            logger.LogWarning("Family briefing AI narrative failed for household {Id}: {Reason}",
+                household.Id, ex.Message);
+            return (plain, true);
+        }
+    }
+
+    /// <summary>
+    /// Flatten the Today aggregate into a compact, deterministic facts summary the model NARRATES (it invents
+    /// nothing — every number/name comes from the server). Mirrors what <c>Compose()</c> surfaces: greeting,
+    /// today's reminders (with local times), the busiest list, running timers, pinned notes, weather, and
+    /// today's events. Empty categories are omitted.
+    /// </summary>
+    private static string BriefingSummary(FamilyTodayService.TodayDto t)
+    {
+        var sb = new StringBuilder();
+        sb.Append("GREETING: ").Append(t.Greeting).Append('\n');
+        sb.Append("DATE: ").Append(t.DateLocal).Append('\n');
+
+        if (t.Reminders.Count > 0)
+        {
+            sb.Append("REMINDERS (").Append(t.Reminders.Count).Append("):\n");
+            foreach (var r in t.Reminders.Take(10))
+                sb.Append("- ").Append(r.Text).Append(" at ").Append(r.LocalTime).Append('\n');
+        }
+
+        var openLists = t.Lists.Where(l => l.OpenCount > 0).OrderByDescending(l => l.OpenCount).ToList();
+        if (openLists.Count > 0)
+        {
+            sb.Append("LISTS:\n");
+            foreach (var l in openLists.Take(5))
+                sb.Append("- ").Append(l.Name).Append(" (").Append(l.Kind).Append("): ")
+                  .Append(l.OpenCount).Append(" open\n");
+        }
+
+        if (t.Timers.Count > 0)
+        {
+            sb.Append("TIMERS (").Append(t.Timers.Count).Append("):\n");
+            foreach (var tm in t.Timers.Take(10))
+                sb.Append("- ").Append(tm.Label).Append('\n');
+        }
+
+        if (t.PinnedNotes.Count > 0)
+        {
+            sb.Append("PINNED NOTES (").Append(t.PinnedNotes.Count).Append("):\n");
+            foreach (var n in t.PinnedNotes.Take(10))
+                sb.Append("- ").Append(n.Title).Append('\n');
+        }
+
+        if (t.Weather is { } w)
+            sb.Append("WEATHER: ").Append(Math.Round(w.TempF)).Append("F, ").Append(w.Description)
+              .Append(" in ").Append(w.Location).Append('\n');
+
+        if (t.Events.Count > 0)
+        {
+            sb.Append("EVENTS (").Append(t.Events.Count).Append("):\n");
+            foreach (var e in t.Events.Take(10))
+                sb.Append("- ").Append(e.Title).Append(" at ").Append(e.LocalTime).Append('\n');
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>

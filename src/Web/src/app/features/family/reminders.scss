@@ -1,5 +1,126 @@
 /* Family Reminders — a warm list of upcoming nudges. Reuses the family design tokens. */
 
+/* ── Add with AI (mirrors the calendar "Schedule with AI" confirm pattern) ── */
+.rem-ai {
+  margin-bottom: var(--tech-space-4, 16px);
+  padding: var(--tech-space-4, 16px);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius, 12px);
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent) 10%, transparent), transparent 55%),
+    var(--tech-panel);
+}
+
+.rem-ai__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2, 8px);
+}
+
+.rem-ai__spark {
+  flex: 0 0 auto;
+  color: var(--tech-accent);
+  width: 24px; height: 24px; font-size: 24px;
+}
+
+.rem-ai__field { flex: 1; min-width: 0; }
+
+.rem-ai__go {
+  flex: 0 0 auto;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+}
+
+.rem-ai__status {
+  margin: var(--tech-space-2, 8px) 0 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+}
+
+.rem-ai__cards {
+  list-style: none;
+  margin: var(--tech-space-3, 12px) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-2, 8px);
+}
+
+.rem-ai-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-3, 12px) var(--tech-space-4, 16px);
+  border: 1px solid var(--tech-border-subtle);
+  border-left: 3px solid var(--tech-accent);
+  border-radius: var(--tech-r-control, 10px);
+  background: var(--tech-bg-sunken);
+}
+
+.rem-ai-card__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.rem-ai-card__title {
+  font-weight: 700;
+  color: var(--tech-text);
+  word-break: break-word;
+}
+
+.rem-ai-card__when {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+  mat-icon { width: 16px; height: 16px; font-size: 16px; }
+}
+
+.rem-ai-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rem-ai-card__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--tech-fs-micro, 11px);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--tech-accent) 16%, transparent);
+  color: var(--tech-accent);
+  mat-icon { width: 13px; height: 13px; font-size: 13px; }
+}
+
+.rem-ai-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+}
+
+@media (max-width: 600px) {
+  .rem-ai__bar { flex-wrap: wrap; }
+  .rem-ai__field { flex: 1 1 100%; order: 1; }
+  .rem-ai__spark { order: 0; }
+  .rem-ai__go { order: 2; margin-left: auto; }
+  .rem-ai-card__actions { flex: 1 1 100%; justify-content: flex-end; }
+}
+
 .reminder-list {
   list-style: none;
   margin: 0;

@@ -18,6 +18,76 @@
     </button>
   </header>
 
+  <!-- Add with AI -->
+  <section class="rem-ai" aria-label="Add a reminder with AI">
+    <div class="rem-ai__bar">
+      <mat-icon class="rem-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+      <mat-form-field appearance="outline" class="rem-ai__field" subscriptSizing="dynamic">
+        <mat-label>Add with AI</mat-label>
+        <input matInput [ngModel]="aiText()" (ngModelChange)="aiText.set($event)"
+               (keydown.enter)="addWithAi()" maxlength="600"
+               placeholder="e.g. call the dentist next Tuesday at 3, every month" [disabled]="aiBusy()" />
+        @if (aiText()) {
+          <button mat-icon-button matSuffix aria-label="Clear" (click)="clearAi()" [disabled]="aiBusy()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+      <button mat-flat-button color="primary" class="rem-ai__go"
+              [disabled]="aiBusy() || !aiText().trim()" (click)="addWithAi()">
+        @if (aiBusy()) {
+          <mat-spinner [diameter]="18" />
+          <span>Thinking…</span>
+        } @else {
+          <span>Suggest</span>
+        }
+      </button>
+    </div>
+
+    @if (aiStatus(); as msg) {
+      <p class="rem-ai__status" aria-live="polite">{{ msg }}</p>
+    }
+
+    @if (proposals().length) {
+      <ul class="rem-ai__cards">
+        @for (p of proposals(); track $index) {
+          <li class="rem-ai-card">
+            <div class="rem-ai-card__main">
+              <span class="rem-ai-card__title">{{ p.ai.text }}</span>
+              <span class="rem-ai-card__when">
+                <mat-icon aria-hidden="true">schedule</mat-icon>{{ p.whenLabel }}
+              </span>
+              @if (p.repeatLabel) {
+                <div class="rem-ai-card__meta">
+                  <span class="rem-ai-card__chip">
+                    <mat-icon aria-hidden="true">repeat</mat-icon>{{ p.repeatLabel }}
+                  </span>
+                </div>
+              }
+            </div>
+            <div class="rem-ai-card__actions">
+              <button mat-button type="button" (click)="editProposal(p)" [disabled]="p.saving">
+                <mat-icon aria-hidden="true">edit</mat-icon> Edit
+              </button>
+              <button mat-button type="button" (click)="dismissProposal(p)" [disabled]="p.saving">
+                Dismiss
+              </button>
+              <button mat-flat-button color="primary" type="button" (click)="addProposal(p)"
+                      [disabled]="p.saving">
+                @if (p.saving) {
+                  <mat-spinner [diameter]="16" />
+                } @else {
+                  <mat-icon aria-hidden="true">add</mat-icon>
+                }
+                Add
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
   @if (loading()) {
     <div class="family__loading">
       <mat-spinner [diameter]="28" />
