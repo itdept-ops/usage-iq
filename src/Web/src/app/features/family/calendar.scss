@@ -136,6 +136,35 @@
   gap: var(--tech-space-2, 8px);
 }
 
+/* ── ✨ Best time for X (cyan-accented variant of the AI bar) ────────── */
+.cal-besttime {
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent-cyan) 10%, transparent), transparent 55%),
+    var(--tech-panel);
+}
+
+.cal-besttime__understood {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: var(--tech-space-3, 12px) 0 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+  mat-icon { width: 18px; height: 18px; font-size: 18px; flex: 0 0 auto; margin-top: 1px; color: var(--tech-accent-cyan); }
+}
+
+.cal-besttime__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: var(--tech-space-2, 8px) 0 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+  mat-icon { width: 18px; height: 18px; font-size: 18px; flex: 0 0 auto; margin-top: 1px; }
+}
+
+.cal-besttime__slots { margin-top: var(--tech-space-3, 12px); }
+
 .cal-ai-card {
   display: flex;
   flex-wrap: wrap;

@@ -20,6 +20,36 @@
     </mat-button-toggle>
   </mat-button-toggle-group>
 
+  <!-- ✨ Suggest options (fills the rows below; nothing is created until you Create) -->
+  <div class="poll-ai" aria-label="Suggest options with AI">
+    <div class="poll-ai__bar">
+      <mat-icon class="poll-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+      <mat-form-field appearance="outline" class="poll-ai__field" subscriptSizing="dynamic">
+        <mat-label>Suggest options</mat-label>
+        <input matInput [ngModel]="aiPrompt()" (ngModelChange)="aiPrompt.set($event)"
+               (keydown.enter)="suggestOptions()" maxlength="400"
+               placeholder="e.g. plan a Saturday family outing" [disabled]="aiBusy()" />
+        @if (aiPrompt()) {
+          <button mat-icon-button matSuffix aria-label="Clear" (click)="aiPrompt.set('')" [disabled]="aiBusy()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+      <button mat-flat-button color="primary" class="poll-ai__go"
+              [disabled]="aiBusy() || !aiPrompt().trim()" (click)="suggestOptions()">
+        @if (aiBusy()) {
+          <mat-spinner [diameter]="18" />
+          <span>Thinking…</span>
+        } @else {
+          <span>Suggest</span>
+        }
+      </button>
+    </div>
+    @if (aiStatus(); as msg) {
+      <p class="poll-ai__status" aria-live="polite">{{ msg }}</p>
+    }
+  </div>
+
   @if (kind() === 'time') {
     <p class="poll-create__hint">Add a few candidate slots. Everyone votes for the ones that work for them.</p>
     @for (t of timeDrafts(); track t.id) {

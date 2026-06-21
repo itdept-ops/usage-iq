@@ -246,9 +246,103 @@
 .poll-create__actions { display: flex; align-items: center; }
 .poll-create__spacer { flex: 1; }
 
+/* ── ✨ Suggest options (in the create dialog; fills the rows below) ──── */
+.poll-ai {
+  margin-bottom: var(--tech-space-3, 12px);
+  padding: var(--tech-space-3, 12px);
+  border: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-r-control, 10px);
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent) 10%, transparent), transparent 55%),
+    var(--tech-bg-sunken);
+}
+
+.poll-ai__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2, 8px);
+}
+
+.poll-ai__spark {
+  flex: 0 0 auto;
+  color: var(--tech-accent);
+  width: 22px; height: 22px; font-size: 22px;
+}
+
+.poll-ai__field { flex: 1; min-width: 0; }
+
+.poll-ai__go {
+  flex: 0 0 auto;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+}
+
+.poll-ai__status {
+  margin: var(--tech-space-2, 8px) 0 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+}
+
+/* ── ✨ Summarize (read-only result card on a poll; plain floor when AI is off) ── */
+.poll-summary {
+  margin-top: var(--tech-space-3, 12px);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tech-space-2, 8px);
+  padding: var(--tech-space-3, 12px) var(--tech-space-4, 16px);
+  border: 1px solid var(--tech-border-subtle);
+  border-left: 3px solid var(--tech-accent);
+  border-radius: var(--tech-r-control, 10px);
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent) 8%, transparent), transparent 55%),
+    var(--tech-bg-sunken);
+
+  /* When Gemini was unavailable, the deterministic plain floor renders without the AI flourish. */
+  &--plain {
+    border-left-color: var(--tech-border);
+    background: var(--tech-bg-sunken);
+  }
+}
+
+.poll-summary__spark {
+  flex: 0 0 auto;
+  width: 20px; height: 20px; font-size: 20px;
+  margin-top: 1px;
+  color: var(--tech-accent);
+  .poll-summary--plain & { color: var(--tech-text-tertiary); }
+}
+
+.poll-summary__text {
+  margin: 0;
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text);
+}
+
+.poll__ai-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2, 8px);
+  margin-top: var(--tech-space-3, 12px);
+}
+
+.poll__summarize {
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  mat-icon { width: 18px; height: 18px; font-size: 18px; }
+  mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+}
+
 /* ── Mobile ─────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .poll-opt--time { flex-wrap: wrap; }
   .poll-opt--time .poll-opt__date { flex: 1 1 100%; }
   .poll-option__voters { padding-left: 0; }
+  .poll-ai__bar { flex-wrap: wrap; }
+  .poll-ai__field { flex: 1 1 100%; order: 1; }
+  .poll-ai__spark { order: 0; }
+  .poll-ai__go { order: 2; margin-left: auto; }
 }

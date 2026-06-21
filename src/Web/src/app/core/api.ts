@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatContactDto, ChatMessageDto, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
-  FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyToday, FindTimeRequest, ReminderAiResult, ListItemsAiResult, NoteDraftAiResult, NoteSummaryAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceSummary, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
+  FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, NoteDraftAiResult, NoteSummaryAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceSummary, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
   HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
@@ -1252,6 +1252,18 @@ export class Api {
       { text, referenceDateUtc: referenceDateUtc ?? null });
   }
 
+  /**
+   * "✨ Best time for X": send free text ("a 45-min slot for the dentist next week, mornings") for Gemini to
+   * fill the find-time form, then the EXISTING deterministic engine finds candidate slots across the whole
+   * household. Returns those `slots` + the `interpreted` form + who was considered (connected or not). Creates
+   * NOTHING — picking a slot opens the event editor. `referenceDateUtc` defaults to now. Degrades gracefully:
+   * a 503 when AI is unavailable / not configured, a 400 for empty text — the caller surfaces a friendly line.
+   */
+  findTimeAi(text: string, referenceDateUtc?: string): Observable<FindTimeAiResult> {
+    return this.http.post<FindTimeAiResult>(`${this.base}/family/calendar/ai/find-time`,
+      { text, referenceDateUtc: referenceDateUtc ?? null });
+  }
+
   // ---- Family Hub F6b: Plan polls (Doodle-style; time/text; vote/close/book) ----
 
   /** The household's plan polls (newest first), each with live vote counts + the caller's own selections. */
@@ -1286,5 +1298,25 @@ export class Api {
   /** Delete a household poll (options + votes cascade). */
   deleteFamilyPoll(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/family/polls/${id}`);
+  }
+
+  /**
+   * "✨ Suggest options": ask Gemini to propose poll options from a free-text `prompt` ("plan a Saturday family
+   * outing"). Pass `kind` to force time/text, or omit it to let the model choose. Creates NOTHING — the dialog
+   * fills its editable option rows from the result, then the user submits the normal create-poll form (which
+   * re-validates). 503 when AI is unavailable / not configured; 400 for an empty prompt.
+   */
+  pollOptionsAi(prompt: string, kind?: FamilyPollKind | null, referenceDateUtc?: string): Observable<PollOptionsAiResult> {
+    return this.http.post<PollOptionsAiResult>(`${this.base}/family/polls/ai/options`,
+      { prompt, kind: kind ?? null, referenceDateUtc: referenceDateUtc ?? null });
+  }
+
+  /**
+   * "✨ Summarize": a short read-only narrative of where a poll stands, built off the AUTHORITATIVE vote tally
+   * (the model invents nothing). NEVER 503 — when AI is unavailable the guaranteed deterministic plain summary
+   * comes back with `fellBackToPlain` = true (same handling as the morning briefing). 404 for a foreign poll.
+   */
+  pollSummaryAi(id: number): Observable<PollSummaryAiResult> {
+    return this.http.get<PollSummaryAiResult>(`${this.base}/family/polls/${id}/ai/summary`);
   }
 }

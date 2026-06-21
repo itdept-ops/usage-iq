@@ -180,6 +180,71 @@
       }
     </section>
 
+    <!-- ✨ Best time for X -->
+    <section class="cal-ai cal-besttime" aria-label="Best time for X">
+      <div class="cal-ai__bar">
+        <mat-icon class="cal-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+        <mat-form-field appearance="outline" class="cal-ai__field" subscriptSizing="dynamic">
+          <mat-label>Best time for…</mat-label>
+          <input matInput [ngModel]="bestText()" (ngModelChange)="bestText.set($event)"
+                 (keydown.enter)="findBestTime()" maxlength="600"
+                 placeholder="e.g. a 45-min slot for the dentist next week, mornings" [disabled]="bestBusy()" />
+          @if (bestText()) {
+            <button mat-icon-button matSuffix aria-label="Clear" (click)="clearBest()" [disabled]="bestBusy()">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </mat-form-field>
+        <button mat-flat-button color="primary" class="cal-ai__go"
+                [disabled]="bestBusy() || !bestText().trim()" (click)="findBestTime()">
+          @if (bestBusy()) {
+            <mat-spinner [diameter]="18" />
+            <span>Thinking…</span>
+          } @else {
+            <span>Find times</span>
+          }
+        </button>
+      </div>
+
+      <!-- What the AI understood (the find-time form it filled) -->
+      @if (bestInterpreted()) {
+        <p class="cal-besttime__understood">
+          <mat-icon aria-hidden="true">lightbulb</mat-icon>{{ bestUnderstood() }}
+        </p>
+      }
+
+      @if (bestStatus(); as msg) {
+        <p class="cal-ai__status" aria-live="polite">{{ msg }}</p>
+      }
+
+      <!-- Members considered but not connected (today, so their availability is unknown) -->
+      @if (bestNotConnected().length && !bestNoneConnected()) {
+        <p class="cal-besttime__note">
+          <mat-icon aria-hidden="true">info</mat-icon>
+          Not counting
+          @for (m of bestNotConnected(); track m.userId; let last = $last) {
+            <strong>{{ m.name }}</strong>{{ last ? '' : ', ' }}
+          }
+          — their calendar isn't connected, so their availability is unknown.
+        </p>
+      }
+
+      <!-- Candidate slots (reuses the find-time slot list UI) -->
+      @if (bestSlots().length) {
+        <ul class="ft-slots cal-besttime__slots">
+          @for (s of bestSlots(); track s.startUtc) {
+            <li>
+              <button type="button" class="ft-slot" (click)="pickBestSlot(s)">
+                <span class="ft-slot__day">{{ slotDay(s) }}</span>
+                <span class="ft-slot__time">{{ slotRange(s) }}</span>
+                <mat-icon class="ft-slot__go" aria-hidden="true">chevron_right</mat-icon>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
     @if (eventsError()) {
       <div class="family__error">
         <mat-icon aria-hidden="true">error_outline</mat-icon>

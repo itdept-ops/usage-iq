@@ -111,6 +111,37 @@
               </li>
             }
           </ul>
+
+          <!-- ✨ Summarize (read-only; NEVER 503 — a deterministic plain floor is the guarantee) -->
+          <div class="poll__ai-actions">
+            <button mat-stroked-button class="poll__summarize" [disabled]="isSummarizing(poll.id)"
+                    (click)="summarize(poll)">
+              @if (isSummarizing(poll.id)) {
+                <mat-spinner [diameter]="18" />
+                <span>Summarizing…</span>
+              } @else {
+                <ng-container>
+                  <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+                  {{ summaryOf(poll.id) ? 'Refresh summary' : 'Summarize' }}
+                </ng-container>
+              }
+            </button>
+            @if (summaryOf(poll.id)) {
+              <button mat-button type="button" (click)="clearSummary(poll.id)">Dismiss</button>
+            }
+          </div>
+
+          @if (summaryOf(poll.id); as s) {
+            @if (s.summary) {
+              <article class="poll-summary" [class.poll-summary--plain]="s.fellBackToPlain"
+                       aria-label="Poll summary" aria-live="polite">
+                <mat-icon class="poll-summary__spark" aria-hidden="true">
+                  {{ s.fellBackToPlain ? 'insights' : 'auto_awesome' }}
+                </mat-icon>
+                <p class="poll-summary__text">{{ s.summary }}</p>
+              </article>
+            }
+          }
         </article>
       }
     </div>

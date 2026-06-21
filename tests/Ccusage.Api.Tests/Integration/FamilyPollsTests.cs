@@ -328,6 +328,121 @@ public class FamilyPollsTests(WebAppFactory factory)
             .Select(x => x.GetProperty("id").GetInt64()).Should().NotContain(pollId);
     }
 
+    // =====================================================================================
+    // AI POLL OPTIONS — gated by family.use, 400 on empty, graceful 503 when Gemini unconfigured,
+    // and writes NOTHING (no poll is created)
+    // =====================================================================================
+
+    [Fact]
+    public async Task PollOptionsAi_requires_family_use()
+    {
+        var (_, plain, _) = await ProvisionUser("dashboard.view");
+        var res = await plain.PostAsJsonAsync("/api/family/polls/ai/options",
+            new { prompt = "dinner out next weekend", kind = "time" });
+        res.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task PollOptionsAi_requires_authentication()
+    {
+        var anon = factory.CreateClient();
+        var res = await anon.PostAsJsonAsync("/api/family/polls/ai/options",
+            new { prompt = "dinner out next weekend", kind = "time" });
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task PollOptionsAi_returns_400_for_empty_prompt()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var res = await owner.PostAsJsonAsync("/api/family/polls/ai/options", new { prompt = "   ", kind = "text" });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task PollOptionsAi_is_unavailable_503_when_gemini_is_unconfigured_never_500()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // No Gemini API key in the test host → graceful 503 (never a 500, never a real model call).
+        var res = await owner.PostAsJsonAsync("/api/family/polls/ai/options",
+            new { prompt = "where should we go on holiday", kind = "text" });
+        res.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task PollOptionsAi_creates_nothing()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // The call is unavailable in tests (no Gemini), but it must NEVER create a poll regardless.
+        await owner.PostAsJsonAsync("/api/family/polls/ai/options",
+            new { prompt = "movie night this weekend", kind = "time" });
+
+        var polls = await Json(await owner.GetAsync("/api/family/polls"));
+        polls.GetArrayLength().Should().Be(0);
+    }
+
+    // =====================================================================================
+    // AI POLL SUMMARY — ALWAYS 200 with a deterministic plain floor (never 503), 404 for a foreign poll
+    // =====================================================================================
+
+    [Fact]
+    public async Task PollSummaryAi_requires_family_use()
+    {
+        var (_, plain, _) = await ProvisionUser("dashboard.view");
+        (await plain.GetAsync("/api/family/polls/1/ai/summary")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task PollSummaryAi_requires_authentication()
+    {
+        var anon = factory.CreateClient();
+        (await anon.GetAsync("/api/family/polls/1/ai/summary")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task PollSummaryAi_falls_back_to_a_plain_summary_when_gemini_unconfigured_never_503()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var poll = await CreateTimePoll(owner);
+        var pollId = poll.GetProperty("id").GetInt64();
+        var opt0 = poll.GetProperty("options")[0].GetProperty("id").GetInt64();
+        await owner.PostAsJsonAsync($"/api/family/polls/{pollId}/vote", new { optionIds = new[] { opt0 } });
+
+        // No Gemini in tests → ALWAYS 200 with the deterministic plain floor (fellBackToPlain=true), never 503.
+        var res = await owner.GetAsync($"/api/family/polls/{pollId}/ai/summary");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await Json(res);
+        dto.GetProperty("fellBackToPlain").GetBoolean().Should().BeTrue();
+        dto.GetProperty("summary").GetString().Should().NotBeNullOrWhiteSpace();
+        // The plain floor names the poll + its standing; never an email.
+        dto.GetProperty("summary").GetString().Should().Contain("Movie night");
+        dto.GetRawText().Should().NotContain("@");
+    }
+
+    [Fact]
+    public async Task PollSummaryAi_is_404_for_a_foreign_poll()
+    {
+        var (_, alice, _) = await ProvisionUser("family.use");
+        var (_, bob, _) = await ProvisionUser("family.use");
+        await alice.GetAsync("/api/family/household");
+        await bob.GetAsync("/api/family/household");
+
+        var alicePoll = await CreateTimePoll(alice);
+        var alicePollId = alicePoll.GetProperty("id").GetInt64();
+
+        // Bob cannot summarise Alice's poll — 404 (existence never leaked, honours household scope).
+        (await bob.GetAsync($"/api/family/polls/{alicePollId}/ai/summary"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     /// <summary>Resolve a user's email from the DB so we can build their client (email never on the wire).</summary>
     private async Task<string> EmailForUser(int userId)
     {

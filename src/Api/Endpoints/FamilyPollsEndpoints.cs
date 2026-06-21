@@ -29,6 +29,11 @@ public static class FamilyPollsEndpoints
     public sealed record ClosePollRequest(long? WinningOptionId);
     public sealed record BookRequest(long OptionId);
 
+    /// <summary>The "AI poll options" request: free-text prompt ("dinner out next weekend") + an optional
+    /// <see cref="Kind"/> ("time"|"text") to force the option shape (null lets the model choose).
+    /// <see cref="ReferenceDateUtc"/> anchors relative dates for time options; defaults to now.</summary>
+    public sealed record PollOptionsAiRequest(string? Prompt, string? Kind, DateTime? ReferenceDateUtc);
+
     // ---- Response DTOs (people by userId + name; never email) ----
     public sealed record VoterDto(int UserId, string Name);
     public sealed record PollOptionDto(
@@ -38,6 +43,21 @@ public static class FamilyPollsEndpoints
         long Id, string Title, string Kind, bool Closed, long? WinningOptionId,
         int CreatedByUserId, string CreatedByName, DateTime CreatedUtc,
         IReadOnlyList<PollOptionDto> Options, IReadOnlyList<long> MyVotes);
+
+    /// <summary>One AI-PROPOSED poll option (mirrors the create-poll <see cref="OptionInput"/> shape so the
+    /// frontend can hand it straight back to POST /polls after the user edits). A time option carries a
+    /// start/end; a text option carries a label; the unused fields are null.</summary>
+    public sealed record ProposedOptionDto(DateTime? StartUtc, DateTime? EndUtc, string? Label);
+
+    /// <summary>The "AI poll options" response: the resolved <see cref="Kind"/> ("time"|"text") + the proposed
+    /// options for the user to EDIT before creating. Nothing is created — the frontend reviews then POSTs the
+    /// confirmed set to /polls, which re-validates.</summary>
+    public sealed record PollOptionsAiDto(string Kind, IReadOnlyList<ProposedOptionDto> Options);
+
+    /// <summary>The "AI poll summary" response: a short read-only narrative of where the poll stands.
+    /// <see cref="FellBackToPlain"/> is true when Gemini was unconfigured/errored and the deterministic plain
+    /// summary was used instead. ALWAYS 200 — the plain text is the guaranteed floor (never a 503/500).</summary>
+    public sealed record PollSummaryDto(string Summary, bool FellBackToPlain);
 
     private static readonly string[] Kinds = { "time", "text" };
 
@@ -232,6 +252,69 @@ public static class FamilyPollsEndpoints
             return Results.Ok(new EventDtoLite(e.Id, e.Title, e.StartUtc, e.EndUtc, e.HtmlLink));
         });
 
+        // ---- POST /api/family/polls/ai/options : Gemini PROPOSES options for the user to edit ----
+        // Creates NOTHING — returns proposed options the frontend reviews then POSTs to /polls (which
+        // re-validates). Rate-limited (shared "ai" policy). Graceful: 400 empty prompt; 503 (never 500) when
+        // Gemini is unconfigured or the call fails.
+        g.MapPost("/ai/options", async (
+            PollOptionsAiRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            GeminiService gemini, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(req?.Prompt))
+                return Results.BadRequest(new { message = "Type what the poll is about." });
+            if (!gemini.IsConfigured)
+                return AiUnavailable();
+
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var tz = FamilyTodayService.ResolveTimeZone(household.TimeZone);
+
+            // Anchor relative dates (for time options) to the supplied reference (or now); reject an absurd one.
+            var reference = req.ReferenceDateUtc is { } r
+                ? DateTime.SpecifyKind(r, DateTimeKind.Utc) : DateTime.UtcNow;
+            if (reference < DateTime.UtcNow.AddYears(-2) || reference > DateTime.UtcNow.AddYears(2))
+                reference = DateTime.UtcNow;
+
+            var result = await gemini.PollOptionsAsync(req.Prompt, req.Kind, reference, tz, ct);
+            if (result is null) return AiUnavailable();
+
+            var options = result.Kind == "time"
+                ? result.TimeOptions.Select(o => new ProposedOptionDto(o.StartUtc, o.EndUtc, null)).ToList()
+                : result.TextOptions.Select(l => new ProposedOptionDto(null, null, l)).ToList();
+
+            return Results.Ok(new PollOptionsAiDto(result.Kind, options));
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
+        // ---- GET /api/family/polls/{id}/ai/summary : a short read-only narrative of where the poll stands ----
+        // Built off the AUTHORITATIVE BuildPollDtoAsync data (options + vote counts + leader). ALWAYS 200 with
+        // a deterministic PLAIN summary floor — Gemini only narrates; an unconfigured/errored model falls back
+        // to the plain text (fellBackToPlain=true), NEVER a 503/500. 404 for a poll outside the caller's
+        // household (existence never leaked). Rate-limited (shared "ai" policy).
+        g.MapGet("/{id:long}/ai/summary", async (
+            long id, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsageDbContext db, GeminiService gemini, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+            // Honour the poll's household scope: a foreign/absent poll is a 404 (never leaked).
+            var poll = await db.FamilyPlanPolls.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (poll is null || poll.HouseholdId != household.Id) return NotFound();
+
+            // The AUTHORITATIVE poll DTO (per-option counts + the winner) is the source of truth.
+            var dto = await BuildPollDtoAsync(db, poll.Id, caller.Id, ct);
+            var plain = PlainPollSummary(dto);
+
+            // Gemini only narrates the facts; any miss falls back to the deterministic plain floor (200).
+            if (!gemini.IsConfigured)
+                return Results.Ok(new PollSummaryDto(plain, FellBackToPlain: true));
+
+            var narrative = await gemini.PollSummaryAsync(PollFacts(dto), ct);
+            return string.IsNullOrWhiteSpace(narrative)
+                ? Results.Ok(new PollSummaryDto(plain, FellBackToPlain: true))
+                : Results.Ok(new PollSummaryDto(narrative!, FellBackToPlain: false));
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
         // ---- DELETE /api/family/polls/{id} ----
         g.MapDelete("/{id:long}", async (
             long id, CurrentUserAccessor me, CurrentHouseholdAccessor households,
@@ -367,4 +450,96 @@ public static class FamilyPollsEndpoints
 
     private static IResult NotFound() =>
         Results.NotFound(new { message = "That poll doesn't exist." });
+
+    /// <summary>503 (never 500) when an AI poll-options call can't run — Gemini unconfigured or the call
+    /// failed. The poll SUMMARY never uses this (it always degrades to a plain text floor instead).</summary>
+    private static IResult AiUnavailable() => Results.Problem(
+        title: "AI is not available.",
+        detail: "AI suggestions aren't available right now. You can add the options manually.",
+        statusCode: StatusCodes.Status503ServiceUnavailable);
+
+    // =====================================================================================
+    // AI poll summary — deterministic facts + plain-text floor (the AI text is commentary only)
+    // =====================================================================================
+
+    /// <summary>
+    /// The GUARANTEED deterministic poll summary (the floor the AI never falls below): off the AUTHORITATIVE
+    /// <paramref name="dto"/> (per-option vote counts + winner) — closed polls name the winner, open polls name
+    /// the current leader (or a tie / no-votes-yet), never inventing anything.
+    /// </summary>
+    private static string PlainPollSummary(PollDto dto)
+    {
+        var totalVotes = dto.Options.Sum(o => o.VoteCount);
+
+        if (dto.Closed)
+        {
+            var winner = dto.WinningOptionId is { } wid
+                ? dto.Options.FirstOrDefault(o => o.Id == wid)
+                : null;
+            return winner is not null
+                ? $"“{dto.Title}” is closed. The pick is {OptionLabel(winner)} ({winner.VoteCount} {Votes(winner.VoteCount)})."
+                : $"“{dto.Title}” is closed.";
+        }
+
+        if (totalVotes == 0)
+            return $"“{dto.Title}” is open with {dto.Options.Count} options and no votes yet.";
+
+        var max = dto.Options.Max(o => o.VoteCount);
+        var leaders = dto.Options.Where(o => o.VoteCount == max && max > 0).ToList();
+        if (leaders.Count == 1)
+        {
+            var lead = leaders[0];
+            return $"“{dto.Title}” is open. {OptionLabel(lead)} is leading with {lead.VoteCount} {Votes(lead.VoteCount)} of {totalVotes} cast.";
+        }
+
+        return $"“{dto.Title}” is open and tied between {leaders.Count} options at {max} {Votes(max)} each.";
+    }
+
+    /// <summary>
+    /// Pre-format the AUTHORITATIVE poll facts for the AI narrator: the title, status, and EACH option's
+    /// label/time + its vote count, plus the current leader. The model is told to narrate ONLY these facts
+    /// (it never sees the DB), so it can't invent options or votes. NO email — only the deterministic tally.
+    /// </summary>
+    private static string PollFacts(PollDto dto)
+    {
+        var lines = new List<string>
+        {
+            $"title: {dto.Title}",
+            $"status: {(dto.Closed ? "closed" : "open")}",
+            $"total_votes: {dto.Options.Sum(o => o.VoteCount)}",
+        };
+
+        foreach (var o in dto.Options)
+            lines.Add($"option: {OptionLabel(o)} — {o.VoteCount} {Votes(o.VoteCount)}");
+
+        if (dto.Closed && dto.WinningOptionId is { } wid &&
+            dto.Options.FirstOrDefault(o => o.Id == wid) is { } w)
+            lines.Add($"winner: {OptionLabel(w)}");
+        else if (!dto.Closed && dto.Options.Count > 0)
+        {
+            var max = dto.Options.Max(o => o.VoteCount);
+            if (max > 0)
+            {
+                var leaders = dto.Options.Where(o => o.VoteCount == max).Select(OptionLabel).ToList();
+                lines.Add(leaders.Count == 1 ? $"leader: {leaders[0]}" : $"tied: {string.Join(", ", leaders)}");
+            }
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>A human label for a poll option: the text label, or a compact UTC time range for a time
+    /// option (the deterministic floor — the AI gets the same string, so it never invents a slot).</summary>
+    private static string OptionLabel(PollOptionDto o)
+    {
+        if (!string.IsNullOrWhiteSpace(o.Label)) return o.Label!;
+        if (o.StartUtc is { } s)
+        {
+            var start = $"{s:ddd MMM d, HH:mm} UTC";
+            return o.EndUtc is { } e ? $"{start}–{e:HH:mm}" : start;
+        }
+        return "an option";
+    }
+
+    private static string Votes(int n) => n == 1 ? "vote" : "votes";
 }

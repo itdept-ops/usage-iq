@@ -48,6 +48,10 @@ public static class FamilyCalendarEndpoints
         int[]? MemberUserIds, int DurationMinutes, DateTime FromUtc, DateTime ToUtc,
         int? DayStartHourLocal, int? DayEndHourLocal);
 
+    /// <summary>The "Best time for X" request: the family member's free-text ("a 45-min slot for a dentist
+    /// next week, mornings"). <see cref="ReferenceDateUtc"/> anchors relative dates; defaults to now.</summary>
+    public sealed record FindTimeAiRequest(string? Text, DateTime? ReferenceDateUtc);
+
     // ---- Response DTOs ----
     public sealed record StatusDto(bool Configured, bool Connected, bool ScopeOk);
     public sealed record ConnectedDto(bool Connected);
@@ -80,6 +84,18 @@ public static class FamilyCalendarEndpoints
     /// <summary>The find-a-time response: candidate slots + which members were considered (connected or not).</summary>
     public sealed record FindTimeDto(
         IReadOnlyList<SlotDto> Slots, IReadOnlyList<ConsideredMemberDto> ConsideredMembers);
+
+    /// <summary>What the AI understood from the free text (the find-time FORM it filled). All clamped; the
+    /// window is UTC. The UI shows this so the family can see what was interpreted before booking.</summary>
+    public sealed record InterpretedFindTimeDto(
+        int DurationMinutes, DateTime FromUtc, DateTime ToUtc,
+        int DayStartHourLocal, int DayEndHourLocal, string? Note);
+
+    /// <summary>The "Best time for X" response: the EXISTING deterministic find-time output (slots +
+    /// considered members) PLUS the <see cref="Interpreted"/> form the AI filled from the free text.</summary>
+    public sealed record FindTimeAiDto(
+        IReadOnlyList<SlotDto> Slots, IReadOnlyList<ConsideredMemberDto> ConsideredMembers,
+        InterpretedFindTimeDto Interpreted);
 
     public static void MapFamilyCalendarEndpoints(this WebApplication app)
     {
@@ -229,41 +245,57 @@ public static class FamilyCalendarEndpoints
             var (start, end) = Window(req.FromUtc == default ? null : req.FromUtc,
                 req.ToUtc == default ? null : req.ToUtc);
 
-            // Constrain the requested ids to ACTUAL members of the caller's own household (privacy). Default
-            // to the whole household when none are given. Resolve display identity (never email).
-            var requested = (req.MemberUserIds ?? Array.Empty<int>()).Distinct().ToHashSet();
-            var members = await db.HouseholdMembers.AsNoTracking()
-                .Where(m => m.HouseholdId == household.Id)
-                .Join(db.Users.AsNoTracking(), m => m.UserId, u => u.Id, (m, u) => new { u.Id, u.Name })
-                .Where(x => requested.Count == 0 || requested.Contains(x.Id))
-                .ToListAsync(ct);
-
-            // FreeBusyAsync SKIPS any member without a connected calendar; the members it returns ARE the
-            // connected ones. Anyone considered but absent from the result is reported connected:false (and
-            // simply doesn't constrain the search — degrade cleanly, never 500).
-            var busy = await cal.FreeBusyAsync(
-                members.Select(m => (m.Id, string.IsNullOrEmpty(m.Name) ? "Unknown user" : m.Name)), start, end, ct);
-            var connectedIds = busy.Select(b => b.UserId).ToHashSet();
-
-            var considered = members
-                .Select(m => new ConsideredMemberDto(
-                    m.Id, string.IsNullOrEmpty(m.Name) ? "Unknown user" : m.Name, connectedIds.Contains(m.Id)))
-                .ToList();
-
             // Workday bounds: caller-supplied or the sensible default 9–17 local. The household timezone does
             // the local-day clipping.
             var dayStart = req.DayStartHourLocal ?? 9;
             var dayEnd = req.DayEndHourLocal ?? 17;
             var tz = FamilyTodayService.ResolveTimeZone(household.TimeZone);
 
-            var found = SlotFinder.FindFreeSlots(
-                busy.Select(b => new SlotFinder.MemberBusy(
-                    b.Busy.Select(x => (x.StartUtc, x.EndUtc)).ToList())),
-                start, end, req.DurationMinutes, dayStart, dayEnd, tz);
-
-            var slots = found.Select(s => new SlotDto(s.StartUtc, s.EndUtc)).ToList();
+            var (slots, considered) = await RunFindTimeAsync(
+                db, cal, household.Id, req.MemberUserIds ?? Array.Empty<int>(), start, end,
+                req.DurationMinutes, dayStart, dayEnd, tz, ct);
             return Results.Ok(new FindTimeDto(slots, considered));
         });
+
+        // ---- POST /ai/find-time : Gemini fills the find-time FORM from free text, then the EXISTING ----
+        // deterministic engine finds the slots over ALL household members. Creates NOTHING — booking still
+        // goes through POST /events on user confirm. Rate-limited (shared "ai" policy). Graceful: 400 empty
+        // text; 503 (never 500) when the PARSE is unavailable (Gemini unconfigured or the call failed). The
+        // find-time itself degrades gracefully (no connected calendars -> empty slots) exactly as today.
+        g.MapPost("/ai/find-time", async (
+            FindTimeAiRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsageDbContext db, GoogleCalendarService cal, GeminiService gemini, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(req?.Text))
+                return Results.BadRequest(new { message = "Type what you'd like to find a time for." });
+            if (!gemini.IsConfigured)
+                return AiUnavailable();
+
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var tz = FamilyTodayService.ResolveTimeZone(household.TimeZone);
+
+            // Anchor relative dates to the supplied reference (or now); reject an absurd reference.
+            var reference = req.ReferenceDateUtc is { } r
+                ? DateTime.SpecifyKind(r, DateTimeKind.Utc) : DateTime.UtcNow;
+            if (reference < DateTime.UtcNow.AddYears(-2) || reference > DateTime.UtcNow.AddYears(2))
+                reference = DateTime.UtcNow;
+
+            // The MODEL only fills the form; an unavailable parse is a graceful 503 (never a 500).
+            var parsed = await gemini.ParseFindTimeAsync(req.Text, reference, tz, ct);
+            if (parsed is null) return AiUnavailable();
+
+            // Run the EXISTING deterministic find-time over ALL household members with the parsed params.
+            var (start, end) = Window(parsed.FromUtc, parsed.ToUtc);
+            var (slots, considered) = await RunFindTimeAsync(
+                db, cal, household.Id, Array.Empty<int>(), start, end,
+                parsed.DurationMinutes, parsed.DayStartHourLocal, parsed.DayEndHourLocal, tz, ct);
+
+            var interpreted = new InterpretedFindTimeDto(
+                parsed.DurationMinutes, start, end,
+                parsed.DayStartHourLocal, parsed.DayEndHourLocal, parsed.Note);
+            return Results.Ok(new FindTimeAiDto(slots, considered, interpreted));
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
 
         // ---- POST /schedule-ai : Gemini parses free text into PROPOSED events the user then confirms ----
         // Creates NOTHING — the frontend creates each confirmed event via POST /events. Rate-limited (the
@@ -300,6 +332,44 @@ public static class FamilyCalendarEndpoints
     // =====================================================================================
     // Helpers
     // =====================================================================================
+
+    /// <summary>
+    /// The SHARED deterministic find-time core (used by both <c>POST /find-time</c> and <c>POST
+    /// /ai/find-time</c>): constrain the requested ids to ACTUAL members of the caller's household (privacy;
+    /// empty = the whole household), pull each connected member's busy blocks (FreeBusyAsync SKIPS the
+    /// unconnected, who simply don't constrain the search), and run <see cref="SlotFinder"/> within the local
+    /// workday window. Returns the candidate slots + which members were considered (connected or not). Degrades
+    /// cleanly — no connected calendars yields an empty slot list, never a 500.
+    /// </summary>
+    private static async Task<(List<SlotDto> Slots, List<ConsideredMemberDto> Considered)> RunFindTimeAsync(
+        UsageDbContext db, GoogleCalendarService cal, int householdId, int[] memberUserIds,
+        DateTime start, DateTime end, int durationMinutes, int dayStartHourLocal, int dayEndHourLocal,
+        TimeZoneInfo tz, CancellationToken ct)
+    {
+        var requested = memberUserIds.Distinct().ToHashSet();
+        var members = await db.HouseholdMembers.AsNoTracking()
+            .Where(m => m.HouseholdId == householdId)
+            .Join(db.Users.AsNoTracking(), m => m.UserId, u => u.Id, (m, u) => new { u.Id, u.Name })
+            .Where(x => requested.Count == 0 || requested.Contains(x.Id))
+            .ToListAsync(ct);
+
+        var busy = await cal.FreeBusyAsync(
+            members.Select(m => (m.Id, string.IsNullOrEmpty(m.Name) ? "Unknown user" : m.Name)), start, end, ct);
+        var connectedIds = busy.Select(b => b.UserId).ToHashSet();
+
+        var considered = members
+            .Select(m => new ConsideredMemberDto(
+                m.Id, string.IsNullOrEmpty(m.Name) ? "Unknown user" : m.Name, connectedIds.Contains(m.Id)))
+            .ToList();
+
+        var found = SlotFinder.FindFreeSlots(
+            busy.Select(b => new SlotFinder.MemberBusy(
+                b.Busy.Select(x => (x.StartUtc, x.EndUtc)).ToList())),
+            start, end, durationMinutes, dayStartHourLocal, dayEndHourLocal, tz);
+
+        var slots = found.Select(s => new SlotDto(s.StartUtc, s.EndUtc)).ToList();
+        return (slots, considered);
+    }
 
     private static EventDto ToDto(CalendarEvent e) => new(
         e.Id, e.Title, e.StartUtc, e.EndUtc, e.AllDay, e.Location, e.Description, e.HtmlLink, e.HangoutLink,

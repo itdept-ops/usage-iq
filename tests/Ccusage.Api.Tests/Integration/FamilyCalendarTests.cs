@@ -367,4 +367,50 @@ public class FamilyCalendarTests(WebAppFactory factory)
             new { text = "soccer practice every Tuesday at 4pm" });
         res.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
+
+    // =====================================================================================
+    // FIND-TIME-AI — gated by family.use, 400 on empty text, graceful 503 when Gemini unconfigured,
+    // and writes NOTHING (no event is created)
+    // =====================================================================================
+
+    [Fact]
+    public async Task FindTimeAi_requires_family_use()
+    {
+        var (_, plain, _) = await ProvisionUser("dashboard.view");
+        var res = await plain.PostAsJsonAsync("/api/family/calendar/ai/find-time",
+            new { text = "a 45-min slot for a dentist next week, mornings" });
+        res.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task FindTimeAi_requires_authentication()
+    {
+        var anon = factory.CreateClient();
+        var res = await anon.PostAsJsonAsync("/api/family/calendar/ai/find-time",
+            new { text = "a 45-min slot for a dentist next week, mornings" });
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task FindTimeAi_returns_400_for_empty_text()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var res = await owner.PostAsJsonAsync("/api/family/calendar/ai/find-time", new { text = "   " });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task FindTimeAi_is_unavailable_503_when_gemini_is_unconfigured_never_500()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // No Gemini API key in the test host → the PARSE is gracefully unavailable (503), never a 500 and
+        // never a real Gemini/Google call (the unconfigured branch returns before any HTTP).
+        var res = await owner.PostAsJsonAsync("/api/family/calendar/ai/find-time",
+            new { text = "a 45-min slot for a dentist next week, mornings" });
+        res.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
 }

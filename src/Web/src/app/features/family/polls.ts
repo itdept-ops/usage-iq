@@ -11,7 +11,9 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
-import { CalendarStatus, FamilyPoll, FamilyPollCreate, FamilyPollOption, FamilyPollVoter } from '../../core/models';
+import {
+  CalendarStatus, FamilyPoll, FamilyPollCreate, FamilyPollOption, FamilyPollVoter, PollSummaryAiResult,
+} from '../../core/models';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { PollCreateDialog } from './poll-create-dialog';
 
@@ -46,6 +48,12 @@ export class FamilyPolls {
 
   /** Per-poll busy flag (booking/closing in flight) keyed by poll id, so buttons disable individually. */
   readonly busy = signal<Set<number>>(new Set());
+
+  // ---- ✨ Summarize (read-only result card; NEVER 503 — a plain floor is the guarantee) ----
+  /** The poll ids whose "Summarize" is in flight, so the button shows a spinner individually. */
+  readonly summarizing = signal<Set<number>>(new Set());
+  /** The fetched summary per poll id (the read-only card). Absent until the user asks. */
+  readonly summaries = signal<Map<number, PollSummaryAiResult>>(new Map());
 
   readonly myUserId = computed(() => this.auth.userId());
 
@@ -143,6 +151,51 @@ export class FamilyPolls {
     }
   }
 
+  // ---- ✨ Summarize (read-only narrative of where the poll stands) ----
+
+  /**
+   * Fetch a short read-only AI summary for a poll and show it as a result card. This endpoint NEVER 503s — a
+   * deterministic plain summary is the guaranteed floor (fellBackToPlain=true), so the card always has content;
+   * it just renders plainly (no AI flourish) when it fell back. A network blip is the only failure path.
+   */
+  async summarize(poll: FamilyPoll): Promise<void> {
+    if (this.isSummarizing(poll.id)) return;
+    this.setSummarizing(poll.id, true);
+    try {
+      const result = await firstValueFrom(this.api.pollSummaryAi(poll.id));
+      this.summaries.update(map => new Map(map).set(poll.id, result));
+    } catch (e) {
+      this.snack.open(this.messageOf(e, "Couldn't summarize that poll just now. Please try again."),
+        'OK', { duration: 4000 });
+    } finally {
+      this.setSummarizing(poll.id, false);
+    }
+  }
+
+  /** Dismiss a poll's summary card. */
+  clearSummary(pollId: number): void {
+    this.summaries.update(map => {
+      if (!map.has(pollId)) return map;
+      const next = new Map(map);
+      next.delete(pollId);
+      return next;
+    });
+  }
+
+  isSummarizing(pollId: number): boolean {
+    return this.summarizing().has(pollId);
+  }
+
+  summaryOf(pollId: number): PollSummaryAiResult | undefined {
+    return this.summaries().get(pollId);
+  }
+
+  private setSummarizing(pollId: number, on: boolean): void {
+    const next = new Set(this.summarizing());
+    if (on) next.add(pollId); else next.delete(pollId);
+    this.summarizing.set(next);
+  }
+
   // ---- Delete ----
 
   async remove(poll: FamilyPoll): Promise<void> {
@@ -155,6 +208,7 @@ export class FamilyPolls {
     try {
       await firstValueFrom(this.api.deleteFamilyPoll(poll.id));
       this.polls.update(list => list.filter(p => p.id !== poll.id));
+      this.clearSummary(poll.id);
     } catch {
       this.snack.open("Couldn't delete that poll.", 'OK', { duration: 4000 });
     }
@@ -211,6 +265,8 @@ export class FamilyPolls {
 
   private replace(poll: FamilyPoll): void {
     this.polls.update(list => list.map(p => p.id === poll.id ? poll : p));
+    // The tally changed (a vote or a close) — drop any stale summary so it isn't out of date.
+    this.clearSummary(poll.id);
   }
 
   private setBusy(pollId: number, on: boolean): void {

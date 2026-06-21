@@ -16,7 +16,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
-  CalendarEvent, CalendarEventInput, CalendarRecurrence, CalendarStatus, HouseholdMember, ScheduleAiEvent,
+  CalendarEvent, CalendarEventInput, CalendarRecurrence, CalendarStatus, FindTimeAiInterpreted,
+  FindTimeConsideredMember, FindTimeSlot, HouseholdMember, ScheduleAiEvent,
 } from '../../core/models';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { EventEditorDialog, EventEditorData, EventEditorResult } from './event-editor-dialog';
@@ -116,6 +117,31 @@ export class FamilyCalendar implements OnDestroy {
   readonly aiStatus = signal('');
   /** The AI-proposed events awaiting the user's confirmation. */
   readonly proposals = signal<ProposedEvent[]>([]);
+
+  // ---- ✨ Best time for X (AI free-text → find-time form → candidate slots) ----
+  /** The free-text "best time" box ("a 45-min slot for the dentist next week, mornings"). */
+  readonly bestText = signal('');
+  readonly bestBusy = signal(false);
+  /** A friendly status line for the best-time box (aria-live), e.g. an error or "no openings". */
+  readonly bestStatus = signal('');
+  /** What the AI understood (duration + window + hours) — shown above the slots. null until a search runs. */
+  readonly bestInterpreted = signal<FindTimeAiInterpreted | null>(null);
+  /** The candidate slots the deterministic engine found for the parsed request. */
+  readonly bestSlots = signal<FindTimeSlot[]>([]);
+  /** Members considered but not connected — surfaced as a gentle note (their availability is unknown). */
+  readonly bestNotConnected = signal<FindTimeConsideredMember[]>([]);
+  /** True after a search returns and NOBODY considered was connected (warm "no one's connected yet"). */
+  readonly bestNoneConnected = signal(false);
+
+  /** A friendly "here's what I understood" line from the interpreted find-time form. */
+  readonly bestUnderstood = computed<string>(() => {
+    const i = this.bestInterpreted();
+    if (!i) return '';
+    const dur = this.durationLabel(i.durationMinutes);
+    const window = this.windowLabel(i.fromUtc, i.toUtc);
+    const hours = `${this.hourLabel(i.dayStartHourLocal)}–${this.hourLabel(i.dayEndHourLocal)}`;
+    return `Looking for a ${dur} slot ${window}, between ${hours}.`;
+  });
 
   readonly connected = computed(() => this.status()?.connected === true);
   readonly configured = computed(() => this.status()?.configured !== false);
@@ -318,6 +344,7 @@ export class FamilyCalendar implements OnDestroy {
       this.status.set({ configured: true, connected: false });
       this.events.set([]);
       this.proposals.set([]);
+      this.clearBest();
       this.lastUpdated.set(null);
       this.stopPolling();
       this.snack.open('Calendar disconnected.', undefined, { duration: 2000 });
@@ -481,6 +508,109 @@ export class FamilyCalendar implements OnDestroy {
     this.aiText.set('');
     this.aiStatus.set('');
     this.proposals.set([]);
+  }
+
+  // ---- ✨ Best time for X ----
+
+  /**
+   * Send the free-text "best time" request to Gemini (which only fills the find-time form), then surface the
+   * candidate slots the existing deterministic engine found. Books NOTHING — picking a slot opens the event
+   * editor prefilled. Degrades gracefully: a 503 (AI/calendar unavailable / not configured) or any error shows
+   * a friendly aria-live line; unconnected members are flagged; no openings says so. Guarded by `connected`.
+   */
+  async findBestTime(): Promise<void> {
+    const text = this.bestText().trim();
+    if (text.length === 0 || this.bestBusy()) return;
+    this.bestBusy.set(true);
+    this.bestStatus.set('Reading your request…');
+    this.bestInterpreted.set(null);
+    this.bestSlots.set([]);
+    this.bestNotConnected.set([]);
+    this.bestNoneConnected.set(false);
+    try {
+      const result = await firstValueFrom(this.api.findTimeAi(text));
+      this.bestInterpreted.set(result.interpreted);
+      const considered = result.consideredMembers ?? [];
+      const noneConnected = considered.length > 0 && considered.every(m => !m.connected);
+      this.bestNoneConnected.set(noneConnected);
+      this.bestNotConnected.set(considered.filter(m => !m.connected));
+      this.bestSlots.set(result.slots ?? []);
+
+      if (noneConnected) {
+        this.bestStatus.set(
+          "No one's connected their calendar yet, so I can't check availability. Once someone connects, this lights up.");
+      } else if ((result.slots ?? []).length === 0) {
+        this.bestStatus.set(
+          (result.interpreted.note?.trim() ? result.interpreted.note!.trim() + ' ' : '') +
+          'No common openings in that window. Try a wider range, a shorter slot, or broader hours.');
+      } else {
+        const n = result.slots.length;
+        this.bestStatus.set(
+          (result.interpreted.note?.trim() ? result.interpreted.note!.trim() + ' ' : '') +
+          `Pick ${n === 1 ? 'the slot' : 'a slot'} below to create the event prefilled.`);
+      }
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      this.bestStatus.set(status === 503
+        ? "AI or calendar isn't available right now. You can use Find a time to look manually."
+        : this.messageOf(e, "I couldn't reach the AI just now. Please try again, or use Find a time."));
+    } finally {
+      this.bestBusy.set(false);
+    }
+  }
+
+  /** Pick a best-time slot → open the event editor prefilled to it (reuses the create-from-slot flow). */
+  async pickBestSlot(slot: FindTimeSlot): Promise<void> {
+    await this.createFromSlot(slot);
+  }
+
+  /** Clear the best-time box + its results. */
+  clearBest(): void {
+    this.bestText.set('');
+    this.bestStatus.set('');
+    this.bestInterpreted.set(null);
+    this.bestSlots.set([]);
+    this.bestNotConnected.set([]);
+    this.bestNoneConnected.set(false);
+  }
+
+  // ---- Best-time slot display (browser local zone) ----
+
+  /** "Thu, Jun 20" day label for a slot. */
+  slotDay(slot: FindTimeSlot): string {
+    return new Date(slot.startUtc).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  /** "9:00 AM – 10:00 AM" local time range for a slot. */
+  slotRange(slot: FindTimeSlot): string {
+    const opts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+    const start = new Date(slot.startUtc).toLocaleTimeString(undefined, opts);
+    const end = new Date(slot.endUtc).toLocaleTimeString(undefined, opts);
+    return `${start} – ${end}`;
+  }
+
+  /** "45-minute" / "1-hour" / "90-minute" duration label for the "what I understood" line. */
+  private durationLabel(min: number): string {
+    if (min % 60 === 0) {
+      const h = min / 60;
+      return h === 1 ? '1-hour' : `${h}-hour`;
+    }
+    return `${min}-minute`;
+  }
+
+  /** "from Jun 20 to Jun 27" window label (local) for the "what I understood" line. */
+  private windowLabel(fromUtc: string, toUtc: string): string {
+    const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    const from = new Date(fromUtc).toLocaleDateString(undefined, opts);
+    const to = new Date(toUtc).toLocaleDateString(undefined, opts);
+    return `from ${from} to ${to}`;
+  }
+
+  /** "9 AM" style label for a workday-hour bound (0–23). */
+  private hourLabel(h: number): string {
+    const ampm = h < 12 ? 'AM' : 'PM';
+    const twelve = h % 12 === 0 ? 12 : h % 12;
+    return `${twelve} ${ampm}`;
   }
 
   private setProposalSaving(p: ProposedEvent, saving: boolean): void {

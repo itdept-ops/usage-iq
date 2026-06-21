@@ -2036,6 +2036,87 @@ export interface FamilyPollCreate {
   options: FamilyPollOptionInput[];
 }
 
+// ---- Family Hub F6c: Calendar + Polls AI assists (slice 5) ----
+
+/**
+ * The "✨ Best time for X" request (POST /api/family/calendar/ai/find-time; mirrors FindTimeAiRequest). The
+ * family member's free text ("a 45-min slot for the dentist next week, mornings"); `referenceDateUtc` anchors
+ * relative dates and defaults to the server's now when omitted. Gemini ONLY fills the find-time form — the
+ * existing deterministic slot engine then runs over the household, so nothing is booked.
+ */
+export interface FindTimeAiRequest {
+  text: string;
+  referenceDateUtc?: string | null;
+}
+
+/**
+ * What the AI understood from the free text (mirrors InterpretedFindTimeDto): the find-time FORM it filled,
+ * all clamped — the duration, the UTC window, and the local workday hours (0–23, in the household timezone).
+ * The UI shows this "here's what I understood" line so the family sees the interpretation before booking.
+ */
+export interface FindTimeAiInterpreted {
+  durationMinutes: number;
+  fromUtc: string;
+  toUtc: string;
+  dayStartHourLocal: number;
+  dayEndHourLocal: number;
+  note: string | null;
+}
+
+/**
+ * The "✨ Best time for X" response (mirrors FindTimeAiDto): the EXISTING deterministic find-time output
+ * (candidate `slots` + the `consideredMembers`, who was connected or not) PLUS the `interpreted` form the AI
+ * filled from the free text. Picking a slot opens the event editor prefilled; nothing is booked automatically.
+ */
+export interface FindTimeAiResult {
+  slots: FindTimeSlot[];
+  consideredMembers: FindTimeConsideredMember[];
+  interpreted: FindTimeAiInterpreted;
+}
+
+/**
+ * The "✨ Suggest options" request (POST /api/family/polls/ai/options; mirrors PollOptionsAiRequest). A
+ * free-text `prompt` ("plan a Saturday family outing" / "best dinner spot") + an optional `kind` to force the
+ * option shape (omit/null lets the model choose). `referenceDateUtc` anchors relative dates for time options.
+ */
+export interface PollOptionsAiRequest {
+  prompt: string;
+  kind?: FamilyPollKind | null;
+  referenceDateUtc?: string | null;
+}
+
+/**
+ * One AI-proposed poll option (mirrors ProposedOptionDto), in the create-poll `FamilyPollOptionInput` shape so
+ * it can fill an editable option row directly. A TIME option carries `startUtc`/`endUtc`; a TEXT option carries
+ * a `label`; the unused fields are null. The user EDITS these rows before the normal Create — nothing is made.
+ */
+export interface PollOptionProposal {
+  startUtc?: string | null;
+  endUtc?: string | null;
+  label?: string | null;
+}
+
+/**
+ * The "✨ Suggest options" response (mirrors PollOptionsAiDto): the resolved `kind` ("time"|"text") + the
+ * proposed `options` for the user to review/edit before creating. Nothing is created — the dialog fills its
+ * rows from this, then the user POSTs the confirmed set through the normal create-poll flow (re-validated).
+ */
+export interface PollOptionsAiResult {
+  kind: FamilyPollKind;
+  options: PollOptionProposal[];
+}
+
+/**
+ * The "✨ Summarize" poll response (GET /api/family/polls/{id}/ai/summary; mirrors PollSummaryDto): a short
+ * read-only `summary` of where the poll stands, built off the AUTHORITATIVE vote tally. `fellBackToPlain` is
+ * true when Gemini was unavailable and the deterministic plain summary was used instead — same handling as the
+ * slice-1 morning briefing. NEVER a 503; the plain text is the guaranteed floor.
+ */
+export interface PollSummaryAiResult {
+  summary: string;
+  fellBackToPlain: boolean;
+}
+
 /**
  * The household's Family Hub settings (GET /api/family/settings; mirrors SettingsDto). Every member may
  * read; only the OWNER may edit (`canEdit`). `timeZone` is an IANA id used for all "today" math; the daily
