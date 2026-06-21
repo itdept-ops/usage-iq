@@ -1677,6 +1677,9 @@ export interface FamilyToday {
 export interface CalendarStatus {
   configured: boolean;
   connected: boolean;
+  /** True when the connection actually granted the calendar.events scope. When connected but this is false,
+   *  the calendar permission wasn't allowed at consent — the user should disconnect + reconnect. */
+  scopeOk?: boolean;
 }
 
 /**

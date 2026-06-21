@@ -60,6 +60,14 @@ public sealed class GoogleCalendarService(
         !string.IsNullOrWhiteSpace(config["Google:ClientId"])
         && !string.IsNullOrWhiteSpace(config["Google:ClientSecret"]);
 
+    /// <summary>
+    /// A user-actionable hint about the LAST Calendar API failure in this scoped request (e.g. the Calendar
+    /// API isn't enabled, or the scope wasn't granted), or null for a generic/transient error. The service
+    /// is per-request, so the endpoint reads this immediately after an Error result. NEVER a secret — only a
+    /// classification of Google's (secret-free) Calendar API error body.
+    /// </summary>
+    public string? LastErrorHint { get; private set; }
+
     // =====================================================================================
     // Outcome types — every public method returns a graceful, never-throwing result.
     // =====================================================================================
@@ -92,6 +100,21 @@ public sealed class GoogleCalendarService(
     /// <summary>True when the given user has a stored calendar connection.</summary>
     public async Task<bool> IsConnectedAsync(int userId, CancellationToken ct = default) =>
         await db.GoogleCalendarConnections.AsNoTracking().AnyAsync(c => c.UserId == userId, ct);
+
+    /// <summary>
+    /// True when the stored connection's GRANTED scope includes calendar.events — i.e. the user actually
+    /// allowed calendar access at consent. False when not connected or the scope is missing (the usual cause
+    /// of "connected but can't create events" when the scope wasn't added to the OAuth consent screen).
+    /// </summary>
+    public async Task<bool> HasEventScopeAsync(int userId, CancellationToken ct = default)
+    {
+        var scope = await db.GoogleCalendarConnections.AsNoTracking()
+            .Where(c => c.UserId == userId).Select(c => c.Scope).FirstOrDefaultAsync(ct);
+        return scope is not null
+            && (scope.Contains("calendar.events", StringComparison.OrdinalIgnoreCase)
+                || scope.Contains("auth/calendar ", StringComparison.OrdinalIgnoreCase)
+                || scope.EndsWith("auth/calendar", StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
     /// Exchange a one-time auth CODE (authorization-code grant) for tokens and store the encrypted refresh
@@ -444,7 +467,7 @@ public sealed class GoogleCalendarService(
             using var res = await client.SendAsync(req, ct);
             if (!res.IsSuccessStatusCode)
             {
-                logger.LogWarning("Google calendar GET returned {Status}.", (int)res.StatusCode);
+                CaptureCalendarError("GET", (int)res.StatusCode, await SafeReadBodyAsync(res, ct));
                 return null;
             }
             await using var stream = await res.Content.ReadAsStreamAsync(ct);
@@ -471,7 +494,7 @@ public sealed class GoogleCalendarService(
             using var res = await client.SendAsync(req, ct);
             if (!res.IsSuccessStatusCode)
             {
-                logger.LogWarning("Google calendar {Method} returned {Status}.", method.Method, (int)res.StatusCode);
+                CaptureCalendarError(method.Method, (int)res.StatusCode, await SafeReadBodyAsync(res, ct));
                 return null;
             }
             await using var stream = await res.Content.ReadAsStreamAsync(ct);
@@ -482,6 +505,59 @@ public sealed class GoogleCalendarService(
             logger.LogWarning("Google calendar {Method} failed: {Reason}", method.Method, ex.Message);
             return null;
         }
+    }
+
+    /// <summary>Read up to 4 KB of a failed Calendar API response body (secret-free — it describes the
+    /// calendar request, not the OAuth exchange). Returns null on any read error.</summary>
+    private static async Task<string?> SafeReadBodyAsync(HttpResponseMessage res, CancellationToken ct)
+    {
+        try
+        {
+            var s = await res.Content.ReadAsStringAsync(ct);
+            return s.Length > 4096 ? s[..4096] : s;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Classify a failed Calendar API call from Google's error body into a user-actionable
+    /// <see cref="LastErrorHint"/> (e.g. "enable the Calendar API", "reconnect to grant scope"), and LOG the
+    /// (secret-free) reason for diagnosis. The most common "connected but can't create" causes are the
+    /// Calendar API being disabled in the Cloud project, or the calendar.events scope never being granted.
+    /// </summary>
+    private void CaptureCalendarError(string method, int statusCode, string? body)
+    {
+        string? reason = null, gstatus = null, message = null;
+        if (!string.IsNullOrEmpty(body))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("error", out var err) && err.ValueKind == JsonValueKind.Object)
+                {
+                    gstatus = GetStr(err, "status");
+                    message = GetStr(err, "message");
+                    if (err.TryGetProperty("errors", out var errs) && errs.ValueKind == JsonValueKind.Array
+                        && errs.GetArrayLength() > 0)
+                        reason = GetStr(errs[0], "reason");
+                }
+            }
+            catch { /* non-JSON error body — fall back to the status code only */ }
+        }
+
+        var lc = ((reason ?? "") + " " + (gstatus ?? "") + " " + (message ?? "")).ToLowerInvariant();
+        LastErrorHint =
+            lc.Contains("accessnotconfigured") || lc.Contains("service_disabled")
+                || lc.Contains("has not been used in project") || lc.Contains("it is disabled")
+                ? "Google Calendar API access isn't enabled for this app yet. In the Google Cloud console → APIs & Services → Library, enable “Google Calendar API”, wait a minute, then try again."
+            : lc.Contains("insufficient") || lc.Contains("scope")
+                ? "Calendar access wasn't granted. Disconnect, then reconnect and be sure to allow the calendar permission when Google asks."
+            : statusCode == 429 || lc.Contains("ratelimit") || lc.Contains("rate_limit")
+                ? "Google rate-limited the request — wait a moment and try again."
+            : null;
+
+        logger.LogWarning("Google calendar {Method} error {Status}: reason={Reason} gstatus={GStatus} message={Message}",
+            method, statusCode, reason, gstatus, message);
     }
 
     // =====================================================================================

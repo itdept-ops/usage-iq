@@ -35,7 +35,7 @@ public static class FamilyCalendarEndpoints
         int? DayStartHourLocal, int? DayEndHourLocal);
 
     // ---- Response DTOs ----
-    public sealed record StatusDto(bool Configured, bool Connected);
+    public sealed record StatusDto(bool Configured, bool Connected, bool ScopeOk);
     public sealed record ConnectedDto(bool Connected);
 
     /// <summary>An event on the caller's calendar (mirrors GoogleCalendarService.CalendarEvent).</summary>
@@ -69,7 +69,10 @@ public static class FamilyCalendarEndpoints
         {
             var caller = (await me.GetUserAsync(ct))!;
             var connected = cal.IsConfigured && await cal.IsConnectedAsync(caller.Id, ct);
-            return Results.Ok(new StatusDto(cal.IsConfigured, connected));
+            // scopeOk distinguishes "connected but calendar.events scope was never granted" (reconnect) from
+            // a working connection (then a create failure points at the Calendar API being disabled instead).
+            var scopeOk = connected && await cal.HasEventScopeAsync(caller.Id, ct);
+            return Results.Ok(new StatusDto(cal.IsConfigured, connected, scopeOk));
         });
 
         // ---- POST /connect : exchange the auth code for tokens; store the encrypted refresh token ----
@@ -110,7 +113,7 @@ public static class FamilyCalendarEndpoints
             var (start, end) = Window(startUtc, endUtc);
 
             var result = await cal.ListEventsAsync(caller.Id, start, end, ct);
-            if (!result.Ok) return NotReady(result.Status);
+            if (!result.Ok) return NotReady(result.Status, cal.LastErrorHint);
 
             var dtos = result.Value!.Select(ToDto).ToList();
             return Results.Ok(dtos);
@@ -126,7 +129,7 @@ public static class FamilyCalendarEndpoints
             var result = await cal.CreateEventAsync(
                 caller.Id, req.Title!.Trim(), req.StartUtc, req.EndUtc, req.AllDay,
                 Trim(req.Location, 1024), Trim(req.Description, 8192), ct);
-            if (!result.Ok) return NotReady(result.Status);
+            if (!result.Ok) return NotReady(result.Status, cal.LastErrorHint);
             return Results.Ok(ToDto(result.Value!));
         });
 
@@ -141,7 +144,7 @@ public static class FamilyCalendarEndpoints
             var result = await cal.UpdateEventAsync(
                 caller.Id, id, req.Title!.Trim(), req.StartUtc, req.EndUtc, req.AllDay,
                 Trim(req.Location, 1024), Trim(req.Description, 8192), ct);
-            if (!result.Ok) return NotReady(result.Status);
+            if (!result.Ok) return NotReady(result.Status, cal.LastErrorHint);
             return Results.Ok(ToDto(result.Value!));
         });
 
@@ -151,7 +154,7 @@ public static class FamilyCalendarEndpoints
         {
             var caller = (await me.GetUserAsync(ct))!;
             var status = await cal.DeleteEventAsync(caller.Id, id, ct);
-            if (status != CalendarStatus.Ok) return NotReady(status);
+            if (status != CalendarStatus.Ok) return NotReady(status, cal.LastErrorHint);
             return Results.NoContent();
         });
 
@@ -248,15 +251,16 @@ public static class FamilyCalendarEndpoints
     /// Map a not-Ok calendar status to a graceful, NON-500 response: a 200 not-connected/not-configured
     /// status body for the soft states, and a 502 only for a genuine upstream error.
     /// </summary>
-    private static IResult NotReady(CalendarStatus status) => status switch
+    private static IResult NotReady(CalendarStatus status, string? hint = null) => status switch
     {
         CalendarStatus.NotConfigured => Results.Ok(new { connected = false, configured = false,
             message = "Google Calendar isn't configured on this server." }),
         CalendarStatus.NotConnected => Results.Ok(new { connected = false, configured = true,
             message = "Connect your Google Calendar to see and manage events here." }),
-        // A transient upstream hiccup — surface as 502, still not a 500/unhandled.
+        // An upstream error — surface the SPECIFIC reason when we could classify it (e.g. the Calendar API
+        // isn't enabled, or the scope wasn't granted), else a generic transient message. 502, never a 500.
         _ => Results.Json(new { connected = true, configured = true,
-            message = "Google Calendar is temporarily unavailable. Please try again." },
+            message = hint ?? "Google Calendar is temporarily unavailable. Please try again." },
             statusCode: StatusCodes.Status502BadGateway),
     };
 
