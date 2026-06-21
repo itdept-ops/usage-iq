@@ -19,6 +19,39 @@
     </mat-select>
   </mat-form-field>
 
+  <!-- ✨ From a recipe -->
+  <div class="note-ai">
+    <button type="button" class="note-ai__toggle" [class.note-ai__toggle--open]="recipeOpen()"
+            (click)="toggleRecipe()" [attr.aria-expanded]="recipeOpen()">
+      <mat-icon class="note-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+      <span>From a recipe</span>
+      <mat-icon class="note-ai__chev" aria-hidden="true">{{ recipeOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+
+    @if (recipeOpen()) {
+      <div class="note-ai__panel">
+        <textarea class="note-ai__input meal-recipe__text" rows="5" maxlength="8000"
+                  [ngModel]="recipeText()" (ngModelChange)="recipeText.set($event)" [disabled]="recipeBusy()"
+                  placeholder="Paste a recipe… (for a link, copy and paste the page's text — we don't open URLs)"></textarea>
+        <div class="note-ai__bar meal-recipe__bar">
+          <button mat-flat-button color="primary" type="button" class="note-ai__go"
+                  [disabled]="recipeBusy() || !recipeText().trim()" (click)="runRecipe()">
+            @if (recipeBusy()) {
+              <mat-spinner [diameter]="16" />
+              <span>Reading…</span>
+            } @else {
+              <span>Use this recipe</span>
+            }
+          </button>
+        </div>
+
+        @if (recipeStatus(); as msg) {
+          <p class="note-ai__status" aria-live="polite">{{ msg }}</p>
+        }
+      </div>
+    }
+  </div>
+
   <mat-form-field appearance="outline" class="note-edit__field">
     <mat-label>Dish</mat-label>
     <input matInput maxlength="200" cdkFocusInitial placeholder="e.g. Sheet-pan chicken & veggies"

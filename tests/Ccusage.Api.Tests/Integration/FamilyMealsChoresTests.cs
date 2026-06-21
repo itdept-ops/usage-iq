@@ -485,4 +485,82 @@ public class FamilyMealsChoresTests(WebAppFactory factory)
         ChoreById(await Json(await owner.GetAsync("/api/family/chores")), choreId)
             .GetProperty("done").GetBoolean().Should().BeTrue();
     }
+
+    // =====================================================================================
+    // AI — "Plan our week" + "From a recipe": gated by family.use, 400 on empty (recipe),
+    // graceful 503 when Gemini unconfigured (never 500), and neither writes anything.
+    // =====================================================================================
+
+    [Fact]
+    public async Task MealsAi_requires_family_use()
+    {
+        var (_, plain, _) = await ProvisionUser("dashboard.view");
+
+        (await plain.PostAsJsonAsync("/api/family/meals/ai/plan-week",
+            new { weekStart = ThisMonday(), constraints = "kid-friendly" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await plain.PostAsJsonAsync("/api/family/meals/ai/from-recipe",
+            new { text = "2 bananas, 1 cup flour" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task MealsAi_requires_authentication()
+    {
+        var anon = factory.CreateClient();
+
+        (await anon.PostAsJsonAsync("/api/family/meals/ai/plan-week", new { weekStart = ThisMonday() }))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await anon.PostAsJsonAsync("/api/family/meals/ai/from-recipe", new { text = "x" }))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task FromRecipe_returns_400_for_empty_text()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var res = await owner.PostAsJsonAsync("/api/family/meals/ai/from-recipe", new { text = "   " });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task PlanWeek_is_unavailable_503_when_gemini_is_unconfigured_never_500()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // The test host configures no Gemini API key, so AI planning is gracefully unavailable (503), never a
+        // 500 and never a real Gemini/Google call (the unconfigured branch returns before any HTTP).
+        var res = await owner.PostAsJsonAsync("/api/family/meals/ai/plan-week",
+            new { weekStart = ThisMonday(), constraints = "budget, no nuts", fillSlots = "allDinners" });
+        res.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task FromRecipe_is_unavailable_503_when_gemini_is_unconfigured_never_500()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var res = await owner.PostAsJsonAsync("/api/family/meals/ai/from-recipe",
+            new { text = "Banana bread: 2 bananas, 1 cup flour, 1/2 cup sugar. Mix and bake." });
+        res.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task PlanWeek_writes_nothing_even_when_it_runs_the_unconfigured_path()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var monday = ThisMonday();
+        await owner.PostAsJsonAsync("/api/family/meals/ai/plan-week",
+            new { weekStart = monday, constraints = "anything", fillSlots = "allDinners" });
+
+        // The week is untouched — the AI endpoint proposes only; it creates no meals.
+        var week = await Json(await owner.GetAsync($"/api/family/meals?weekStart={monday}"));
+        MealIdsInWeek(week).Should().BeEmpty();
+    }
 }

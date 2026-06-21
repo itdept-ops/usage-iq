@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatContactDto, ChatMessageDto, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
-  FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyToday, FindTimeRequest, ReminderAiResult, ListItemsAiResult, NoteDraftAiResult, NoteSummaryAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceSummary, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
+  FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyToday, FindTimeRequest, ReminderAiResult, ListItemsAiResult, NoteDraftAiResult, NoteSummaryAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceSummary, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
   HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
@@ -1014,6 +1014,29 @@ export class Api {
     weekStart?: string; mealIds?: number[]; listId?: number;
   }): Observable<FamilyList> {
     return this.http.post<FamilyList>(`${this.base}/family/meals/to-grocery`, req);
+  }
+
+  /**
+   * "✨ Plan our week": ask Gemini to propose varied dinners for the week's empty (or all) dinner slots.
+   * The server computes the target dates + reads the household's recent titles (a "don't repeat" hint) —
+   * neither is trusted from the client. Saves NOTHING; the page reviews/edits, then POSTs each accepted meal
+   * to /meals (and can run mealsToGrocery). Degrades to a 503 when AI is unavailable / not configured.
+   */
+  planWeekAi(req: PlanWeekAiRequest): Observable<PlanWeekAiResult> {
+    return this.http.post<PlanWeekAiResult>(`${this.base}/family/meals/ai/plan-week`, {
+      weekStart: req.weekStart ?? null,
+      constraints: req.constraints ?? null,
+      fillSlots: req.fillSlots ?? null,
+    });
+  }
+
+  /**
+   * "✨ From a recipe": parse already-extracted recipe TEXT into a meal (title + newline-joined ingredients)
+   * to PREFILL the editor. The server NEVER fetches a URL (no SSRF) — for a recipe link the caller pastes the
+   * page text. Saves NOTHING; the user confirms/edits then Saves. 400 on empty text; 503 when AI is down.
+   */
+  recipeToMealAi(text: string): Observable<RecipeAiResult> {
+    return this.http.post<RecipeAiResult>(`${this.base}/family/meals/ai/from-recipe`, { text });
   }
 
   // ---- Family Hub F4: chore board (assignee; stars/points; recurrence; the stars tally) ----

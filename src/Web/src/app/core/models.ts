@@ -2098,6 +2098,61 @@ export interface FamilyMealDay {
 }
 
 /**
+ * "✨ Plan our week" request (POST /api/family/meals/ai/plan-week; mirrors PlanWeekAiRequest). `weekStart`
+ * is the week's Monday ("YYYY-MM-DD"; defaults to the household's current week). `constraints` is optional
+ * free text (kid-friendly / budget / no nuts). `fillSlots` chooses which dinners to propose: "emptyDinners"
+ * (only the week's empty dinner slots — the default) or "allDinners" (all 7). The server computes the target
+ * dates + the household's recent titles (neither trusted from the client) and saves NOTHING — the frontend
+ * reviews then POSTs each accepted meal to /meals.
+ */
+export interface PlanWeekAiRequest {
+  weekStart?: string | null;
+  constraints?: string | null;
+  fillSlots?: 'emptyDinners' | 'allDinners' | null;
+}
+
+/**
+ * One proposed dinner from "✨ Plan our week" (mirrors PlanWeekMealDto), in the same shape the frontend
+ * POSTs to /meals: `localDate` ("YYYY-MM-DD"), `slot` (always "dinner" here), `title`, and newline-separated
+ * `ingredients`. The user reviews/edits before any of it is created.
+ */
+export interface PlanWeekMeal {
+  localDate: string;
+  slot: FamilyMealSlot;
+  title: string;
+  ingredients: string;
+}
+
+/**
+ * "✨ Plan our week" response (mirrors PlanWeekAiDto): 0+ proposed `meals` to review + an optional short
+ * `notes`. An empty `meals` list means every targeted dinner was already planned (or the model returned
+ * nothing) — the page says so.
+ */
+export interface PlanWeekAiResult {
+  meals: PlanWeekMeal[];
+  notes: string | null;
+}
+
+/**
+ * "✨ From a recipe" request (POST /api/family/meals/ai/from-recipe; mirrors RecipeAiRequest). `text` is the
+ * already-extracted recipe TEXT — the server NEVER fetches a URL (no SSRF), so for a recipe link the user
+ * pastes the page's text. Saves nothing; the editor PREFILLS from the response for the user to confirm.
+ */
+export interface RecipeAiRequest {
+  text: string;
+}
+
+/**
+ * "✨ From a recipe" response (mirrors RecipeAiDto): a parsed `title` + newline-joined `ingredients` to
+ * PREFILL the meal editor, plus an optional short `notes`. Nothing is saved until the user hits Save.
+ */
+export interface RecipeAiResult {
+  title: string;
+  ingredients: string;
+  notes: string | null;
+}
+
+/**
  * A household chore on the shared board (mirrors ChoreDto). Optionally assigned to a member
  * (`assignedToUserId` + name; null = unassigned/anyone). `done` checks it off for the current period and
  * stamps `doneByUserId`/`doneByName`/`doneUtc`. `points` are the stars earned each completion; `recurrence`

@@ -1,17 +1,21 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
-import { FamilyMeal, FamilyMealDay, FamilyMealSlot } from '../../core/models';
+import { FamilyMeal, FamilyMealDay, FamilyMealSlot, PlanWeekMeal } from '../../core/models';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { MealEditorDialog, MealEditorData, MealEditorResult } from './meal-editor-dialog';
 
@@ -22,6 +26,21 @@ interface DayCell {
   dateLabel: string;
   isToday: boolean;
   meals: FamilyMeal[];
+}
+
+/** Which dinners "Plan our week" should propose: only the empty slots, or all seven. */
+type FillSlots = 'emptyDinners' | 'allDinners';
+
+/** One AI-proposed dinner the family can edit/remove before adding it to the plan. */
+interface ProposedMeal {
+  /** Stable key for @for tracking (the AI list has no ids). */
+  key: number;
+  localDate: string;
+  /** A friendly "Monday, Jun 23" label for the row, in the viewer's local zone. */
+  dayLabel: string;
+  title: string;
+  /** Raw newline-separated ingredient text (editable in the row). */
+  ingredients: string;
 }
 
 /** Pretty labels + icons for each slot (dinner is the primary slot at the table). */
@@ -44,8 +63,8 @@ const SLOT_META: Record<FamilyMealSlot, { label: string; icon: string }> = {
 @Component({
   selector: 'app-family-meals',
   imports: [
-    RouterLink, MatIconModule, MatButtonModule, MatTooltipModule, MatProgressSpinnerModule,
-    MatSnackBarModule,
+    FormsModule, RouterLink, MatIconModule, MatButtonModule, MatButtonToggleModule, MatTooltipModule,
+    MatProgressSpinnerModule, MatFormFieldModule, MatInputModule, MatSnackBarModule,
   ],
   templateUrl: './meals.html',
   styleUrls: ['./family.scss', './meals.scss'],
@@ -61,6 +80,23 @@ export class FamilyMeals {
   readonly error = signal(false);
   /** True while the whole-week "add to grocery" call is in flight (locks the button). */
   readonly addingWeek = signal(false);
+
+  // ---- ✨ Plan our week ----
+  /** Whether the "Plan our week" sheet is open. */
+  readonly planOpen = signal(false);
+  /** Free-text constraints ("kid-friendly, budget, no nuts…"). */
+  readonly planConstraints = signal('');
+  /** Fill only the empty dinners (default) or all seven. */
+  readonly planFill = signal<FillSlots>('emptyDinners');
+  readonly planBusy = signal(false);
+  /** A friendly aria-live status line for the plan sheet (a hint, an error, or progress). */
+  readonly planStatus = signal('');
+  /** The AI-proposed dinners awaiting review (editable rows), or empty when none are staged. */
+  readonly proposals = signal<ProposedMeal[]>([]);
+  /** True while "Add to plan" is creating the accepted meals (locks the actions). */
+  readonly addingPlan = signal(false);
+  /** Monotonic key source for proposal rows (the AI list has no ids). */
+  private proposalKey = 0;
 
   /** The Monday (local) of the week being viewed. */
   readonly weekStart = signal<Date>(this.thisMonday());
@@ -189,6 +225,142 @@ export class FamilyMeals {
       data: { meal, localDate, dayLabel, defaultSlot }, width: '460px', maxWidth: '94vw', autoFocus: false,
     });
     return firstValueFrom(ref.afterClosed());
+  }
+
+  // ---- ✨ Plan our week (AI proposes dinners → editable review → add to plan) ----
+
+  /** Open/close the plan sheet. Closing while proposals are staged keeps them (they live below the sheet). */
+  togglePlan(): void {
+    this.planOpen.update(o => !o);
+  }
+
+  setFill(fill: FillSlots): void {
+    this.planFill.set(fill);
+  }
+
+  /**
+   * Ask Gemini to propose dinners for the visible week's empty (or all) slots and stage them as EDITABLE
+   * review rows. Creates NOTHING — the user edits/removes, then "Add to plan" POSTs each to /meals. Degrades
+   * gracefully: a 503 (AI unavailable / not configured) or any error shows a friendly aria-live line; an
+   * empty result (every dinner already planned, or nothing came back) says so.
+   */
+  async planWeek(): Promise<void> {
+    if (this.planBusy()) return;
+    this.planBusy.set(true);
+    this.planStatus.set('Thinking up some dinners…');
+    this.proposals.set([]);
+    try {
+      const result = await firstValueFrom(this.api.planWeekAi({
+        weekStart: this.weekStartIso(),
+        constraints: this.planConstraints().trim() || null,
+        fillSlots: this.planFill(),
+      }));
+      const proposed = (result.meals ?? []).map(m => this.toProposed(m));
+      this.proposals.set(proposed);
+      if (proposed.length === 0) {
+        this.planStatus.set(result.notes?.trim()
+          || (this.planFill() === 'emptyDinners'
+            ? 'Every dinner this week is already planned — switch to “All dinners” to get fresh ideas.'
+            : "I couldn't come up with dinners just now. Please try again."));
+      } else {
+        const n = proposed.length;
+        this.planStatus.set((result.notes?.trim() ? result.notes!.trim() + ' ' : '')
+          + `Review ${n === 1 ? 'this dinner' : `these ${n} dinners`} below, tweak anything, then add to your plan.`);
+      }
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      this.planStatus.set(status === 503
+        ? 'AI unavailable, add meals manually.'
+        : this.messageOf(e, "I couldn't reach the AI just now. Please try again, or add meals manually."));
+    } finally {
+      this.planBusy.set(false);
+    }
+  }
+
+  /** Re-run the proposal with the same constraints/scope (replaces the staged rows). */
+  regeneratePlan(): void {
+    void this.planWeek();
+  }
+
+  /** Drop one proposed dinner from the review list. */
+  removeProposal(p: ProposedMeal): void {
+    this.proposals.set(this.proposals().filter(x => x.key !== p.key));
+  }
+
+  /** Discard the whole proposal list + status (e.g. after a regenerate the user no longer wants). */
+  clearProposals(): void {
+    this.proposals.set([]);
+    this.planStatus.set('');
+  }
+
+  /**
+   * Add every staged proposal to the plan by POSTing each to the existing /meals — partial-failure aware: a
+   * row that saves drops off the list; rows that fail stay so the user can retry. On full success, offer a
+   * one-tap "Add ingredients to grocery list" for the week.
+   */
+  async addPlanToPlan(): Promise<void> {
+    const rows = this.proposals();
+    if (this.addingPlan() || rows.length === 0) return;
+    this.addingPlan.set(true);
+    this.planStatus.set('Adding your dinners…');
+
+    let added = 0;
+    const failed: ProposedMeal[] = [];
+    for (const p of rows) {
+      const title = p.title.trim();
+      if (!title) { failed.push(p); continue; }
+      try {
+        await firstValueFrom(this.api.createFamilyMeal({
+          localDate: p.localDate, slot: 'dinner', title, ingredients: p.ingredients.trim(),
+        }));
+        added++;
+      } catch {
+        failed.push(p);
+      }
+    }
+
+    this.proposals.set(failed); // keep only the ones that didn't make it
+    this.addingPlan.set(false);
+
+    if (added > 0) this.reload();
+
+    if (failed.length === 0) {
+      this.planStatus.set('');
+      this.planOpen.set(false);
+      this.offerWeekToGrocery(added);
+    } else if (added === 0) {
+      this.planStatus.set("Couldn't add those dinners just now. Please try again.");
+    } else {
+      this.planStatus.set(
+        `Added ${added}. ${failed.length} couldn't be added — review the remaining ${failed.length === 1 ? 'one' : 'rows'} and try again.`);
+    }
+  }
+
+  /** After a successful add, a warm snackbar with a one-tap "Add ingredients to grocery list". */
+  private offerWeekToGrocery(added: number): void {
+    const msg = `Added ${added} ${added === 1 ? 'dinner' : 'dinners'} to your plan.`;
+    const ref = this.snack.open(msg, 'Add ingredients to grocery list', { duration: 7000 });
+    ref.onAction().subscribe(() => { void this.addWeekToGrocery(); });
+  }
+
+  /** Build an editable review row from a raw AI proposal (its day labelled in the viewer's local zone). */
+  private toProposed(m: PlanWeekMeal): ProposedMeal {
+    const localDate = this.dateOnly(m.localDate);
+    const date = new Date(`${localDate}T00:00:00`);
+    const dayLabel = Number.isNaN(date.getTime())
+      ? localDate
+      : `${date.toLocaleDateString(undefined, { weekday: 'long' })}, ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+    return { key: ++this.proposalKey, localDate, dayLabel, title: m.title, ingredients: m.ingredients };
+  }
+
+  /** Edit a proposal's title inline (bound from the row input). */
+  setProposalTitle(p: ProposedMeal, title: string): void {
+    this.proposals.set(this.proposals().map(x => x.key === p.key ? { ...x, title } : x));
+  }
+
+  /** Edit a proposal's ingredients inline (bound from the row textarea). */
+  setProposalIngredients(p: ProposedMeal, ingredients: string): void {
+    this.proposals.set(this.proposals().map(x => x.key === p.key ? { ...x, ingredients } : x));
   }
 
   // ---- Grocery-list tie-in ----

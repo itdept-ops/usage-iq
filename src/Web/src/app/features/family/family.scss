@@ -645,6 +645,10 @@ a.tile:focus-visible {
     mat-icon { width: 18px; height: 18px; font-size: 18px; } }
 }
 
+/* "From a recipe" box in the meal editor (reuses .note-ai shell). */
+.meal-recipe__text { width: 100%; flex: 1 1 auto; resize: vertical; min-height: 96px; line-height: 1.4; }
+.meal-recipe__bar { justify-content: flex-end; }
+
 /* ── Share dialog ───────────────────────────────────────────────────── */
 .share-dlg__body { padding-top: 6px !important; display: flex; flex-direction: column;
   gap: var(--tech-space-3, 12px); min-width: min(380px, 84vw); }

@@ -42,6 +42,30 @@ public static class FamilyMealsChoresEndpoints
     public sealed record MealUpsertRequest(string? LocalDate, string? Slot, string? Title, string? Ingredients);
     public sealed record ToGroceryRequest(string? WeekStart, IReadOnlyList<long>? MealIds, long? ListId);
 
+    // ---- AI-assist DTOs (plan our week / from a recipe) ----
+
+    /// <summary>"Plan our week" request: the week to plan (<see cref="WeekStart"/> = its Monday, YYYY-MM-DD;
+    /// defaults to the current household week), optional free-text <see cref="Constraints"/> (kid-friendly /
+    /// budget / allergies), and <see cref="FillSlots"/> ("emptyDinners" = only empty dinner slots, the default;
+    /// "allDinners" = all 7). The SERVER computes the target dinner dates + reads the household's recent meal
+    /// titles; neither is trusted from the client. Nothing is created — the frontend reviews then POSTs each
+    /// proposed meal to /meals.</summary>
+    public sealed record PlanWeekAiRequest(string? WeekStart, string? Constraints, string? FillSlots);
+
+    /// <summary>One proposed meal from "Plan our week", in the same shape the frontend POSTs to /meals.</summary>
+    public sealed record PlanWeekMealDto(string LocalDate, string Slot, string Title, string Ingredients);
+
+    /// <summary>"Plan our week" response: 0+ proposed meals (each on a requested slot date) + an optional note.</summary>
+    public sealed record PlanWeekAiDto(IReadOnlyList<PlanWeekMealDto> Meals, string? Notes);
+
+    /// <summary>"From a recipe" request: the already-extracted recipe <see cref="Text"/> (the server NEVER
+    /// fetches a URL — the client passes recipe TEXT only, so there's no SSRF surface).</summary>
+    public sealed record RecipeAiRequest(string? Text);
+
+    /// <summary>"From a recipe" response: a parsed meal (title + newline-joined ingredients) + an optional note,
+    /// for the editor to PREFILL. Saves nothing.</summary>
+    public sealed record RecipeAiDto(string Title, string Ingredients, string? Notes);
+
     public sealed record ChoreDto(
         long Id, string Title,
         int? AssignedToUserId, string? AssignedToName,
@@ -271,6 +295,76 @@ public static class FamilyMealsChoresEndpoints
             // reflect a household member).
             return Results.Ok(await FamilyNotesListsEndpoints.LoadListDtoAsync(db, list.Id, caller.Id, household.Id, ct));
         });
+
+        // ---- POST /meals/ai/plan-week : Gemini proposes varied dinners for the week's empty (or all) slots ----
+        // The SERVER computes the target dinner dates (the empty ones, or all 7 with fillSlots="allDinners") and
+        // reads the household's last ~14 days of meal titles as a "don't repeat these" hint — NEVER trusted from
+        // the client. Creates NOTHING — the frontend reviews then POSTs each proposed meal to /meals (and can run
+        // /meals/to-grocery). Rate-limited (the shared "ai" policy); graceful 503 when Gemini is unavailable.
+        g.MapPost("/meals/ai/plan-week", async (
+            PlanWeekAiRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            GeminiService gemini, UsageDbContext db, CancellationToken ct) =>
+        {
+            if (!gemini.IsConfigured) return AiUnavailable();
+
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+            var start = ParseDate(req?.WeekStart) ?? WeekStartLocal(household);
+            var end = start.AddDays(7); // exclusive
+
+            // The week's existing dinners (to find the empty slots) + the recent titles ("don't repeat").
+            var existingDinnerDates = (await db.FamilyMeals.AsNoTracking()
+                    .Where(m => m.HouseholdId == household.Id && m.Slot == "dinner"
+                        && m.LocalDate >= start && m.LocalDate < end)
+                    .Select(m => m.LocalDate)
+                    .ToListAsync(ct))
+                .ToHashSet();
+
+            var allDinners = string.Equals(req?.FillSlots, "allDinners", StringComparison.OrdinalIgnoreCase);
+            var slotDates = new List<DateOnly>(7);
+            for (var i = 0; i < 7; i++)
+            {
+                var date = start.AddDays(i);
+                if (allDinners || !existingDinnerDates.Contains(date)) slotDates.Add(date);
+            }
+
+            // Every dinner is already planned (and they asked only to fill the empties) → nothing to do.
+            if (slotDates.Count == 0) return Results.Ok(new PlanWeekAiDto(Array.Empty<PlanWeekMealDto>(), null));
+
+            // The "don't repeat these" hint: the household's last ~14 days of meal titles, server-read.
+            var since = start.AddDays(-14);
+            var recentTitles = await db.FamilyMeals.AsNoTracking()
+                .Where(m => m.HouseholdId == household.Id && m.LocalDate >= since && m.LocalDate < end)
+                .OrderByDescending(m => m.LocalDate)
+                .Select(m => m.Title)
+                .ToListAsync(ct);
+
+            var result = await gemini.PlanWeekAsync(req?.Constraints, slotDates, recentTitles, ct);
+            if (result is null) return AiUnavailable();
+
+            var meals = result.Meals
+                .Select(m => new PlanWeekMealDto(m.LocalDate.ToString("yyyy-MM-dd"), m.Slot, m.Title, m.Ingredients))
+                .ToList();
+            return Results.Ok(new PlanWeekAiDto(meals, result.Notes));
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
+        // ---- POST /meals/ai/from-recipe : Gemini parses pasted recipe TEXT into a meal for the editor ----
+        // The server NEVER fetches a URL — the client passes already-extracted recipe TEXT only (no SSRF).
+        // Returns the parsed meal (title + ingredients) for the editor to PREFILL; saves nothing. Rate-limited;
+        // 400 on empty text; graceful 503 when Gemini is unavailable.
+        g.MapPost("/meals/ai/from-recipe", async (
+            RecipeAiRequest req, GeminiService gemini, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(req?.Text))
+                return Results.BadRequest(new { message = "Paste the recipe text you'd like to turn into a meal." });
+            if (!gemini.IsConfigured) return AiUnavailable();
+
+            var result = await gemini.RecipeToMealAsync(req.Text, ct);
+            if (result is null) return AiUnavailable();
+
+            return Results.Ok(new RecipeAiDto(result.Title, result.Ingredients, result.Notes));
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
     }
 
     // =====================================================================================
@@ -604,4 +698,11 @@ public static class FamilyMealsChoresEndpoints
 
     private static IResult NotFound() =>
         Results.NotFound(new { message = "That item doesn't exist." });
+
+    /// <summary>503 (never 500) when an AI-assist call can't run — Gemini unconfigured or the call failed. One
+    /// consistent degraded path the frontend shows as "AI isn't available right now; do it manually".</summary>
+    private static IResult AiUnavailable() => Results.Problem(
+        title: "AI assistance is not available.",
+        detail: "AI assistance is not available right now. You can do this manually.",
+        statusCode: StatusCodes.Status503ServiceUnavailable);
 }

@@ -12,16 +12,103 @@
         <p class="family__sub">Plan the week around the table</p>
       </div>
     </div>
-    <button mat-flat-button color="primary" class="family__settings-btn meals__grocery-btn"
-            [disabled]="addingWeek() || mealCount() === 0" (click)="addWeekToGrocery()">
-      @if (addingWeek()) {
-        <mat-spinner [diameter]="20" />
-      } @else {
-        <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
-      }
-      Add this week's ingredients to grocery list
-    </button>
+    <div class="meals__hero-actions">
+      <button mat-flat-button color="primary" class="family__settings-btn meals__plan-btn"
+              [class.meals__plan-btn--open]="planOpen()" (click)="togglePlan()" [attr.aria-expanded]="planOpen()">
+        <mat-icon class="meals__spark" aria-hidden="true">auto_awesome</mat-icon>
+        Plan our week
+      </button>
+      <button mat-stroked-button class="family__settings-btn meals__grocery-btn"
+              [disabled]="addingWeek() || mealCount() === 0" (click)="addWeekToGrocery()">
+        @if (addingWeek()) {
+          <mat-spinner [diameter]="20" />
+        } @else {
+          <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
+        }
+        Add this week's ingredients to grocery list
+      </button>
+    </div>
   </header>
+
+  <!-- ── ✨ Plan our week ─────────────────────────────────────────────── -->
+  @if (planOpen()) {
+    <section class="plan-ai" aria-label="Plan our week with AI">
+      <div class="plan-ai__form">
+        <mat-form-field appearance="outline" class="plan-ai__field" subscriptSizing="dynamic">
+          <mat-label>Any constraints?</mat-label>
+          <input matInput maxlength="400" [ngModel]="planConstraints()"
+                 (ngModelChange)="planConstraints.set($event)" (keydown.enter)="planWeek()"
+                 placeholder="kid-friendly, budget, no nuts…" [disabled]="planBusy()" />
+        </mat-form-field>
+
+        <mat-button-toggle-group class="plan-ai__scope" [value]="planFill()"
+                                 (change)="setFill($event.value)" [disabled]="planBusy()"
+                                 aria-label="Which dinners to plan">
+          <mat-button-toggle value="emptyDinners">Empty dinners</mat-button-toggle>
+          <mat-button-toggle value="allDinners">All dinners</mat-button-toggle>
+        </mat-button-toggle-group>
+
+        <button mat-flat-button color="primary" class="plan-ai__go"
+                [disabled]="planBusy()" (click)="planWeek()">
+          @if (planBusy()) {
+            <mat-spinner [diameter]="18" />
+            <span>Thinking…</span>
+          } @else {
+            <mat-icon class="meals__spark" aria-hidden="true">auto_awesome</mat-icon>
+            <span>{{ proposals().length ? 'Regenerate' : 'Suggest dinners' }}</span>
+          }
+        </button>
+      </div>
+
+      @if (planStatus(); as msg) {
+        <p class="plan-ai__status" aria-live="polite">{{ msg }}</p>
+      }
+
+      @if (proposals().length) {
+        <ul class="plan-ai__rows">
+          @for (p of proposals(); track p.key) {
+            <li class="plan-row">
+              <div class="plan-row__head">
+                <span class="plan-row__day"><mat-icon aria-hidden="true">event</mat-icon>{{ p.dayLabel }}</span>
+                <button mat-icon-button class="plan-row__remove" matTooltip="Remove"
+                        (click)="removeProposal(p)" [disabled]="addingPlan()">
+                  <mat-icon aria-hidden="true">close</mat-icon>
+                </button>
+              </div>
+              <mat-form-field appearance="outline" class="plan-row__field" subscriptSizing="dynamic">
+                <mat-label>Dinner</mat-label>
+                <input matInput maxlength="200" [ngModel]="p.title"
+                       (ngModelChange)="setProposalTitle(p, $event)" [disabled]="addingPlan()" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="plan-row__field" subscriptSizing="dynamic">
+                <mat-label>Ingredients</mat-label>
+                <textarea matInput rows="3" maxlength="4000" [ngModel]="p.ingredients"
+                          (ngModelChange)="setProposalIngredients(p, $event)" [disabled]="addingPlan()"
+                          placeholder="One per line"></textarea>
+              </mat-form-field>
+            </li>
+          }
+        </ul>
+
+        <div class="plan-ai__actions">
+          <button mat-button type="button" (click)="clearProposals()" [disabled]="addingPlan()">Discard</button>
+          <button mat-button type="button" (click)="regeneratePlan()" [disabled]="addingPlan() || planBusy()">
+            <mat-icon aria-hidden="true">refresh</mat-icon> Regenerate
+          </button>
+          <button mat-flat-button color="primary" type="button" (click)="addPlanToPlan()"
+                  [disabled]="addingPlan()">
+            @if (addingPlan()) {
+              <mat-spinner [diameter]="18" />
+              <span>Adding…</span>
+            } @else {
+              <mat-icon aria-hidden="true">playlist_add</mat-icon>
+              <span>Add {{ proposals().length === 1 ? 'dinner' : 'all' }} to plan</span>
+            }
+          </button>
+        </div>
+      }
+    </section>
+  }
 
   <!-- ── Week navigator ──────────────────────────────────────────────── -->
   <div class="week-nav">
