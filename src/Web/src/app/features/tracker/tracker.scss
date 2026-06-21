@@ -97,6 +97,83 @@
   .tracker__daybuilder-actions { width: 100%; justify-content: space-between; }
 }
 
+/* ── ✨ "This week" recap card (read-only weekly narration; mirrors the finance "explain this month" /
+   morning-briefing card UX: warm gradient surface, a calmer plain fallback when AI is unavailable) ── */
+.tracker__recap { display: block; }
+
+.tracker__recap-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2);
+  padding: var(--tech-space-3) var(--tech-space-4);
+  color: var(--tech-text-secondary);
+  font-size: var(--tech-fs-body);
+}
+
+.recap-card {
+  display: flex;
+  gap: var(--tech-space-4, 16px);
+  padding: var(--tech-space-5, 20px);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius, 12px);
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent) 12%, transparent), transparent 55%),
+    radial-gradient(120% 160% at 100% 0%, rgba(255, 196, 0, 0.10), transparent 55%),
+    var(--tech-panel, var(--tech-bg-sunken));
+  box-shadow: var(--tech-shadow-panel);
+
+  /* When the AI fell back to the plain deterministic recap, drop the accent flourish to a calmer surface. */
+  &--plain {
+    background: var(--tech-panel, var(--tech-bg-sunken));
+    .recap-card__spark { color: var(--tech-text-secondary); }
+  }
+}
+
+.recap-card__spark {
+  flex: 0 0 auto;
+  color: var(--tech-accent);
+  width: 28px; height: 28px; font-size: 28px;
+  margin-top: 2px;
+}
+
+.recap-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-2, 8px);
+  min-width: 0;
+}
+
+.recap-card__eyebrow {
+  margin: 0;
+  font-size: var(--tech-fs-label);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tech-text-tertiary);
+}
+
+.recap-card__text {
+  margin: 0;
+  font-size: var(--tech-fs-body);
+  line-height: 1.5;
+  color: var(--tech-text);
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.recap-card__insights {
+  margin: 4px 0 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  li {
+    font-size: var(--tech-fs-body);
+    line-height: 1.4;
+    color: var(--tech-text-secondary);
+  }
+}
+
 /* ── Read-only banner ── */
 .tracker__readonly {
   display: flex;

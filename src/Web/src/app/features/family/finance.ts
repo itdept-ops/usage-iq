@@ -12,7 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import {
-  FinanceAccount, FinanceAccountKind, FinanceImportBatch, FinanceOwner, FinanceSummary,
+  FinanceAccount, FinanceAccountKind, FinanceImportBatch, FinanceMoneyCoachResult, FinanceOwner, FinanceSummary,
   FinanceSummaryAiResult, FinanceTransaction, FinanceTransactionsPage, FinanceTxnKind,
 } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
@@ -79,6 +79,16 @@ export class FamilyFinance {
   /** The yyyy-MM the AI summary was last loaded for, so we only refetch when the month actually changes. */
   private aiSummaryMonth = '';
 
+  // ---- ✨ "Money coach" (DETERMINISTIC recurring-charges floor + optional read-only AI narration) ----
+  /**
+   * The recurring-charges detector + optional warm narration. The `recurring` list + `monthlyRecurringTotal`
+   * are the DETERMINISTIC floor and always render once loaded (even when `fellBackToPlain`). Null until
+   * loaded. The endpoint always anchors to recent activity (no month param), so we load it once on init —
+   * the month stepper doesn't change it. Best-effort; a network blip just hides the card.
+   */
+  readonly coach = signal<FinanceMoneyCoachResult | null>(null);
+  readonly coachLoading = signal(false);
+
   // ---- import dropzone ----
   readonly importing = signal(false);
   readonly dragOver = signal(false);
@@ -135,6 +145,8 @@ export class FamilyFinance {
     this.loadImports();
     this.loadTxns();
     this.loadAiSummary();
+    // A fresh import can change the recurring-charges floor, so force a coach refetch on a non-initial reload.
+    this.loadCoach(!initial);
   }
 
   private loadSummary(): void {
@@ -186,6 +198,25 @@ export class FamilyFinance {
           this.aiSummary.set(s);
           this.aiLoading.set(false);
         }
+      });
+  }
+
+  /**
+   * Load the "✨ Money coach": the DETERMINISTIC recurring-charges floor (+ optional warm narration). The
+   * endpoint always anchors to the household's recent activity (no month param) and NEVER 503s — when AI is
+   * unavailable it returns the recurring list with fellBackToPlain=true and a null narrative — so a network
+   * blip is the only failure path; we degrade silently and hide the card. Loaded once on init / after an
+   * import (the month stepper doesn't change it). Skips a redundant refetch if it's already loaded.
+   */
+  private loadCoach(force = false): void {
+    if (this.coachLoading()) return;
+    if (!force && this.coach()) return;
+    this.coachLoading.set(true);
+    this.api.financeMoneyCoachAi()
+      .pipe(catchError(() => of<FinanceMoneyCoachResult | null>(null)), takeUntilDestroyed())
+      .subscribe(c => {
+        this.coach.set(c);
+        this.coachLoading.set(false);
       });
   }
 

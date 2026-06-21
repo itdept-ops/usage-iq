@@ -523,3 +523,140 @@ app-chart { display: block; width: 100%; height: 100%; }
   color: var(--tech-text-dim, #9ba9bd);
   font-size: var(--tech-fs-label);
 }
+
+/* ── ✨ Money coach: a calm card whose deterministic recurring list + monthly total always render; the
+   warm AI narration + trim tips sit below (only when the model narrated) ── */
+.fin-coach {
+  margin: 0 0 var(--tech-space-4, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-3, 12px);
+}
+
+.fin-coach__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tech-space-3, 12px);
+}
+
+.fin-coach__crest {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tech-accent) 16%, transparent);
+  color: var(--tech-accent);
+  mat-icon { width: 22px; height: 22px; font-size: 22px; }
+}
+
+.fin-coach__headtext { flex: 1 1 auto; min-width: 0; }
+
+.fin-coach__total {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.fin-coach__total-label {
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--tech-text-dim, #9ba9bd);
+}
+
+.fin-coach__total-value {
+  font-size: var(--tech-fs-stat, 1.5rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--tech-text);
+}
+
+.fin-coach__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fin-coach__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "merchant amt" "meta amt";
+  align-items: center;
+  column-gap: var(--tech-space-3, 12px);
+  padding: 10px 0;
+  border-top: 1px solid var(--tech-border);
+  &:first-child { border-top: none; }
+}
+
+.fin-coach__merchant {
+  grid-area: merchant;
+  font-weight: 600;
+  color: var(--tech-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fin-coach__meta {
+  grid-area: meta;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-dim, #9ba9bd);
+}
+
+.fin-coach__amt {
+  grid-area: amt;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--tech-text);
+  white-space: nowrap;
+}
+
+.fin-coach__per {
+  margin-left: 2px;
+  font-size: var(--tech-fs-label);
+  font-weight: 500;
+  color: var(--tech-text-dim, #9ba9bd);
+}
+
+.fin-coach__ai {
+  margin-top: 2px;
+  padding-top: var(--tech-space-3, 12px);
+  border-top: 1px solid var(--tech-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-2, 8px);
+}
+
+.fin-coach__narrative {
+  margin: 0;
+  font-size: var(--tech-fs-body);
+  line-height: 1.5;
+  color: var(--tech-text);
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.fin-coach__tips {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  li {
+    font-size: var(--tech-fs-label);
+    line-height: 1.45;
+    color: var(--tech-text);
+  }
+}
+
+@media (max-width: 560px) {
+  .fin-coach__head { flex-wrap: wrap; }
+  .fin-coach__total { align-items: flex-start; text-align: left; }
+}

@@ -80,6 +80,27 @@ public static class FamilyFinanceEndpoints
     public sealed record FinanceAiSummaryDto(
         string Narrative, IReadOnlyList<string> Insights, bool FellBackToPlain);
 
+    /// <summary>One detected recurring charge (a subscription/bill that recurs monthly): its display
+    /// <see cref="Merchant"/>, the <see cref="TypicalAmount"/> (median of its occurrences), the
+    /// <see cref="Cadence"/> ("monthly"), <see cref="MonthsSeen"/> distinct months it appeared in, and the
+    /// <see cref="LastDate"/> it was last seen. Computed DETERMINISTICALLY server-side; this list + the
+    /// monthly total are the AUTHORITATIVE floor (they work with Gemini off).</summary>
+    public sealed record RecurringChargeDto(
+        string Merchant, decimal TypicalAmount, string Cadence, int MonthsSeen, string LastDate);
+
+    /// <summary>
+    /// The finance "money coach" result. The <see cref="Recurring"/> list + <see cref="MonthlyRecurringTotal"/>
+    /// are the DETERMINISTIC, authoritative FLOOR (computed server-side from the household's recent expenses;
+    /// they're present whether Gemini is on or off). When Gemini is configured it ALSO NARRATES those facts
+    /// into a warm <see cref="Narrative"/> + up to 5 actionable <see cref="Tips"/>; otherwise those are
+    /// empty/null and <see cref="FellBackToPlain"/> is true. The coach NEVER cancels or edits anything — advice
+    /// only. This endpoint ALWAYS returns 200 (the recurring list is the floor), never a 503/500, and writes
+    /// NOTHING.
+    /// </summary>
+    public sealed record MoneyCoachDto(
+        IReadOnlyList<RecurringChargeDto> Recurring, decimal MonthlyRecurringTotal,
+        string? Narrative, IReadOnlyList<string> Tips, bool FellBackToPlain);
+
     private static readonly string[] Owners = { "his", "hers", "joint", "unassigned" };
     private static readonly string[] Kinds = { "bank", "credit", "other" };
 
@@ -103,6 +124,7 @@ public static class FamilyFinanceEndpoints
         MapSummary(g);
         MapImportsList(g);
         MapAiSummary(g);
+        MapMoneyCoach(g);
     }
 
     // =====================================================================================
@@ -700,6 +722,190 @@ public static class FamilyFinanceEndpoints
         var rounded = Math.Round(pct, 0, MidpointRounding.AwayFromZero);
         var sign = rounded > 0 ? "+" : "";
         return $"{sign}{rounded.ToString("0", CultureInfo.InvariantCulture)}%";
+    }
+
+    // =====================================================================================
+    // AI — "Money coach" (DETERMINISTIC recurring-charge detector + read-only narration)
+    // =====================================================================================
+
+    /// <summary>How many months of expense history the recurring detector scans (the spec's "last ~4 months").</summary>
+    private const int MoneyCoachLookbackMonths = 4;
+
+    private static void MapMoneyCoach(RouteGroupBuilder g)
+    {
+        // GET /ai/money-coach — FIRST a DETERMINISTIC, authoritative recurring-charge detector (server-side),
+        // THEN an OPTIONAL warm narration + tips from Gemini. ALWAYS 200: the recurring list + monthly total
+        // are the FLOOR (present whether Gemini is on or off); when Gemini is unconfigured/errors, narrative is
+        // null + tips empty + fellBackToPlain=true, NEVER a 503/500. Writes NOTHING (advice only — the coach
+        // never cancels/edits anything). CACHED per (household, month). Rate-limited. Still gated by BOTH
+        // family.use AND family.finance (inherited). No email (none in finance).
+        g.MapGet("/ai/money-coach", async (
+            CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            GeminiService gemini, IMemoryCache cache, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+            // The anchor month: the most recent month with data, else now. The detector scans the lookback
+            // window ending at that month. (No client month param — the coach is always "recent activity".)
+            var maxDate = await db.FinanceTransactions.AsNoTracking()
+                .Where(t => t.HouseholdId == household.Id)
+                .OrderByDescending(t => t.Date)
+                .Select(t => (DateOnly?)t.Date)
+                .FirstOrDefaultAsync(ct);
+            var anchor = maxDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var monthLabel = new DateOnly(anchor.Year, anchor.Month, 1)
+                .ToString("yyyy-MM", CultureInfo.InvariantCulture);
+            var windowStart = new DateOnly(anchor.Year, anchor.Month, 1).AddMonths(-(MoneyCoachLookbackMonths - 1));
+            var windowEnd = new DateOnly(anchor.Year, anchor.Month, 1).AddMonths(1); // exclusive
+
+            // Load the window's EXPENSE rows (transfers/income never recur as "bills"). Merchant + amount +
+            // date are all we need; nothing here comes from the client.
+            var expenses = await db.FinanceTransactions.AsNoTracking()
+                .Where(t => t.HouseholdId == household.Id && t.Kind == "expense"
+                    && t.Date >= windowStart && t.Date < windowEnd)
+                .Select(t => new ExpenseRow(t.Merchant, t.Magnitude, t.Date))
+                .ToListAsync(ct);
+
+            // The DETERMINISTIC, authoritative floor.
+            var recurring = DetectRecurring(expenses);
+            var monthlyTotal = recurring.Sum(r => r.TypicalAmount);
+            var recurringDtos = recurring
+                .Select(r => new RecurringChargeDto(
+                    r.Merchant, r.TypicalAmount, "monthly", r.MonthsSeen,
+                    r.LastDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
+                .ToList();
+
+            // No recurring charges found → return the empty floor without calling the model.
+            if (recurringDtos.Count == 0)
+                return Results.Ok(new MoneyCoachDto(recurringDtos, 0m, null, Array.Empty<string>(), true));
+
+            // Recurring list is the floor. Prefer the warm AI narration when configured (cached per month).
+            if (!gemini.IsConfigured)
+                return Results.Ok(new MoneyCoachDto(recurringDtos, monthlyTotal, null, Array.Empty<string>(), true));
+
+            var cacheKey = $"family:money-coach:{household.Id}:{monthLabel}";
+            if (cache.TryGetValue(cacheKey, out MoneyCoachDto? cached) && cached is not null)
+                return Results.Ok(cached);
+
+            MoneyCoachResult? ai;
+            try
+            {
+                ai = await gemini.MoneyCoachAsync(MoneyCoachFacts(recurringDtos, monthlyTotal), ct);
+            }
+            catch
+            {
+                ai = null;
+            }
+
+            if (ai is null || string.IsNullOrWhiteSpace(ai.Narrative))
+                return Results.Ok(new MoneyCoachDto(recurringDtos, monthlyTotal, null, Array.Empty<string>(), true)); // floor
+
+            var dto = new MoneyCoachDto(recurringDtos, monthlyTotal, ai.Narrative, ai.Tips, false);
+            cache.Set(cacheKey, dto, TimeSpan.FromHours(6));
+            return Results.Ok(dto);
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+    }
+
+    /// <summary>One expense row fed to the recurring detector (merchant + positive magnitude + date).</summary>
+    public sealed record ExpenseRow(string Merchant, decimal Magnitude, DateOnly Date);
+
+    /// <summary>One detected recurring charge (pre-DTO): the display merchant, the median amount, the count of
+    /// distinct months it appeared in, and the last date seen.</summary>
+    public sealed record RecurringCharge(string Merchant, decimal TypicalAmount, int MonthsSeen, DateOnly LastDate);
+
+    /// <summary>How close two amounts must be to count as "the same charge" (relative tolerance) — a
+    /// subscription that drifts a little (tax/price change) still groups.</summary>
+    private const decimal RecurringAmountTolerance = 0.15m; // 15%
+
+    /// <summary>
+    /// The DETERMINISTIC, authoritative recurring-charge detector. Groups expenses by NORMALIZED merchant, then
+    /// keeps a merchant when its charges recur in &gt;= 2 DISTINCT calendar months with a stable-ish amount
+    /// (the per-month median is within <see cref="RecurringAmountTolerance"/> of the overall median, i.e.
+    /// monthly cadence at a consistent price). Returns one row per recurring merchant — typical amount = the
+    /// median occurrence, monthsSeen = distinct months, lastDate = the latest occurrence — ordered by amount
+    /// desc. Pure + DB-free so it is unit-testable: 3 monthly Netflix charges -&gt; 1 row; a one-off -&gt;
+    /// excluded.
+    /// </summary>
+    public static IReadOnlyList<RecurringCharge> DetectRecurring(IReadOnlyList<ExpenseRow> expenses)
+    {
+        var result = new List<RecurringCharge>();
+
+        var groups = expenses
+            .Where(e => e.Magnitude > 0 && !string.IsNullOrWhiteSpace(e.Merchant))
+            .GroupBy(e => NormalizeMerchant(e.Merchant));
+
+        foreach (var grp in groups)
+        {
+            var rows = grp.ToList();
+
+            // Distinct calendar months this merchant was charged in — the cadence signal.
+            var monthsSeen = rows.Select(r => new DateOnly(r.Date.Year, r.Date.Month, 1)).Distinct().Count();
+            if (monthsSeen < 2) continue; // not recurring (a one-off, or twice in the same month only)
+
+            var overallMedian = Median(rows.Select(r => r.Magnitude).ToList());
+            if (overallMedian <= 0) continue;
+
+            // Stable-ish amount: most occurrences sit within tolerance of the median (filters out a merchant
+            // you happen to shop at irregularly for wildly different amounts — that's not a subscription).
+            var withinTolerance = rows.Count(r =>
+                Math.Abs(r.Magnitude - overallMedian) <= overallMedian * RecurringAmountTolerance);
+            if (withinTolerance < monthsSeen) continue; // need at least one stable charge per recurring month
+
+            // Display name: the most common raw merchant string in the group (nicest casing/spelling).
+            var display = rows
+                .GroupBy(r => r.Merchant.Trim())
+                .OrderByDescending(d => d.Count()).ThenBy(d => d.Key, StringComparer.OrdinalIgnoreCase)
+                .First().Key;
+
+            result.Add(new RecurringCharge(
+                Merchant: display,
+                TypicalAmount: decimal.Round(overallMedian, 2),
+                MonthsSeen: monthsSeen,
+                LastDate: rows.Max(r => r.Date)));
+        }
+
+        return result
+            .OrderByDescending(r => r.TypicalAmount)
+            .ThenBy(r => r.Merchant, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>Normalize a merchant for grouping: lower-case, drop a trailing transaction/store id, collapse
+    /// whitespace, and strip surrounding punctuation so "Netflix.com", "NETFLIX #123", and "Netflix" all
+    /// group. Conservative — it never merges distinct brands.</summary>
+    private static string NormalizeMerchant(string merchant)
+    {
+        var s = merchant.Trim().ToLowerInvariant();
+        // Cut at the first store/transaction marker ("#", "*", or a long digit run) — POS noise after the name.
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s*[#*].*$", "");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+\d{3,}.*$", "");
+        // Drop a common ".com"/".net" suffix and any non-alphanumeric trailing/leading punctuation runs.
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\.(com|net|org|io)\b", "");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"[^a-z0-9]+", " ").Trim();
+        return s.Length == 0 ? merchant.Trim().ToLowerInvariant() : s;
+    }
+
+    /// <summary>The median of a non-empty decimal list (average of the two middles for an even count).</summary>
+    private static decimal Median(List<decimal> values)
+    {
+        if (values.Count == 0) return 0m;
+        var sorted = values.OrderBy(v => v).ToList();
+        var mid = sorted.Count / 2;
+        return sorted.Count % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2m;
+    }
+
+    /// <summary>Pre-format the DETERMINISTIC recurring charges as a tight DATA block the model NARRATES (it
+    /// never recomputes). Amounts are the authoritative server medians.</summary>
+    private static string MoneyCoachFacts(IReadOnlyList<RecurringChargeDto> recurring, decimal monthlyTotal)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("monthly_recurring_total: ").Append(Money(monthlyTotal)).Append('\n');
+        sb.Append("recurring_charges:\n");
+        foreach (var r in recurring)
+            sb.Append("- ").Append(r.Merchant).Append(": ").Append(Money(r.TypicalAmount))
+              .Append("/mo, seen ").Append(r.MonthsSeen).Append(" months, last ").Append(r.LastDate).Append('\n');
+        return sb.ToString();
     }
 
     // =====================================================================================

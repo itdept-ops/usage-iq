@@ -19,7 +19,7 @@ import {
   ActivityCalorieMode, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, CommitDayResponse, DailyCoachResponse,
   DaySummaryResponse, ExerciseEntryDto, FoodEntryDto,
   FoodSuggestionDto, HydrationEntryDto, LogWeightRequest, Meal, MoveDayRequest, MoveDayResult, PERM, SharedUserDto, TrackerDayDto, TrackerProfileDto,
-  UpsertActivityRequest, WeeklyReviewResponse, WeightPointDto, WeightStatsDto,
+  TrackerRecapResult, UpsertActivityRequest, WeeklyReviewResponse, WeightPointDto, WeightStatsDto,
 } from '../../core/models';
 import { CalorieRing } from './calorie-ring';
 import { HydrationRing } from './hydration-ring';
@@ -132,6 +132,15 @@ export class Tracker {
   readonly daySummaryUnavailable = signal(false);
   readonly daySummaryAnnounce = signal('');
 
+  // "✨ This week" recap card (GET tracker-recap; gated by tracker.self alone, ALWAYS 200 with a deterministic
+  // plain floor). Auto-loaded once per OWN-tracker week — it's read-only narration of the caller's last 7
+  // days, never mutates, and degrades to the plain floor (fellBackToPlain) when AI is unavailable. We load it
+  // best-effort and just hide the card on a network blip (the endpoint itself never 503s).
+  readonly recap = signal<TrackerRecapResult | null>(null);
+  readonly recapLoading = signal(false);
+  /** The week-start (yyyy-MM-dd) the recap was last loaded for, so we only refetch when the week changes. */
+  private recapWeek = '';
+
   /** Screen-reader-only live status: announces day reloads and entry deletions. */
   readonly statusMsg = signal('');
 
@@ -179,6 +188,19 @@ export class Tracker {
         return;
       }
       void this.loadWeightHistory();
+    });
+
+    // "✨ This week" recap: auto-load the read-only weekly narration for the caller's OWN tracker. Keyed on
+    // the current local week so it refetches at most once per week (the endpoint caches per user+week too).
+    // Hidden in read-only views of someone else (the recap is the caller's own data, server-side).
+    effect(() => {
+      const day = this.store.day();
+      if (!day || day.readOnly) {
+        this.recap.set(null);
+        this.recapWeek = '';
+        return;
+      }
+      void this.loadRecap();
     });
 
     // Read-only auto-refresh lifecycle: run a gentle 30s re-fetch ONLY while viewing someone else's
@@ -948,6 +970,39 @@ export class Tracker {
   clearDaySummary(): void {
     this.daySummary.set(null);
     this.daySummaryUnavailable.set(false);
+  }
+
+  // ---- "✨ This week" recap (read-only weekly narration; tracker.self, always 200, plain floor) ----
+
+  /**
+   * Load the read-only weekly recap for the caller's OWN tracker. The endpoint NEVER 503s — it returns a
+   * guaranteed deterministic plain floor (fellBackToPlain=true) when AI is unavailable — so a network blip is
+   * the only failure path and we simply hide the card. Keyed on the current local week so we refetch at most
+   * once per week; the in-flight guard and the week-key prevent the auto-load effect from spamming the key.
+   */
+  async loadRecap(): Promise<void> {
+    const week = this.currentWeekStart();
+    if (this.recapLoading()) return;
+    if (week === this.recapWeek && this.recap()) return;
+    this.recapWeek = week;
+    this.recapLoading.set(true);
+    try {
+      this.recap.set(await firstValueFrom(this.api.trackerRecapAi()));
+    } catch {
+      // Network blip only (the endpoint itself never 503s) — drop the card, allow a later retry.
+      this.recap.set(null);
+      this.recapWeek = '';
+    } finally {
+      this.recapLoading.set(false);
+    }
+  }
+
+  /** The yyyy-MM-dd start (6 days back from local today) of the current recap window — the cache key. */
+  private currentWeekStart(): string {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - 6);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   removeFood(f: FoodEntryDto): void {

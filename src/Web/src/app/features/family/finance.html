@@ -110,6 +110,63 @@
         }
       </div>
 
+      <!-- ══ ✨ "Money coach" — DETERMINISTIC recurring-charges floor + read-only AI narration ══════════
+           The recurring list + monthly total are the AUTHORITATIVE floor: they ALWAYS render (even when the
+           model is unavailable / fellBackToPlain). The warm narrative + trim tips are the optional AI flourish
+           below — hidden when fellBackToPlain. Calm, reassuring, advice-only: the coach NEVER cancels or edits
+           anything. Mirrors the finance "explain this month" card UX. -->
+      @if (coach(); as c) {
+        @if (c.recurring.length > 0) {
+          <section class="fin-card fin-coach" aria-label="Recurring charges and money coaching">
+            <div class="fin-coach__head">
+              <span class="fin-coach__crest" aria-hidden="true">
+                <mat-icon>{{ c.fellBackToPlain ? 'sync' : 'auto_awesome' }}</mat-icon>
+              </span>
+              <div class="fin-coach__headtext">
+                <h2 class="fin-card__title">Money coach</h2>
+                <p class="fin-card__sub">Subscriptions and bills that recur each month — totals are calculated, not guessed.</p>
+              </div>
+              <div class="fin-coach__total">
+                <span class="fin-coach__total-label">Monthly recurring</span>
+                <span class="fin-coach__total-value">{{ money(c.monthlyRecurringTotal) }}</span>
+              </div>
+            </div>
+
+            <!-- The DETERMINISTIC recurring list — always present (the floor). -->
+            <ul class="fin-coach__list">
+              @for (r of c.recurring; track r.merchant) {
+                <li class="fin-coach__row">
+                  <span class="fin-coach__merchant">{{ r.merchant }}</span>
+                  <span class="fin-coach__meta">
+                    {{ r.cadence }} · seen {{ r.monthsSeen }} months · last {{ txnDate(r.lastDate) }}
+                  </span>
+                  <span class="fin-coach__amt">{{ money(r.typicalAmount) }}<span class="fin-coach__per">/mo</span></span>
+                </li>
+              }
+            </ul>
+
+            <!-- The OPTIONAL warm AI narration + trim tips — only when the model narrated (not fellBackToPlain). -->
+            @if (!c.fellBackToPlain && c.narrative) {
+              <div class="fin-coach__ai" aria-live="polite">
+                <p class="fin-coach__narrative">{{ c.narrative }}</p>
+                @if (c.tips.length) {
+                  <ul class="fin-coach__tips">
+                    @for (tip of c.tips; track $index) {
+                      <li>{{ tip }}</li>
+                    }
+                  </ul>
+                }
+              </div>
+            }
+          </section>
+        }
+      } @else if (coachLoading()) {
+        <div class="fin-ai__loading">
+          <mat-spinner [diameter]="20" />
+          <span>Spotting your recurring charges…</span>
+        </div>
+      }
+
       @if (summary(); as s) {
         <!-- ══ HEADLINE cards ═══════════════════════════════════════════ -->
         <div class="fin-cards">

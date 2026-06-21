@@ -5,6 +5,7 @@ using Ccusage.Api.Data.Entities;
 using Ccusage.Api.Dtos;
 using Ccusage.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Ccusage.Api.Endpoints;
 
@@ -316,6 +317,236 @@ public static class AiEndpoints
             var result = await gemini.DaySummaryAsync(caller.Email, localDate.ToString("yyyy-MM-dd"), summary, ct);
             return result is null ? Unavailable() : Results.Ok(result);
         });
+
+        // ---- A warm, read-only weekly recap of the caller's OWN last 7 local days (cached 6h, ALWAYS 200) ----
+        // Unlike the other AI routes, this one is gated by tracker.self (NOT tracker.ai) and ALWAYS returns 200:
+        // its deterministic plain floor needs no AI, so a tracker.self user always gets the recap (the warm AI
+        // narration is the optional upgrade when tracker.ai-level AI is configured). When Gemini is
+        // unconfigured/errors the GUARANTEED plain floor is returned with fellBackToPlain=true (NEVER a 503). It
+        // NARRATES ONLY the server-computed weekly numbers; it writes NOTHING. Mapped OUTSIDE the tracker.ai
+        // group so the floor is reachable with tracker.self alone; still rate-limited (the AI policy).
+        var recap = app.MapGroup("/api/ai")
+            .RequireAuthorization()
+            .RequirePermission(Permissions.TrackerSelf)
+            .RequireRateLimiting(RateLimitPolicy);
+
+        recap.MapGet("/tracker-recap", async (
+            CurrentUserAccessor me, GeminiService gemini, IMemoryCache cache, UsageDbContext db,
+            CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var today = await TodayAsync(db, ct);
+            var weekStart = today.AddDays(-6);
+            var facts = await ComputeWeekRecapFactsAsync(db, caller.Email, today, ct);
+
+            var plain = PlainTrackerRecap(facts);
+
+            // Plain recap is the floor. Prefer the warm AI narrative when configured (cached per user+week).
+            if (!gemini.IsConfigured)
+                return Results.Ok(new TrackerRecapDto(plain, Array.Empty<string>(), true));
+
+            var cacheKey = $"ai:tracker-recap:{caller.Email}:{weekStart:yyyy-MM-dd}";
+            if (cache.TryGetValue(cacheKey, out TrackerRecapDto? cached) && cached is not null)
+                return Results.Ok(cached);
+
+            TrackerRecapResult? ai;
+            try
+            {
+                ai = await gemini.TrackerRecapAsync(TrackerRecapFacts(facts), ct);
+            }
+            catch
+            {
+                ai = null;
+            }
+
+            if (ai is null || string.IsNullOrWhiteSpace(ai.Narrative))
+                return Results.Ok(new TrackerRecapDto(plain, Array.Empty<string>(), true)); // floor
+
+            var dto = new TrackerRecapDto(ai.Narrative, ai.Insights, false);
+            cache.Set(cacheKey, dto, TimeSpan.FromHours(6));
+            return Results.Ok(dto);
+        });
+    }
+
+    // ===================================================================================
+    // Tracker weekly recap — server-side aggregation of the caller's OWN last 7 local days
+    // ===================================================================================
+
+    /// <summary>
+    /// The tracker weekly-recap DTO: a warm 2–4 sentence <see cref="Narrative"/> of the caller's last 7 days
+    /// plus 0–4 gentle <see cref="Insights"/>, both NARRATED from the same server-side tracker queries the
+    /// recap aggregates (the model invents nothing). <see cref="FellBackToPlain"/> is true when Gemini was
+    /// unconfigured/errored and the deterministic plain floor was returned instead. This endpoint ALWAYS
+    /// returns 200 — the plain text is the floor — never a 503/500, and it writes NOTHING.
+    /// </summary>
+    public sealed record TrackerRecapDto(
+        string Narrative, IReadOnlyList<string> Insights, bool FellBackToPlain);
+
+    /// <summary>The server-computed facts for the caller's last 7 LOCAL days, aggregated from the SAME tracker
+    /// queries the day/weight reads use. Nothing here comes from the client. <see cref="DaysLogged"/> counts
+    /// days with ANY food/exercise/hydration/weight/activity row; the averages are over the 7-day window.</summary>
+    private sealed record WeekRecapFacts(
+        string WeekStart, string WeekEnd, int DaysLogged,
+        int AvgCaloriesIn, int? CalorieGoal,
+        double AvgProteinG, double AvgCarbsG, double AvgFatG,
+        int? ProteinGoalG, int? CarbGoalG, int? FatGoalG,
+        int ProteinGoalMetDays, int CarbGoalMetDays, int FatGoalMetDays,
+        int AvgSteps, int AvgActiveCalories, int AvgHydrationMl,
+        double? WeightStartKg, double? WeightEndKg, double? WeightDeltaKg);
+
+    private static async Task<WeekRecapFacts> ComputeWeekRecapFactsAsync(
+        UsageDbContext db, string email, DateOnly today, CancellationToken ct)
+    {
+        var from = today.AddDays(-6);
+        var profile = await db.TrackerProfiles.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserEmail == email, ct);
+
+        var foods = await db.FoodEntries.AsNoTracking()
+            .Where(f => f.UserEmail == email && f.LocalDate >= from && f.LocalDate <= today)
+            .Select(f => new { f.LocalDate, f.Calories, f.ProteinG, f.CarbG, f.FatG })
+            .ToListAsync(ct);
+        var exercises = await db.ExerciseEntries.AsNoTracking()
+            .Where(x => x.UserEmail == email && x.LocalDate >= from && x.LocalDate <= today)
+            .Select(x => new { x.LocalDate, x.CaloriesBurned })
+            .ToListAsync(ct);
+        var hydration = await db.HydrationEntries.AsNoTracking()
+            .Where(h => h.UserEmail == email && h.LocalDate >= from && h.LocalDate <= today)
+            .Select(h => new { h.LocalDate, h.AmountMl })
+            .ToListAsync(ct);
+        var activities = await db.DailyActivities.AsNoTracking()
+            .Where(a => a.UserEmail == email && a.LocalDate >= from && a.LocalDate <= today)
+            .Select(a => new { a.LocalDate, a.Steps, a.ActiveCalories })
+            .ToListAsync(ct);
+        var weights = await db.WeightEntries.AsNoTracking()
+            .Where(w => w.UserEmail == email && w.LocalDate >= from && w.LocalDate <= today)
+            .OrderBy(w => w.LocalDate).ThenBy(w => w.Slot).ThenBy(w => w.Id)
+            .Select(w => new { w.LocalDate, w.WeightKg })
+            .ToListAsync(ct);
+
+        // Goals (null when unset — the floor/model handles "no goal" gracefully).
+        var calGoal = profile?.DailyCalorieGoal;
+        var proteinGoal = profile?.ProteinGoalG;
+        var carbGoal = profile?.CarbGoalG;
+        var fatGoal = profile?.FatGoalG;
+
+        // Per-day macro/calorie roll-ups (only days that have food entries contribute to the averages).
+        var foodDays = foods.GroupBy(f => f.LocalDate).Select(grp => new
+        {
+            Date = grp.Key,
+            Cal = grp.Sum(f => f.Calories),
+            Protein = grp.Sum(f => f.ProteinG),
+            Carbs = grp.Sum(f => f.CarbG),
+            Fat = grp.Sum(f => f.FatG),
+        }).ToList();
+
+        int AvgOver(IEnumerable<int> vals)
+        {
+            var list = vals.ToList();
+            return list.Count == 0 ? 0 : (int)Math.Round(list.Average(), MidpointRounding.AwayFromZero);
+        }
+        double AvgOverD(IEnumerable<double> vals)
+        {
+            var list = vals.ToList();
+            return list.Count == 0 ? 0 : Math.Round(list.Average(), 1);
+        }
+
+        var avgCal = AvgOver(foodDays.Select(d => d.Cal));
+        var avgProtein = AvgOverD(foodDays.Select(d => d.Protein));
+        var avgCarbs = AvgOverD(foodDays.Select(d => d.Carbs));
+        var avgFat = AvgOverD(foodDays.Select(d => d.Fat));
+
+        // How many of the logged-food days met each macro goal (only meaningful when a goal is set).
+        var proteinMet = proteinGoal is int pg && pg > 0 ? foodDays.Count(d => d.Protein >= pg) : 0;
+        var carbMet = carbGoal is int cg && cg > 0 ? foodDays.Count(d => d.Carbs >= cg) : 0;
+        var fatMet = fatGoal is int fg && fg > 0 ? foodDays.Count(d => d.Fat >= fg) : 0;
+
+        // Steps / active calories: average over the days that recorded each (not the whole window).
+        var avgSteps = AvgOver(activities.Where(a => a.Steps is not null).Select(a => a.Steps!.Value));
+        var avgActiveCal = AvgOver(activities.Where(a => a.ActiveCalories is not null)
+            .Select(a => a.ActiveCalories!.Value));
+
+        // Hydration: average over days that logged any fluid.
+        var hydrationByDay = hydration.GroupBy(h => h.LocalDate).Select(grp => grp.Sum(h => h.AmountMl)).ToList();
+        var avgHydration = AvgOver(hydrationByDay);
+
+        // Weight trend: first vs last reading in the window (start→end delta).
+        double? weightStart = weights.Count > 0 ? weights[0].WeightKg : null;
+        double? weightEnd = weights.Count > 0 ? weights[^1].WeightKg : null;
+        double? weightDelta = weightStart is { } ws && weightEnd is { } we ? Math.Round(we - ws, 2) : null;
+
+        // Days logged = days with ANY tracked data of any kind.
+        var loggedDates = new HashSet<DateOnly>();
+        foreach (var f in foods) loggedDates.Add(f.LocalDate);
+        foreach (var x in exercises) loggedDates.Add(x.LocalDate);
+        foreach (var h in hydration) loggedDates.Add(h.LocalDate);
+        foreach (var a in activities)
+            if (a.Steps is not null || a.ActiveCalories is not null) loggedDates.Add(a.LocalDate);
+        foreach (var w in weights) loggedDates.Add(w.LocalDate);
+
+        return new WeekRecapFacts(
+            WeekStart: from.ToString("yyyy-MM-dd"),
+            WeekEnd: today.ToString("yyyy-MM-dd"),
+            DaysLogged: loggedDates.Count,
+            AvgCaloriesIn: avgCal,
+            CalorieGoal: calGoal,
+            AvgProteinG: avgProtein, AvgCarbsG: avgCarbs, AvgFatG: avgFat,
+            ProteinGoalG: proteinGoal, CarbGoalG: carbGoal, FatGoalG: fatGoal,
+            ProteinGoalMetDays: proteinMet, CarbGoalMetDays: carbMet, FatGoalMetDays: fatMet,
+            AvgSteps: avgSteps, AvgActiveCalories: avgActiveCal, AvgHydrationMl: avgHydration,
+            WeightStartKg: weightStart, WeightEndKg: weightEnd, WeightDeltaKg: weightDelta);
+    }
+
+    /// <summary>Pre-format the server-computed week <paramref name="f"/> numbers as a tight DATA block the model
+    /// NARRATES (it never recomputes). Goals that are unset read as "(unset)". Nothing here comes from the
+    /// client beyond the implicit "today".</summary>
+    private static string TrackerRecapFacts(WeekRecapFacts f)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("week: ").Append(f.WeekStart).Append(" to ").Append(f.WeekEnd).Append('\n');
+        sb.Append("days_logged: ").Append(f.DaysLogged).Append(" of 7\n");
+        sb.Append("avg_calories_per_day: ").Append(f.AvgCaloriesIn)
+          .Append(" (goal ").Append(f.CalorieGoal?.ToString() ?? "unset").Append(")\n");
+        sb.Append("avg_protein_g: ").Append(f.AvgProteinG)
+          .Append(" (goal ").Append(f.ProteinGoalG?.ToString() ?? "unset").Append(")");
+        if (f.ProteinGoalG is int) sb.Append(" met ").Append(f.ProteinGoalMetDays).Append(" of 7 days");
+        sb.Append('\n');
+        sb.Append("avg_carbs_g: ").Append(f.AvgCarbsG)
+          .Append(" (goal ").Append(f.CarbGoalG?.ToString() ?? "unset").Append(")");
+        if (f.CarbGoalG is int) sb.Append(" met ").Append(f.CarbGoalMetDays).Append(" of 7 days");
+        sb.Append('\n');
+        sb.Append("avg_fat_g: ").Append(f.AvgFatG)
+          .Append(" (goal ").Append(f.FatGoalG?.ToString() ?? "unset").Append(")");
+        if (f.FatGoalG is int) sb.Append(" met ").Append(f.FatGoalMetDays).Append(" of 7 days");
+        sb.Append('\n');
+        sb.Append("avg_steps: ").Append(f.AvgSteps).Append('\n');
+        sb.Append("avg_active_calories: ").Append(f.AvgActiveCalories).Append('\n');
+        sb.Append("avg_hydration_ml: ").Append(f.AvgHydrationMl).Append('\n');
+        if (f.WeightDeltaKg is { } d && f.WeightStartKg is { } ws && f.WeightEndKg is { } we)
+            sb.Append("weight_kg: start ").Append(ws).Append(" end ").Append(we)
+              .Append(" delta ").Append(d).Append('\n');
+        else
+            sb.Append("weight_kg: (no readings this week)\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The GUARANTEED deterministic plain floor: a one-liner stating days logged, avg calories vs goal,
+    /// and the weight delta. Used when Gemini is unconfigured/errors — it NEVER 503s.</summary>
+    private static string PlainTrackerRecap(WeekRecapFacts f)
+    {
+        var s = $"You logged {f.DaysLogged} of 7 days";
+        if (f.DaysLogged > 0)
+        {
+            s += $"; averaged {f.AvgCaloriesIn} kcal/day";
+            if (f.CalorieGoal is int g && g > 0) s += $" vs a {g} goal";
+        }
+        if (f.WeightDeltaKg is { } d)
+        {
+            var dir = d < 0 ? "down" : d > 0 ? "up" : "steady";
+            s += d == 0
+                ? "; weight held steady"
+                : $"; weight {dir} {Math.Abs(d).ToString("0.#", CultureInfo.InvariantCulture)} kg";
+        }
+        return s + ".";
     }
 
     /// <summary>Parse the client's yyyy-MM-dd date, or fall back to "today" in the display timezone.</summary>

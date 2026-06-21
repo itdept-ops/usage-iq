@@ -104,6 +104,9 @@ public class FamilyFinanceTests(WebAppFactory factory)
         // The AI "explain this month" route is gated the SAME way (family.use alone is not enough).
         (await useOnly.GetAsync("/api/family/finance/ai/summary?month=2026-05"))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        // The AI "money coach" route is gated the SAME way (BOTH family.use AND family.finance).
+        (await useOnly.GetAsync("/api/family/finance/ai/money-coach"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -113,6 +116,7 @@ public class FamilyFinanceTests(WebAppFactory factory)
         (await anon.GetAsync("/api/family/finance/accounts")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await anon.GetAsync("/api/family/finance/summary")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await anon.GetAsync("/api/family/finance/ai/summary")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await anon.GetAsync("/api/family/finance/ai/money-coach")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     // =====================================================================================
@@ -452,5 +456,78 @@ public class FamilyFinanceTests(WebAppFactory factory)
         dto.GetProperty("fellBackToPlain").GetBoolean().Should().BeTrue();
         dto.GetProperty("narrative").GetString().Should().Contain("No spending recorded");
         dto.GetProperty("insights").GetArrayLength().Should().Be(0);
+    }
+
+    // =====================================================================================
+    // AI "MONEY COACH" — DETERMINISTIC recurring detector is the FLOOR; never 503; writes nothing
+    // =====================================================================================
+
+    /// <summary>An export with a recurring subscription (3 monthly Netflix charges, same amount, across 3
+    /// distinct months) plus a one-off purchase that must NOT be flagged as recurring.</summary>
+    private const string RecurringCsv =
+        "Date,Original Date,Account Type,Account Name,Institution Name,Name,Custom Name,Amount,Description,Category,Note,Ignored From,Tax Deductible\n" +
+        "2026-03-05,2026-03-05,Checking,SoFi Checking 1,SoFi,Netflix,,-15.99,sub,Entertainment,,,\n" +
+        "2026-04-05,2026-04-05,Checking,SoFi Checking 1,SoFi,Netflix.com,,-15.99,sub,Entertainment,,,\n" +
+        "2026-05-05,2026-05-05,Checking,SoFi Checking 1,SoFi,NETFLIX #4471,,-15.99,sub,Entertainment,,,\n" +
+        // A one-off purchase in a single month — must be EXCLUDED from recurring.
+        "2026-05-12,2026-05-12,Checking,SoFi Checking 1,SoFi,Best Buy,,-499.00,tv,Shopping,,,\n";
+
+    [Fact]
+    public async Task Money_coach_detects_recurring_charges_as_the_floor_never_503_and_writes_nothing()
+    {
+        var owner = await FinanceUser();
+        await owner.PostAsJsonAsync("/api/family/finance/import",
+            new { fileName = "recurring.csv", content = RecurringCsv });
+
+        // Snapshot the data BEFORE the AI call so we can assert it mutates nothing.
+        var accountsBefore = await Json(await owner.GetAsync("/api/family/finance/accounts"));
+        var txnsBefore = await Json(await owner.GetAsync("/api/family/finance/transactions?month=2026-05"));
+
+        // Gemini is OFF -> ALWAYS 200 with the DETERMINISTIC recurring floor, never 503/500.
+        var res = await owner.GetAsync("/api/family/finance/ai/money-coach");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await Json(res);
+
+        dto.GetProperty("fellBackToPlain").GetBoolean().Should().BeTrue();
+
+        // The recurring list is the authoritative floor: exactly one recurring charge (the 3 Netflix variants
+        // collapse to one), and the one-off Best Buy is excluded.
+        var recurring = dto.GetProperty("recurring").EnumerateArray().ToList();
+        recurring.Should().ContainSingle();
+        var netflix = recurring[0];
+        netflix.GetProperty("typicalAmount").GetDecimal().Should().Be(15.99m);
+        netflix.GetProperty("cadence").GetString().Should().Be("monthly");
+        netflix.GetProperty("monthsSeen").GetInt32().Should().Be(3);
+        recurring.Select(r => r.GetProperty("merchant").GetString())
+            .Should().NotContain("Best Buy");
+
+        // The monthly recurring total is the sum of the typical amounts.
+        dto.GetProperty("monthlyRecurringTotal").GetDecimal().Should().Be(15.99m);
+        // No narrative/tips when falling back (the floor drops them).
+        dto.GetProperty("tips").GetArrayLength().Should().Be(0);
+        // No email anywhere (there is none in finance).
+        dto.GetRawText().Should().NotContain("@");
+
+        // The read changed NOTHING: same accounts, same transactions, no new import batch.
+        var accountsAfter = await Json(await owner.GetAsync("/api/family/finance/accounts"));
+        var txnsAfter = await Json(await owner.GetAsync("/api/family/finance/transactions?month=2026-05"));
+        accountsAfter.GetArrayLength().Should().Be(accountsBefore.GetArrayLength());
+        txnsAfter.GetProperty("total").GetInt32().Should().Be(txnsBefore.GetProperty("total").GetInt32());
+        var imports = await Json(await owner.GetAsync("/api/family/finance/imports"));
+        imports.GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Money_coach_with_no_recurring_charges_returns_an_empty_floor()
+    {
+        var owner = await FinanceUser(); // no import — nothing to detect
+
+        var res = await owner.GetAsync("/api/family/finance/ai/money-coach");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await Json(res);
+        dto.GetProperty("fellBackToPlain").GetBoolean().Should().BeTrue();
+        dto.GetProperty("recurring").GetArrayLength().Should().Be(0);
+        dto.GetProperty("monthlyRecurringTotal").GetDecimal().Should().Be(0m);
+        dto.GetProperty("tips").GetArrayLength().Should().Be(0);
     }
 }

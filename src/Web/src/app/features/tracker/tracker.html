@@ -141,6 +141,42 @@
       </div>
     }
 
+    <!-- ✨ "This week" recap — read-only, encouraging narration of the caller's OWN last 7 days (gated by
+         tracker.self alone, so it shows for every tracker user). It NEVER mutates anything. The endpoint
+         always returns a deterministic plain floor with fellBackToPlain=true when AI is unavailable, in which
+         case we drop the AI flourish (calmer surface + a steadier icon), mirroring the finance "explain this
+         month" / morning-briefing card UX. Hidden in read-only views of someone else. -->
+    @if (!store.readOnly()) {
+      <div class="tracker__recap" aria-live="polite" aria-busy="{{ recapLoading() }}">
+        @if (recap(); as r) {
+          @if (r.narrative) {
+            <article class="recap-card" [class.recap-card--plain]="r.fellBackToPlain"
+                     aria-label="Your week in review">
+              <mat-icon class="recap-card__spark" aria-hidden="true">
+                {{ r.fellBackToPlain ? 'insights' : 'auto_awesome' }}
+              </mat-icon>
+              <div class="recap-card__body">
+                <p class="recap-card__eyebrow">This week</p>
+                <p class="recap-card__text">{{ r.narrative }}</p>
+                @if (r.insights.length) {
+                  <ul class="recap-card__insights">
+                    @for (insight of r.insights; track $index) {
+                      <li>{{ insight }}</li>
+                    }
+                  </ul>
+                }
+              </div>
+            </article>
+          }
+        } @else if (recapLoading()) {
+          <div class="tracker__recap-loading">
+            <mat-progress-spinner mode="indeterminate" diameter="20" aria-hidden="true" />
+            <span>Looking back on your week…</span>
+          </div>
+        }
+      </div>
+    }
+
     <!-- Headline summary: calorie ring + breakdown + macro bars. -->
     <div class="tracker__summary">
       <div class="tracker__ringcard">

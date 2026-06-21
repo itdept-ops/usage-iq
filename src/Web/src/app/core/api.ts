@@ -4,11 +4,11 @@ import { Observable } from 'rxjs';
 import {
   AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatMessageDto, ChatRepliesResult, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
-  FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
+  FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
   HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
-  SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
+  SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
   WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WorkoutXSearchResultDto,
 } from './models';
 
@@ -706,6 +706,17 @@ export class Api {
   }
 
   /**
+   * "✨ This week" recap: a warm, encouraging read-only narration (+ 0–4 gentle coaching insight bullets) of
+   * the CALLER's OWN last 7 local days, aggregated server-side from their food/exercise/activity/hydration/
+   * weight (the model invents nothing). Gated by tracker.self alone (NOT tracker.ai) and NEVER 503 — when AI
+   * is unavailable/unconfigured the GUARANTEED deterministic plain floor comes back with `fellBackToPlain` =
+   * true (same handling as the morning briefing). Read-only — nothing is mutated.
+   */
+  trackerRecapAi(): Observable<TrackerRecapResult> {
+    return this.http.get<TrackerRecapResult>(`${this.base}/ai/tracker-recap`);
+  }
+
+  /**
    * Atomically + idempotently log the user-EDITED day draft (POST /api/tracker/day/commit; OWN tracker only,
    * no Gemini). Send the server-issued `buildId` from {@link buildDay}; a re-submit of the same id is a no-op
    * that returns `alreadyCommitted`. Returns the per-kind counts + the rebuilt authoritative day.
@@ -1270,6 +1281,18 @@ export class Api {
     let p = new HttpParams();
     if (month) p = p.set('month', month);
     return this.http.get<FinanceSummaryAiResult>(`${this.base}/family/finance/ai/summary`, { params: p });
+  }
+
+  /**
+   * "✨ Money coach": a DETERMINISTIC recurring-charges list (merchant · typical amount · monthly) + the
+   * monthly recurring total — the authoritative floor that always renders — plus, when Gemini is configured,
+   * a calm read-only `narrative` + up to 5 trim `tips` NARRATED from those same facts (advice only; nothing
+   * is ever cancelled or edited). NEVER 503 — when AI is unavailable/unconfigured (or no recurring charges
+   * are found) `narrative` is null, `tips` is empty, and `fellBackToPlain` is true. The server always picks
+   * the recent-activity window, so the optional `month` param is reserved/ignored. Read-only.
+   */
+  financeMoneyCoachAi(_month?: string | null): Observable<FinanceMoneyCoachResult> {
+    return this.http.get<FinanceMoneyCoachResult>(`${this.base}/family/finance/ai/money-coach`);
   }
 
   // ---- Family Hub F6: Google Calendar (OAuth code flow; the caller's own primary calendar) ----

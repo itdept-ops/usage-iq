@@ -234,4 +234,68 @@ public class AiIntegrationTests(WebAppFactory factory)
     }
 
     private sealed record PermissionRow(string Key, string Group, string Label, string Description);
+
+    // =====================================================================================
+    // TRACKER WEEKLY RECAP — gated by tracker.self (NOT tracker.ai); ALWAYS-200 plain FLOOR
+    // =====================================================================================
+
+    [Fact]
+    public async Task Tracker_recap_requires_authentication()
+    {
+        var anon = factory.CreateClient();
+        (await anon.GetAsync("/api/ai/tracker-recap")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Tracker_recap_requires_tracker_self_permission()
+    {
+        // A user with NEITHER tracker.self nor tracker.ai is forbidden (the recap is a tracker.self feature).
+        var (_, noPerms) = await ProvisionUser("reporter.view");
+        (await noPerms.GetAsync("/api/ai/tracker-recap")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Tracker_recap_falls_back_to_plain_never_503_and_writes_nothing()
+    {
+        // tracker.self is enough — the deterministic floor needs no AI (tracker.ai is the optional upgrade).
+        var (email, user) = await ProvisionUser("tracker.self");
+
+        // Log a day of food so the floor reflects real aggregation.
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        await user.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = today, meal = "breakfast", description = "Oatmeal",
+            quantity = 1.0, calories = 350, proteinG = 12.0, carbG = 60.0, fatG = 6.0,
+        });
+
+        // Gemini is OFF in the test host -> ALWAYS 200 with the deterministic plain floor, never a 503.
+        var res = await user.GetAsync("/api/ai/tracker-recap");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+
+        dto.GetProperty("fellBackToPlain").GetBoolean().Should().BeTrue();
+        dto.GetProperty("narrative").GetString().Should().NotBeNullOrWhiteSpace();
+        // The plain floor narrates the server-aggregated week: at least one day logged.
+        dto.GetProperty("narrative").GetString().Should().Contain("of 7 days");
+        dto.GetProperty("insights").GetArrayLength().Should().Be(0); // no insights on the floor
+        // The facts the recap is built from carry no email anywhere on the wire.
+        dto.GetRawText().Should().NotContain("@");
+
+        // The read changed nothing: the day still has exactly the one food entry.
+        var day = await user.GetAsync($"/api/tracker/day?date={today}");
+        day.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await day.Content.ReadAsStringAsync()).Should().Contain("Oatmeal");
+    }
+
+    [Fact]
+    public async Task Tracker_recap_with_no_data_still_returns_a_plain_floor()
+    {
+        var (_, user) = await ProvisionUser("tracker.self"); // never logged anything
+
+        var res = await user.GetAsync("/api/ai/tracker-recap");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        dto.GetProperty("fellBackToPlain").GetBoolean().Should().BeTrue();
+        dto.GetProperty("narrative").GetString().Should().Contain("logged 0 of 7 days");
+    }
 }

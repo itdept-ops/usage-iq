@@ -2691,6 +2691,52 @@ export interface FinanceSummaryAiResult {
   fellBackToPlain: boolean;
 }
 
+/**
+ * One detected recurring charge in the "✨ Money coach" (mirrors RecurringChargeDto): a subscription/bill
+ * that recurs monthly — its display `merchant`, the `typicalAmount` (the median of its occurrences), the
+ * `cadence` ("monthly"), the count of distinct `monthsSeen`, and the ISO `lastDate` it was last seen. These
+ * are computed DETERMINISTICALLY server-side from the household's recent expenses — they (and the monthly
+ * total) are the AUTHORITATIVE floor and always render, even when Gemini is off (fellBackToPlain).
+ */
+export interface FinanceRecurringCharge {
+  merchant: string;
+  typicalAmount: number;
+  cadence: string;
+  monthsSeen: number;
+  lastDate: string;
+}
+
+/**
+ * The "✨ Money coach" result (GET /api/family/finance/ai/money-coach; mirrors MoneyCoachDto). The
+ * `recurring` list + `monthlyRecurringTotal` are the DETERMINISTIC, authoritative FLOOR — present whether
+ * Gemini is on or off, so they ALWAYS render prominently. When Gemini is configured it ALSO narrates those
+ * facts into a calm, reassuring `narrative` + up to 5 actionable `tips`; otherwise `narrative` is null,
+ * `tips` is empty, and `fellBackToPlain` is true (we drop the AI flourish, same as the briefing). The coach
+ * NEVER cancels or edits anything — advice only. NEVER a 503; the recurring list is the floor. Read-only.
+ */
+export interface FinanceMoneyCoachResult {
+  recurring: FinanceRecurringCharge[];
+  monthlyRecurringTotal: number;
+  narrative: string | null;
+  tips: string[];
+  fellBackToPlain: boolean;
+}
+
+/**
+ * The tracker "✨ This week" recap (GET /api/ai/tracker-recap; mirrors TrackerRecapDto): a warm, encouraging
+ * read-only `narrative` of the caller's OWN last 7 local days plus 0–4 gentle coaching `insights` bullets,
+ * both NARRATED from the same server-side tracker queries (food/exercise/activity/hydration/weight) the recap
+ * aggregates — the model invents nothing. `fellBackToPlain` is true when Gemini was unavailable/unconfigured
+ * and the GUARANTEED deterministic plain floor was returned instead (we drop the AI flourish, same handling
+ * as the morning briefing / finance "explain this month"). NEVER a 503; the plain text is the floor. Gated by
+ * tracker.self alone (the floor needs no AI). Purely read-only — nothing is mutated.
+ */
+export interface TrackerRecapResult {
+  narrative: string;
+  insights: string[];
+  fellBackToPlain: boolean;
+}
+
 /** Canonical permission keys (mirror of the backend catalog — all 29 keys). */
 export const PERM = {
   dashboardView: 'dashboard.view',
