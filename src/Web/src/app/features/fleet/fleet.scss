@@ -82,6 +82,16 @@ mat-progress-bar {
   }
 }
 
+/* Tablet band (641–880px, where the KPI grid also collapses): drop the sticky pin so the
+   wrapped 2–3 row filter bar can't occupy a large slice of a short landscape viewport and
+   cover leaderboard rows, and let the date inputs flex instead of staying rigidly 116px. */
+@media (max-width: 880px) {
+  .filters {
+    position: static;
+    .f-date { flex: 1 1 0; width: auto; min-width: 0; }
+  }
+}
+
 /* On phones the filter bar stops being sticky chrome and stacks into full-width clusters
    so nothing clips and the controls stay comfortably tappable. */
 @media (max-width: 640px) {

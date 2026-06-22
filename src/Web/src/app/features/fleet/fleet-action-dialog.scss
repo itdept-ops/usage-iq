@@ -1,10 +1,17 @@
-:host { display: block; min-width: 420px; max-width: 520px; }
-/* On phones the dialog is opened near full-width (maxWidth 94vw); drop the fixed min so
-   it never forces horizontal overflow, and let tall content scroll inside. */
+/* Cap the desired min by the viewport so it can never exceed the dialog's own max width
+   (opened at maxWidth 94vw): on a 421–447px viewport a rigid 420px min would otherwise
+   push the inner content wider than the surface and introduce horizontal overflow. */
+:host { display: block; min-width: min(420px, 90vw); max-width: 520px; }
+/* On phones the dialog is opened near full-width; relax fully and let tall content scroll inside. */
 @media (max-width: 640px) {
   :host { min-width: 0; max-width: 100%; width: 100%; }
 }
 .mono { font-family: var(--tech-font-mono, ui-monospace, monospace); }
+
+/* Robust mobile sizing — the panel is height-capped, only the CONTENT scrolls, and the action
+   row stays pinned (never cut off under mobile browser chrome) — is provided by the shared
+   `.uiq-dialog` panelClass set at the call site (see fleet.ts open(); rule in dashboard.scss),
+   so this stylesheet only needs the fleet-specific min-width above. */
 
 h2[mat-dialog-title] {
   display: flex;

@@ -514,7 +514,7 @@ export class FamilyLists {
       },
     };
     const ref = this.dialog.open<FamilyShareDialog, ShareDialogData, boolean>(FamilyShareDialog, {
-      data, width: '460px', maxWidth: '94vw', autoFocus: false,
+      data, width: '460px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog',
     });
     await firstValueFrom(ref.afterClosed());
   }
@@ -534,14 +534,14 @@ export class FamilyLists {
 
   private promptName(title: string, placeholder: string, initial = ''): Promise<string | undefined> {
     const ref = this.dialog.open<ListNamePrompt, ListNamePromptData, string>(ListNamePrompt, {
-      data: { title, placeholder, initial }, width: '420px', maxWidth: '92vw', autoFocus: false,
+      data: { title, placeholder, initial }, width: '420px', maxWidth: '92vw', autoFocus: false, panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }
 
   private confirm(data: ConfirmData): Promise<boolean | undefined> {
     const ref = this.dialog.open<FamilyConfirmDialog, ConfirmData, boolean>(FamilyConfirmDialog, {
-      data, width: '420px', maxWidth: '92vw',
+      data, width: '420px', maxWidth: '92vw', panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }

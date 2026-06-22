@@ -89,7 +89,7 @@ export class FamilyPolls {
 
   async create(): Promise<void> {
     const ref = this.dialog.open<PollCreateDialog, undefined, FamilyPollCreate>(
-      PollCreateDialog, { width: '560px', maxWidth: '94vw', autoFocus: false });
+      PollCreateDialog, { width: '560px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog' });
     const payload = await firstValueFrom(ref.afterClosed());
     if (!payload) return;
     try {
@@ -277,7 +277,7 @@ export class FamilyPolls {
 
   private confirm(data: ConfirmData): Promise<boolean | undefined> {
     const ref = this.dialog.open<FamilyConfirmDialog, ConfirmData, boolean>(FamilyConfirmDialog, {
-      data, width: '420px', maxWidth: '92vw',
+      data, width: '420px', maxWidth: '92vw', panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }

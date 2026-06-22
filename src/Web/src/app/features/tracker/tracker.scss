@@ -1179,6 +1179,9 @@
 
 @media (max-width: 1024px) and (min-width: 861px) {
   .tracker__ai-row { grid-template-columns: 1fr 1fr; }
+  // Three panels in a 2-up grid leave the third (Day summary) orphaned half-width on its own row.
+  // Span it across both columns so the 2+1 reads as deliberate rather than ragged.
+  .tracker__ai-panel--summary { grid-column: 1 / -1; }
 }
 // Collapse to one column at <=860px (matching .tracker__fitness) so the AI panels never get
 // narrower than the stats panels — at the 2-up boundary the action-button labels would otherwise pinch.

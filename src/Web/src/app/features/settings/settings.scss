@@ -338,9 +338,12 @@ mat-slide-toggle {
 .notif-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 20px;
   margin: 10px 0 14px;
+
+  /* Nudge toggles down so their label sits on the form-field input line */
+  mat-slide-toggle { margin-top: 9px; }
 
   .threshold { width: 180px; max-width: 100%; }
 }
@@ -350,7 +353,7 @@ mat-slide-toggle {
 }
 
 .notif-row .mention { width: 220px; max-width: 100%; }
-.notif-row .notif-hint { color: var(--tech-text-tertiary); }
+.notif-row .notif-hint { color: var(--tech-text-tertiary); margin-top: 9px; }
 
 /* ───────────────────────── Responsive (phones / small tablets) ───────────────────────── */
 @media (max-width: 640px) {

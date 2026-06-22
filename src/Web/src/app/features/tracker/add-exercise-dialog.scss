@@ -335,8 +335,15 @@
 }
 
 .ax-actions {
+  // Pin the action row (Cancel/Save) so it's always reachable on a short phone even when the
+  // WorkoutX / AI tabs are tall — same proven pattern as the AI Day Builder footer.
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   padding: var(--tech-space-3) var(--tech-space-4);
   gap: 8px;
+  background: var(--tech-panel);
+  border-top: 1px solid var(--tech-border-subtle);
   button { border-radius: var(--tech-r-control); font-weight: 600; min-height: 44px; }
 }
 

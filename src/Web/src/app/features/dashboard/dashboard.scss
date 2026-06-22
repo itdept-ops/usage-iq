@@ -183,6 +183,59 @@ mat-progress-bar {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   Shared dialog convention — `.uiq-dialog` panelClass (CDK overlay).
+   Passed to every dialog.open() on the dashboard so they size + scroll
+   consistently: the panel is height-capped, ONLY the content scrolls,
+   and the action row stays pinned/visible (never cut off). On phones the
+   dialog goes near-full-screen so long content stays reachable. Lives
+   here (not styles.scss) because this unit owns dashboard/*; ideally the
+   global unit hosts this rule so every feature dialog can reuse it.
+   ═══════════════════════════════════════════════════════════════ */
+::ng-deep .uiq-dialog.mat-mdc-dialog-panel {
+  max-height: 90dvh;
+
+  .mat-mdc-dialog-container,
+  .mat-mdc-dialog-surface {
+    max-height: 90dvh;
+  }
+
+  /* The dialog is a column so the content region absorbs slack and scrolls,
+     keeping the title and the action row fixed in view. */
+  .mat-mdc-dialog-surface {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mat-mdc-dialog-content {
+    flex: 1 1 auto;
+    max-height: none;       /* the panel caps height; let content fill + scroll */
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Pin the action row to the bottom of the panel so long content can't push
+     the buttons out of reach. */
+  .mat-mdc-dialog-actions {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    background: var(--tech-panel);
+    border-top: 1px solid var(--tech-border-subtle);
+  }
+}
+
+/* Phones: go near-full-screen so nothing is cut off on a small viewport. */
+@media (max-width: 640px) {
+  ::ng-deep .uiq-dialog.mat-mdc-dialog-panel {
+    max-width: 95vw !important;
+    max-height: 92dvh;
+
+    .mat-mdc-dialog-container,
+    .mat-mdc-dialog-surface { max-height: 92dvh; }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Saved-views menu — rendered in the CDK overlay (::ng-deep via panelClass)
    ═══════════════════════════════════════════════════════════════ */
 ::ng-deep .views-menu.mat-mdc-menu-panel {

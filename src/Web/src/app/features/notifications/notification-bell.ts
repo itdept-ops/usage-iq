@@ -137,7 +137,8 @@ export class NotificationBell {
     const { NotificationPreferencesDialog } = await import('./notification-preferences-dialog');
     this.dialog.open(NotificationPreferencesDialog, {
       width: '480px',
-      maxWidth: '94vw',
+      maxWidth: '95vw',
+      panelClass: 'ax-dialog',
       autoFocus: false,
     });
   }

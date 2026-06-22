@@ -230,7 +230,7 @@ export class Fleet {
 
   /** Open the dialog with the prepared data; on success refresh the data and toast the count. */
   private runDialog(data: FleetActionData): void {
-    this.dialog.open(FleetActionDialog, { data, width: '520px', maxWidth: '94vw', autoFocus: false })
+    this.dialog.open(FleetActionDialog, { data, width: '520px', maxWidth: '94vw', maxHeight: '90dvh', panelClass: 'uiq-dialog', autoFocus: false })
       .afterClosed().subscribe((res: FleetActionResult | undefined) => {
         if (!res) return;
         this.toastResult(res, data.label);

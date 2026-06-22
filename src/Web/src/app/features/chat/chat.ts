@@ -986,7 +986,7 @@ export class Chat implements AfterViewChecked, OnDestroy {
     source$.pipe(catchError(() => of<ChatContactDto[]>([]))).subscribe(list => {
       this.contacts.set(list);
       const data: ChatCreateData = { people: this.pickablePeople(), mode, isAdmin };
-      this.dialog.open(ChatCreateDialog, { data, width: '480px', maxWidth: '94vw', autoFocus: false })
+      this.dialog.open(ChatCreateDialog, { data, width: '480px', maxWidth: '95vw', autoFocus: false })
         .afterClosed().subscribe((ch: ChatChannelDto | undefined) => {
           if (ch) this.select(ch);
         });

@@ -346,4 +346,7 @@
 
   mat-icon { font-size: 16px; width: 16px; height: 16px; }
 }
+/* Spin the sync glyph while autosaving so the in-progress state reads as motion, not a finished refresh. */
+.cycle__day-spin { animation: cyc-spin 1s linear infinite; }
+@keyframes cyc-spin { to { transform: rotate(360deg); } }
 .cycle__day-clear { color: var(--tech-text-secondary); font-size: var(--tech-fs-caption, 0.82rem); }

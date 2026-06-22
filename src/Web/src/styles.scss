@@ -466,3 +466,41 @@ code, pre, kbd, samp {
   display: flex;
   flex-direction: column;
 }
+
+/* ── Robust dialog shell (shared) ─────────────────────────────────────────────────────────────────
+   Every dialog opts in via one of these panelClasses (set in its open() call). These rules MUST live
+   in the GLOBAL sheet: a dialog renders in the body-level CDK overlay, OUTSIDE any component's
+   view-encapsulation scope, so a component .scss rule can't reliably reach the panel (a `:host`-prefixed
+   ::ng-deep rule never matches it at all). The pattern: cap the surface at ~90dvh so a tall dialog
+   scrolls its CONTENT (not the page) and never clips on a phone's dynamic viewport chrome; pin the
+   action row so the primary button stays reachable; and on phones let the panel go near-full-width.
+   Per-dialog width/maxWidth (set in each open()) is deliberately left untouched — this governs only
+   height/scroll + a mobile width safety net, so intentionally-wide dialogs (e.g. the exercise picker)
+   keep their width. */
+.uiq-dialog,
+.tracker-dialog,
+.family-dialog,
+.ax-dialog,
+.app-dialog {
+  .mat-mdc-dialog-surface {
+    max-height: 90dvh; /* dvh: a phone's URL bar can't clip the footer */
+  }
+  /* The scroll lives on the content region so the title + actions stay put. */
+  .mat-mdc-dialog-content {
+    max-height: unset;
+    overflow: auto;
+  }
+  /* Keep the action row reachable no matter how long the body is. */
+  .mat-mdc-dialog-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--mdc-dialog-container-color, var(--tech-panel));
+  }
+
+  @media (max-width: 640px) {
+    max-width: 96vw !important; /* near-full-width on phones; beats Material's 80vw default */
+    .mat-mdc-dialog-surface {
+      max-height: 93dvh;
+    }
+  }
+}

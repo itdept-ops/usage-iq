@@ -670,7 +670,7 @@ export class FamilyCycle implements OnDestroy {
 
   private confirm(data: ConfirmData): Promise<boolean | undefined> {
     const ref = this.dialog.open<FamilyConfirmDialog, ConfirmData, boolean>(FamilyConfirmDialog, {
-      data, width: '420px', maxWidth: '92vw',
+      data, width: '420px', maxWidth: '92vw', panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }

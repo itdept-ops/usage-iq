@@ -619,14 +619,14 @@ export class FamilyChores {
 
   private openEditor(chore: FamilyChore | null): Promise<ChoreEditorResult | undefined> {
     const ref = this.dialog.open<ChoreEditorDialog, ChoreEditorData, ChoreEditorResult>(ChoreEditorDialog, {
-      data: { chore, members: this.members() }, width: '460px', maxWidth: '94vw', autoFocus: false,
+      data: { chore, members: this.members() }, width: '460px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }
 
   private confirm(data: ConfirmData): Promise<boolean | undefined> {
     const ref = this.dialog.open<FamilyConfirmDialog, ConfirmData, boolean>(FamilyConfirmDialog, {
-      data, width: '420px', maxWidth: '92vw',
+      data, width: '420px', maxWidth: '92vw', panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }

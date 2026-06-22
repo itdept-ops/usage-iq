@@ -6,10 +6,10 @@
   <mat-button-toggle-group class="cc-mode" [value]="mode()" (change)="setMode($event.value)"
                            aria-label="Conversation type" hideSingleSelectionIndicator>
     <mat-button-toggle value="channel">
-      <mat-icon>tag</mat-icon> Channel
+      <mat-icon aria-hidden="true">tag</mat-icon> Channel
     </mat-button-toggle>
     <mat-button-toggle value="direct">
-      <mat-icon>alternate_email</mat-icon> Direct
+      <mat-icon aria-hidden="true">alternate_email</mat-icon> Direct
     </mat-button-toggle>
   </mat-button-toggle-group>
 
@@ -67,9 +67,9 @@
             <span class="cc-person__name">{{ p.name }}</span>
           </span>
           @if (isSelected(p.userId)) {
-            <mat-icon class="cc-person__check">check_circle</mat-icon>
+            <mat-icon class="cc-person__check" aria-hidden="true">check_circle</mat-icon>
           } @else {
-            <mat-icon class="cc-person__add">
+            <mat-icon class="cc-person__add" aria-hidden="true">
               {{ mode() === 'direct' ? 'radio_button_unchecked' : 'add_circle_outline' }}
             </mat-icon>
           }
@@ -84,7 +84,7 @@
 
   @if (error()) {
     <p class="cc-error" role="alert">
-      <mat-icon>error_outline</mat-icon> {{ error() }}
+      <mat-icon aria-hidden="true">error_outline</mat-icon> {{ error() }}
     </p>
   }
 </mat-dialog-content>

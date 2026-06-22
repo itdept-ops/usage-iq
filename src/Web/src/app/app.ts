@@ -134,7 +134,7 @@ export class App {
   readonly usageGroupActive = computed(() =>
     this.pathInGroup(['/', '/calendar', '/pricing', '/reporter', '/fleet']));
   readonly adminGroupActive = computed(() =>
-    this.pathInGroup(['/users', '/activity', '/ai-usage', '/settings']));
+    this.pathInGroup(['/users', '/admin/locations', '/activity', '/ai-usage', '/settings']));
 
   /**
    * Page routes that require a single view permission (for live-revocation enforcement). Keyed by the

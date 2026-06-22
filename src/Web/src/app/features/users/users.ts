@@ -63,7 +63,7 @@ import {
   `,
   styles: [`
     .erd-sub { margin: 0 0 14px; max-width: 380px; font-size: 13px; line-height: 1.5; color: var(--tech-text-secondary); }
-    .erd-field { width: 320px; max-width: 100%; }
+    .erd-field { width: 100%; }
     [mat-dialog-title] { font-family: var(--tech-font-ui); }
   `],
 })
@@ -111,7 +111,7 @@ interface ConfirmData {
   `,
   styles: [`
     [mat-dialog-title] { font-family: var(--tech-font-ui); }
-    .ucd-line { margin: 0 0 8px; max-width: 420px; font-size: 13px; line-height: 1.5; color: var(--tech-text-secondary); }
+    .ucd-line { margin: 0 0 8px; width: 100%; font-size: 13px; line-height: 1.5; color: var(--tech-text-secondary); }
     .ucd-line:last-child { margin-bottom: 0; }
     .ucd-danger { --mdc-filled-button-container-color: var(--tech-error, #ff5c6c); --mdc-filled-button-label-text-color: #fff; }
   `],
@@ -175,6 +175,13 @@ export class Users {
   private dialog = inject(MatDialog);
   readonly auth = inject(AuthService);
   readonly PERM = PERM;
+
+  /**
+   * Shared robust sizing for every dialog this page opens. `maxWidth:95vw` overrides Material's default
+   * 80vw cap so a fixed `width` reflows to the viewport on phones; `maxHeight:90dvh` + the `app-dialog`
+   * panelClass (whose global rule lets the CONTENT scroll) keep the action row reachable on tall lists.
+   */
+  private static readonly DIALOG_OPTS = { maxWidth: '95vw', maxHeight: '90dvh', panelClass: 'app-dialog' } as const;
 
   /** The detail heading — selection moves focus here (accessibility). */
   private detailHeading = viewChild<ElementRef<HTMLElement>>('detailHeading');
@@ -577,7 +584,7 @@ export class Users {
   }
 
   private promptForKey(): void {
-    const ref = this.dialog.open(EmailRevealDialog, { width: '380px', autoFocus: 'dialog', restoreFocus: true });
+    const ref = this.dialog.open(EmailRevealDialog, { ...Users.DIALOG_OPTS, width: '380px', autoFocus: 'dialog', restoreFocus: true });
     ref.afterClosed().subscribe((key: string | undefined) => {
       if (!key) return;
       this.applyRevealKey(key);
@@ -625,10 +632,16 @@ export class Users {
 
   /** Open a user in the detail pane (seeds the staged edit + lazy-loads detail data). */
   select(u: ManagedUser, mobileDrill = false): void {
-    // Guard an unsaved edit before switching away.
+    // Guard an unsaved edit before switching away (themed confirm, matching the rest of the page).
     if (this.selectedId() != null && this.selectedId() !== u.id && this.dirty()) {
-      if (!confirm('You have unsaved changes. Discard them and switch users?')) return;
+      this.confirmDiscard(() => this.openDetail(u, mobileDrill));
+      return;
     }
+    this.openDetail(u, mobileDrill);
+  }
+
+  /** Commit the selection + lazy-load its detail data (the non-guarded body of `select`). */
+  private openDetail(u: ManagedUser, mobileDrill: boolean): void {
     this.selectedId.set(u.id);
     this.seedDraft(u);
     if (mobileDrill) this.mobileDetailOpen.set(true);
@@ -639,6 +652,23 @@ export class Users {
     }
   }
 
+  /**
+   * Themed "discard unsaved changes?" confirm — reuses UsersConfirmDialog so the prompt is sized/styled
+   * like the rest of the area (replaces the OS-native `confirm()`). Runs `onDiscard` only on accept.
+   */
+  private confirmDiscard(onDiscard: () => void): void {
+    const ref = this.dialog.open(UsersConfirmDialog, {
+      ...Users.DIALOG_OPTS, width: '420px',
+      data: {
+        title: 'Discard unsaved changes?',
+        lines: ['You have unsaved changes to this user.', 'They will be lost if you continue.'],
+        confirmLabel: 'Discard changes',
+        danger: true,
+      } as ConfirmData,
+    });
+    ref.afterClosed().subscribe(ok => { if (ok) onDiscard(); });
+  }
+
   /** Seed the staged draft from a saved row + detect its current role. */
   private seedDraft(u: ManagedUser): void {
     this.draftPerms.set(new Set(u.permissions));
@@ -647,9 +677,13 @@ export class Users {
     this.collapsedGroups.set(new Set());
   }
 
-  /** Close the detail (mobile Back / deselect). Guards an unsaved edit. */
+  /** Close the detail (mobile Back / deselect). Guards an unsaved edit with the themed confirm. */
   closeDetail(): void {
-    if (this.dirty() && !confirm('You have unsaved changes. Discard them?')) return;
+    if (this.dirty()) { this.confirmDiscard(() => this.doCloseDetail()); return; }
+    this.doCloseDetail();
+  }
+
+  private doCloseDetail(): void {
     this.mobileDetailOpen.set(false);
     this.selectedId.set(null);
   }
@@ -825,7 +859,7 @@ export class Users {
     if (aiAdds.length) lines.push(`Grants token-spending AI: ${aiAdds.join(', ')}.`);
     if (disabling) lines.push('Disables the account — they can no longer sign in.');
     const ref = this.dialog.open(UsersConfirmDialog, {
-      width: '440px',
+      ...Users.DIALOG_OPTS, width: '440px',
       data: { title: 'Confirm sensitive changes', lines, confirmLabel: 'Save changes', danger: disabling } as ConfirmData,
     });
     ref.afterClosed().subscribe(ok => { if (ok) this.commitSave(u, /*announceUndo*/ false); });
@@ -878,7 +912,7 @@ export class Users {
    */
   forceLogout(u: ManagedUser): void {
     const ref = this.dialog.open(UsersConfirmDialog, {
-      width: '420px',
+      ...Users.DIALOG_OPTS, width: '420px',
       data: {
         title: 'Sign out of all sessions?',
         lines: [
@@ -907,7 +941,7 @@ export class Users {
 
   remove(u: ManagedUser): void {
     const ref = this.dialog.open(UsersConfirmDialog, {
-      width: '420px',
+      ...Users.DIALOG_OPTS, width: '420px',
       data: {
         title: 'Remove user?',
         lines: [`${u.name || this.userLabel(u)} will lose access immediately.`, 'This cannot be undone.'],
@@ -1092,7 +1126,7 @@ export class Users {
   /** Open a named-button confirm for a bulk action; runs `onConfirm` on accept. */
   private confirmBulk(title: string, lines: string[], confirmLabel: string, _ai: boolean, onConfirm: () => void, danger = false): void {
     const ref = this.dialog.open(UsersConfirmDialog, {
-      width: '460px', data: { title, lines, confirmLabel, danger } as ConfirmData,
+      ...Users.DIALOG_OPTS, width: '460px', data: { title, lines, confirmLabel, danger } as ConfirmData,
     });
     ref.afterClosed().subscribe(ok => { if (ok) onConfirm(); });
   }

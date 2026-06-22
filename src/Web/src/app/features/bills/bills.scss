@@ -105,6 +105,17 @@
   &--settled .item__name, &--settled .item__amt-in { text-decoration: line-through; color: var(--tech-text-dim); }
   &--new { margin-top: 6px; padding-top: 10px; border-top: 1px dashed var(--tech-border); }
 }
+@media (max-width: 560px) {
+  .item, .item--new {
+    grid-template-columns: 36px 1fr 36px;
+    row-gap: 6px;
+  }
+  /* amount + assign drop to a full-width second row */
+  .item__amt, .item__assign {
+    grid-column: 1 / -1;
+  }
+  .item__assign { max-width: none; justify-self: start; }
+}
 .item__settle { background: transparent; border: none; cursor: pointer; color: var(--tech-text-dim); padding: 2px;
   display: inline-flex; align-items: center; justify-content: center;
   &:hover { color: #6ee7a8; }

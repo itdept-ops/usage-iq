@@ -483,7 +483,7 @@ export class Tracker {
   openAddFood(meal: Meal): void {
     if (this.store.readOnly()) return;
     const data: AddFoodData = { date: this.store.date(), meal };
-    this.dialog.open(AddFoodDialog, { data, width: '500px', maxWidth: '95vw', autoFocus: false })
+    this.dialog.open(AddFoodDialog, { data, width: '500px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((req: AddFoodRequest | AddFoodRequest[] | undefined) => {
         if (!req) return;
         // The AI multi-item flows (photo / "describe your meal") resolve with an ARRAY; log them as a
@@ -526,7 +526,7 @@ export class Tracker {
       goal: p?.goal ?? '',
       hasWeight: (p?.weightKg ?? 0) > 0,
     };
-    this.dialog.open(AddExerciseDialog, { data, width: '820px', maxWidth: '94vw', autoFocus: false })
+    this.dialog.open(AddExerciseDialog, { data, width: '820px', maxWidth: '94vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((req: AddExerciseRequest | undefined) => {
         if (!req) return;
         this.store.addExercise(req)
@@ -540,7 +540,7 @@ export class Tracker {
     const profile: TrackerProfileDto = this.store.profile()
       ?? { goal: 'Maintain', shareWithContacts: false, sex: 'Unspecified', activityLevel: 'Sedentary', unitSystem: 'Imperial' };
     const data: ProfileData = { profile };
-    this.dialog.open(ProfileDialog, { data, width: '460px', maxWidth: '95vw', autoFocus: false })
+    this.dialog.open(ProfileDialog, { data, width: '460px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((req: TrackerProfileDto | undefined) => {
         if (!req) return;
         this.store.saveProfile(req)
@@ -587,7 +587,7 @@ export class Tracker {
       unitSystem: (p?.unitSystem ?? 'Imperial'),
       currentKg: p?.weightKg ?? null,
     };
-    this.dialog.open(LogWeightDialog, { data, width: '360px', maxWidth: '95vw', autoFocus: false })
+    this.dialog.open(LogWeightDialog, { data, width: '360px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((req: LogWeightRequest | undefined) => {
         if (!req) return;
         this.store.logWeight(req)
@@ -607,7 +607,7 @@ export class Tracker {
   openMoveDay(): void {
     if (this.store.readOnly()) return;
     const data: MoveDayData = { fromDate: this.store.date() };
-    this.dialog.open(MoveDayDialog, { data, width: '420px', maxWidth: '95vw', autoFocus: false })
+    this.dialog.open(MoveDayDialog, { data, width: '420px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((req: MoveDayRequest | undefined) => {
         if (!req) return;
         void this.runMoveDay(req);
@@ -692,7 +692,7 @@ export class Tracker {
     if (this.store.readOnly()) return;
     const p = this.store.profile();
     const data: AddHydrationData = { date: this.store.date(), unitSystem: p?.unitSystem ?? 'Imperial' };
-    this.dialog.open(AddHydrationDialog, { data, width: '400px', maxWidth: '95vw', autoFocus: false })
+    this.dialog.open(AddHydrationDialog, { data, width: '400px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((res: AddHydrationResult | undefined) => {
         if (!res) return;
         if (res.kind === 'goal') {
@@ -769,7 +769,7 @@ export class Tracker {
   openAddCoffee(): void {
     if (this.store.readOnly()) return;
     const data: AddCoffeeData = { date: this.store.date() };
-    this.dialog.open(AddCoffeeDialog, { data, width: '400px', maxWidth: '95vw', autoFocus: false })
+    this.dialog.open(AddCoffeeDialog, { data, width: '400px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((res: AddCoffeeResult | undefined) => {
         if (!res) return;
         this.logCoffees(res.requests);
@@ -845,7 +845,7 @@ export class Tracker {
   openAddSupplement(presetName?: string): void {
     if (this.store.readOnly()) return;
     const data: AddSupplementData = { date: this.store.date(), presetName };
-    this.dialog.open(AddSupplementDialog, { data, width: '440px', maxWidth: '95vw', autoFocus: false })
+    this.dialog.open(AddSupplementDialog, { data, width: '440px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((res: AddSupplementResult | undefined) => {
         if (!res) return;
         this.store.addSupplement(res.request)
@@ -923,7 +923,7 @@ export class Tracker {
       unitSystem: p?.unitSystem ?? 'Imperial',
       activity: this.activity(),
     };
-    this.dialog.open(AddActivityDialog, { data, width: '380px', maxWidth: '95vw', autoFocus: false })
+    this.dialog.open(AddActivityDialog, { data, width: '380px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((res: UpsertActivityRequest | 'clear' | undefined) => {
         if (!res) return;
         if (res === 'clear') {
@@ -1022,7 +1022,7 @@ export class Tracker {
   addSuggestedFood(s: FoodSuggestionDto): void {
     if (this.store.readOnly()) return;
     const data: AddFoodData = { date: this.store.date(), meal: 'snack', prefillQuery: s.food };
-    this.dialog.open(AddFoodDialog, { data, width: '500px', maxWidth: '95vw', autoFocus: false })
+    this.dialog.open(AddFoodDialog, { data, width: '500px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((req: AddFoodRequest | AddFoodRequest[] | undefined) => {
         if (!req) return;
         const reqs = Array.isArray(req) ? req : [req];
@@ -1096,7 +1096,7 @@ export class Tracker {
       unitSystem: p?.unitSystem ?? 'Imperial',
       existingDayBrief: this.existingDayBrief(),
     };
-    this.dialog.open(AiDayBuilderDialog, { data, width: '720px', maxWidth: '96vw', maxHeight: '92vh', autoFocus: false })
+    this.dialog.open(AiDayBuilderDialog, { data, width: '720px', maxWidth: '96vw', maxHeight: '92dvh', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((res: AiDayBuilderResult) => {
         if (!res) return;
         void this.commitBuiltDay(res);

@@ -986,6 +986,11 @@
   min-width: 220px;
   transform-origin: top left;
 
+  @media (max-width: 480px) {
+    min-width: 0;
+    max-width: 92vw;
+  }
+
   .acct-item--radio.mat-mdc-menu-item .acct-item__radio {
     font-size: 18px;
     width: 18px;

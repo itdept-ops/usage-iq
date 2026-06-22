@@ -1,3 +1,7 @@
+/* Mobile robustness (surface height cap, content scroll, sticky actions, near-full-width on phones)
+   is handled globally by the shared `.ax-dialog` rule in src/styles.scss — a dialog renders in the
+   body-level overlay, so the rule cannot live in this component's encapsulated scope. */
+
 .np-title {
   font-family: var(--tech-font-ui);
   font-weight: 700;
@@ -132,7 +136,10 @@
 }
 
 .np-actions {
+  position: sticky;
+  bottom: 0;
   padding: var(--tech-space-3) var(--tech-space-4);
   gap: 8px;
+  background: var(--mat-sys-surface);
   button { border-radius: var(--tech-r-control); font-weight: 600; }
 }

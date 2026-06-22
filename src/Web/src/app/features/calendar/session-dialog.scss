@@ -1,13 +1,35 @@
 :host { display: block; min-width: 520px; max-width: 680px; }
 .mono { font-family: var(--tech-font-mono, ui-monospace, monospace); }
 
+// Robust dialog shell (panelClass 'uiq-dialog', set in calendar.ts open()).
+// The panel is capped at 90dvh (also via the open() maxHeight); only the
+// content scrolls, and the action row stays pinned so Close is always reachable
+// no matter how long the session timeline is.
+::ng-deep .uiq-dialog {
+  .mat-mdc-dialog-content {
+    max-height: unset;        // height is governed by the panel cap, not a fixed body cap
+    overflow: auto;
+  }
+  .mat-mdc-dialog-actions {
+    position: sticky;
+    bottom: 0;
+    // Match the dialog surface so the pinned row isn't transparent over scrolled content.
+    background: var(--mdc-dialog-container-color, var(--tech-panel, #0b0f17));
+  }
+}
+
 @media (max-width: 640px) {
   // The dialog panel is opened at maxWidth:94vw; drop the fixed min-width so the
   // content can shrink to the phone viewport instead of forcing horizontal scroll.
   :host { min-width: 0; width: 100%; }
-  // Let the dialog body scroll vertically when the timeline is long; cap it to the
-  // viewport so the panel itself never overflows the screen.
-  ::ng-deep .mat-mdc-dialog-content { max-height: 70vh; }
+
+  // Near-full-screen on phones: widen the panel and let it use almost the full
+  // height, with only the content scrolling (sticky actions handled above).
+  ::ng-deep .uiq-dialog {
+    width: 95vw;
+    max-width: 95vw;
+    max-height: 92dvh;
+  }
 }
 
 .sx-error { margin: 4px 0; font-size: 13px; color: var(--tech-text-secondary); }

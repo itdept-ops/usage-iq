@@ -232,7 +232,7 @@
           <div class="cycle__day-foot">
             <span class="cycle__day-status" role="status" aria-live="polite">
               @if (daySaving()) {
-                <mat-icon aria-hidden="true">sync</mat-icon> Saving…
+                <mat-icon class="cycle__day-spin" aria-hidden="true">sync</mat-icon> Saving…
               } @else if (daySaved()) {
                 <mat-icon aria-hidden="true">check</mat-icon> Saved
               } @else if (hasDayLog()) {

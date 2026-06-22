@@ -319,7 +319,7 @@
           <select class="fin-select" aria-label="Kind" [value]="fKind() ?? ''"
                   (change)="setKindFilter($any($event.target).value || null)">
             <option value="">All kinds</option>
-            @for (k of txnKindOptions; track k) { <option [value]="k">{{ k }}</option> }
+            @for (k of txnKindOptions; track k) { <option [value]="k">{{ txnKindLabel(k) }}</option> }
           </select>
 
           @if (hasFilters()) {

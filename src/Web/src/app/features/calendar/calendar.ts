@@ -54,7 +54,7 @@ export class Calendar {
   }
 
   openSession(id: string): void {
-    this.dialog.open(SessionDialog, { data: { sessionId: id }, width: '680px', maxWidth: '94vw', autoFocus: false });
+    this.dialog.open(SessionDialog, { data: { sessionId: id }, width: '680px', maxWidth: '94vw', maxHeight: '90dvh', panelClass: 'uiq-dialog', autoFocus: false });
   }
 
   fmtHour(h: number): string { return `${String(h).padStart(2, '0')}:00`; }

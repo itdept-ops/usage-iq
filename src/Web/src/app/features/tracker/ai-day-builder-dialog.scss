@@ -2,11 +2,10 @@
   display: block;
 }
 
-// ── sticky header ──────────────────────────────────────────────────────────────
+// ── header ─────────────────────────────────────────────────────────────────────
+// Sits BEFORE mat-dialog-content (the single scroll region), so it is already pinned by being
+// outside the scroller — no position:sticky needed. Keeps its background + border for separation.
 .db-head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -224,8 +223,10 @@
 .db-actmode { margin-top: 6px; }
 
 // ── actions ─────────────────────────────────────────────────────────────────
+// Sits AFTER mat-dialog-content (the scroll region) as the mat-dialog-actions footer, so it is
+// already pinned by being outside the scroller — no position:sticky needed. Keeps its background +
+// top border for separation.
 .db-actions {
-  position: sticky; bottom: 0;
   padding: var(--tech-space-3) var(--tech-space-4);
   gap: 8px;
   background: var(--tech-panel);

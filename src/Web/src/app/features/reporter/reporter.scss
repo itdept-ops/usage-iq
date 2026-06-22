@@ -389,7 +389,7 @@
     border: 1px solid color-mix(in srgb, var(--tech-error, #ff5c6c) 45%, transparent);
   }
   .grow { flex: 1 1 auto; }
-  .key-meta { color: var(--tech-text-tertiary); white-space: nowrap; }
+  .key-meta { color: var(--tech-text-tertiary); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .key-revoke { flex: 0 0 auto; mat-icon { font-size: 17px; height: 17px; width: 17px; margin-right: 3px; } }
 }
 

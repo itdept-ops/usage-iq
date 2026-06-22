@@ -642,10 +642,19 @@ a.tile:focus-visible {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ── Note editor dialog ─────────────────────────────────────────────── */
-.note-edit__title, .share-dlg__title {
+.note-edit__title, .share-dlg__title, .qadd__title {
   display: flex; align-items: center; gap: 8px;
   font-family: var(--tech-font-ui); font-weight: 700; color: var(--tech-text);
   mat-icon { color: var(--tech-accent-cyan); }
+}
+
+/* Shared dialog header close (X): a discoverable touch affordance to dismiss without scrolling to
+   the footer Cancel. Pushed to the trailing edge of the title row; its own glyph stays neutral. */
+.dlg-close {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--tech-text-secondary);
+  mat-icon { color: var(--tech-text-secondary); }
 }
 .note-edit__body { padding-top: 6px !important; display: flex; flex-direction: column; gap: var(--tech-space-2, 8px); }
 .note-edit__field { width: 100%; }
@@ -670,7 +679,11 @@ a.tile:focus-visible {
 
 @media (max-width: 720px) {
   .note-edit__split { grid-template-columns: 1fr; }
-  .note-edit__preview { max-height: 180px; }
+  /* Collapse the nested scroll regions on phones: let the preview and AI-draft bodies grow naturally so
+     the mat-dialog-content is the single scroll container (avoids a scroll-within-a-scroll that traps the
+     gesture before the dialog body — which would otherwise make the pin toggle / actions hard to reach). */
+  .note-edit__preview { max-height: none; overflow: visible; }
+  .note-ai__draft-body { max-height: none; overflow: visible; }
 }
 
 /* ── ✨ Draft / rewrite with AI (note editor) ───────────────────────── */

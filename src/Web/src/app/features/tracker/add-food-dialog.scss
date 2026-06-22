@@ -361,8 +361,15 @@
     display: flex;
     flex-direction: column;
     gap: var(--tech-space-2);
-    max-height: 340px;
-    overflow-y: auto;
+
+    // Let mat-dialog-content own the scroll so short/landscape phones don't get a 340px inner
+    // scroller nested inside the dialog-content scroller (double scrollbars / nested scroll trap).
+    // Only cap the list (and scroll internally) on tall viewports where the extra height would
+    // otherwise push the meal toggle + totals off-screen.
+    @media (min-height: 720px) {
+      max-height: 340px;
+      overflow-y: auto;
+    }
   }
 }
 
@@ -395,11 +402,11 @@
 @media (max-width: 520px) {
   .af-macgrid { grid-template-columns: 1fr; }
   .af-review-item__macros { grid-template-columns: repeat(2, 1fr); }
-}
 
-@media (max-width: 480px) {
-  // With AI on, .af-mode has 5 segments and can't wrap (single flex row). Tighten the
-  // label padding/font and shrink the inline icon so all 5 fit the narrow dialog.
+  // With AI on, .af-mode has 5 segments and can't wrap (single flex row). The dialog can be ~500px
+  // wide (width:500px / maxWidth:95vw), so 5 full-padding labels start to clip well before 480px —
+  // tighten the label padding/font and shrink the inline icon at the 520px step (matching .af-macgrid
+  // above) so all 5 fit the narrow dialog.
   .af-mode {
     font-size: var(--tech-fs-micro);
 

@@ -24,7 +24,10 @@
 }
 
 <ng-template #body>
-  <!-- ── Start a timer: presets + custom + optional label ─────────────── -->
+  <!-- ── Start a timer: presets + custom + optional label ───────────────
+       Hidden in the embedded home "glance" card, which shows only the live
+       countdowns below (with an Open link to this full Timer page). -->
+  @if (!embedded()) {
   <div class="timer-start family__card">
     <h2 class="family__card-title">Start a timer</h2>
 
@@ -101,6 +104,7 @@
       </button>
     </div>
   </div>
+  }
 
   <!-- ── Running timers: live countdowns for the whole household ──────── -->
   @if (loading()) {

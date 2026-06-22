@@ -1156,7 +1156,7 @@ export class FamilyCalendar implements OnDestroy {
    */
   async openFindTime(): Promise<void> {
     const ref = this.dialog.open<FindTimeDialog, FindTimeData, FindTimeResultSlot>(
-      FindTimeDialog, { data: { members: this.members() }, width: '520px', maxWidth: '94vw', autoFocus: false });
+      FindTimeDialog, { data: { members: this.members() }, width: '520px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog' });
     const slot = await firstValueFrom(ref.afterClosed());
     if (!slot) return;
     await this.createFromSlot(slot);
@@ -1223,13 +1223,13 @@ export class FamilyCalendar implements OnDestroy {
 
   private openEditor(data: EventEditorData): Promise<EventEditorResult | undefined> {
     const ref = this.dialog.open<EventEditorDialog, EventEditorData, EventEditorResult>(
-      EventEditorDialog, { data, width: '460px', maxWidth: '94vw', autoFocus: false });
+      EventEditorDialog, { data, width: '460px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog' });
     return firstValueFrom(ref.afterClosed());
   }
 
   private confirm(data: ConfirmData): Promise<boolean | undefined> {
     const ref = this.dialog.open<FamilyConfirmDialog, ConfirmData, boolean>(FamilyConfirmDialog, {
-      data, width: '420px', maxWidth: '92vw',
+      data, width: '420px', maxWidth: '92vw', panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }

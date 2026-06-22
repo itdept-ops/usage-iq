@@ -1,10 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
@@ -31,13 +30,13 @@ import { LocationMap, MapPin, MapTrail } from './location-map';
   selector: 'app-admin-locations',
   standalone: true,
   imports: [
-    CommonModule, MatButtonModule, MatIconModule, MatTooltipModule, MatProgressBarModule,
+    CommonModule, MatButtonModule, MatIconModule, MatProgressBarModule,
     MatSnackBarModule, LocationMap,
   ],
   templateUrl: './admin-locations.html',
   styleUrl: './admin-locations.scss',
 })
-export class AdminLocations {
+export class AdminLocations implements OnDestroy {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
   private route = inject(ActivatedRoute);
@@ -46,6 +45,9 @@ export class AdminLocations {
   readonly loading = signal(true);
   readonly now = signal(Date.now());
   readonly timeAgo = timeAgo;
+
+  /** Refresh relative-time labels (~every minute) so roster "when" labels never freeze on this oversight page. */
+  private readonly tick = setInterval(() => this.now.set(Date.now()), 60_000);
 
   /** The currently-selected user id (shows their trail + history). null = show everyone's latest. */
   readonly selectedId = signal<number | null>(null);
@@ -133,5 +135,9 @@ export class AdminLocations {
     if (!f) return '—';
     const parts = [f.city, f.region, f.country].filter(Boolean);
     return parts.length ? parts.join(', ') : `${f.lat.toFixed(3)}, ${f.lng.toFixed(3)}`;
+  }
+
+  ngOnDestroy(): void {
+    clearInterval(this.tick);
   }
 }

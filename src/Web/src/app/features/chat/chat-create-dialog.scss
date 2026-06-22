@@ -136,14 +136,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  &__email {
-    font-family: var(--tech-font-mono);
-    font-size: var(--tech-fs-label);
-    color: var(--tech-text-tertiary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 
   &__check { color: var(--tech-accent); flex: 0 0 auto; }
   &__add { color: var(--tech-text-tertiary); flex: 0 0 auto; }
@@ -173,4 +165,16 @@
   padding: var(--tech-space-3) var(--tech-space-4);
   gap: 8px;
   button { border-radius: var(--tech-r-control); font-weight: 600; }
+}
+
+/* On short phone viewports let the dialog content be the single scroll region:
+   the people list flexes to fill remaining height instead of its own fixed cap,
+   so we don't stack an inner scrollbar inside the scrolling dialog body. */
+@media (max-width: 640px) {
+  .cc-body { min-width: 0; }
+  .cc-people {
+    max-height: none;
+    flex: 1 1 auto;
+    min-height: 120px;
+  }
 }

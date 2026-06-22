@@ -203,7 +203,7 @@ export class FamilyAssistantPanel {
     }
 
     const ref = this.dialog.open<EventEditorDialog, EventEditorData, EventEditorResult>(
-      EventEditorDialog, { data, width: '460px', maxWidth: '94vw', autoFocus: false });
+      EventEditorDialog, { data, width: '460px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog' });
     const result = await firstValueFrom(ref.afterClosed());
     if (!result || result.kind !== 'save') {
       // The user dismissed the editor — leave the card actionable (idle) rather than "done".

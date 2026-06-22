@@ -270,7 +270,7 @@ export class FamilyReminders {
     const ref = this.dialog.open<ReminderEditorDialog, ReminderEditorData, ReminderEditorResult>(
       ReminderEditorDialog, {
         data: { reminder, members: this.members(), selfUserId: this.selfUserId() },
-        width: '460px', maxWidth: '94vw', autoFocus: false,
+        width: '460px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog',
       });
     return firstValueFrom(ref.afterClosed());
   }
@@ -311,7 +311,7 @@ export class FamilyReminders {
 
   private confirm(data: ConfirmData): Promise<boolean | undefined> {
     const ref = this.dialog.open<FamilyConfirmDialog, ConfirmData, boolean>(FamilyConfirmDialog, {
-      data, width: '420px', maxWidth: '92vw',
+      data, width: '420px', maxWidth: '92vw', panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }

@@ -27,6 +27,11 @@ const KIND_LABEL: Record<FinanceAccountKind, string> = {
   bank: 'Bank', credit: 'Credit', other: 'Other',
 };
 
+/** Friendly labels for the transaction kind filter (expense/income/transfer). */
+const TXN_KIND_LABEL: Record<FinanceTxnKind, string> = {
+  expense: 'Expenses', income: 'Income', transfer: 'Transfers',
+};
+
 /** Owner options offered in the account-tagging picker. */
 const OWNER_OPTIONS: FinanceOwner[] = ['his', 'hers', 'joint', 'unassigned'];
 const KIND_OPTIONS: FinanceAccountKind[] = ['bank', 'credit', 'other'];
@@ -427,6 +432,7 @@ export class FamilyFinance {
 
   ownerLabel(o: FinanceOwner): string { return OWNER_LABEL[o] ?? o; }
   kindLabel(k: FinanceAccountKind): string { return KIND_LABEL[k] ?? k; }
+  txnKindLabel(k: FinanceTxnKind): string { return TXN_KIND_LABEL[k] ?? k; }
 
   /** A signed currency string, e.g. "$1,234.56". */
   money(n: number): string {

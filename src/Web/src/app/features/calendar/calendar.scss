@@ -126,6 +126,15 @@ mat-progress-bar {
 @media (max-width: 640px) {
   .hw-wrap { height: 220px; }
   .hw-wrap ::ng-deep .chart-host { min-height: 220px; }
+  // The heatmap is intrinsically wide (24 hour columns). Hold a minimum drawing
+  // width and let THIS wrapper scroll horizontally — never the page — so the
+  // hourly labels and cells stay legible instead of compressing.
+  .hw-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .hw-wrap app-chart { display: block; min-width: 480px; height: 100%; }
 }
 
 .ts-list { display: flex; flex-direction: column; max-height: 260px; overflow-y: auto; }

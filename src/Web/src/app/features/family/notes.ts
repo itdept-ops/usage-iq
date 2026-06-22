@@ -192,7 +192,7 @@ export class FamilyNotes {
 
   private openEditor(note: FamilyNote | null): Promise<NoteEditorResult | undefined> {
     const ref = this.dialog.open<NoteEditorDialog, NoteEditorData, NoteEditorResult>(NoteEditorDialog, {
-      data: { note }, width: '720px', maxWidth: '94vw', autoFocus: false,
+      data: { note }, width: '720px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }
@@ -250,7 +250,7 @@ export class FamilyNotes {
       },
     };
     const ref = this.dialog.open<FamilyShareDialog, ShareDialogData, boolean>(FamilyShareDialog, {
-      data, width: '460px', maxWidth: '94vw', autoFocus: false,
+      data, width: '460px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog',
     });
     await firstValueFrom(ref.afterClosed());
   }
@@ -458,7 +458,7 @@ export class FamilyNotes {
 
   private confirm(data: ConfirmData): Promise<boolean | undefined> {
     const ref = this.dialog.open<FamilyConfirmDialog, ConfirmData, boolean>(FamilyConfirmDialog, {
-      data, width: '420px', maxWidth: '92vw',
+      data, width: '420px', maxWidth: '92vw', panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }

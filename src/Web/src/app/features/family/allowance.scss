@@ -136,3 +136,10 @@
   }
 }
 .move__actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Narrow phones: a single column so a card never exceeds the viewport, and let the three
+   per-child actions share the row evenly instead of wrapping 2+1 awkwardly. */
+@media (max-width: 600px) {
+  .child-cards { grid-template-columns: 1fr; }
+  .child-card__actions button { flex: 1 1 auto; }
+}

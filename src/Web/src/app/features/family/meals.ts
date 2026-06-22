@@ -407,7 +407,7 @@ export class FamilyMeals {
         meal, localDate, dayLabel, defaultSlot,
         prefillTitle: prefill?.title, prefillIngredients: prefill?.ingredients,
       },
-      width: '460px', maxWidth: '94vw', autoFocus: false,
+      width: '460px', maxWidth: '94vw', autoFocus: false, panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }
@@ -874,7 +874,7 @@ export class FamilyMeals {
 
   private confirm(data: ConfirmData): Promise<boolean | undefined> {
     const ref = this.dialog.open<FamilyConfirmDialog, ConfirmData, boolean>(FamilyConfirmDialog, {
-      data, width: '420px', maxWidth: '92vw',
+      data, width: '420px', maxWidth: '92vw', panelClass: 'family-dialog',
     });
     return firstValueFrom(ref.afterClosed());
   }

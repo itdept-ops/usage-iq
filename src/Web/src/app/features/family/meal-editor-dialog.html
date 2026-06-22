@@ -1,6 +1,9 @@
 <h2 mat-dialog-title class="note-edit__title">
   <mat-icon aria-hidden="true">restaurant</mat-icon>
   {{ isEdit ? 'Edit meal' : 'Add a meal' }}
+  <button mat-icon-button mat-dialog-close type="button" class="dlg-close" aria-label="Close">
+    <mat-icon aria-hidden="true">close</mat-icon>
+  </button>
 </h2>
 
 <mat-dialog-content class="note-edit__body meal-edit__body">

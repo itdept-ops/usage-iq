@@ -1,6 +1,9 @@
 <h2 mat-dialog-title class="note-edit__title">
   <mat-icon aria-hidden="true">schedule</mat-icon>
   Find a time
+  <button mat-icon-button mat-dialog-close type="button" class="dlg-close" aria-label="Close">
+    <mat-icon aria-hidden="true">close</mat-icon>
+  </button>
 </h2>
 
 <mat-dialog-content class="note-edit__body find-time__body">
@@ -122,11 +125,12 @@
 
 <mat-dialog-actions class="note-edit__actions find-time__actions">
   <button mat-stroked-button type="button" (click)="ref.close()">Close</button>
-  <button mat-flat-button color="primary" type="button" [disabled]="!canSearch()" (click)="search()">
+  <button mat-flat-button color="primary" type="button" class="find-time__search-btn"
+          [disabled]="!canSearch()" (click)="search()">
     @if (searching()) {
       <mat-spinner [diameter]="18" />
     } @else {
-      <ng-container><mat-icon aria-hidden="true">search</mat-icon> Find times</ng-container>
+      <span class="find-time__search-label"><mat-icon aria-hidden="true">search</mat-icon> Find times</span>
     }
   </button>
 </mat-dialog-actions>

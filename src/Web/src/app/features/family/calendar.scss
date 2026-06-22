@@ -1018,6 +1018,16 @@
 .ft-slot__time { color: var(--tech-text-secondary); flex: 1; }
 .ft-slot__go { color: var(--tech-text-tertiary); }
 
+/* "Find times" primary button: keep the icon+label vertically centred as a single inline-flex unit
+   (parity with the other dialogs' AI buttons), and give the button a min-width so the idle↔spinner
+   swap doesn't reflow its width. */
+.find-time__search-btn { min-width: 132px; }
+.find-time__search-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Event editor — "Advanced settings" progressive disclosure: keep the base event to just title + when,
    with repeat/location/notes tucked behind a quiet toggle. */
 .event-edit__advtoggle {

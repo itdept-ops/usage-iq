@@ -184,7 +184,7 @@ export class Dashboard {
   openShare(): void {
     this.dialog.open(ShareDialog, {
       data: { filter: this.filter(), groupBy: this.groupBy() },
-      width: '560px', maxWidth: '94vw', autoFocus: false,
+      width: '560px', maxWidth: '94vw', maxHeight: '90dvh', autoFocus: false, panelClass: 'uiq-dialog',
     });
   }
 
@@ -202,7 +202,7 @@ export class Dashboard {
 
   /** Save the current filter set as a named view (upsert-by-name on the server). */
   saveCurrentView(): void {
-    this.dialog.open(SaveViewDialog, { width: '420px', maxWidth: '94vw', autoFocus: false })
+    this.dialog.open(SaveViewDialog, { width: '420px', maxWidth: '94vw', maxHeight: '90dvh', autoFocus: false, panelClass: 'uiq-dialog' })
       .afterClosed().subscribe((name?: string) => {
         if (!name) return;
         this.savingView.set(true);
@@ -270,7 +270,7 @@ export class Dashboard {
   deleteView(v: SavedView, ev: Event): void {
     ev.stopPropagation();
     this.dialog.open(FamilyConfirmDialog, {
-      width: '420px', maxWidth: '94vw', autoFocus: false,
+      width: '420px', maxWidth: '94vw', maxHeight: '90dvh', autoFocus: false, panelClass: 'uiq-dialog',
       data: { title: 'Delete saved view', message: `Delete the saved view “${v.name}”?`, destructive: true },
     }).afterClosed().subscribe((ok?: boolean) => {
       if (!ok) return;

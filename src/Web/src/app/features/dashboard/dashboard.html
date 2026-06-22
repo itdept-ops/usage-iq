@@ -182,6 +182,8 @@
       <div class="kpi-value mono-num">{{ activeHours() | number: '1.0-1' }}<span class="dim">h</span></div>
       @if (activeWeekdays() > 0) {
         <div class="kpi-sub">avg <span class="mono-num">{{ dailyAvgHours() | number: '1.0-1' }}</span>h/weekday</div>
+      } @else if (activeHours() > 0) {
+        <div class="kpi-sub">weekend activity</div>
       } @else {
         <div class="kpi-sub">estimated time with AI</div>
       }
@@ -267,7 +269,7 @@
   <div class="chart-head"><h3 class="panel-header">Messages</h3></div>
   @if (records(); as r) {
     <div class="table-scroll">
-      <table mat-table [dataSource]="r.items" matSort (matSortChange)="onSort($event)">
+      <table mat-table [dataSource]="r.items" matSort (matSortChange)="onSort($event)" aria-label="Usage messages">
         <ng-container matColumnDef="localDate">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
           <td mat-cell *matCellDef="let r" class="mono">{{ r.localDate }}</td>

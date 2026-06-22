@@ -36,7 +36,7 @@ export interface MapTrail {
 @Component({
   selector: 'app-location-map',
   standalone: true,
-  template: `<div #host class="leaflet-host" [class.is-empty]="!pins().length"></div>
+  template: `<div #host class="leaflet-host"></div>
     @if (!ready()) {
       <div class="leaflet-loading">Loading map…</div>
     }`,
