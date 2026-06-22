@@ -16,9 +16,9 @@ import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { TrackerStore } from '../../core/tracker-store';
 import {
-  ActivityCalorieMode, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, CoffeeEntryDto, CommitDayResponse, DailyCoachResponse,
+  ActivityCalorieMode, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, CoffeeEntryDto, CommitDayResponse, CustomFoodDto, DailyCoachResponse,
   DaySummaryResponse, ExerciseEntryDto, FoodEntryDto,
-  FoodSuggestionDto, HydrationEntryDto, LogWeightRequest, Meal, MoveDayRequest, MoveDayResult, PERM, SharedUserDto, SupplementEntryDto, SupplementKind, TrackerDayDto, TrackerProfileDto,
+  FoodSuggestionDto, HydrationEntryDto, LogWeightRequest, Meal, MoveDayRequest, MoveDayResult, PERM, QuickFoodTile, SharedUserDto, SupplementEntryDto, SupplementKind, TrackerDayDto, TrackerProfileDto,
   TrackerRecapResult, UpsertActivityRequest, WeeklyReviewResponse, WeightPointDto, WeightStatsDto,
 } from '../../core/models';
 import { CalorieRing } from './calorie-ring';
@@ -59,6 +59,22 @@ const MEAL_SECTIONS: MealSection[] = [
 ];
 
 /**
+ * Curated one-tap food tiles (frontend-only constants) — common branded/whole-food items with
+ * reasonable single-serving macros. Tapping one logs a FoodEntry instantly (mirrors the hydration /
+ * coffee quick-add UX). Logged with source 'custom' so they don't pollute the manual "My foods" library.
+ */
+const QUICK_FOOD_TILES: QuickFoodTile[] = [
+  { description: 'Red Bull', brand: 'Red Bull', servingDesc: '8.4 oz can', calories: 110, proteinG: 1, carbG: 28, fatG: 0, icon: 'bolt' },
+  { description: 'Monster Energy', brand: 'Monster', servingDesc: '16 oz can', calories: 210, proteinG: 0, carbG: 54, fatG: 0, icon: 'flash_on' },
+  { description: 'Black coffee', servingDesc: '12 oz', calories: 5, proteinG: 0, carbG: 0, fatG: 0, icon: 'local_cafe' },
+  { description: 'La Croix', brand: 'La Croix', servingDesc: '12 oz can', calories: 0, proteinG: 0, carbG: 0, fatG: 0, icon: 'bubble_chart' },
+  { description: 'Banana', servingDesc: '1 medium', calories: 105, proteinG: 1, carbG: 27, fatG: 0, icon: 'lunch_dining' },
+  { description: 'Large egg', servingDesc: '1 large', calories: 72, proteinG: 6, carbG: 0, fatG: 5, icon: 'egg' },
+  { description: 'Protein shake', servingDesc: '1 shake', calories: 160, proteinG: 30, carbG: 5, fatG: 2, icon: 'fitness_center' },
+  { description: 'Apple', servingDesc: '1 medium', calories: 95, proteinG: 0, carbG: 25, fatG: 0, icon: 'nutrition' },
+];
+
+/**
  * Food & fitness tracker dashboard. Renders the active {@link TrackerDayDto} from {@link TrackerStore}:
  * a date navigator, the headline calorie ring + macro bars, the four meal sections (with add/delete),
  * the exercise section, and a read-only shared-view selector. All add/delete controls are hidden when
@@ -84,6 +100,28 @@ export class Tracker {
   private destroyRef = inject(DestroyRef);
 
   readonly mealSections = MEAL_SECTIONS;
+  readonly quickFoodTiles = QUICK_FOOD_TILES;
+
+  /**
+   * The caller's RECENT/saved foods (GET /tracker/foods/saved?recent=true — the EXISTING endpoint) for
+   * one-tap re-add, deduped against the curated tiles by name. Own tracker only; empty in read-only views.
+   */
+  readonly recentFoods = signal<CustomFoodDto[]>([]);
+
+  /** Recent/saved foods minus anything already covered by a curated tile (case-insensitive name match). */
+  readonly recentFoodTiles = computed<CustomFoodDto[]>(() => {
+    const curated = new Set(QUICK_FOOD_TILES.map(t => t.description.trim().toLowerCase()));
+    const seen = new Set<string>();
+    const out: CustomFoodDto[] = [];
+    for (const f of this.recentFoods()) {
+      const key = f.description.trim().toLowerCase();
+      if (curated.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      out.push(f);
+      if (out.length >= 8) break; // keep the row compact
+    }
+    return out;
+  });
 
   // ---- AI assists (gated by tracker.ai; Gemini-backed, gracefully degrade on 503/error) ----
 
@@ -191,6 +229,7 @@ export class Tracker {
         return;
       }
       void this.loadWeightHistory();
+      void this.loadRecentFoods();
     });
 
     // "✨ This week" recap: auto-load the read-only weekly narration for the caller's OWN tracker. Keyed on
@@ -257,6 +296,76 @@ export class Tracker {
     } catch {
       this.weightStats.set(null);
     }
+  }
+
+  /**
+   * Load the caller's RECENT/saved foods for the quick-add row via the EXISTING saved endpoint
+   * (recent=true). Own tracker only — best-effort, so a blip just leaves the curated tiles showing.
+   */
+  private async loadRecentFoods(): Promise<void> {
+    if (this.store.readOnly()) { this.recentFoods.set([]); return; }
+    try {
+      this.recentFoods.set(await firstValueFrom(this.api.savedFoods(undefined, true)));
+    } catch {
+      this.recentFoods.set([]);
+    }
+  }
+
+  /**
+   * A sensible default meal slot for a quick-add tap, picked by local time of day so an instant log
+   * lands somewhere reasonable without asking (breakfast / lunch / dinner / snack).
+   */
+  private defaultMeal(): Meal {
+    const h = new Date().getHours();
+    if (h < 11) return 'breakfast';
+    if (h < 15) return 'lunch';
+    if (h < 21) return 'dinner';
+    return 'snack';
+  }
+
+  /**
+   * Instantly log a curated quick-add food tile to the default meal slot, with a snackbar + Undo —
+   * mirrors the hydration/coffee quick-add. Source 'custom' keeps it out of the manual "My foods" library.
+   */
+  quickAddFood(tile: QuickFoodTile): void {
+    if (this.store.readOnly()) return;
+    this.logQuickFood({
+      date: this.store.date(), meal: this.defaultMeal(),
+      description: tile.description, brand: tile.brand, quantity: 1, servingDesc: tile.servingDesc,
+      calories: tile.calories, proteinG: tile.proteinG, carbG: tile.carbG, fatG: tile.fatG,
+      source: 'custom',
+    });
+  }
+
+  /**
+   * Instantly log one of the caller's RECENT/saved foods (a CustomFoodDto from the existing endpoint) to
+   * the default meal slot, with a snackbar + Undo. Re-logged as 'custom' (reuse of an existing food).
+   */
+  quickAddRecent(food: CustomFoodDto): void {
+    if (this.store.readOnly()) return;
+    this.logQuickFood({
+      date: this.store.date(), meal: this.defaultMeal(),
+      description: food.description, brand: food.brand, quantity: 1, servingDesc: food.servingDesc,
+      calories: food.calories, proteinG: food.proteinG, carbG: food.carbG, fatG: food.fatG,
+      source: 'custom',
+    });
+  }
+
+  /**
+   * POST a single quick-add food via the existing add-food path, then refresh recents and show a
+   * snackbar with an Undo that deletes exactly the entry just created (diffed against the prior ids).
+   */
+  private logQuickFood(req: AddFoodRequest): void {
+    const before = new Set((this.store.day()?.foods ?? []).map(f => f.id));
+    this.store.addFood(req)
+      .then(() => {
+        void this.loadRecentFoods();
+        const created = (this.store.day()?.foods ?? []).find(f => !before.has(f.id));
+        this.statusMsg.set(`Added ${req.description}, ${req.calories} calories`);
+        const ref = this.snack.open(`Added ${req.description}`, 'Undo', { duration: 5000 });
+        if (created) ref.onAction().subscribe(() => this.removeFood(created));
+      })
+      .catch(() => this.snack.open('Could not add food', 'Dismiss', { duration: 4000 }));
   }
 
   // ---- stats / unit display helpers ----

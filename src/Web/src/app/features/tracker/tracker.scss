@@ -793,6 +793,58 @@
   strong { color: var(--tech-text); }
 }
 
+/* ── Quick add food card (curated common items + recents, one-tap instant log) ── */
+.tracker__quickfood {
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius);
+  background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
+  overflow: hidden;
+
+  .tracker__meal-title mat-icon { color: var(--tech-accent-2); }
+}
+
+.tracker__quickfood-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-3);
+  padding: var(--tech-space-4);
+}
+
+.tracker__qfquick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tech-space-2);
+}
+
+.tracker__qfbtn {
+  flex: 1 1 auto;
+  min-height: 44px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  color: var(--tech-accent-2);
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+  &-amt {
+    margin-left: 6px;
+    font-family: var(--tech-font-mono);
+    font-size: var(--tech-fs-micro);
+    color: var(--tech-text-tertiary);
+  }
+
+  &--recent { color: var(--tech-accent); }
+}
+
+.tracker__qfrecent-l {
+  margin: var(--tech-space-1) 0 0;
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  color: var(--tech-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ── Activity card (steps ring + distance + active calories add/override) ── */
 .tracker__activity {
   border: 1px solid var(--tech-border);

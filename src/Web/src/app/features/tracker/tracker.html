@@ -808,6 +808,47 @@
       </div>
     }
 
+    <!-- ── Quick add: curated common items + your recent foods, one-tap instant log (own tracker only).
+         Mirrors the hydration/coffee quick-add — taps log a FoodEntry to a time-of-day meal slot with an
+         Undo snackbar. Recent foods come from the existing GET /tracker/foods/saved?recent=true. ── -->
+    @if (!store.readOnly()) {
+      <section class="tracker__quickfood" aria-label="Quick add food">
+        <div class="tracker__meal-head">
+          <h2 class="tracker__meal-title">
+            <mat-icon aria-hidden="true">bolt</mat-icon> Quick add
+          </h2>
+          <span class="tracker__meal-cal">one-tap log</span>
+        </div>
+
+        <div class="tracker__quickfood-body">
+          <div class="tracker__qfquick" role="group" aria-label="Quick add a common food">
+            @for (t of quickFoodTiles; track t.description) {
+              <button mat-stroked-button type="button" class="tracker__qfbtn" (click)="quickAddFood(t)"
+                      [attr.aria-label]="'Add ' + t.description + ', ' + t.servingDesc + ', about ' + t.calories + ' calories'">
+                <mat-icon>{{ t.icon }}</mat-icon> {{ t.description }}
+                <span class="tracker__qfbtn-amt mono-num">{{ t.calories }} kcal</span>
+              </button>
+            }
+          </div>
+
+          <!-- The caller's recent/saved foods (deduped against the curated set), if any. -->
+          @if (recentFoodTiles().length > 0) {
+            <p class="tracker__qfrecent-l">Recent</p>
+            <div class="tracker__qfquick" role="group" aria-label="Quick add a recent food">
+              @for (f of recentFoodTiles(); track f.description) {
+                <button mat-stroked-button type="button" class="tracker__qfbtn tracker__qfbtn--recent"
+                        (click)="quickAddRecent(f)"
+                        [attr.aria-label]="'Add ' + f.description + (f.brand ? ', ' + f.brand : '') + ', about ' + f.calories + ' calories'">
+                  <mat-icon>history</mat-icon> {{ f.description }}
+                  <span class="tracker__qfbtn-amt mono-num">{{ f.calories | number }} kcal</span>
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
+
     <!-- Meal sections. -->
     @for (s of mealSections; track s.meal) {
       <section class="tracker__meal" [attr.aria-label]="s.label">

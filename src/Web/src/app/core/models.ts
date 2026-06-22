@@ -1786,6 +1786,27 @@ export interface CustomFoodDto {
 }
 
 /**
+ * A curated "Quick add" food tile (frontend-only constant) shown in the tracker food area for one-tap
+ * logging — common branded/whole-food items with reasonable single-serving macros. Tapping one logs a
+ * FoodEntry instantly via the normal add-food path (POST /api/tracker/food) with `source: 'custom'` so
+ * it does NOT pollute the auto-built "My foods" library (that only captures manual, source-less logs).
+ */
+export interface QuickFoodTile {
+  /** Logged description (e.g. "Red Bull"). */
+  description: string;
+  /** Optional brand/label shown on the entry. */
+  brand?: string;
+  /** Serving descriptor shown on the entry (e.g. "8.4 oz can", "1 medium"). */
+  servingDesc: string;
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  /** Material icon for the tile glyph. */
+  icon: string;
+}
+
+/**
  * Log-an-exercise payload (POST /api/tracker/exercise). Pass `exerciseId` + `durationMin` (with a
  * profile weight) to let the server estimate `caloriesBurned`; otherwise `caloriesBurned` is required.
  * Mirrors AddExerciseRequest.
