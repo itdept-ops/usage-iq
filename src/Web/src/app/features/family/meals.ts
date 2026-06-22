@@ -15,17 +15,32 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
-import { FamilyMeal, FamilyMealDay, FamilyMealSlot, MealIdea, PlanWeekMeal } from '../../core/models';
+import { AuthService } from '../../core/auth';
+import {
+  FamilyMeal, FamilyMealDay, FamilyMealSlot, MealIdea, PlanWeekMeal, TrackerProfileDto,
+} from '../../core/models';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { MealEditorDialog, MealEditorData, MealEditorResult } from './meal-editor-dialog';
 
-/** A day cell as rendered: the ISO date, friendly labels, today flag, and its meals. */
+/** A day's planned-macro rollup (sum of each meal's per-serving macros), with optional goal comparisons. */
+interface DayRollup {
+  /** True when at least one meal on the day has macros set (else we hide the rollup). */
+  hasMacros: boolean;
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+}
+
+/** A day cell as rendered: the ISO date, friendly labels, today flag, its meals, and its macro rollup. */
 interface DayCell {
   localDate: string;
   weekday: string;
   dateLabel: string;
   isToday: boolean;
   meals: FamilyMeal[];
+  /** Sum of each meal's PER-SERVING macros for the day (planned, one-portion). */
+  rollup: DayRollup;
 }
 
 /** Which dinners "Plan our week" should propose: only the empty slots, or all seven. */
@@ -71,6 +86,7 @@ const SLOT_META: Record<FamilyMealSlot, { label: string; icon: string }> = {
 })
 export class FamilyMeals {
   private api = inject(Api);
+  private auth = inject(AuthService);
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private router = inject(Router);
@@ -81,6 +97,14 @@ export class FamilyMeals {
   readonly error = signal(false);
   /** True while the whole-week "add to grocery" call is in flight (locks the button). */
   readonly addingWeek = signal(false);
+
+  // ---- Tracker tie-in (Slice 2): "✨ Add to my tracker" + the goal-aware planner rollups ----
+  /** True when the caller holds tracker.self (gates the "Add to my tracker" button + goal comparisons). */
+  readonly canTrack = computed(() => this.auth.hasPermission('tracker.self'));
+  /** The caller's own tracker profile/goals (loaded once when they hold tracker.self), or null. */
+  readonly trackerProfile = signal<TrackerProfileDto | null>(null);
+  /** The meal id currently being logged to the tracker (locks just that card's button), or null. */
+  readonly loggingMealId = signal<number | null>(null);
 
   // ---- ✨ Plan our week ----
   /** Whether the "Plan our week" sheet is open. */
@@ -133,7 +157,7 @@ export class FamilyMeals {
   /** True when the viewed week contains today (so we can offer a "This week" reset). */
   readonly isThisWeek = computed(() => this.toIso(this.weekStart()) === this.toIso(this.thisMonday()));
 
-  /** The 7 day cells with friendly labels + a today flag, derived from the loaded days. */
+  /** The 7 day cells with friendly labels + a today flag + a planned-macro rollup, from the loaded days. */
   readonly cells = computed<DayCell[]>(() => {
     const todayIso = this.toIso(new Date());
     return this.days().map(d => {
@@ -144,6 +168,7 @@ export class FamilyMeals {
         dateLabel: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
         isToday: this.dateOnly(d.localDate) === todayIso,
         meals: d.meals,
+        rollup: this.rollup(d.meals),
       };
     });
   });
@@ -151,8 +176,53 @@ export class FamilyMeals {
   /** Total meals planned across the visible week (drives the empty-week hint + the grocery button). */
   readonly mealCount = computed(() => this.cells().reduce((n, c) => n + c.meals.length, 0));
 
+  /** The whole-week planned-macro total (sum of every day's per-serving rollup). */
+  readonly weekRollup = computed<DayRollup>(() =>
+    this.cells().reduce<DayRollup>((acc, c) => ({
+      hasMacros: acc.hasMacros || c.rollup.hasMacros,
+      calories: acc.calories + c.rollup.calories,
+      proteinG: this.round1(acc.proteinG + c.rollup.proteinG),
+      carbG: this.round1(acc.carbG + c.rollup.carbG),
+      fatG: this.round1(acc.fatG + c.rollup.fatG),
+    }), { hasMacros: false, calories: 0, proteinG: 0, carbG: 0, fatG: 0 }));
+
+  /** The caller's daily calorie goal (only when they hold tracker.self AND a goal is set), else null. */
+  readonly calorieGoal = computed(() =>
+    this.canTrack() ? (this.trackerProfile()?.dailyCalorieGoal ?? null) : null);
+  readonly proteinGoal = computed(() =>
+    this.canTrack() ? (this.trackerProfile()?.proteinGoalG ?? null) : null);
+  /** True when we can show the goal comparison (tracker.self + at least a calorie goal set). */
+  readonly showGoals = computed(() => this.canTrack() && this.calorieGoal() != null);
+
+  /** True when the week has any macro-bearing meal (so the rollup strip shows at all). */
+  readonly hasWeekMacros = computed(() => this.weekRollup().hasMacros);
+
   constructor() {
     this.reload(true);
+    // Load the caller's tracker goals once, for the goal-aware rollups (best-effort; silent on failure).
+    if (this.canTrack()) {
+      this.api.trackerProfile()
+        .pipe(catchError(() => of<TrackerProfileDto | null>(null)), takeUntilDestroyed(this.destroyRef))
+        .subscribe(p => this.trackerProfile.set(p));
+    }
+  }
+
+  /** Sum a day's meals' PER-SERVING macros (one planned portion each); flags whether any had macros set. */
+  private rollup(meals: FamilyMeal[]): DayRollup {
+    let calories = 0, proteinG = 0, carbG = 0, fatG = 0, hasMacros = false;
+    for (const m of meals) {
+      if (m.macroSource === 'none') continue;
+      hasMacros = true;
+      calories += m.perServing.calories;
+      proteinG += m.perServing.proteinG;
+      carbG += m.perServing.carbG;
+      fatG += m.perServing.fatG;
+    }
+    return { hasMacros, calories: Math.round(calories), proteinG: this.round1(proteinG), carbG: this.round1(carbG), fatG: this.round1(fatG) };
+  }
+
+  private round1(n: number): number {
+    return Math.round((Number.isFinite(n) ? n : 0) * 10) / 10;
   }
 
   private reload(initial = false): void {
@@ -187,15 +257,58 @@ export class FamilyMeals {
     return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
   }
 
+  // ---- Macros (per-meal display + "✨ Add to my tracker") ----
+
+  /** True when a meal has macros set (any source other than "none"). */
+  hasMacros(meal: FamilyMeal): boolean {
+    return meal.macroSource !== 'none';
+  }
+
+  /** The short macro-source tag shown on a card ("AI estimate" / "from food DB" / "manual" / "not set"). */
+  macroTag(meal: FamilyMeal): string {
+    switch (meal.macroSource) {
+      case 'ai': return 'AI estimate';
+      case 'database': return 'from food DB';
+      case 'manual': return 'manual';
+      default: return 'not set';
+    }
+  }
+
+  /** Show the "✨ Add to my tracker" button only when the meal has macros AND the caller holds tracker.self. */
+  canAddToTracker(meal: FamilyMeal): boolean {
+    return this.canTrack() && this.hasMacros(meal);
+  }
+
+  /**
+   * Log ONE serving of a planned meal's per-serving macros onto the caller's OWN tracker (POST
+   * /tracker/food/from-meal, defaulting to the meal's planned date). Confirms with a snackbar; degrades
+   * gracefully on any error (a 400 means macros aren't set; a 404 means it's not the caller's household).
+   */
+  async addToTracker(meal: FamilyMeal): Promise<void> {
+    if (this.loggingMealId() !== null || !this.canAddToTracker(meal)) return;
+    this.loggingMealId.set(meal.id);
+    try {
+      await firstValueFrom(this.api.addMealToTracker(meal.id, this.dateOnly(meal.localDate)));
+      const ref = this.snack.open('Logged 1 serving to your tracker.', 'Open tracker', { duration: 5000 });
+      ref.onAction().subscribe(() => { this.router.navigateByUrl('/tracker'); });
+    } catch (e) {
+      this.snack.open(
+        this.messageOf(e, "Couldn't add this meal to your tracker. Please try again."), 'OK', { duration: 4000 });
+    } finally {
+      this.loggingMealId.set(null);
+    }
+  }
+
   // ---- Meals (add / edit / delete) ----
 
-  /** Add a meal to a specific day (default slot = dinner). */
+  /** Add a meal to a specific day (default slot = dinner). Macros (if entered manually) ride along. */
   async addMeal(cell: DayCell, slot: FamilyMealSlot = 'dinner'): Promise<void> {
     const result = await this.openEditor(null, cell.localDate, `${cell.weekday}, ${cell.dateLabel}`, slot);
     if (!result) return;
     try {
       await firstValueFrom(this.api.createFamilyMeal({
         localDate: cell.localDate, slot: result.slot, title: result.title, ingredients: result.ingredients,
+        ...this.macroPayload(result),
       }));
       this.reload();
     } catch (e) {
@@ -203,18 +316,27 @@ export class FamilyMeals {
     }
   }
 
-  /** Edit an existing meal on a day. */
+  /** Edit an existing meal on a day. PATCHes the plain fields + the macros (servings + totals + source). */
   async editMeal(cell: DayCell, meal: FamilyMeal): Promise<void> {
     const result = await this.openEditor(meal, cell.localDate, `${cell.weekday}, ${cell.dateLabel}`);
     if (!result) return;
     try {
-      await firstValueFrom(this.api.updateFamilyMeal(meal.id, {
+      await firstValueFrom(this.api.patchFamilyMeal(meal.id, {
         slot: result.slot, title: result.title, ingredients: result.ingredients,
+        ...this.macroPayload(result),
       }));
       this.reload();
     } catch (e) {
       this.snack.open(this.messageOf(e, "Couldn't save that meal. Please try again."), 'OK', { duration: 4000 });
     }
+  }
+
+  /** The macro fields of an editor result, as a create/patch payload fragment. */
+  private macroPayload(r: MealEditorResult) {
+    return {
+      servings: r.servings, calories: r.calories, proteinG: r.proteinG, carbG: r.carbG, fatG: r.fatG,
+      macroSource: r.macroSource,
+    };
   }
 
   async removeMeal(meal: FamilyMeal): Promise<void> {

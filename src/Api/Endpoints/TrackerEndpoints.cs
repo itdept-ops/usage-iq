@@ -188,6 +188,65 @@ public static class TrackerEndpoints
             return Results.Ok(ToFoodDto(entry));
         }).RequirePermission(Permissions.TrackerSelf);
 
+        // ---- Log a family meal's PER-SERVING macros onto the caller's own day (tracker ⇄ Family Hub) ----
+        // Cross-feature tie-in (Slice 2): take ONE serving of a planned FamilyMeal and log it as a FoodEntry on
+        // the CALLER's own tracker. Strict isolation: the caller must be a MEMBER of the meal's household (else
+        // 404 — a foreign meal's existence is never leaked, no email anywhere). The meal must already have macros
+        // (MacroSource != "none"), else 400 ("estimate macros first"). The logged values are the DERIVED
+        // per-serving macros (dish total / max(Servings, 1), rounded) — one person's portion — vs the CALLER's
+        // own tracker goals. Owner-only write (the caller logs onto their OWN day), like the manual add-food path.
+        g.MapPost("/food/from-meal", async (
+            AddFoodFromMealRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+
+            if (req.MealId <= 0)
+                return Results.BadRequest(new { message = "A valid mealId is required." });
+
+            var meal = await db.FamilyMeals.AsNoTracking().FirstOrDefaultAsync(m => m.Id == req.MealId, ct);
+            // 404 when the meal doesn't exist OR the caller isn't a member of its household — never leak it.
+            if (meal is null) return Results.NotFound();
+            var isMember = await db.HouseholdMembers.AsNoTracking()
+                .AnyAsync(hm => hm.HouseholdId == meal.HouseholdId && hm.UserId == caller.Id, ct);
+            if (!isMember) return Results.NotFound();
+
+            // Macros must be set (an AI/DB/manual estimate confirmed onto the meal) before it can be logged.
+            if (string.Equals(meal.MacroSource, "none", StringComparison.OrdinalIgnoreCase))
+                return Results.BadRequest(new { message = "Estimate this meal's macros first, then add it to your tracker." });
+
+            // PER-SERVING = dish total / max(Servings, 1), rounded (calories whole, macros 1 dp). One portion.
+            var servings = Math.Max(meal.Servings, 1);
+            var calories = (int)Math.Round((double)meal.Calories / servings, MidpointRounding.AwayFromZero);
+            var proteinG = Math.Round(meal.ProteinG / servings, 1);
+            var carbG = Math.Round(meal.CarbG / servings, 1);
+            var fatG = Math.Round(meal.FatG / servings, 1);
+
+            // LocalDate = provided localDate (if valid) else the meal's own planned date.
+            var localDate = TryParseDate(req.LocalDate, out var parsed) ? parsed : meal.LocalDate;
+
+            var description = meal.Title.Trim();
+            if (description.Length == 0) description = "Meal";
+            if (description.Length > 256) description = description[..256];
+
+            var entry = new FoodEntry
+            {
+                UserEmail = caller.Email,
+                LocalDate = localDate,
+                Meal = MealType.Dinner, // a planned dish defaults onto dinner; the user can recategorise later
+                Description = description,
+                Quantity = 1,
+                Calories = Math.Max(0, calories),
+                ProteinG = Math.Max(0, proteinG),
+                CarbG = Math.Max(0, carbG),
+                FatG = Math.Max(0, fatG),
+                CreatedUtc = DateTime.UtcNow,
+            };
+            db.FoodEntries.Add(entry);
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(ToFoodDto(entry));
+        }).RequirePermission(Permissions.TrackerSelf);
+
         // ---- The caller's saved "My foods" library (auto-built from manual logs), newest-used first ----
         g.MapGet("/foods/saved", async (
             string? q, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>

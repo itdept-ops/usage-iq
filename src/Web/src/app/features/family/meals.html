@@ -236,6 +236,37 @@
                   <div class="meal__main">
                     <p class="meal__title">{{ meal.title }}</p>
                     <span class="meal__slot-label">{{ slotMeta(meal.slot).label }}</span>
+
+                    <!-- Macros: per serving prominent; dish total + servings secondary; a source tag. -->
+                    <div class="meal__macros">
+                      @if (hasMacros(meal)) {
+                        <p class="meal__macros-per">
+                          <strong>{{ meal.perServing.calories }}</strong> kcal
+                          <span class="meal__macros-pcf">{{ meal.perServing.proteinG }}P / {{ meal.perServing.carbG }}C / {{ meal.perServing.fatG }}F</span>
+                          <span class="meal__macros-unit">/ serving</span>
+                        </p>
+                        <p class="meal__macros-total">
+                          {{ meal.calories }} kcal total · {{ meal.servings }} {{ meal.servings === 1 ? 'serving' : 'servings' }}
+                          <span class="meal__macros-tag meal__macros-tag--set">macros: {{ macroTag(meal) }}</span>
+                        </p>
+                      } @else {
+                        <p class="meal__macros-total">
+                          <span class="meal__macros-tag">macros: not set</span>
+                        </p>
+                      }
+                    </div>
+
+                    @if (canAddToTracker(meal)) {
+                      <button mat-stroked-button class="meal__track" (click)="addToTracker(meal)"
+                              [disabled]="loggingMealId() !== null">
+                        @if (loggingMealId() === meal.id) {
+                          <mat-spinner [diameter]="16" />
+                        } @else {
+                          <mat-icon class="meals__spark" aria-hidden="true">auto_awesome</mat-icon>
+                        }
+                        Add to my tracker
+                      </button>
+                    }
                   </div>
                   <div class="meal__actions">
                     @if (hasIngredients(meal)) {
@@ -258,12 +289,54 @@
             <p class="day-card__empty">Nothing planned</p>
           }
 
+          <!-- Planned (per-serving) daily macro rollup, vs the caller's goals when available. -->
+          @if (cell.rollup.hasMacros) {
+            <div class="day-roll" aria-label="Planned macros for the day">
+              <span class="day-roll__cal">
+                <strong>{{ cell.rollup.calories }}</strong>@if (showGoals() && calorieGoal() != null) { / {{ calorieGoal() }}} kcal
+              </span>
+              <span class="day-roll__pcf">
+                @if (showGoals() && proteinGoal() != null) {
+                  {{ cell.rollup.proteinG }}/{{ proteinGoal() }}g P
+                } @else {
+                  {{ cell.rollup.proteinG }}g P
+                }
+                · {{ cell.rollup.carbG }}g C · {{ cell.rollup.fatG }}g F
+              </span>
+              <span class="day-roll__note">planned · per serving</span>
+            </div>
+          }
+
           <button mat-stroked-button class="day-card__add" (click)="addMeal(cell)">
             <mat-icon aria-hidden="true">add</mat-icon> Add a meal
           </button>
         </article>
       }
     </div>
+
+    @if (hasWeekMacros()) {
+      <div class="week-roll" aria-label="Planned macros for the week">
+        <span class="week-roll__label"><mat-icon aria-hidden="true">insights</mat-icon> This week (planned)</span>
+        <span class="week-roll__cal">
+          <strong>{{ weekRollup().calories }}</strong>@if (showGoals() && calorieGoal() != null) { / {{ calorieGoal()! * 7 }}} kcal
+        </span>
+        <span class="week-roll__pcf">
+          @if (showGoals() && proteinGoal() != null) {
+            {{ weekRollup().proteinG }}/{{ proteinGoal()! * 7 }}g P
+          } @else {
+            {{ weekRollup().proteinG }}g P
+          }
+          · {{ weekRollup().carbG }}g C · {{ weekRollup().fatG }}g F
+        </span>
+        <span class="week-roll__note">
+          @if (showGoals()) {
+            Per-serving totals vs your daily goal ×7
+          } @else {
+            Sum of each meal’s per-serving macros
+          }
+        </span>
+      </div>
+    }
 
     @if (mealCount() === 0) {
       <p class="meals__hint">

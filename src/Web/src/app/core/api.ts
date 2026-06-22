@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatMessageDto, ChatRepliesResult, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
-  FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
+  FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
   HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
@@ -1078,9 +1078,15 @@ export class Api {
     return this.http.get<FamilyMealDay[]>(`${this.base}/family/meals`, { params });
   }
 
-  /** Add a meal to a day/slot. `localDate` is "YYYY-MM-DD"; `ingredients` is newline-separated text. Returns the created meal. */
+  /**
+   * Add a meal to a day/slot. `localDate` is "YYYY-MM-DD"; `ingredients` is newline-separated text. The
+   * optional macro fields (Slice 2: `servings` + the four dish TOTALS + `macroSource`) ride along when the
+   * user entered them manually. Returns the created meal.
+   */
   createFamilyMeal(req: {
     localDate: string; slot: FamilyMealSlot; title: string; ingredients?: string;
+    servings?: number; calories?: number; proteinG?: number; carbG?: number; fatG?: number;
+    macroSource?: FamilyMealMacroSource;
   }): Observable<FamilyMeal> {
     return this.http.post<FamilyMeal>(`${this.base}/family/meals`, req);
   }
@@ -1092,9 +1098,51 @@ export class Api {
     return this.http.put<FamilyMeal>(`${this.base}/family/meals/${id}`, req);
   }
 
+  /**
+   * Partial-update a meal (PATCH — the macro-save path). Carries the plain fields AND the Slice 2 macro
+   * fields: `servings` + the four dish TOTALS + `macroSource` (manual edit, or confirming an AI/DB proposal).
+   * Omitted fields are unchanged; everything is clamped + household-scoped server-side. Returns the updated meal.
+   */
+  patchFamilyMeal(id: number, req: {
+    localDate?: string; slot?: FamilyMealSlot; title?: string; ingredients?: string;
+    servings?: number; calories?: number; proteinG?: number; carbG?: number; fatG?: number;
+    macroSource?: FamilyMealMacroSource;
+  }): Observable<FamilyMeal> {
+    return this.http.patch<FamilyMeal>(`${this.base}/family/meals/${id}`, req);
+  }
+
   /** Delete a meal (any household member). */
   deleteFamilyMeal(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/family/meals/${id}`);
+  }
+
+  /**
+   * "✨ Estimate with AI": ask Gemini for a meal's dish TOTAL macros + a suggested servings count from its
+   * title + ingredients. Returns a PROPOSAL (saves NOTHING) — the editor previews it, and the user confirms
+   * before the meal PATCH writes it. Household-scoped (foreign meal → 404); 503 when AI is unavailable.
+   */
+  estimateMealMacros(id: number): Observable<FamilyMealMacroProposal> {
+    return this.http.post<FamilyMealMacroProposal>(`${this.base}/family/meals/${id}/ai/macros`, {});
+  }
+
+  /**
+   * "✨ Refine with food database": sum per-ingredient food-DB (USDA) lookups into dish TOTALS, keeping the
+   * meal's current servings. Returns a PROPOSAL (saves NOTHING) plus the `matched`/`unmatched` ingredient
+   * lines so the user sees what was found. Household-scoped (foreign meal → 404); 503 when the DB is unavailable.
+   */
+  refineMealMacros(id: number): Observable<FamilyMealMacroProposal> {
+    return this.http.post<FamilyMealMacroProposal>(`${this.base}/family/meals/${id}/macros/refine`, {});
+  }
+
+  /**
+   * "✨ Add to my tracker": log ONE serving of a planned meal's per-serving macros onto the caller's OWN
+   * tracker day (gated tracker.self). The meal must already have macros set (else 400) and the caller must be
+   * a member of its household (else 404). `localDate` ("YYYY-MM-DD") defaults to the meal's own planned date.
+   * Returns the created food entry.
+   */
+  addMealToTracker(mealId: number, localDate?: string): Observable<FoodEntryDto> {
+    return this.http.post<FoodEntryDto>(`${this.base}/tracker/food/from-meal`,
+      { mealId, localDate: localDate ?? null });
   }
 
   /**

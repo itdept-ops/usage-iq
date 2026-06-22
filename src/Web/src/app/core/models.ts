@@ -2357,10 +2357,29 @@ export interface FamilyAssistantResult {
   actions: FamilyAssistantAction[];
 }
 
+/** Where a meal's macros came from (mirrors the backend vocabulary). "none" = unset. */
+export type FamilyMealMacroSource = 'none' | 'ai' | 'database' | 'manual';
+
+/**
+ * The DERIVED per-serving macros for a meal (mirrors MacroPerServingDto): the dish TOTAL over
+ * max(servings, 1), calories whole + macros to 1 dp. One person's portion — what the planner rollups
+ * show and what "✨ Add to my tracker" logs. Never stored; the server always recomputes it from the totals.
+ */
+export interface FamilyMealPerServing {
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+}
+
 /**
  * One planned meal on the weekly plan (mirrors MealDto). `localDate` is an ISO date in the household
  * timezone; `slot` is the meal-of-day. `ingredients` is raw newline-separated text (one per line) that
  * feeds the grocery-list tie-in. The author is `createdByUserId` + `createdByName` only — never an email.
+ *
+ * Macros (Slice 2): `servings` + the four dish TOTALS (`calories`/`proteinG`/`carbG`/`fatG`) + `macroSource`
+ * are the stored values; `perServing` is the server-DERIVED one-portion block (total / max(servings, 1))
+ * the cards show prominently and "✨ Add to my tracker" logs. `macroSource === 'none'` means macros aren't set.
  */
 export interface FamilyMeal {
   id: number;
@@ -2370,6 +2389,40 @@ export interface FamilyMeal {
   ingredients: string;
   createdByUserId: number;
   createdByName: string;
+  /** How many servings the dish makes (>=1); per-serving = total / max(servings, 1). */
+  servings: number;
+  /** Dish TOTAL calories (kcal) across all servings. */
+  calories: number;
+  /** Dish TOTAL protein (g) across all servings. */
+  proteinG: number;
+  /** Dish TOTAL carbohydrate (g) across all servings. */
+  carbG: number;
+  /** Dish TOTAL fat (g) across all servings. */
+  fatG: number;
+  /** Where the macros came from; "none" until an AI/DB/manual estimate is saved. */
+  macroSource: FamilyMealMacroSource;
+  /** Server-derived per-serving macros (total / max(servings, 1)). One person's portion. */
+  perServing: FamilyMealPerServing;
+}
+
+/**
+ * An AI/DB macro PROPOSAL for a meal (mirrors MealMacroProposalDto): the dish TOTALS + a suggested/kept
+ * `servings` count + the derived `perServing` block + an optional `note`. NOTHING is saved — the editor
+ * previews it, then the user confirms and the meal PATCH writes the totals + servings + source. The
+ * DB-refine variant also carries `matched`/`unmatched` ingredient lines so the user sees what was looked up.
+ */
+export interface FamilyMealMacroProposal {
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  servings: number;
+  perServing: FamilyMealPerServing;
+  note: string | null;
+  /** Ingredient lines that matched a food-DB hit (DB-refine only; null for the AI estimate). */
+  matched: string[] | null;
+  /** Ingredient lines with no food-DB match (DB-refine only; null for the AI estimate). */
+  unmatched: string[] | null;
 }
 
 /**

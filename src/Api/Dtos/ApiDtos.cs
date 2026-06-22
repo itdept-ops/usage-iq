@@ -1035,6 +1035,20 @@ public sealed class AddFoodRequest
     public string? Source { get; set; }
 }
 
+/// <summary>
+/// Log ONE serving of a planned Family Hub meal onto the caller's OWN tracker day (Slice 2 tie-in). The
+/// <see cref="MealId"/> names a <c>FamilyMeal</c> in a household the caller is a member of (else 404 — never
+/// leaked); the endpoint logs the meal's DERIVED per-serving macros (dish total / servings). <see cref="LocalDate"/>
+/// (yyyy-MM-dd) is optional — absent, the meal's own planned date is used.
+/// </summary>
+public sealed class AddFoodFromMealRequest
+{
+    public long MealId { get; set; }
+
+    /// <summary>The day (yyyy-MM-dd) to log onto; null/blank/invalid ⇒ the meal's own planned date.</summary>
+    public string? LocalDate { get; set; }
+}
+
 /// <summary>One of the caller's saved "My foods" — a per-user library auto-built from manual food logs.
 /// Calories/macros are the verbatim totals first logged; <see cref="UseCount"/> tracks how often it was
 /// logged (newest-used first in the list).</summary>

@@ -71,6 +71,124 @@
       }
     </mat-hint>
   </mat-form-field>
+
+  <!-- ── Macros (dish TOTALS + servings; per-serving derived) ──────────── -->
+  <div class="meal-macros">
+    <div class="meal-macros__head">
+      <span class="meal-macros__label">
+        <mat-icon aria-hidden="true">monitor_weight</mat-icon> Macros
+        <span class="meal-macros__source" [class.meal-macros__source--set]="macroSource() !== 'none'">
+          {{ macroSourceLabel() }}
+        </span>
+      </span>
+      @if (hasMacros()) {
+        <button mat-button type="button" class="meal-macros__clear" (click)="clearMacros()">Clear</button>
+      }
+    </div>
+
+    @if (isEdit) {
+      <div class="meal-macros__assist">
+        <button mat-stroked-button type="button" class="meal-macros__ai"
+                [disabled]="macroBusy() !== ''" (click)="estimateMacros()">
+          @if (macroBusy() === 'ai') {
+            <mat-spinner [diameter]="16" />
+          } @else {
+            <mat-icon class="note-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+          }
+          <span>Estimate with AI</span>
+        </button>
+        <button mat-stroked-button type="button" class="meal-macros__ai"
+                [disabled]="macroBusy() !== ''" (click)="refineMacros()">
+          @if (macroBusy() === 'database') {
+            <mat-spinner [diameter]="16" />
+          } @else {
+            <mat-icon class="note-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+          }
+          <span>Refine with food database</span>
+        </button>
+      </div>
+    }
+
+    @if (macroStatus(); as msg) {
+      <p class="meal-macros__status" aria-live="polite">{{ msg }}</p>
+    }
+
+    <!-- Proposal preview (confirm before apply) -->
+    @if (proposal(); as p) {
+      <div class="meal-macros__proposal" role="group" aria-label="Proposed macros">
+        <p class="meal-macros__proposal-head">
+          {{ p.source === 'ai' ? 'AI estimate' : 'Food-database total' }} — {{ p.data.servings }}
+          {{ p.data.servings === 1 ? 'serving' : 'servings' }}
+        </p>
+        <p class="meal-macros__proposal-totals">
+          <strong>{{ p.data.calories }}</strong> kcal ·
+          <strong>{{ p.data.proteinG }}</strong>g P ·
+          <strong>{{ p.data.carbG }}</strong>g C ·
+          <strong>{{ p.data.fatG }}</strong>g F
+          <span class="meal-macros__proposal-per">
+            ({{ p.data.perServing.calories }} kcal / serving)
+          </span>
+        </p>
+        @if (p.data.unmatched?.length) {
+          <p class="meal-macros__proposal-unmatched">
+            <mat-icon aria-hidden="true">help_outline</mat-icon>
+            Not found: {{ p.data.unmatched!.join(', ') }}
+          </p>
+        }
+        <div class="meal-macros__proposal-actions">
+          <button mat-button type="button" (click)="dismissProposal()">Dismiss</button>
+          <button mat-flat-button color="primary" type="button" (click)="useProposal()">Use these</button>
+        </div>
+      </div>
+    }
+
+    <div class="meal-macros__grid">
+      <mat-form-field appearance="outline" class="meal-macros__field" subscriptSizing="dynamic">
+        <mat-label>Servings</mat-label>
+        <input matInput type="number" min="1" max="50" inputmode="numeric"
+               [ngModel]="servings()" (ngModelChange)="servings.set($event)" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="meal-macros__field" subscriptSizing="dynamic">
+        <mat-label>Calories (total)</mat-label>
+        <input matInput type="number" min="0" inputmode="numeric"
+               [ngModel]="calories()" (ngModelChange)="calories.set($event); onMacroEdited()" />
+        <span matTextSuffix>kcal</span>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="meal-macros__field" subscriptSizing="dynamic">
+        <mat-label>Protein (total)</mat-label>
+        <input matInput type="number" min="0" inputmode="decimal"
+               [ngModel]="proteinG()" (ngModelChange)="proteinG.set($event); onMacroEdited()" />
+        <span matTextSuffix>g</span>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="meal-macros__field" subscriptSizing="dynamic">
+        <mat-label>Carbs (total)</mat-label>
+        <input matInput type="number" min="0" inputmode="decimal"
+               [ngModel]="carbG()" (ngModelChange)="carbG.set($event); onMacroEdited()" />
+        <span matTextSuffix>g</span>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="meal-macros__field" subscriptSizing="dynamic">
+        <mat-label>Fat (total)</mat-label>
+        <input matInput type="number" min="0" inputmode="decimal"
+               [ngModel]="fatG()" (ngModelChange)="fatG.set($event); onMacroEdited()" />
+        <span matTextSuffix>g</span>
+      </mat-form-field>
+    </div>
+
+    @if (hasMacros()) {
+      <p class="meal-macros__per" aria-live="polite">
+        <mat-icon aria-hidden="true">person</mat-icon>
+        Per serving:
+        <strong>{{ perServing().calories }}</strong> kcal ·
+        <strong>{{ perServing().proteinG }}</strong>g P ·
+        <strong>{{ perServing().carbG }}</strong>g C ·
+        <strong>{{ perServing().fatG }}</strong>g F
+      </p>
+    } @else {
+      <p class="meal-macros__hint">
+        Add macros to see this meal’s per-serving nutrition and log it to your tracker.
+      </p>
+    }
+  </div>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end" class="note-edit__actions">

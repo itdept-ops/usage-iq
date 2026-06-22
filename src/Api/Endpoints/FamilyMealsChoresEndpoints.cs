@@ -1,6 +1,7 @@
 using Ccusage.Api.Auth;
 using Ccusage.Api.Data;
 using Ccusage.Api.Data.Entities;
+using Ccusage.Api.Dtos;
 using Ccusage.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -39,12 +40,34 @@ public static class FamilyMealsChoresEndpoints
 
     public sealed record MealDto(
         long Id, string LocalDate, string Slot, string Title, string Ingredients,
-        int CreatedByUserId, string CreatedByName);
+        int CreatedByUserId, string CreatedByName,
+        // Macros (Slice 2): the dish TOTALS + servings + their source, plus a DERIVED per-serving block
+        // (total / max(Servings, 1)) the frontend can use directly for rollups + "add to my tracker".
+        int Servings, int Calories, double ProteinG, double CarbG, double FatG, string MacroSource,
+        MacroPerServingDto PerServing);
+
+    /// <summary>The DERIVED per-serving macros for a meal: the dish total divided by max(Servings, 1), rounded
+    /// (calories to a whole number, macros to 1 dp). One person's portion — what the planner rollups show and
+    /// what "add to my tracker" logs. Never stored; always computed from the totals.</summary>
+    public sealed record MacroPerServingDto(int Calories, double ProteinG, double CarbG, double FatG);
 
     /// <summary>One day of the weekly plan: its local date + the meals planned on it.</summary>
     public sealed record MealDayDto(string LocalDate, IReadOnlyList<MealDto> Meals);
 
-    public sealed record MealUpsertRequest(string? LocalDate, string? Slot, string? Title, string? Ingredients);
+    /// <summary>Create/update a meal. The four macro TOTALS + <see cref="Servings"/> + <see cref="MacroSource"/>
+    /// are optional (Slice 2): a manual macro edit, or confirming an AI/DB proposal. On create they default to a
+    /// macro-less meal (MacroSource "none"). All are clamped + household-scoped.</summary>
+    public sealed record MealUpsertRequest(
+        string? LocalDate, string? Slot, string? Title, string? Ingredients,
+        int? Servings, int? Calories, double? ProteinG, double? CarbG, double? FatG, string? MacroSource);
+
+    /// <summary>An AI/DB macro PROPOSAL for a meal (Slice 2): the dish TOTALS + a suggested/kept servings count +
+    /// a derived per-serving block + an optional note. NOT saved — the frontend confirms then PATCHes the meal.
+    /// The DB-refine variant adds <see cref="Matched"/>/<see cref="Unmatched"/> ingredient lines.</summary>
+    public sealed record MealMacroProposalDto(
+        int Calories, double ProteinG, double CarbG, double FatG, int Servings,
+        MacroPerServingDto PerServing, string? Note,
+        IReadOnlyList<string>? Matched, IReadOnlyList<string>? Unmatched);
     public sealed record ToGroceryRequest(string? WeekStart, IReadOnlyList<long>? MealIds, long? ListId);
 
     // ---- AI-assist DTOs (plan our week / from a recipe) ----
@@ -205,6 +228,8 @@ public static class FamilyMealsChoresEndpoints
                 CreatedByUserId = caller.Id,
                 CreatedUtc = DateTime.UtcNow,
             };
+            // Optional macros on create (manual entry or a confirmed proposal). Clamped + source-normalised.
+            ApplyMacroFields(meal, req);
             db.FamilyMeals.Add(meal);
             await db.SaveChangesAsync(ct);
 
@@ -237,6 +262,43 @@ public static class FamilyMealsChoresEndpoints
             }
             if (req.Slot is not null) meal.Slot = NormalizeSlot(req.Slot);
             if (req.Ingredients is not null) meal.Ingredients = ClampIngredients(req.Ingredients);
+            ApplyMacroFields(meal, req); // macros: a manual edit OR confirming an AI/DB proposal
+
+            await db.SaveChangesAsync(ct);
+
+            var names = await NamesAsync(db, new[] { meal.CreatedByUserId }, ct);
+            return Results.Ok(ToMealDto(meal, names));
+        });
+
+        // ---- PATCH /meals/{id} : partial update (the macro-save path; same shape as PUT) ----
+        // The frontend SAVES macros here: a manual edit OR confirming an AI/DB proposal (Servings + the four
+        // dish TOTALS + MacroSource). Also accepts the plain fields (title/date/slot/ingredients) so it is a
+        // full partial-update. Everything is clamped + household-scoped (a foreign meal is a 404).
+        g.MapPatch("/meals/{id:long}", async (
+            long id, MealUpsertRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+            var meal = await db.FamilyMeals.FirstOrDefaultAsync(m => m.Id == id, ct);
+            if (meal is null || meal.HouseholdId != household.Id) return NotFound();
+
+            if (req.Title is not null)
+            {
+                var title = req.Title.Trim();
+                if (string.IsNullOrEmpty(title)) return Results.BadRequest(new { message = "A meal title is required." });
+                meal.Title = Clamp(title, 200);
+            }
+            if (req.LocalDate is not null)
+            {
+                if (ParseDate(req.LocalDate) is not DateOnly date)
+                    return Results.BadRequest(new { message = "A valid localDate (YYYY-MM-DD) is required." });
+                meal.LocalDate = date;
+            }
+            if (req.Slot is not null) meal.Slot = NormalizeSlot(req.Slot);
+            if (req.Ingredients is not null) meal.Ingredients = ClampIngredients(req.Ingredients);
+            ApplyMacroFields(meal, req);
 
             await db.SaveChangesAsync(ct);
 
@@ -437,7 +499,169 @@ public static class FamilyMealsChoresEndpoints
                 .ToList();
             return Results.Ok(new WhatCanIMakeAiDto(ideas));
         }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
+        MapMealMacros(g);
     }
+
+    // =====================================================================================
+    // MEAL MACROS (Slice 2) — AI estimate + DB refine, both household-scoped PROPOSALS
+    // =====================================================================================
+    // Family-AI pattern: gated by family.use (the group filter) + rate-limited (the shared "ai" policy),
+    // household-scoped (a foreign meal is a 404 — existence never leaked), graceful 503 (never 500) when the
+    // provider is unconfigured/errors, and they APPLY NOTHING — each returns a PROPOSAL (dish TOTALS + a
+    // derived per-serving block) the frontend reviews then SAVES via the meal PATCH. No email anywhere.
+
+    /// <summary>Loose ingredient line parse: an optional leading quantity (e.g. "2", "1.5", "1/2") then the
+    /// rest as the food NAME to look up. The quantity scales the looked-up food's macros; a unit token is
+    /// ignored (USDA's first hit already carries a per-serving/per-100g basis we can't reconcile precisely).</summary>
+    private static readonly System.Text.RegularExpressions.Regex QtyPrefix =
+        new(@"^\s*(?<qty>\d+(?:\.\d+)?|\d+\s*/\s*\d+)?\s*(?<rest>.*)$",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static void MapMealMacros(RouteGroupBuilder g)
+    {
+        // ---- POST /meals/{id}/ai/macros : Gemini estimates the dish TOTAL macros + suggested servings ----
+        // Household-scoped (foreign meal → 404). Returns a PROPOSAL (does NOT save) — the frontend confirms then
+        // PATCHes the meal. Rate-limited; graceful 503 when Gemini is unavailable.
+        g.MapPost("/meals/{id:long}/ai/macros", async (
+            long id, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            GeminiService gemini, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+            // Resolve the meal FIRST (household-scoped) so a foreign/missing meal is a 404 even when AI is off —
+            // existence is never leaked through a 503.
+            var meal = await db.FamilyMeals.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id, ct);
+            if (meal is null || meal.HouseholdId != household.Id) return NotFound();
+
+            if (!gemini.IsConfigured) return AiUnavailable();
+
+            var result = await gemini.EstimateMealMacrosAsync(meal.Title, meal.Ingredients, ct);
+            if (result is null) return AiUnavailable();
+
+            return Results.Ok(new MealMacroProposalDto(
+                Calories: result.Calories,
+                ProteinG: result.ProteinG,
+                CarbG: result.CarbG,
+                FatG: result.FatG,
+                Servings: result.Servings,
+                PerServing: PerServing(result.Calories, result.ProteinG, result.CarbG, result.FatG, result.Servings),
+                Note: result.Note,
+                Matched: null,
+                Unmatched: null));
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
+        // ---- POST /meals/{id}/macros/refine : sum per-ingredient USDA lookups into dish TOTALS ----
+        // Household-scoped (foreign meal → 404). Parses the meal's ingredient lines (loose "qty unit name"),
+        // looks each NAME up via USDA (first hit), and SUMS into dish totals; returns matched + unmatched lines.
+        // A PROPOSAL (does NOT save). Graceful 503 when USDA is unavailable/unconfigured.
+        g.MapPost("/meals/{id:long}/macros/refine", async (
+            long id, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsdaFoodService usda, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+            var meal = await db.FamilyMeals.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id, ct);
+            if (meal is null || meal.HouseholdId != household.Id) return NotFound();
+
+            if (!usda.IsConfigured) return AiUnavailable();
+
+            var lines = SplitIngredients(meal.Ingredients).Take(MaxMealIds).ToList();
+            double cal = 0, protein = 0, carb = 0, fat = 0;
+            var matched = new List<string>();
+            var unmatched = new List<string>();
+
+            foreach (var line in lines)
+            {
+                var (qty, name) = ParseIngredientLine(line);
+                if (name.Length == 0) { unmatched.Add(Clamp(line, 200)); continue; }
+
+                IReadOnlyList<FoodSearchItemDto> hits;
+                try
+                {
+                    hits = await usda.SearchAsync(name, null, ct);
+                }
+                catch (UsdaNotConfiguredException)
+                {
+                    return AiUnavailable(); // provider went away mid-loop — degrade gracefully (never 500)
+                }
+
+                var hit = hits.Count > 0 ? hits[0] : null;
+                if (hit is null) { unmatched.Add(Clamp(line, 200)); continue; }
+
+                cal += hit.Calories * qty;
+                protein += hit.ProteinG * qty;
+                carb += hit.CarbG * qty;
+                fat += hit.FatG * qty;
+                matched.Add(Clamp(line, 200));
+            }
+
+            var calT = ClampMealCalories((int)Math.Round(cal, MidpointRounding.AwayFromZero));
+            var proteinT = ClampMealMacro(protein);
+            var carbT = ClampMealMacro(carb);
+            var fatT = ClampMealMacro(fat);
+            var servings = ClampServings(meal.Servings); // keep the meal's existing servings (>=1)
+
+            return Results.Ok(new MealMacroProposalDto(
+                Calories: calT,
+                ProteinG: proteinT,
+                CarbG: carbT,
+                FatG: fatT,
+                Servings: servings,
+                PerServing: PerServing(calT, proteinT, carbT, fatT, servings),
+                Note: null,
+                Matched: matched,
+                Unmatched: unmatched));
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+    }
+
+    /// <summary>Loosely parse an ingredient line into a (quantity multiplier, food name). A leading whole/decimal/
+    /// fraction quantity scales the looked-up macros (default 1.0 when absent); the remaining text is the name to
+    /// search. A bare leading unit token (cup/tbsp/g/oz…) is dropped so the name lookup is cleaner.</summary>
+    private static (double Qty, string Name) ParseIngredientLine(string line)
+    {
+        var m = QtyPrefix.Match(line.Trim());
+        var qty = 1.0;
+        if (m.Groups["qty"].Success && m.Groups["qty"].Value.Length > 0)
+        {
+            var raw = m.Groups["qty"].Value;
+            if (raw.Contains('/'))
+            {
+                var parts = raw.Split('/');
+                if (parts.Length == 2
+                    && double.TryParse(parts[0].Trim(), System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var num)
+                    && double.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var den)
+                    && den != 0)
+                    qty = num / den;
+            }
+            else if (double.TryParse(raw, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var n))
+                qty = n;
+        }
+        if (qty <= 0 || double.IsNaN(qty) || double.IsInfinity(qty)) qty = 1.0;
+
+        var rest = m.Groups["rest"].Value.Trim();
+        // Drop a single leading unit token so the search term is the food, not the measure.
+        var firstSpace = rest.IndexOf(' ');
+        if (firstSpace > 0)
+        {
+            var token = rest[..firstSpace].ToLowerInvariant();
+            if (Units.Contains(token)) rest = rest[(firstSpace + 1)..].Trim();
+        }
+        return (qty, Clamp(rest, 120));
+    }
+
+    private static readonly HashSet<string> Units = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "cup", "cups", "tbsp", "tablespoon", "tablespoons", "tsp", "teaspoon", "teaspoons",
+        "g", "gram", "grams", "kg", "oz", "ounce", "ounces", "lb", "lbs", "pound", "pounds",
+        "ml", "l", "liter", "litre", "liters", "litres", "pinch", "dash", "clove", "cloves",
+        "can", "cans", "slice", "slices", "stick", "sticks", "pkg", "package", "packages",
+    };
 
     // =====================================================================================
     // CHORES — the shared board + the points ledger/tally
@@ -937,7 +1161,54 @@ public static class FamilyMealsChoresEndpoints
 
     private static MealDto ToMealDto(FamilyMeal m, Dictionary<int, string> names) =>
         new(m.Id, m.LocalDate.ToString("o"), m.Slot, m.Title, m.Ingredients,
-            m.CreatedByUserId, Name(names, m.CreatedByUserId));
+            m.CreatedByUserId, Name(names, m.CreatedByUserId),
+            m.Servings, m.Calories, m.ProteinG, m.CarbG, m.FatG, m.MacroSource,
+            PerServing(m.Calories, m.ProteinG, m.CarbG, m.FatG, m.Servings));
+
+    // ---- Macros (Slice 2): clamp bounds + per-serving derivation ----
+    // Mirror GeminiService's dish-TOTAL ceilings so a manual edit or a confirmed proposal lands in the same
+    // sane range (a whole family dish legitimately totals more than a single logged food).
+    private const int MaxMealTotalCalories = 20000;
+    private const double MaxMealTotalMacroG = 2000;
+    private const int MaxMealServings = 50;
+    private static readonly string[] MacroSources = { "none", "ai", "database", "manual" };
+
+    /// <summary>The DERIVED per-serving block: the dish total over max(servings, 1), calories rounded to a whole
+    /// number and macros to 1 dp. One person's portion — shown by the rollups + logged by "add to my tracker".</summary>
+    private static MacroPerServingDto PerServing(int calories, double proteinG, double carbG, double fatG, int servings)
+    {
+        var s = Math.Max(servings, 1);
+        return new MacroPerServingDto(
+            (int)Math.Round((double)calories / s, MidpointRounding.AwayFromZero),
+            Math.Round(proteinG / s, 1),
+            Math.Round(carbG / s, 1),
+            Math.Round(fatG / s, 1));
+    }
+
+    private static int ClampMealCalories(int v) => Math.Clamp(v, 0, MaxMealTotalCalories);
+    private static double ClampMealMacro(double v) =>
+        double.IsNaN(v) || double.IsInfinity(v) || v < 0 ? 0 : Math.Round(Math.Min(v, MaxMealTotalMacroG), 1);
+    private static int ClampServings(int v) => Math.Clamp(v, 1, MaxMealServings);
+
+    /// <summary>Normalise a macro source to the vocabulary none|ai|database|manual; unknown/blank -> "none".</summary>
+    private static string NormalizeMacroSource(string? s)
+    {
+        var v = (s ?? "").Trim().ToLowerInvariant();
+        return MacroSources.Contains(v) ? v : "none";
+    }
+
+    /// <summary>Apply the OPTIONAL macro fields of an upsert onto a meal: each absent field is left as-is, and
+    /// each present field is clamped (totals 0..20000 cal / 0..2000 g, servings 1..50, source normalised). The
+    /// per-serving block is always derived from the totals on read — never stored.</summary>
+    private static void ApplyMacroFields(FamilyMeal meal, MealUpsertRequest req)
+    {
+        if (req.Servings is int servings) meal.Servings = ClampServings(servings);
+        if (req.Calories is int calories) meal.Calories = ClampMealCalories(calories);
+        if (req.ProteinG is double proteinG) meal.ProteinG = ClampMealMacro(proteinG);
+        if (req.CarbG is double carbG) meal.CarbG = ClampMealMacro(carbG);
+        if (req.FatG is double fatG) meal.FatG = ClampMealMacro(fatG);
+        if (req.MacroSource is not null) meal.MacroSource = NormalizeMacroSource(req.MacroSource);
+    }
 
     private static ChoreDto ToChoreDto(FamilyChore c, Dictionary<int, string> names) =>
         new(c.Id, c.Title,

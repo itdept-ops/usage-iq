@@ -559,6 +559,13 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.Title).HasMaxLength(200);
             e.Property(x => x.Ingredients).HasMaxLength(4000).HasDefaultValue("");
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // Macros (Slice 2): dish TOTALS + servings; per-serving is derived, never stored.
+            e.Property(x => x.Servings).HasDefaultValue(1);
+            e.Property(x => x.Calories).HasDefaultValue(0);
+            e.Property(x => x.ProteinG).HasDefaultValue(0d);
+            e.Property(x => x.CarbG).HasDefaultValue(0d);
+            e.Property(x => x.FatG).HasDefaultValue(0d);
+            e.Property(x => x.MacroSource).HasMaxLength(16).HasDefaultValue("none");
             // The weekly plan reads one household's meals over a date window.
             e.HasIndex(x => new { x.HouseholdId, x.LocalDate });
         });

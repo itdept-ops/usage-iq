@@ -733,6 +733,75 @@ a.tile:focus-visible {
 .meal-recipe__text { width: 100%; flex: 1 1 auto; resize: vertical; min-height: 96px; line-height: 1.4; }
 .meal-recipe__bar { justify-content: flex-end; }
 
+/* ── Macros block in the meal editor (Slice 2): totals + servings, derived per-serving, ✨ assists ── */
+.meal-macros {
+  display: flex; flex-direction: column; gap: var(--tech-space-2, 8px);
+  padding: var(--tech-space-3, 12px);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-r-control, 10px);
+  background: var(--tech-panel);
+}
+.meal-macros__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.meal-macros__label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--tech-fs-label); font-weight: 700; color: var(--tech-text);
+  mat-icon { width: 18px; height: 18px; font-size: 18px; color: var(--tech-accent-cyan); }
+}
+.meal-macros__source {
+  font-size: var(--tech-fs-micro); font-weight: 700; letter-spacing: 0.02em;
+  padding: 0 6px; border-radius: 999px; line-height: 1.6;
+  color: var(--tech-text-tertiary);
+  background: color-mix(in srgb, var(--tech-text-tertiary) 12%, transparent);
+  &--set { color: var(--tech-accent-cyan); background: color-mix(in srgb, var(--tech-accent-cyan) 14%, transparent); }
+}
+.meal-macros__clear { min-height: 0; padding: 0 6px; font-size: var(--tech-fs-micro); font-weight: 600; color: var(--tech-text-secondary); }
+
+.meal-macros__assist { display: flex; flex-wrap: wrap; gap: 6px; }
+.meal-macros__ai {
+  flex: 1 1 auto; border-radius: var(--tech-r-control); font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+  .note-ai__spark { width: 16px; height: 16px; font-size: 16px; color: var(--tech-accent); }
+  mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+}
+.meal-macros__status { margin: 0; font-size: var(--tech-fs-label); color: var(--tech-text-secondary); }
+
+.meal-macros__proposal {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--tech-space-3, 12px);
+  border: 1px solid var(--tech-border-subtle); border-left: 3px solid var(--tech-accent);
+  border-radius: var(--tech-r-control, 10px); background: var(--tech-bg-sunken);
+}
+.meal-macros__proposal-head { margin: 0; font-weight: 700; color: var(--tech-text); font-size: var(--tech-fs-label); }
+.meal-macros__proposal-totals {
+  margin: 0; font-size: var(--tech-fs-label); color: var(--tech-text-secondary);
+  font-variant-numeric: tabular-nums;
+  strong { color: var(--tech-text); }
+}
+.meal-macros__proposal-per { color: var(--tech-text-tertiary); }
+.meal-macros__proposal-unmatched {
+  display: flex; align-items: flex-start; gap: 5px; margin: 0;
+  font-size: var(--tech-fs-micro); color: var(--tech-text-secondary);
+  mat-icon { width: 15px; height: 15px; font-size: 15px; color: var(--tech-warn, var(--tech-accent)); flex: 0 0 auto; margin-top: 1px; }
+}
+.meal-macros__proposal-actions {
+  display: flex; justify-content: flex-end; gap: 6px;
+  button { border-radius: var(--tech-r-control); font-weight: 600; }
+}
+
+.meal-macros__grid {
+  display: grid; gap: var(--tech-space-2, 8px);
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+}
+.meal-macros__field { width: 100%; }
+.meal-macros__per {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 0;
+  font-size: var(--tech-fs-label); color: var(--tech-text-secondary);
+  font-variant-numeric: tabular-nums;
+  strong { color: var(--tech-accent-cyan); font-weight: 800; }
+  mat-icon { width: 16px; height: 16px; font-size: 16px; color: var(--tech-accent-cyan); }
+}
+.meal-macros__hint { margin: 0; font-size: var(--tech-fs-micro); color: var(--tech-text-tertiary); font-style: italic; }
+
 /* ── Share dialog ───────────────────────────────────────────────────── */
 .share-dlg__body { padding-top: 6px !important; display: flex; flex-direction: column;
   gap: var(--tech-space-3, 12px); min-width: min(380px, 84vw); }
