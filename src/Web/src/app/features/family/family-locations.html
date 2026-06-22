@@ -1,0 +1,91 @@
+<section class="family family-locs">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <!-- Hero: warm header consistent with the other family sub-pages -->
+  <header class="family__hero">
+    <div class="family__hero-id">
+      <span class="family__crest" aria-hidden="true"><mat-icon>person_pin_circle</mat-icon></span>
+      <div>
+        <p class="family__eyebrow">Family</p>
+        <h1 class="family__name">Where is everyone</h1>
+        <p class="family__sub">A map of where the family is right now. Members appear here only when they've
+          turned on location sharing for the household.</p>
+      </div>
+    </div>
+    <div class="family-locs__actions">
+      <button mat-stroked-button (click)="refresh()" [disabled]="loading()"
+              matTooltip="Refresh everyone's latest location">
+        <mat-icon aria-hidden="true">refresh</mat-icon>
+        Refresh
+      </button>
+      <a mat-stroked-button routerLink="/locations" matTooltip="Your own location settings & history">
+        <mat-icon aria-hidden="true">my_location</mat-icon>
+        My locations
+      </a>
+    </div>
+  </header>
+
+  @if (!loading() && !members().length) {
+    <!-- Friendly empty state: nobody is sharing yet -->
+    <div class="family__card family-locs__empty" role="status">
+      <span class="family__crest family-locs__empty-crest" aria-hidden="true">
+        <mat-icon>location_off</mat-icon>
+      </span>
+      <h2 class="family-locs__empty-title">No one's sharing a location yet</h2>
+      <p class="family-locs__empty-body">When a family member turns on location sharing for the household,
+        their pin shows up here. You can opt in on your own
+        <a routerLink="/locations">My locations</a> page — enable location, then switch on
+        “Share with my household.”</p>
+      <a mat-flat-button color="primary" routerLink="/locations">
+        <mat-icon aria-hidden="true">my_location</mat-icon>
+        Go to My locations
+      </a>
+    </div>
+  } @else if (members().length) {
+    <div class="family-locs__layout">
+      <!-- Map -->
+      <section class="family__card family-locs__map-card" aria-label="Family map">
+        <app-location-map [pins]="pins()" (pinClick)="onPinClick($event)" />
+        <div class="family-locs__osm">
+          <mat-icon aria-hidden="true">public</mat-icon>
+          <span>Powered by
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</span>
+        </div>
+      </section>
+
+      <!-- Side list: name · city · as-of · stale -->
+      <aside class="family__card family-locs__list-card" aria-label="Family members">
+        <h2 class="family__card-title">Family</h2>
+        <ul class="member-locs">
+          @for (m of members(); track m.userId) {
+            <li class="member-loc" [class.member-loc--self]="m.isSelf"
+                [class.member-loc--active]="selectedId() === m.userId"
+                [class.member-loc--stale]="isStale(m)">
+              <button type="button" class="member-loc__btn" (click)="select(m.userId)"
+                      [attr.aria-pressed]="selectedId() === m.userId">
+                <span class="member-loc__swatch" [style.background]="colorFor(m)" aria-hidden="true">
+                  {{ initials(m.name) }}
+                </span>
+                <span class="member-loc__body">
+                  <span class="member-loc__name">
+                    {{ m.name }}
+                    @if (m.isSelf) { <span class="member-loc__you">You</span> }
+                  </span>
+                  <span class="member-loc__place">{{ placeLabel(m) }}</span>
+                  <span class="member-loc__meta">
+                    <span class="member-loc__asof">as of {{ timeAgo(m.capturedUtc, now()) }}</span>
+                    @if (isStale(m)) {
+                      <span class="member-loc__stale" matTooltip="This location may be out of date">stale</span>
+                    }
+                  </span>
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      </aside>
+    </div>
+  }
+</section>

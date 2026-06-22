@@ -43,6 +43,7 @@ const TILES: FeatureTile[] = [
   { key: 'finance', label: 'Finance', icon: 'savings', blurb: 'Budgets, bills, and balances', route: '/family/finance', perm: PERM.familyFinance },
   { key: 'calendar', label: 'Calendar', icon: 'calendar_month', blurb: 'The family calendar in one place', route: '/family/calendar' },
   { key: 'polls', label: 'Polls', icon: 'how_to_vote', blurb: 'Pick a time or settle a plan together', route: '/family/polls' },
+  { key: 'locations', label: "Where's everyone", icon: 'person_pin_circle', blurb: 'See where the family is on a map', route: '/family/locations' },
 ];
 
 /**

@@ -157,6 +157,13 @@ export const routes: Routes = [
         title: 'Usage IQ · Family Polls',
       },
       {
+        // "Where is everyone" — the family-finder map (opted-in members' pins). Inherits the group's
+        // family.use guard; the server only ever resolves the caller's own household.
+        path: 'locations',
+        loadComponent: () => import('./features/family/family-locations').then(m => m.FamilyLocations),
+        title: 'Usage IQ · Where is everyone',
+      },
+      {
         // Finance — extra-sensitive: gated by family.finance ON TOP OF the group's family.use. Every
         // /api/family/finance route is double-gated server-side too (family.use AND family.finance).
         path: 'finance',

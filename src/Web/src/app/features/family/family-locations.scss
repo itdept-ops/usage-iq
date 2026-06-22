@@ -1,0 +1,179 @@
+/* "Where is everyone" — the family-finder. Leans on family.scss (.family, .family__hero, .family__card,
+   .family__card-title, .family__crest, .member--self colours) and adds the map + member-list layout. */
+
+.family-locs__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tech-space-2, 8px);
+
+  mat-icon { margin-right: 4px; }
+}
+
+/* ── Map + list layout (map left, list right; stacks on narrow screens) ── */
+.family-locs__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--tech-space-4, 16px);
+  align-items: start;
+
+  @media (max-width: 760px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.family-locs__map-card {
+  padding: var(--tech-space-2, 8px);
+  overflow: hidden;
+
+  app-location-map { display: block; height: 460px; }
+
+  .family-locs__osm {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: var(--tech-space-2, 8px) var(--tech-space-1, 4px) 0;
+    font-size: var(--tech-fs-micro, 10.5px);
+    color: var(--tech-text-tertiary);
+
+    a { color: var(--tech-text-accent); }
+    mat-icon { width: 13px; height: 13px; font-size: 13px; line-height: 13px; }
+  }
+}
+
+.family-locs__list-card {
+  padding: var(--tech-space-4, 16px);
+
+  .family__card-title { margin-top: 0; }
+}
+
+/* ── Member list ────────────────────────────────────────────────────── */
+.member-locs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-1, 4px);
+}
+
+.member-loc {
+  border-radius: var(--tech-r-control, 10px);
+
+  &--active .member-loc__btn {
+    background: var(--tech-bg-sunken, rgba(255, 255, 255, 0.05));
+    box-shadow: inset 0 0 0 1px var(--tech-border);
+  }
+  &--stale { opacity: 0.72; }
+}
+
+.member-loc__btn {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-3, 12px);
+  width: 100%;
+  padding: var(--tech-space-2, 8px) var(--tech-space-2, 8px);
+  border: none;
+  background: transparent;
+  border-radius: var(--tech-r-control, 10px);
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  transition: background 120ms ease;
+
+  &:hover { background: var(--tech-bg-sunken, rgba(255, 255, 255, 0.04)); }
+  &:focus-visible { outline: 2px solid var(--tech-text-accent); outline-offset: 1px; }
+}
+
+.member-loc__swatch {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-family: var(--tech-font-mono);
+  font-size: var(--tech-fs-label, 11px);
+  font-weight: 700;
+  color: #0b1020;
+  letter-spacing: 0.02em;
+}
+
+.member-loc__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.member-loc__name {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2, 8px);
+  font-size: var(--tech-fs-body, 13px);
+  font-weight: 600;
+  color: var(--tech-text);
+}
+
+.member-loc__you {
+  font-family: var(--tech-font-mono);
+  font-size: var(--tech-fs-micro, 10.5px);
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: var(--tech-r-pill, 999px);
+  color: var(--tech-text-accent);
+  background: color-mix(in srgb, var(--tech-text-accent) 16%, transparent);
+}
+
+.member-loc__place {
+  font-size: var(--tech-fs-label, 11px);
+  color: var(--tech-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-loc__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2, 8px);
+  margin-top: 1px;
+  font-family: var(--tech-font-mono);
+  font-size: var(--tech-fs-micro, 10.5px);
+  color: var(--tech-text-tertiary);
+}
+
+.member-loc__stale {
+  padding: 0 6px;
+  border-radius: var(--tech-r-pill, 999px);
+  color: var(--tech-warn, #d9a23f);
+  background: color-mix(in srgb, var(--tech-warn, #d9a23f) 16%, transparent);
+}
+
+/* ── Empty state ────────────────────────────────────────────────────── */
+.family-locs__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-8, 32px) var(--tech-space-6, 24px);
+
+  .family-locs__empty-crest mat-icon { color: var(--tech-text-tertiary); }
+
+  .family-locs__empty-title {
+    margin: 0;
+    font-size: var(--tech-fs-title, 16px);
+    color: var(--tech-text);
+  }
+  .family-locs__empty-body {
+    margin: 0;
+    max-width: 44ch;
+    font-size: var(--tech-fs-body, 13px);
+    color: var(--tech-text-secondary);
+    line-height: 1.5;
+
+    a { color: var(--tech-text-accent); }
+  }
+
+  a[mat-flat-button] mat-icon { margin-right: 4px; }
+}

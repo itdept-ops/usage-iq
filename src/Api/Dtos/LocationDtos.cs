@@ -45,6 +45,29 @@ public sealed class LocationSettingsDto
     public bool ShareHousehold { get; set; }
 }
 
+/// <summary>
+/// One household member's latest pin on the family-finder map (<c>GET /api/family/locations</c>).
+/// Identity is userId + display NAME only — an email is NEVER on the wire. The precise lat/lng is present
+/// because, for the family-finder, the member's <see cref="AppUser.LocationShareHousehold"/> opt-in IS the
+/// consent to show their exact latest location to the household (distinct from the coarse-city presence).
+/// The CALLER always sees their own latest pin (<see cref="IsSelf"/> = true); other members appear only
+/// when they share AND have a recent fix.
+/// </summary>
+public sealed class FamilyMemberLocationDto
+{
+    public int UserId { get; set; }
+    public string Name { get; set; } = "";
+    /// <summary>True for the caller's own pin (always included if they have any history, regardless of sharing).</summary>
+    public bool IsSelf { get; set; }
+    public double Lat { get; set; }
+    public double Lng { get; set; }
+    public string? City { get; set; }
+    public string? Region { get; set; }
+    public string? Country { get; set; }
+    public double? AccuracyM { get; set; }
+    public DateTime CapturedUtc { get; set; }
+}
+
 /// <summary>One user's entry on the admin location map (<c>GET /api/location/admin</c>): identity by id+name
 /// (admin page is admin-gated, but we still prefer userId+name over email), the latest pin, and a short
 /// recent history. The precise coordinates are visible here ONLY because the endpoint is admin-gated.</summary>

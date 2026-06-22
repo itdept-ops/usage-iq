@@ -482,6 +482,7 @@ app.MapInboxEndpoints();
 app.MapTrackerEndpoints();
 app.MapAiEndpoints();
 app.MapFamilyEndpoints();
+app.MapFamilyLocationsEndpoints();
 app.MapFamilyNotesListsEndpoints();
 app.MapFamilyRemindersTimersEndpoints();
 app.MapFamilyTodayEndpoints();

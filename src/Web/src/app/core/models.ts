@@ -1678,6 +1678,27 @@ export interface HouseholdMember {
 }
 
 /**
+ * One household member's latest pin on the family-finder map (GET /api/family/locations). Identity is
+ * `userId` + display `name` only — no email is ever on the wire. The precise lat/lng is present because,
+ * for the family-finder, the member's household-sharing opt-in IS the consent to show their exact latest
+ * location to the household. The caller always sees their own pin (`isSelf` = true); other members appear
+ * only when they share AND have a recent fix. Mirrors FamilyMemberLocationDto.
+ */
+export interface FamilyMemberLocation {
+  userId: number;
+  name: string;
+  /** True for the caller's own pin (always included if they have any history, regardless of sharing). */
+  isSelf: boolean;
+  lat: number;
+  lng: number;
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+  accuracyM?: number | null;
+  capturedUtc: string;
+}
+
+/**
  * A person the owner may add to the household (GET /api/family/household/candidates) — the caller's
  * circle / family-capable users not yet in a household. Identity is `userId` + `name` (+ optional
  * `picture`); never an email. The picker adds by `userId`. Mirrors CandidateDto.

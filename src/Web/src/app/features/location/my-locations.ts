@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -25,7 +24,7 @@ import { LocationMap, MapPin, MapTrail } from './location-map';
   selector: 'app-my-locations',
   standalone: true,
   imports: [
-    CommonModule, RouterLink, MatButtonModule, MatIconModule, MatTooltipModule, MatProgressBarModule,
+    CommonModule, MatButtonModule, MatIconModule, MatTooltipModule, MatProgressBarModule,
     MatSlideToggleModule, MatSnackBarModule, LocationMap,
   ],
   templateUrl: './my-locations.html',
