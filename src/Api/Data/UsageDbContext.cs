@@ -23,6 +23,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<IngestKey> IngestKeys => Set<IngestKey>();
     public DbSet<SavedView> SavedViews => Set<SavedView>();
     public DbSet<MachineInfo> MachineInfos => Set<MachineInfo>();
+    public DbSet<UserLocation> UserLocations => Set<UserLocation>();
     public DbSet<ChatChannel> ChatChannels => Set<ChatChannel>();
     public DbSet<ChatChannelMember> ChatChannelMembers => Set<ChatChannelMember>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
@@ -155,6 +156,9 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.HomeRoute).HasMaxLength(64);
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
             e.Property(x => x.LastLoginUtc).HasColumnType("timestamp with time zone");
+            // Location opt-in + sharing are OFF by default (privacy: capture is opt-in, sharing separate).
+            e.Property(x => x.LocationEnabled).HasDefaultValue(false);
+            e.Property(x => x.LocationShareHousehold).HasDefaultValue(false);
             e.HasIndex(x => x.Email).IsUnique();
             // One Google account maps to at most one user row (nulls allowed for not-yet-logged-in users).
             e.HasIndex(x => x.GoogleSubject).IsUnique().HasFilter("\"GoogleSubject\" IS NOT NULL");
@@ -264,8 +268,26 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.ReporterVersion).HasMaxLength(64);
             e.Property(x => x.FirstSeenUtc).HasColumnType("timestamp with time zone");
             e.Property(x => x.LastSeenUtc).HasColumnType("timestamp with time zone");
+            // IP-geo of PublicIp (coarse): city/region/country + lat/lng, resolved best-effort & cached.
+            e.Property(x => x.City).HasMaxLength(120);
+            e.Property(x => x.Region).HasMaxLength(120);
+            e.Property(x => x.Country).HasMaxLength(120);
+            e.Property(x => x.GeoUpdatedUtc).HasColumnType("timestamp with time zone");
             // One metadata row per machine name; the upsert keys on this unique index.
             e.HasIndex(x => x.Name).IsUnique();
+        });
+
+        b.Entity<UserLocation>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Source).HasMaxLength(16).HasDefaultValue("manual");
+            e.Property(x => x.City).HasMaxLength(120);
+            e.Property(x => x.Region).HasMaxLength(120);
+            e.Property(x => x.Country).HasMaxLength(120);
+            e.Property(x => x.CapturedUtc).HasColumnType("timestamp with time zone");
+            // The own-history read filters by UserEmail and pages newest-first; this composite serves it
+            // directly, and its UserEmail prefix also covers the admin "latest per user" scan.
+            e.HasIndex(x => new { x.UserEmail, x.CapturedUtc }).IsDescending(false, true);
         });
 
         b.Entity<SavedView>(e =>

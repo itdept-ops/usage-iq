@@ -130,6 +130,26 @@ builder.Services.AddScoped<WeatherService>();
 builder.Services.AddScoped<FamilyTodayService>();
 builder.Services.AddScoped<FamilyBriefingService>();
 
+// Location (GPS): two free, keyless geocoders, both with FIXED hosts (no SSRF), cached (IMemoryCache),
+// rate-limited, and graceful-null so they NEVER throw into the request/ingest path.
+//   - ip-api.com  (IP -> coarse geo, ~45/min)        : gives desktops a "fleet location" via their PublicIp.
+//   - Nominatim/OSM (lat/lng -> city, 1 req/s + UA)  : attaches a coarse city to a recorded GPS fix.
+builder.Services.AddHttpClient(IpGeoService.HttpClientName, c =>
+{
+    c.BaseAddress = new Uri("http://ip-api.com");
+    c.Timeout = TimeSpan.FromSeconds(8);
+});
+builder.Services.AddScoped<IpGeoService>();
+builder.Services.AddHttpClient(ReverseGeocodeService.HttpClientName, c =>
+{
+    c.BaseAddress = new Uri("https://nominatim.openstreetmap.org");
+    c.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddScoped<ReverseGeocodeService>();
+// Background pass that fills in IP-geo (city/lat/lng) for MachineInfo rows whose PublicIp hasn't been
+// resolved yet (or is stale) — keeps the fleet map populated without blocking the ingest hot path.
+builder.Services.AddHostedService<MachineGeoBackfillService>();
+
 // Family Hub F6: Google Calendar via the OAuth 2.0 authorization-CODE flow (offline access) — a separate
 // concern from Google sign-in. The OAuth CLIENT SECRET (Google:ClientSecret, blank in dev → calendar is
 // "not configured") and the per-user REFRESH TOKEN are secrets that never appear in any response/log; the
@@ -447,6 +467,7 @@ app.MapAuthEndpoints();
 app.MapUsersEndpoints();
 app.MapApiEndpoints();
 app.MapPresenceEndpoints();
+app.MapLocationEndpoints();
 app.MapSavedViewsEndpoints();
 app.MapObservabilityEndpoints();
 app.MapNotificationsEndpoints();

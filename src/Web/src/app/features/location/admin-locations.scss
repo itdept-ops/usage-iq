@@ -1,0 +1,172 @@
+:host {
+  display: block;
+  padding: var(--tech-space-4, 16px);
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tech-space-3, 12px);
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--tech-space-4, 16px);
+
+  .head-eyebrow { display: block; color: var(--tech-text-accent); margin-bottom: 6px; }
+  h2 {
+    margin: 0 0 var(--tech-space-1, 4px);
+    font-size: clamp(20px, 5vw, var(--tech-fs-display, 26px));
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--tech-text);
+  }
+  .sub {
+    margin: 0;
+    max-width: 640px;
+    font-size: var(--tech-fs-body, 13px);
+    color: var(--tech-text-secondary);
+    line-height: 1.5;
+  }
+  .head-actions mat-icon { margin-right: 4px; }
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--tech-space-3, 12px);
+
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.map-card {
+  padding: var(--tech-space-2, 8px);
+  border-radius: var(--tech-r-panel, 14px);
+
+  app-location-map { display: block; height: 540px; }
+
+  .osm-note {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: var(--tech-space-2, 8px) var(--tech-space-1, 4px) 0;
+    font-size: var(--tech-fs-micro, 10.5px);
+    color: var(--tech-text-tertiary);
+
+    a { color: var(--tech-text-accent); }
+    mat-icon { width: 13px; height: 13px; font-size: 13px; line-height: 13px; }
+  }
+}
+
+.side {
+  padding: var(--tech-space-3, 12px);
+  border-radius: var(--tech-r-panel, 14px);
+  max-height: 560px;
+  overflow-y: auto;
+
+  .side-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: var(--tech-space-2, 8px);
+
+    .panel-header { margin: 0; }
+  }
+}
+
+.roster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li { margin: 0; }
+}
+
+.roster-item {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2, 8px);
+  width: 100%;
+  padding: var(--tech-space-2, 8px);
+  border: 1px solid transparent;
+  border-radius: var(--tech-r-control, 10px);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--tech-text);
+  transition: background 120ms var(--tech-ease, ease);
+
+  &:hover { background: var(--tech-bg-sunken, rgba(255, 255, 255, 0.04)); }
+  &.selected {
+    background: color-mix(in srgb, var(--tech-accent, #5b8def) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-accent, #5b8def) 38%, transparent);
+  }
+
+  .roster-icon { color: var(--tech-accent, #5b8def); flex: 0 0 auto; }
+
+  .roster-id {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .roster-name {
+    font-size: var(--tech-fs-body, 13px);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .roster-place {
+    font-size: var(--tech-fs-label, 11px);
+    color: var(--tech-text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .roster-when {
+    flex: 0 0 auto;
+    font-family: var(--tech-font-mono);
+    font-size: var(--tech-fs-micro, 10.5px);
+    color: var(--tech-text-tertiary);
+  }
+}
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  .hist-item {
+    display: flex;
+    gap: var(--tech-space-2, 8px);
+    padding: var(--tech-space-2, 8px) 0;
+    border-bottom: 1px solid var(--tech-border-subtle, rgba(255, 255, 255, 0.06));
+
+    &:last-child { border-bottom: none; }
+  }
+  .hist-dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: var(--tech-accent, #5b8def);
+  }
+  .hist-place { font-size: var(--tech-fs-body, 13px); color: var(--tech-text); }
+  .hist-when {
+    font-family: var(--tech-font-mono);
+    font-size: var(--tech-fs-label, 11px);
+    color: var(--tech-text-tertiary);
+    margin-top: 1px;
+  }
+}
+
+.empty {
+  padding: var(--tech-space-4, 16px);
+  text-align: center;
+  font-size: var(--tech-fs-body, 13px);
+  color: var(--tech-text-tertiary);
+}

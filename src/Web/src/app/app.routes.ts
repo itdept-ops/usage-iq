@@ -167,10 +167,25 @@ export const routes: Routes = [
     ],
   },
   {
+    // My locations — the caller's OWN history map (PRIVATE to them). Capture is opt-in (Settings).
+    path: 'locations',
+    canActivate: [permissionGuard(PERM.locationSelf)],
+    loadComponent: () => import('./features/location/my-locations').then(m => m.MyLocations),
+    title: 'Usage IQ · My locations',
+  },
+  {
     path: 'users',
     canActivate: [permissionGuard(PERM.usersView)],
     loadComponent: () => import('./features/users/users').then(m => m.Users),
     title: 'Usage IQ · Users',
+  },
+  {
+    // Admin Locations map — admin oversight of everyone's location (gated location.view-all). In the
+    // Admin nav group; also linked from the user detail row (?user=<id> preselects that user's history).
+    path: 'admin/locations',
+    canActivate: [permissionGuard(PERM.locationViewAll)],
+    loadComponent: () => import('./features/location/admin-locations').then(m => m.AdminLocations),
+    title: 'Usage IQ · Locations',
   },
   {
     path: 'activity',

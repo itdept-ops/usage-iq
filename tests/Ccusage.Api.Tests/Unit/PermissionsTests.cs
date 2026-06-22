@@ -6,7 +6,7 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 36 keys.
+    // The full catalog of 37 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
@@ -19,7 +19,7 @@ public class PermissionsTests
         "tracker.self", "tracker.viewall",
         "shares.view", "shares.manage",
         "family.use", "family.finance",
-        "location.self", "location.share",
+        "location.self", "location.share", "location.view-all",
         "users.view", "users.manage", "activity.view",
         "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision",
     };
@@ -52,6 +52,7 @@ public class PermissionsTests
     [InlineData("family.finance")]
     [InlineData("location.self")]
     [InlineData("location.share")]
+    [InlineData("location.view-all")]
     [InlineData("users.view")]
     [InlineData("users.manage")]
     [InlineData("activity.view")]
@@ -106,6 +107,7 @@ public class PermissionsTests
         Permissions.FamilyFinance.Should().Be("family.finance");
         Permissions.LocationSelf.Should().Be("location.self");
         Permissions.LocationShare.Should().Be("location.share");
+        Permissions.LocationViewAll.Should().Be("location.view-all");
         Permissions.UsersView.Should().Be("users.view");
         Permissions.UsersManage.Should().Be("users.manage");
         Permissions.ActivityView.Should().Be("activity.view");
@@ -118,9 +120,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_thirty_six_known_keys()
+    public void All_contains_exactly_the_thirty_seven_known_keys()
     {
-        Permissions.All.Should().HaveCount(36);
+        Permissions.All.Should().HaveCount(37);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -131,9 +133,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_thirty_six_entries()
+    public void Catalog_has_thirty_seven_entries()
     {
-        Permissions.Catalog.Should().HaveCount(36);
+        Permissions.Catalog.Should().HaveCount(37);
     }
 
     [Fact]
@@ -233,6 +235,7 @@ public class PermissionsTests
         // never inherited by every new account.
         Permissions.IsDefaultable(Permissions.LocationSelf).Should().BeFalse();
         Permissions.IsDefaultable(Permissions.LocationShare).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.LocationViewAll).Should().BeFalse();
     }
 
     [Fact]

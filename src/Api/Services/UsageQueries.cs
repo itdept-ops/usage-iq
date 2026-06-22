@@ -449,6 +449,11 @@ public sealed class UsageQueries(UsageDbContext db)
                 CpuCount = meta?.CpuCount,
                 FirstSeenUtc = meta?.FirstSeenUtc,
                 MetadataLastSeenUtc = meta?.LastSeenUtc,
+                City = meta?.City,
+                Region = meta?.Region,
+                Country = meta?.Country,
+                Lat = meta?.Lat,
+                Lng = meta?.Lng,
             };
         }).OrderByDescending(m => m.CostUsd).ToList();
 

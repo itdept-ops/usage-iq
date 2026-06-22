@@ -15,6 +15,7 @@ import { QuickAddDialog } from './features/family/quick-add-dialog';
 import { Api } from './core/api';
 import { AuthService } from './core/auth';
 import { ChatRealtime } from './core/chat-realtime';
+import { LocationCapture } from './core/location-capture';
 import { Presence, SyncStatus, PERM, QuickAddResult } from './core/models';
 import { timeAgo, humanizeInterval } from './shared/format';
 import { NotificationBell } from './features/notifications/notification-bell';
@@ -56,6 +57,7 @@ export class App {
   private router = inject(Router);
   readonly auth = inject(AuthService);
   private chat = inject(ChatRealtime);
+  private locationCapture = inject(LocationCapture);
   private snack = inject(MatSnackBar);
   private dialog = inject(MatDialog);
 
@@ -123,6 +125,8 @@ export class App {
     '/chat': 'chat.read',
     '/tracker': 'tracker.self',
     '/family': 'family.use',
+    '/locations': 'location.self',
+    '/admin/locations': 'location.view-all',
     '/users': 'users.view',
     '/activity': 'activity.view',
   };
@@ -207,6 +211,7 @@ export class App {
   /** Account-menu shortcuts, filtered to the pages the current session is allowed to view. */
   private static readonly quickLinkDefs: readonly QuickLink[] = [
     { route: '/', label: 'Dashboard', icon: 'dashboard', perm: PERM.dashboardView },
+    { route: '/locations', label: 'My locations', icon: 'place', perm: PERM.locationSelf },
     { route: '/settings', label: 'Settings', icon: 'tune', perm: PERM.settingsView },
     { route: '/users', label: 'Users', icon: 'group', perm: PERM.usersView },
   ];
@@ -229,6 +234,7 @@ export class App {
     { route: '/tracker', label: 'Tracker', perms: [PERM.trackerSelf] },
     { route: '/family', label: 'Family', perms: [PERM.familyUse] },
     { route: '/chat', label: 'Chat', perms: [PERM.chatRead] },
+    { route: '/locations', label: 'My locations', perms: [PERM.locationSelf] },
     { route: '/users', label: 'Users', perms: [PERM.usersView] },
     { route: '/activity', label: 'Activity', perms: [PERM.activityView] },
     { route: '/settings', label: 'Settings', perms: [PERM.settingsView] },
@@ -300,6 +306,19 @@ export class App {
         void this.chat.start();
       } else {
         void this.chat.stop();
+      }
+    });
+
+    // Location capture lifecycle (PRIVACY: opt-in + permission-gated). Symmetric with the chat effect so
+    // teardown tracks the gating signals: start the capture lifecycle when signed in AND holding
+    // location.self (start() itself no-ops unless the user has ALSO enabled capture in settings, and never
+    // touches the browser otherwise); stop it on sign-out or a live location.self revocation. start() is
+    // idempotent, so the periodic poll re-entrancy is harmless.
+    effect(() => {
+      if (this.auth.isAuthenticated() && this.auth.hasPermission(PERM.locationSelf)) {
+        void this.locationCapture.start();
+      } else {
+        this.locationCapture.stop();
       }
     });
 

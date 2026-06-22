@@ -5,7 +5,7 @@ import {
   AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatMessageDto, ChatRepliesResult, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
   FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate,
-  HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
+  HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, PermissionPreset, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
   SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
@@ -238,6 +238,50 @@ export class Api {
   /** Teammates active within the last ~2 minutes (includes the caller). Requires any signed-in user. */
   presence(): Observable<Presence[]> {
     return this.http.get<Presence[]>(`${this.base}/presence`);
+  }
+
+  // ---- Location / GPS (PRIVATE by default; capture is OPT-IN) -------------------------------------
+  // Every method maps 1:1 to /api/location/*. The settings PATCH gates capture; nothing is ever recorded
+  // (recordLocation 409s) until the caller has enabled location. All require location.self except
+  // adminLocations, which requires location.view-all (enforced server-side too).
+
+  /** The caller's current opt-in settings (capture on/off + share-to-household). Requires location.self. */
+  locationSettings(): Observable<LocationSettings> {
+    return this.http.get<LocationSettings>(`${this.base}/location/settings`);
+  }
+
+  /** Flip one or both opt-in toggles (omit a field to leave it unchanged). Returns the saved settings. */
+  patchLocationSettings(body: LocationSettingsUpdate): Observable<LocationSettings> {
+    return this.http.patch<LocationSettings>(`${this.base}/location/settings`, body);
+  }
+
+  /**
+   * Record one location fix for the caller. The server 409s unless the caller has enabled location
+   * (the opt-in gate) — callers should only invoke this after a successful settings enable. Returns the
+   * stored fix (with best-effort reverse-geocoded city).
+   */
+  recordLocation(body: RecordLocationRequest): Observable<LocationFix> {
+    return this.http.post<LocationFix>(`${this.base}/location`, body);
+  }
+
+  /** The caller's OWN location history, newest-first (self-scoped; capped server-side). */
+  myLocations(limit = 100): Observable<LocationFix[]> {
+    return this.http.get<LocationFix[]>(`${this.base}/location/me`, {
+      params: new HttpParams().set('limit', limit),
+    });
+  }
+
+  /** Permanently clear the caller's OWN location history (privacy). Returns the deleted count. */
+  clearMyLocations(): Observable<{ deleted: number }> {
+    return this.http.delete<{ deleted: number }>(`${this.base}/location/me`);
+  }
+
+  /**
+   * Admin oversight: every user's latest pin + a short recent trail, for the admin Locations map.
+   * Identity is userId+name (no email). Requires location.view-all (enforced server-side too).
+   */
+  adminLocations(): Observable<AdminUserLocation[]> {
+    return this.http.get<AdminUserLocation[]>(`${this.base}/location/admin`);
   }
 
   // ---- User management (requires users.manage) ----

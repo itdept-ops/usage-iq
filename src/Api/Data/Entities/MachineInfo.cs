@@ -42,4 +42,17 @@ public class MachineInfo
 
     public DateTime FirstSeenUtc { get; set; }
     public DateTime LastSeenUtc { get; set; }
+
+    // ---- IP-geolocation of the server-observed PublicIp (desktops have no GPS, so a machine's "location"
+    // is the coarse city/lat-lng of its public IP). Resolved best-effort from PublicIp via ip-api.com and
+    // cached; all null until a successful lookup. GeoUpdatedUtc gates re-resolution (stale or never-done).
+    /// <summary>Coarse city for <see cref="PublicIp"/> (IP-geo; null until resolved or on failure).</summary>
+    public string? City { get; set; }
+    public string? Region { get; set; }
+    public string? Country { get; set; }
+    public double? Lat { get; set; }
+    public double? Lng { get; set; }
+
+    /// <summary>When the IP-geo for the current <see cref="PublicIp"/> was last resolved; null when never done.</summary>
+    public DateTime? GeoUpdatedUtc { get; set; }
 }

@@ -509,6 +509,16 @@
         <span class="ai-off micro-label">AI is off for this user.</span>
       }
     </div>
+
+    <!-- Admin oversight: jump to this user's location history (only for admins holding location.view-all;
+         deep-links the admin Locations map preselected to this user). -->
+    @if (auth.hasPermission(PERM.locationViewAll)) {
+      <a class="locations-link" mat-stroked-button
+         [routerLink]="['/admin/locations']" [queryParams]="{ user: u.id }"
+         matTooltip="View this user's location history on the admin map">
+        <mat-icon aria-hidden="true">map</mat-icon> View locations
+      </a>
+    }
   </div>
 
   <!-- Sign-in history -->

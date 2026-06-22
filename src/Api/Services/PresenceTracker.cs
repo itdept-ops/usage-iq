@@ -15,21 +15,45 @@ public sealed class PresenceTracker
     /// crashed tab (and a signed-out/force-logged-out user, who is also removed explicitly) fast.</summary>
     public static readonly TimeSpan DefaultWindow = TimeSpan.FromSeconds(45);
 
-    public sealed record Entry(string Email, string Name, string? Picture, DateTime LastSeenUtc);
+    public sealed record Entry(string Email, string Name, string? Picture, DateTime LastSeenUtc, string? City = null);
 
     // Keyed by lowercased email so re-touches from the same user collapse onto one entry.
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Record that <paramref name="email"/> is active right now, refreshing their last-seen time
-    /// (and any changed name/picture). No-op for a blank email.
+    /// (and any changed name/picture). No-op for a blank email. A heartbeat does NOT clear a previously
+    /// recorded city — the latest known city is sticky across plain Touches (it changes only via
+    /// <see cref="SetCity"/> when a fresh location fix arrives).
     /// </summary>
     public void Touch(string? email, string? name, string? picture)
     {
         var key = email?.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(key)) return;
 
-        var entry = new Entry(key, name?.Trim() ?? "", string.IsNullOrWhiteSpace(picture) ? null : picture, DateTime.UtcNow);
+        // Preserve any city already recorded for this user (the heartbeat path carries no city).
+        var city = _entries.TryGetValue(key, out var prev) ? prev.City : null;
+        var entry = new Entry(key, name?.Trim() ?? "", string.IsNullOrWhiteSpace(picture) ? null : picture, DateTime.UtcNow, city);
+        _entries[key] = entry;
+    }
+
+    /// <summary>
+    /// Attach/refresh the latest coarse city for <paramref name="email"/> (set when they record a location
+    /// fix), also refreshing last-seen. No-op for a blank email. The city is ephemeral like the rest of
+    /// presence — it resets on restart.
+    /// </summary>
+    public void SetCity(string? email, string? city, string? name = null, string? picture = null)
+    {
+        var key = email?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(key)) return;
+
+        _entries.TryGetValue(key, out var prev);
+        var entry = new Entry(
+            key,
+            string.IsNullOrWhiteSpace(name) ? prev?.Name ?? "" : name.Trim(),
+            string.IsNullOrWhiteSpace(picture) ? prev?.Picture : picture,
+            DateTime.UtcNow,
+            string.IsNullOrWhiteSpace(city) ? null : city.Trim());
         _entries[key] = entry;
     }
 

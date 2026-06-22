@@ -223,6 +223,13 @@ public sealed class FleetMachineDto
     public DateTime? FirstSeenUtc { get; set; }
     /// <summary>When metadata was last reported (distinct from <see cref="LastSeenUtc"/>, the last usage row).</summary>
     public DateTime? MetadataLastSeenUtc { get; set; }
+
+    // Coarse IP-geolocation of PublicIp (a desktop's "fleet location"; resolved off-path, may be null).
+    public string? City { get; set; }
+    public string? Region { get; set; }
+    public string? Country { get; set; }
+    public double? Lat { get; set; }
+    public double? Lng { get; set; }
 }
 
 /// <summary>One reporting user in the fleet view: spend/volume plus the machines they reported from.
@@ -512,6 +519,9 @@ public sealed class PresenceDto
     /// <summary>True for the row whose email matches the caller's (server-resolved; the email itself is
     /// never put in the response).</summary>
     public bool IsSelf { get; set; }
+    /// <summary>The user's latest COARSE city, shown ONLY to themselves and (when they share-to-household)
+    /// to fellow household members. Null otherwise — precise location is never exposed via presence.</summary>
+    public string? City { get; set; }
 }
 
 public sealed class UserDto

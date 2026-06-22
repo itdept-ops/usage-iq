@@ -1,0 +1,100 @@
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+<!-- ───────────────────────── Header ───────────────────────── -->
+<div class="head">
+  <div class="head-text">
+    <span class="micro-label head-eyebrow">~/location — your own history, private to you</span>
+    <h2>My locations</h2>
+    <p class="sub">A map of the places you've recorded, newest first. Only you can see this. Capture is
+      opt-in — turn it on below.</p>
+  </div>
+  <div class="head-actions">
+    <button mat-stroked-button (click)="shareNow()" [disabled]="capture.capturing()"
+            matTooltip="Record where you are right now (one-shot)">
+      <mat-icon>my_location</mat-icon> Share current location
+    </button>
+    <button mat-stroked-button class="danger" (click)="clearHistory()" [disabled]="!history().length"
+            matTooltip="Permanently delete your recorded locations">
+      <mat-icon>delete_sweep</mat-icon> Clear my history
+    </button>
+  </div>
+</div>
+
+<!-- ───────────────────────── Opt-in settings ───────────────────────── -->
+<!-- The Location consent controls live here (a page every location.self holder can reach), NOT the
+     admin-only Settings page. PRIVACY: capture is OFF by default; toggling it ON is the explicit gesture
+     that prompts the browser for the Geolocation permission. -->
+<section class="optin-card glass" aria-label="Location preferences">
+  <div class="optin-row">
+    <div class="optin-text">
+      <span class="optin-title">Enable location</span>
+      <span class="optin-desc">When on, your location is recorded on sign-in and occasionally while a tab
+        is open. Your browser will ask for permission. Off by default — nothing is recorded until you opt in.</span>
+    </div>
+    <mat-slide-toggle [checked]="settings()?.locationEnabled ?? false"
+                      [disabled]="savingSettings()"
+                      (change)="toggleEnabled($event.checked)"
+                      aria-label="Enable location capture"></mat-slide-toggle>
+  </div>
+
+  <div class="optin-row" [class.optin-row--muted]="!settings()?.locationEnabled">
+    <div class="optin-text">
+      <span class="optin-title">Share with my household</span>
+      <span class="optin-desc">Let household members see your approximate city (only the city — never your
+        precise location) next to your name when you're online.</span>
+    </div>
+    <mat-slide-toggle [checked]="settings()?.shareHousehold ?? false"
+                      [disabled]="savingSettings() || !settings()?.locationEnabled"
+                      (change)="toggleShare($event.checked)"
+                      aria-label="Share approximate city with household"></mat-slide-toggle>
+  </div>
+</section>
+
+@if (settings() && !settings()!.locationEnabled) {
+  <div class="hint glass" role="status">
+    <mat-icon aria-hidden="true">location_off</mat-icon>
+    <span>Location capture is off. Turn on “Enable location” below to start recording.</span>
+  </div>
+}
+@if (capture.permissionDenied()) {
+  <div class="hint glass hint--warn" role="status">
+    <mat-icon aria-hidden="true">gpp_bad</mat-icon>
+    <span>Your browser denied the location permission. Allow it in the site settings, then try again.</span>
+  </div>
+}
+
+<!-- ───────────────────────── Map ───────────────────────── -->
+<section class="map-card glass" aria-label="Your location map">
+  <app-location-map [pins]="pins()" [trails]="trails()" />
+  <div class="osm-note">
+    <mat-icon aria-hidden="true">public</mat-icon>
+    <span>Powered by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.
+      <!-- NOTE: maps run on free Leaflet + OSM tiles (no API key). A swap to Google Maps is a possible
+           future upgrade and would touch only the shared leaflet-loader + the map component. --></span>
+  </div>
+</section>
+
+<!-- ───────────────────────── Timeline ───────────────────────── -->
+<section class="timeline-card glass" aria-label="Location timeline">
+  <h3 class="panel-header">Timeline</h3>
+  @if (history().length) {
+    <ol class="timeline">
+      @for (f of history(); track f.id) {
+        <li class="tl-item">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <div class="tl-body">
+            <div class="tl-place">{{ placeLabel(f) }}</div>
+            <div class="tl-meta">
+              <span class="tl-when">{{ timeAgo(f.capturedUtc, now()) }}</span>
+              <span class="tl-source">{{ sourceLabel(f.source) }}</span>
+            </div>
+          </div>
+        </li>
+      }
+    </ol>
+  } @else if (!loading()) {
+    <div class="empty">No locations recorded yet. Use “Share current location” above, or enable capture.</div>
+  }
+</section>

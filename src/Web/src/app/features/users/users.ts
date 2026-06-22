@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
@@ -111,7 +112,7 @@ type FilterMode = 'all' | 'perm' | 'preset';
 @Component({
   selector: 'app-users',
   imports: [
-    CommonModule, FormsModule, MatCardModule, MatFormFieldModule, MatInputModule, MatButtonModule,
+    CommonModule, RouterLink, FormsModule, MatCardModule, MatFormFieldModule, MatInputModule, MatButtonModule,
     MatIconModule, MatCheckboxModule, MatSlideToggleModule, MatProgressBarModule, MatProgressSpinnerModule,
     MatTooltipModule, MatMenuModule, MatSelectModule, MatSnackBarModule, MatDialogModule,
   ],

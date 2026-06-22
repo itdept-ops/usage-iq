@@ -46,6 +46,7 @@ export class AuthService {
     '/chat': [PERM.chatRead],
     '/tracker': [PERM.trackerSelf],
     '/family': [PERM.familyUse],
+    '/locations': [PERM.locationSelf],
     '/users': [PERM.usersView],
     '/activity': [PERM.activityView],
   };
@@ -71,7 +72,7 @@ export class AuthService {
     // in lock-step with homePerms + the nav grouping (every route is represented — no dead landings).
     const order = [
       '/', '/calendar', '/pricing', '/reporter', '/fleet',
-      '/tracker', '/family', '/chat',
+      '/tracker', '/family', '/chat', '/locations',
       '/users', '/activity', '/settings',
     ];
     for (const route of order) {

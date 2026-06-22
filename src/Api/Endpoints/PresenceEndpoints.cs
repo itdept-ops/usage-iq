@@ -20,18 +20,40 @@ public static class PresenceEndpoints
                 var online = presence.Online(PresenceTracker.DefaultWindow);
                 var callerEmail = caller.FindFirstValue("email")?.Trim().ToLowerInvariant();
 
-                // One DB round-trip: resolve the online emails to {Id, Name, Picture} public identity.
+                // One DB round-trip: resolve the online emails to public identity + the location-share flag.
                 var emails = online.Select(e => e.Email).ToArray();
                 var users = await db.Users.AsNoTracking()
                     .Where(u => emails.Contains(u.Email))
-                    .Select(u => new { u.Id, u.Email, u.Name, u.Picture })
+                    .Select(u => new { u.Id, u.Email, u.Name, u.Picture, u.LocationShareHousehold })
                     .ToListAsync(ct);
                 var byEmail = users.ToDictionary(u => u.Email, StringComparer.OrdinalIgnoreCase);
+
+                // Coarse-city visibility (privacy): a user's latest city is shown to THEMSELVES always, and
+                // to fellow household members only when that user shares-to-household. Resolve the caller's
+                // household once, then the set of user ids in it, so we can gate each online user's city.
+                var callerUserId = callerEmail is not null && byEmail.TryGetValue(callerEmail, out var self)
+                    ? (int?)self.Id : null;
+                var callerHouseholdId = callerUserId is int cid
+                    ? await db.HouseholdMembers.AsNoTracking()
+                        .Where(m => m.UserId == cid).Select(m => (int?)m.HouseholdId).FirstOrDefaultAsync(ct)
+                    : null;
+                var householdUserIds = callerHouseholdId is int hid
+                    ? (await db.HouseholdMembers.AsNoTracking()
+                        .Where(m => m.HouseholdId == hid).Select(m => m.UserId).ToListAsync(ct)).ToHashSet()
+                    : new HashSet<int>();
 
                 var result = online
                     .Select(e =>
                     {
                         byEmail.TryGetValue(e.Email, out var u);
+                        var isSelf = callerEmail is not null
+                                     && string.Equals(e.Email, callerEmail, StringComparison.OrdinalIgnoreCase);
+
+                        // Show the city to self always; to others only when the user shares-to-household AND
+                        // is a member of the caller's household. Otherwise the city is suppressed.
+                        var cityVisible = isSelf
+                            || (u is not null && u.LocationShareHousehold && householdUserIds.Contains(u.Id));
+
                         return new PresenceDto
                         {
                             UserId = u?.Id,
@@ -42,8 +64,8 @@ public static class PresenceEndpoints
                             Name = string.IsNullOrWhiteSpace(u?.Name) ? ScrubName(e.Name) : u!.Name,
                             Picture = u?.Picture ?? e.Picture,
                             LastSeenUtc = e.LastSeenUtc,
-                            IsSelf = callerEmail is not null
-                                     && string.Equals(e.Email, callerEmail, StringComparison.OrdinalIgnoreCase),
+                            IsSelf = isSelf,
+                            City = cityVisible ? e.City : null,
                         };
                     })
                     .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)

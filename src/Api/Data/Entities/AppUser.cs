@@ -39,6 +39,19 @@ public class AppUser
     /// </summary>
     public int SessionVersion { get; set; }
 
+    /// <summary>
+    /// Per-user OPT-IN for location capture. False by default: even with the <c>location.self</c>
+    /// permission, no location is recorded until the user flips this on (PATCH /api/location/settings).
+    /// The record endpoint REQUIRES this be true (else 409 "enable location first").
+    /// </summary>
+    public bool LocationEnabled { get; set; }
+
+    /// <summary>
+    /// When true, the user's COARSE latest city (never precise lat/lng) is visible to their household
+    /// members. False by default — sharing is an explicit, separate choice from enabling capture.
+    /// </summary>
+    public bool LocationShareHousehold { get; set; }
+
     public DateTime CreatedUtc { get; set; }
     public DateTime? LastLoginUtc { get; set; }
 

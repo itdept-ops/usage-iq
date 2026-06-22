@@ -516,6 +516,11 @@ $ai: var(--tech-accent-secondary, #b07cff);
 }
 .ai-off { color: var(--tech-text-tertiary); font-style: italic; }
 
+.locations-link {
+  margin-top: 12px;
+  mat-icon { margin-right: 4px; }
+}
+
 .logins-state {
   padding: 6px 0;
   --mat-progress-bar-active-indicator-color: var(--tech-accent);

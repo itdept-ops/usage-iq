@@ -358,6 +358,76 @@ export interface Presence {
   lastSeenUtc: string;
   /** True for the caller's own row (server-resolved; the email itself is never in the response). */
   isSelf: boolean;
+  /**
+   * The user's latest COARSE city, surfaced ONLY to themselves and (when they share-to-household) to
+   * fellow household members; null otherwise. Precise location is never exposed via presence — this is
+   * a city name at most. Populated only after a location fix is recorded; absent on older sessions.
+   */
+  city?: string | null;
+}
+
+// ---- Location / GPS (privacy-sensitive: PRIVATE by default, capture is OPT-IN) ----------------------
+// Mirrors the API's LocationDtos.cs. The precise lat/lng is only ever returned to the SHARER (their own
+// history, GET /api/location/me) or to an admin holding location.view-all (GET /api/location/admin);
+// household sharing surfaces only the coarse city via presence (see Presence.city above).
+
+/** How a location fix was captured. Unknown values normalize to "manual" server-side. */
+export type LocationSource = 'login' | 'periodic' | 'manual' | 'agent';
+
+/**
+ * One recorded location fix returned to its OWNER (own history) or to an admin. Carries the precise
+ * lat/lng — exposed only to the sharer themselves or an admin with location.view-all. Mirrors LocationDto.
+ */
+export interface LocationFix {
+  id: number;
+  lat: number;
+  lng: number;
+  /** Reported GPS accuracy radius in metres, when the browser supplied one. */
+  accuracyM?: number | null;
+  source: LocationSource | string;
+  /** Best-effort reverse-geocoded place (may be null when geocoding was unavailable). */
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+  /** ISO-8601 UTC timestamp of when the fix was recorded. */
+  capturedUtc: string;
+}
+
+/** Body of POST /api/location — the client's own browser-resolved coordinates for one fix. */
+export interface RecordLocationRequest {
+  lat: number;
+  lng: number;
+  accuracyM?: number | null;
+  /** login | periodic | manual | agent. Unknown values normalize to "manual" server-side. */
+  source?: LocationSource;
+}
+
+/** The caller's current location opt-in settings (GET/PATCH /api/location/settings). */
+export interface LocationSettings {
+  /** Opt in / out of capture. Turning it off does NOT delete history (use DELETE /api/location/me). */
+  locationEnabled: boolean;
+  /** Share the coarse latest city with household members (surfaced via presence). */
+  shareHousehold: boolean;
+}
+
+/** Body of PATCH /api/location/settings — each field optional (null/undefined = leave unchanged). */
+export interface LocationSettingsUpdate {
+  locationEnabled?: boolean;
+  shareHousehold?: boolean;
+}
+
+/**
+ * One user's entry on the admin location map (GET /api/location/admin). Identity is userId+name — the
+ * raw owner email is never put on the wire even on this admin-gated page (email-privacy preference).
+ * Precise coordinates are visible here only because the endpoint is admin-gated (location.view-all).
+ */
+export interface AdminUserLocation {
+  userId?: number | null;
+  name: string;
+  /** The most recent fix (the API omits users with no rows, so this is effectively always present). */
+  latest?: LocationFix | null;
+  /** A short window of recent fixes (newest-first) for drawing a trail on the map. */
+  recent: LocationFix[];
 }
 
 export interface AuthSession {
@@ -2865,9 +2935,10 @@ export const PERM = {
   trackerViewAll: 'tracker.viewall',
   familyUse: 'family.use',
   familyFinance: 'family.finance',
-  // ---- Location (GPS feature placeholders; never default) ----
+  // ---- Location (GPS feature; group "Location"; never default) ----
   locationSelf: 'location.self',
   locationShare: 'location.share',
+  locationViewAll: 'location.view-all',
   // ---- AI (group "AI"; token-spending; never default) ----
   trackerAi: 'tracker.ai',
   familyAi: 'family.ai',
@@ -2918,6 +2989,7 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   // ---- Location ----
   [PERM.locationSelf]: 'Location',
   [PERM.locationShare]: 'Location',
+  [PERM.locationViewAll]: 'Location',
   // ---- Admin ----
   [PERM.usersView]: 'Admin',
   [PERM.usersManage]: 'Admin',

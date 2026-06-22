@@ -55,9 +55,11 @@ public static class Permissions
     public const string FamilyUse = "family.use";
     public const string FamilyFinance = "family.finance";
 
-    // ---- Location (GPS feature placeholders; never default) ----
+    // ---- Location (GPS feature; never default) ----
     public const string LocationSelf = "location.self";
     public const string LocationShare = "location.share";
+    /// <summary>Admin oversight: view ALL users' location history + the live map. Admin-gated, never default.</summary>
+    public const string LocationViewAll = "location.view-all";
 
     // ---- AI (group "AI", IsAi=true; NONE are defaultable — every user starts AI-off) ----
     public const string TrackerAi = "tracker.ai";
@@ -78,8 +80,8 @@ public static class Permissions
         TrackerAi, FamilyAi, FamilyAiAssistant, FinanceAi, ChatAi, AiVision,
     };
 
-    /// <summary>The Location permission keys (GPS placeholders). NONE are defaultable.</summary>
-    public static readonly string[] LocationKeys = { LocationSelf, LocationShare };
+    /// <summary>The Location permission keys (GPS feature). NONE are defaultable.</summary>
+    public static readonly string[] LocationKeys = { LocationSelf, LocationShare, LocationViewAll };
 
     public static readonly IReadOnlyList<PermissionInfo> Catalog = new[]
     {
@@ -113,9 +115,10 @@ public static class Permissions
         new PermissionInfo(ChatModerate, "Chat", "Moderate chat", "Edit or delete other people’s messages, and archive or delete channels."),
         new PermissionInfo(ChatContactsManage, "Chat", "Manage contacts", "Add or remove the people in any user’s chat contacts (their circle)."),
 
-        // ---- Location (GPS feature placeholders; never default) ----
+        // ---- Location (GPS feature; never default) ----
         new PermissionInfo(LocationSelf, "Location", "Track own location", "Record and view your own location and location history."),
         new PermissionInfo(LocationShare, "Location", "Share location", "Share your live location with your household and contacts."),
+        new PermissionInfo(LocationViewAll, "Location", "View all locations", "Admin oversight: view every user’s location history and the live location map."),
 
         // ---- Administration ----
         new PermissionInfo(UsersView, "Admin", "View users", "View the user list, permission catalog, and audit log."),

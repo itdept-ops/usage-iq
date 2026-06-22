@@ -91,8 +91,8 @@
         <a mat-button class="nav__item" routerLink="/chat" routerLinkActive="active">Chat</a>
       }
 
-      <!-- Admin ▾ : Users, Activity, Settings -->
-      @if (auth.hasAnyPermission('users.view', 'activity.view', 'settings.view')) {
+      <!-- Admin ▾ : Users, Locations, Activity, Settings -->
+      @if (auth.hasAnyPermission('users.view', 'location.view-all', 'activity.view', 'settings.view')) {
         <button type="button" mat-button class="nav__item nav__group"
                 [matMenuTriggerFor]="adminMenu" #adminTrigger="matMenuTrigger"
                 [class.nav__group--open]="adminTrigger.menuOpen"
@@ -105,6 +105,12 @@
             <a mat-menu-item class="nav-menu__item" routerLink="/users" routerLinkActive="active">
               <mat-icon class="nav-menu__icon" aria-hidden="true">group</mat-icon>
               <span>Users</span>
+            </a>
+          }
+          @if (auth.hasPermission('location.view-all')) {
+            <a mat-menu-item class="nav-menu__item" routerLink="/admin/locations" routerLinkActive="active">
+              <mat-icon class="nav-menu__icon" aria-hidden="true">map</mat-icon>
+              <span>Locations</span>
             </a>
           }
           @if (auth.hasPermission('activity.view')) {
@@ -176,7 +182,14 @@
                   {{ u.name }}
                   @if (u.isYou) { <span class="pres-item__you">you</span> }
                 </div>
-                <div class="pres-item__seen">active {{ timeAgo(u.lastSeenUtc, now()) }}</div>
+                <div class="pres-item__seen">
+                  active {{ timeAgo(u.lastSeenUtc, now()) }}
+                  @if (u.city) {
+                    <span class="pres-item__city">
+                      <mat-icon class="pres-item__city-icon" aria-hidden="true">place</mat-icon>{{ u.city }}
+                    </span>
+                  }
+                </div>
               </div>
             </div>
           }
@@ -330,11 +343,15 @@
          (click)="closeMobileNav()">Chat</a>
     }
 
-    @if (auth.hasAnyPermission('users.view', 'activity.view', 'settings.view')) {
+    @if (auth.hasAnyPermission('users.view', 'location.view-all', 'activity.view', 'settings.view')) {
       <div class="mobile-nav__head" role="presentation">Admin</div>
       @if (auth.hasPermission('users.view')) {
         <a class="mobile-nav__item" routerLink="/users" routerLinkActive="active"
            (click)="closeMobileNav()">Users</a>
+      }
+      @if (auth.hasPermission('location.view-all')) {
+        <a class="mobile-nav__item" routerLink="/admin/locations" routerLinkActive="active"
+           (click)="closeMobileNav()">Locations</a>
       }
       @if (auth.hasPermission('activity.view')) {
         <a class="mobile-nav__item" routerLink="/activity" routerLinkActive="active"

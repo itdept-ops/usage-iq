@@ -1,0 +1,85 @@
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+<!-- ───────────────────────── Header ───────────────────────── -->
+<div class="head">
+  <div class="head-text">
+    <span class="micro-label head-eyebrow">~/admin/locations — oversight map (location.view-all)</span>
+    <h2>Locations</h2>
+    <p class="sub">Every user's most recent location. Select someone to trace their recent history. Fleet
+      machines appear as distinct pins based on the IP-geo of their public address.</p>
+  </div>
+  @if (selected()) {
+    <div class="head-actions">
+      <button mat-stroked-button (click)="clearSelection()">
+        <mat-icon>arrow_back</mat-icon> Show everyone
+      </button>
+    </div>
+  }
+</div>
+
+<div class="layout">
+  <!-- ───────────────────────── Map ───────────────────────── -->
+  <section class="map-card glass" aria-label="Locations map">
+    <app-location-map [pins]="pins()" [trails]="trails()" (pinClick)="onPinClick($event)" />
+    <div class="osm-note">
+      <mat-icon aria-hidden="true">public</mat-icon>
+      <span>Powered by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.
+        <!-- Free Leaflet + OSM tiles (no API key). Google Maps is a possible future swap. --></span>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Side list ───────────────────────── -->
+  <aside class="side glass" aria-label="Users">
+    @if (selected(); as sel) {
+      <!-- Selected user: their recent history -->
+      <div class="side-head">
+        <h3 class="panel-header">{{ sel.name }}</h3>
+        <span class="micro-label">recent history</span>
+      </div>
+      @if (sel.recent.length) {
+        <ol class="history">
+          @for (f of sel.recent; track f.id) {
+            <li class="hist-item">
+              <span class="hist-dot" aria-hidden="true"></span>
+              <div class="hist-body">
+                <div class="hist-place">{{ placeLabel(f) }}</div>
+                <div class="hist-when">{{ timeAgo(f.capturedUtc, now()) }}</div>
+              </div>
+            </li>
+          }
+        </ol>
+      } @else {
+        <div class="empty">No history for this user.</div>
+      }
+    } @else {
+      <!-- Roster: every user with a latest pin -->
+      <div class="side-head">
+        <h3 class="panel-header">People</h3>
+        <span class="micro-label">{{ users().length }}</span>
+      </div>
+      @if (users().length) {
+        <ul class="roster">
+          @for (u of users(); track u.userId ?? u.name) {
+            <li>
+              <button class="roster-item" (click)="select(u.userId)"
+                      [class.selected]="selectedId() === u.userId">
+                <mat-icon class="roster-icon" aria-hidden="true">person_pin_circle</mat-icon>
+                <span class="roster-id">
+                  <span class="roster-name">{{ u.name }}</span>
+                  <span class="roster-place">{{ placeLabel(u.latest) }}</span>
+                </span>
+                @if (u.latest) {
+                  <span class="roster-when">{{ timeAgo(u.latest.capturedUtc, now()) }}</span>
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      } @else if (!loading()) {
+        <div class="empty">No users have recorded a location yet.</div>
+      }
+    }
+  </aside>
+</div>
