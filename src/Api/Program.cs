@@ -46,6 +46,12 @@ builder.Services.AddScoped<CostRecomputeService>();
 builder.Services.AddScoped<UsageQueries>();
 builder.Services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
 builder.Services.AddSingleton<TokenProtector>();
+
+// Payments holds the OWNER's intentionally-PUBLIC pay-me handles (CashApp/PayPal/Venmo) shown by the Bill
+// Splitter to people who owe. A single global set for the deployment, not per-user. NOT secrets, but still
+// never committed with real values: appsettings.json ships placeholders; real values live in the git-ignored
+// appsettings.Local.json locally / Payments__CashApp etc. env (SSM) in prod. They are never logged.
+builder.Services.Configure<PaymentsOptions>(builder.Configuration.GetSection(PaymentsOptions.SectionName));
 builder.Services.AddScoped<GoogleAuthService>();
 builder.Services.AddScoped<CurrentUserAccessor>();
 builder.Services.AddScoped<CurrentHouseholdAccessor>();
@@ -475,6 +481,7 @@ app.MapSavedViewsEndpoints();
 app.MapObservabilityEndpoints();
 app.MapNotificationsEndpoints();
 app.MapShareEndpoints();
+app.MapBillEndpoints();
 app.MapIngestEndpoints();
 app.MapFleetEndpoints();
 app.MapChatEndpoints();

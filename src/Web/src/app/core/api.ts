@@ -19,6 +19,8 @@ import {
   IdentityImportResult,
   HardChallengeDto, HardSharedPersonDto, StartChallengeRequest, UpsertHardDayRequest, HardDayDto, CheatDaysRequest,
   HardTaskDto, CreateHardTaskRequest, UpdateHardTaskRequest, HardLeaderboardRowDto, HardCoachDto,
+  BillDto, BillItemRequest, BillShareToggleResult, CreateBillRequest, PaymentHandlesDto,
+  PublicBillDto, ReceiptBreakdownDto, UpdateBillRequest,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -122,6 +124,82 @@ export class Api {
   /** Anonymous read of a public share by token. */
   publicShare(token: string): Observable<PublicShare> {
     return this.http.get<PublicShare>(`${this.base}/share/${encodeURIComponent(token)}`);
+  }
+
+  // ---- Bill Splitter (owner CRUD gated bills.use; the public claim surface is anonymous below) ----
+
+  /** The owner's payment handles (single global config set) — also returned on each bill DTO. */
+  billPaymentHandles(): Observable<PaymentHandlesDto> {
+    return this.http.get<PaymentHandlesDto>(`${this.base}/bills/payment-handles`);
+  }
+
+  /** List the caller's own bills (newest first). */
+  bills(): Observable<BillDto[]> {
+    return this.http.get<BillDto[]>(`${this.base}/bills/`);
+  }
+
+  /** Read one of the caller's own bills. */
+  bill(id: number): Observable<BillDto> {
+    return this.http.get<BillDto>(`${this.base}/bills/${id}`);
+  }
+
+  createBill(body: CreateBillRequest): Observable<BillDto> {
+    return this.http.post<BillDto>(`${this.base}/bills/`, body);
+  }
+
+  updateBill(id: number, body: UpdateBillRequest): Observable<BillDto> {
+    return this.http.put<BillDto>(`${this.base}/bills/${id}`, body);
+  }
+
+  deleteBill(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/bills/${id}`);
+  }
+
+  addBillItem(id: number, body: BillItemRequest): Observable<{ id: number }> {
+    return this.http.post<{ id: number }>(`${this.base}/bills/${id}/items`, body);
+  }
+
+  updateBillItem(id: number, itemId: number, body: BillItemRequest): Observable<unknown> {
+    return this.http.put(`${this.base}/bills/${id}/items/${itemId}`, body);
+  }
+
+  deleteBillItem(id: number, itemId: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/bills/${id}/items/${itemId}`);
+  }
+
+  /** Assign an item to a CONTACT (a mutual ChatContact of the owner), or clear with null. */
+  assignBillItem(id: number, itemId: number, assignedToUserId: number | null): Observable<unknown> {
+    return this.http.post(`${this.base}/bills/${id}/items/${itemId}/assign`, { assignedToUserId });
+  }
+
+  /** Owner marks an item settled/unsettled. */
+  settleBillItem(id: number, itemId: number, settled: boolean): Observable<unknown> {
+    return this.http.post(`${this.base}/bills/${id}/items/${itemId}/settle`, { settled });
+  }
+
+  /**
+   * MULTIMODAL receipt breakdown (gated bills.use AND ai.vision). `imageBase64` is raw base64 (no `data:`
+   * prefix). Returns the items + tax/tip for the owner to review; nothing is saved. 503 when AI is off.
+   */
+  billReceipt(id: number, body: { imageBase64: string; mimeType: string }): Observable<ReceiptBreakdownDto> {
+    return this.http.post<ReceiptBreakdownDto>(`${this.base}/bills/${id}/receipt`, body);
+  }
+
+  /** Enable/disable the public claim link; enabling mints a token on first use. */
+  toggleBillShare(id: number, enabled: boolean): Observable<BillShareToggleResult> {
+    return this.http.post<BillShareToggleResult>(`${this.base}/bills/${id}/share`, { enabled });
+  }
+
+  // ---- Public, anonymous claim surface (mirrors /api/share/{token}) ----
+
+  /** Anonymous read of a public bill by token. */
+  publicBill(token: string): Observable<PublicBillDto> {
+    return this.http.get<PublicBillDto>(`${this.base}/bill-share/${encodeURIComponent(token)}`);
+  }
+
+  /** Claim an open item under a display name (anonymous). Returns the refreshed public bill. */
+  claimBillItem(token: string, itemId: number, name: string): Observable<PublicBillDto> {
+    return this.http.post<PublicBillDto>(`${this.base}/bill-share/${encodeURIComponent(token)}/claim`, { itemId, name });
   }
 
   recordsCsv(f: UsageFilter): Observable<Blob> {

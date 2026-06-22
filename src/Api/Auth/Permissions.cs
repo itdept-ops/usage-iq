@@ -51,6 +51,12 @@ public static class Permissions
     public const string SharesView = "shares.view";
     public const string SharesManage = "shares.manage";
 
+    // ---- Bills ----
+    /// <summary>Bill Splitter (split-the-check): create bills, break a receipt photo down with AI, assign
+    /// items to contacts, and share a PUBLIC anonymous claim link. Never default — granted deliberately per
+    /// user. The receipt-AI route ALSO requires <see cref="AiVision"/> (the multimodal gate).</summary>
+    public const string BillsUse = "bills.use";
+
     // ---- Family ----
     public const string FamilyUse = "family.use";
     public const string FamilyFinance = "family.finance";
@@ -122,6 +128,9 @@ public static class Permissions
         // ---- Fitness ----
         new PermissionInfo(TrackerSelf, "Fitness", "Track food & fitness", "Log and view your own food intake and exercises."),
         new PermissionInfo(TrackerViewAll, "Fitness", "View all trackers", "View every user’s food & fitness log (coach/admin)."),
+
+        // ---- Bills ----
+        new PermissionInfo(BillsUse, "Bills", "Use Bill Splitter", "Create bills, break a receipt photo down with AI, assign items to your contacts, and share a public claim link so people can claim what they owe."),
 
         // ---- Family ----
         new PermissionInfo(FamilyUse, "Family", "Use Family Hub", "Access the Family Hub: see your household, its members, and shared family data."),
@@ -244,6 +253,9 @@ public static class Permissions
     /// (via the "child"/"family-member" presets) so open sign-up can never auto-mint a child or an allowance
     /// manager. Likewise excludes <see cref="IdentityMap"/>: the Identity Map holds private, personal
     /// time/role data, so it must be granted deliberately per user, never inherited by every new account.
+    /// Likewise excludes <see cref="BillsUse"/>: the Bill Splitter mints PUBLIC anonymous claim links and
+    /// reads receipt photos through vision AI, so it must be granted deliberately per user, never inherited
+    /// by every new account.
     /// Finally excludes ALL AI keys (<see cref="AiKeys"/>) and ALL Location keys (<see cref="LocationKeys"/>):
     /// AI capabilities spend tokens and the Location feature reveals where a user is, so both must be
     /// granted deliberately per user — every new account starts with AI off and location off.
@@ -252,6 +264,6 @@ public static class Permissions
         IsValid(key) && key != UsersManage && key != ChatModerate && key != ChatContactsManage
         && key != TrackerViewAll && key != FamilyUse && key != FamilyFinance && key != CycleTrack
         && key != ChoreClaim && key != AllowanceManage && key != IdentityMap
-        && key != AiUsageView
+        && key != AiUsageView && key != BillsUse
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }

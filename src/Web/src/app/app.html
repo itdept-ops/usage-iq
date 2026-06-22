@@ -83,6 +83,9 @@
         <a mat-button class="nav__item" routerLink="/tracker" routerLinkActive="active">Tracker</a>
         <a mat-button class="nav__item" routerLink="/challenge" routerLinkActive="active">75 Hard</a>
       }
+      @if (auth.hasPermission('bills.use')) {
+        <a mat-button class="nav__item" routerLink="/bills" routerLinkActive="active">Bills</a>
+      }
       @if (auth.hasPermission('family.use')) {
         <a mat-button class="nav__item nav__item--family" routerLink="/family" routerLinkActive="active">
           <mat-icon class="nav__item-icon" aria-hidden="true">cottage</mat-icon>Family
@@ -337,6 +340,12 @@
          (click)="closeMobileNav()">Tracker</a>
       <a class="mobile-nav__item" routerLink="/challenge" routerLinkActive="active"
          (click)="closeMobileNav()">75 Hard</a>
+    }
+
+    @if (auth.hasPermission('bills.use')) {
+      <div class="mobile-nav__head" role="presentation">Bills</div>
+      <a class="mobile-nav__item" routerLink="/bills" routerLinkActive="active"
+         (click)="closeMobileNav()">Bill Splitter</a>
     }
 
     @if (auth.hasPermission('family.use')) {

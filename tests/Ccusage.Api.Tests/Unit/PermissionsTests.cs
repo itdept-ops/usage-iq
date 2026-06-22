@@ -6,7 +6,7 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 42 keys.
+    // The full catalog of 43 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
@@ -18,6 +18,7 @@ public class PermissionsTests
         "chat.read", "chat.send", "chat.moderate", "chat.contacts.manage",
         "tracker.self", "tracker.viewall",
         "shares.view", "shares.manage",
+        "bills.use",
         "family.use", "family.finance", "cycle.track", "chore.claim", "allowance.manage", "identity.map",
         "location.self", "location.share", "location.view-all",
         "users.view", "users.manage", "activity.view", "ai.usage.view",
@@ -48,6 +49,7 @@ public class PermissionsTests
     [InlineData("tracker.viewall")]
     [InlineData("shares.view")]
     [InlineData("shares.manage")]
+    [InlineData("bills.use")]
     [InlineData("family.use")]
     [InlineData("family.finance")]
     [InlineData("cycle.track")]
@@ -108,6 +110,7 @@ public class PermissionsTests
         Permissions.TrackerViewAll.Should().Be("tracker.viewall");
         Permissions.SharesView.Should().Be("shares.view");
         Permissions.SharesManage.Should().Be("shares.manage");
+        Permissions.BillsUse.Should().Be("bills.use");
         Permissions.FamilyUse.Should().Be("family.use");
         Permissions.FamilyFinance.Should().Be("family.finance");
         Permissions.CycleTrack.Should().Be("cycle.track");
@@ -130,9 +133,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_forty_two_known_keys()
+    public void All_contains_exactly_the_forty_three_known_keys()
     {
-        Permissions.All.Should().HaveCount(42);
+        Permissions.All.Should().HaveCount(43);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -143,9 +146,24 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_forty_two_entries()
+    public void Catalog_has_forty_three_entries()
     {
-        Permissions.Catalog.Should().HaveCount(42);
+        Permissions.Catalog.Should().HaveCount(43);
+    }
+
+    [Fact]
+    public void BillsUse_is_in_the_Bills_group_non_ai_not_defaultable_and_in_the_administrator_preset()
+    {
+        // The Bill Splitter mints PUBLIC anonymous claim links + reads receipt photos via vision AI; bills.use
+        // lives in its own "Bills" group, is NOT an AI key, and is never defaultable — granted deliberately.
+        Permissions.Catalog.Single(p => p.Key == Permissions.BillsUse).Group.Should().Be("Bills");
+        Permissions.Catalog.Single(p => p.Key == Permissions.BillsUse).IsAi.Should().BeFalse();
+        Permissions.IsAi(Permissions.BillsUse).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.BillsUse).Should().BeFalse();
+        // It is part of the administrator preset (the full catalog) and is not a page-view gate.
+        Permissions.Presets.Single(p => p.Key == "administrator")
+            .Permissions.Should().Contain(Permissions.BillsUse);
+        Permissions.Views.Should().NotContain(Permissions.BillsUse);
     }
 
     [Fact]

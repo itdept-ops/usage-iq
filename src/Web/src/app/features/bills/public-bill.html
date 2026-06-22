@@ -1,0 +1,126 @@
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+} @else if (error()) {
+  <div class="pb-error">
+    <h2>Link unavailable</h2>
+    <p>This bill link is invalid, has been turned off, or no longer exists.</p>
+  </div>
+} @else if (data(); as d) {
+  <div class="pb-wrap">
+    <header class="pb-head">
+      <div class="pb-brand">
+        <svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <defs><linearGradient id="pb-g" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#3D8BFF" /><stop offset="0.52" stop-color="#8B7CFF" /><stop offset="1" stop-color="#3FD8D0" />
+          </linearGradient></defs>
+          <rect x="1.25" y="1.25" width="29.5" height="29.5" rx="7.5" fill="#0B1019" stroke="url(#pb-g)" stroke-width="1.5" />
+          <rect x="7" y="18" width="3.6" height="7" rx="1.3" fill="url(#pb-g)" />
+          <rect x="14.2" y="13" width="3.6" height="12" rx="1.3" fill="url(#pb-g)" />
+          <rect x="21.4" y="8" width="3.6" height="17" rx="1.3" fill="url(#pb-g)" />
+        </svg>
+        <span>Usage&nbsp;IQ</span>
+      </div>
+      <div class="pb-titles">
+        <h1>{{ d.title }}</h1>
+        <span class="pb-scope">
+          {{ billTotal() | currency: 'USD' }} total
+          @if (settled()) { · <span class="pb-settled">settled</span> }
+        </span>
+      </div>
+    </header>
+
+    @if (settled()) {
+      <div class="pb-note pb-note--settled">
+        <mat-icon aria-hidden="true">check_circle</mat-icon>
+        This bill has been settled — items can no longer be claimed.
+      </div>
+    } @else {
+      <!-- Name field: a visitor types who they are, then claims open items. -->
+      <div class="pb-name">
+        <label for="pb-name-in">Your name</label>
+        <input id="pb-name-in" class="pb-name__in" [ngModel]="myName()" (ngModelChange)="myName.set($event)"
+               placeholder="Type your name to claim items" maxlength="80" autocomplete="name" />
+      </div>
+    }
+
+    <!-- Items -->
+    <div class="pb-items">
+      @for (it of d.items; track it.id) {
+        <div class="pb-item" [class.pb-item--taken]="!it.open" [class.pb-item--settled]="it.settled">
+          <span class="pb-item__name">{{ it.name }}</span>
+          <span class="pb-item__amt">{{ it.amount | currency: 'USD' }}</span>
+          <span class="pb-item__state">
+            @if (it.settled) {
+              <span class="pb-tag pb-tag--paid"><mat-icon aria-hidden="true">check</mat-icon> paid</span>
+            } @else if (it.open) {
+              @if (!settled()) {
+                <button mat-flat-button color="primary" class="pb-claim" type="button"
+                        [disabled]="!myName().trim() || claiming() != null" (click)="claim(it.id)">
+                  @if (claiming() === it.id) { Claiming… } @else { Claim }
+                </button>
+              } @else {
+                <span class="pb-tag pb-tag--open">open</span>
+              }
+            } @else if (it.claimedByName) {
+              <span class="pb-tag">{{ it.claimedByName }}</span>
+            } @else {
+              <span class="pb-tag pb-tag--taken">taken</span>
+            }
+          </span>
+        </div>
+      }
+    </div>
+
+    <!-- Your total -->
+    @if (myTotal(); as mine) {
+      <div class="pb-mine">
+        <div class="pb-mine__row">
+          <span>Your items</span><span>{{ mine.itemsTotal | currency: 'USD' }}</span>
+        </div>
+        @if (mine.taxTipShare > 0) {
+          <div class="pb-mine__row pb-mine__row--sub">
+            <span>Your share of tax/tip</span><span>{{ mine.taxTipShare | currency: 'USD' }}</span>
+          </div>
+        }
+        <div class="pb-mine__row pb-mine__row--total">
+          <span>You owe</span><span>{{ mine.total | currency: 'USD' }}</span>
+        </div>
+      </div>
+    }
+
+    <!-- Everyone's totals -->
+    @if (d.personTotals.length) {
+      <div class="pb-people">
+        <h2>Everyone</h2>
+        @for (p of d.personTotals; track p.name) {
+          <div class="pb-person">
+            <span class="pb-person__name">{{ p.name }}</span>
+            <span class="pb-person__total">{{ p.total | currency: 'USD' }}</span>
+          </div>
+        }
+        @if (d.unclaimedTotal > 0) {
+          <div class="pb-person pb-person--open">
+            <span class="pb-person__name">Still open</span>
+            <span class="pb-person__total">{{ d.unclaimedTotal | currency: 'USD' }}</span>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Pay-me links -->
+    @if (payLinks().length) {
+      <div class="pb-pay">
+        <span class="pb-pay__label">Pay what you owe</span>
+        <div class="pb-pay__links">
+          @for (l of payLinks(); track l.label) {
+            <a class="pb-pay__link" [href]="l.url" target="_blank" rel="noopener">
+              <mat-icon aria-hidden="true">{{ l.icon }}</mat-icon>{{ l.label }}
+            </a>
+          }
+        </div>
+      </div>
+    }
+
+    <footer class="pb-foot">Shared via Usage IQ Bill Splitter</footer>
+  </div>
+}

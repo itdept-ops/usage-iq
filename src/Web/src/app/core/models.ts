@@ -3806,6 +3806,131 @@ export interface CheatDaysRequest {
   remove?: string[];
 }
 
+// ---- Bill Splitter (gated bills.use; public claim link mirrors the dashboard share-link model) ----
+
+/**
+ * The owner's intentionally-PUBLIC pay-me handles (CashApp / PayPal / Venmo), read from the Payments
+ * config section. A single global set for the deployment, shown to people who owe so they can pay. Any
+ * handle may be null/blank (the UI hides that link). NEVER a secret — these are public URLs by design.
+ * Mirrors PaymentHandlesDto.
+ */
+export interface PaymentHandlesDto {
+  cashApp?: string | null;
+  payPal?: string | null;
+  venmo?: string | null;
+}
+
+/** One line item on a bill, in the OWNER's view. `open` is true when no one is assigned/has claimed it. Mirrors BillItemDto. */
+export interface BillItemDto {
+  id: number;
+  name: string;
+  amount: number;
+  /** The contact (AppUser id) the owner pre-assigned this item to, or null. */
+  assignedToUserId?: number | null;
+  /** The assigned contact's display NAME (never an email), or null. */
+  assignedToName?: string | null;
+  /** A public claimer's display name, or null. */
+  claimedByName?: string | null;
+  /** A logged-in claimer's AppUser id, or null. */
+  claimedByUserId?: number | null;
+  claimedUtc?: string | null;
+  settled: boolean;
+  open: boolean;
+}
+
+/** One person's roll-up: their claimed/assigned item total plus a proportional share of tax+tip. Mirrors PersonTotalDto. */
+export interface PersonTotalDto {
+  name: string;
+  itemsTotal: number;
+  taxTipShare: number;
+  total: number;
+}
+
+/** The owner's full view of a bill (includes the public claim path + handles when a link is live). Mirrors BillDto. */
+export interface BillDto {
+  id: number;
+  title: string;
+  createdUtc: string;
+  taxAmount?: number | null;
+  tipAmount?: number | null;
+  status: string;
+  shareEnabled: boolean;
+  /** The public claim path (`/bill/{token}`) when a link is live; null otherwise. */
+  sharePath?: string | null;
+  items: BillItemDto[];
+  personTotals: PersonTotalDto[];
+  unclaimedTotal: number;
+  payments: PaymentHandlesDto;
+}
+
+/** Create a bill (owner-scoped). Mirrors CreateBillRequest. */
+export interface CreateBillRequest {
+  title?: string;
+  taxAmount?: number | null;
+  tipAmount?: number | null;
+}
+
+/** Update a bill's title/tax/tip/status (owner-scoped). Status is "open" or "settled". Mirrors UpdateBillRequest. */
+export interface UpdateBillRequest {
+  title?: string;
+  taxAmount?: number | null;
+  tipAmount?: number | null;
+  status?: string;
+}
+
+/** Add or edit a line item (owner-scoped). Mirrors BillItemRequest. */
+export interface BillItemRequest {
+  name?: string;
+  amount: number;
+}
+
+/** Result of POST /api/bills/{id}/share — whether the public link is live and (when on) its path. */
+export interface BillShareToggleResult {
+  shareEnabled: boolean;
+  sharePath?: string | null;
+}
+
+/** One AI-extracted receipt line (amount clamped server-side). The owner reviews before saving. Mirrors ReceiptItemDto. */
+export interface ReceiptItemDto {
+  name: string;
+  amount: number;
+}
+
+/** The AI receipt breakdown the owner reviews then saves. Nothing is persisted by the AI call. Mirrors ReceiptBreakdownDto. */
+export interface ReceiptBreakdownDto {
+  items: ReceiptItemDto[];
+  tax?: number | null;
+  tip?: number | null;
+}
+
+/** An item on the PUBLIC claim page — just whether it's open and (when claimed) the claimer's name. Mirrors PublicBillItemDto. */
+export interface PublicBillItemDto {
+  id: number;
+  name: string;
+  amount: number;
+  open: boolean;
+  claimedByName?: string | null;
+  settled: boolean;
+}
+
+/** The PUBLIC, anonymous claim view of a bill — items + per-person totals + the owner's payment handles. Mirrors PublicBillDto. */
+export interface PublicBillDto {
+  title: string;
+  status: string;
+  taxAmount?: number | null;
+  tipAmount?: number | null;
+  items: PublicBillItemDto[];
+  personTotals: PersonTotalDto[];
+  unclaimedTotal: number;
+  payments: PaymentHandlesDto;
+}
+
+/** Claim an open item on the public page under a display name (anonymous). Mirrors ClaimItemRequest. */
+export interface ClaimItemRequest {
+  itemId: number;
+  name?: string;
+}
+
 /** Canonical permission keys (mirror of the backend catalog). */
 export const PERM = {
   dashboardView: 'dashboard.view',
@@ -3837,6 +3962,8 @@ export const PERM = {
   trackerViewAll: 'tracker.viewall',
   familyUse: 'family.use',
   familyFinance: 'family.finance',
+  /** Bill Splitter: create bills, AI receipt breakdown, assign items to contacts, public claim link. */
+  billsUse: 'bills.use',
   cycleTrack: 'cycle.track',
   /** Identity Map: log time against the roles you play + see the split (optionally import from your calendar). */
   identityMap: 'identity.map',
@@ -3864,7 +3991,7 @@ export const PERM = {
  * fallback/ordering hint. Any catalog group not listed here is appended after, so nothing is ever dropped.
  */
 export const PERM_GROUP_ORDER: readonly string[] = [
-  'Usage', 'Fitness', 'Family', 'Chat', 'Location', 'Admin', 'AI',
+  'Usage', 'Fitness', 'Bills', 'Family', 'Chat', 'Location', 'Admin', 'AI',
 ];
 
 /** Maps each permission key to its UI group (mirror of the backend catalog grouping). */
@@ -3887,6 +4014,8 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   // ---- Fitness ----
   [PERM.trackerSelf]: 'Fitness',
   [PERM.trackerViewAll]: 'Fitness',
+  // ---- Bills ----
+  [PERM.billsUse]: 'Bills',
   // ---- Family ----
   [PERM.familyUse]: 'Family',
   [PERM.familyFinance]: 'Family',

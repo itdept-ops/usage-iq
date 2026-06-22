@@ -70,6 +70,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<IdentityRole> IdentityRoles => Set<IdentityRole>();
     public DbSet<IdentityTimeEntry> IdentityTimeEntries => Set<IdentityTimeEntry>();
     public DbSet<IdentityRule> IdentityRules => Set<IdentityRule>();
+    public DbSet<Bill> Bills => Set<Bill>();
+    public DbSet<BillItem> BillItems => Set<BillItem>();
     public DbSet<HardChallenge> HardChallenges => Set<HardChallenge>();
     public DbSet<HardChallengeDay> HardChallengeDays => Set<HardChallengeDay>();
     public DbSet<HardChallengeTask> HardChallengeTasks => Set<HardChallengeTask>();
@@ -265,6 +267,33 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => new { x.ShareLinkId, x.WhenUtc });
             e.HasOne(x => x.ShareLink).WithMany()
                 .HasForeignKey(x => x.ShareLinkId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<Bill>(e =>
+        {
+            e.Property(x => x.OwnerEmail).HasMaxLength(256);
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.ShareTokenHash).HasMaxLength(64);
+            e.Property(x => x.ShareTokenEnc).HasMaxLength(256);
+            e.Property(x => x.Status).HasMaxLength(16);
+            e.Property(x => x.TaxAmount).HasColumnType("numeric(12,2)");
+            e.Property(x => x.TipAmount).HasColumnType("numeric(12,2)");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.HasIndex(x => x.OwnerEmail);
+            // Unique only over the live (non-null) hashes — mirrors the GoogleSubject filtered-unique pattern
+            // so many bills can have a null hash (no share) yet a live token is the single public lookup key.
+            e.HasIndex(x => x.ShareTokenHash).IsUnique().HasFilter("\"ShareTokenHash\" IS NOT NULL");
+        });
+
+        b.Entity<BillItem>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Amount).HasColumnType("numeric(12,2)");
+            e.Property(x => x.ClaimedByName).HasMaxLength(80);
+            e.Property(x => x.ClaimedUtc).HasColumnType("timestamp with time zone");
+            e.HasIndex(x => x.BillId);
+            e.HasOne(x => x.Bill).WithMany(x => x.Items)
+                .HasForeignKey(x => x.BillId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<IngestKey>(e =>

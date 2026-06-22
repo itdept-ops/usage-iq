@@ -112,7 +112,7 @@ export class App {
    * how-it-works) render bare — they bring their own chrome, so the app toolbar is hidden.
    */
   readonly bareLayout = signal(App.isBare(this.router.url));
-  private static readonly barePrefixes = ['/widget', '/share', '/login', '/features', '/how-it-works', '/technology', '/ai', '/signin', '/about'];
+  private static readonly barePrefixes = ['/widget', '/share', '/bill', '/login', '/features', '/how-it-works', '/technology', '/ai', '/signin', '/about'];
   private static isBare(url: string): boolean {
     const path = url.split('?')[0];
     return App.barePrefixes.some(p => path === p || path.startsWith(p + '/'));
@@ -150,6 +150,7 @@ export class App {
     '/chat': 'chat.read',
     '/tracker': 'tracker.self',
     '/challenge': 'tracker.self',
+    '/bills': 'bills.use',
     '/family': 'family.use',
     '/locations': 'location.self',
     '/admin/locations': 'location.view-all',
@@ -260,6 +261,7 @@ export class App {
     { route: '/fleet', label: 'Fleet', perms: [PERM.fleetView, PERM.reporterManage] },
     { route: '/tracker', label: 'Tracker', perms: [PERM.trackerSelf] },
     { route: '/challenge', label: '75 Hard', perms: [PERM.trackerSelf] },
+    { route: '/bills', label: 'Bill Splitter', perms: [PERM.billsUse] },
     { route: '/family', label: 'Family', perms: [PERM.familyUse] },
     { route: '/chat', label: 'Chat', perms: [PERM.chatRead] },
     { route: '/locations', label: 'My locations', perms: [PERM.locationSelf] },

@@ -18,10 +18,12 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next, RequestLogQue
 
     // Logged surface: everything under /api except these (probes + the SPA's background polls + self).
     // "/api/share" (singular) is the public token read — exclude it so live tokens never land in the log
-    // (segment-based match leaves "/api/shares" management endpoints logged).
+    // (segment-based match leaves "/api/shares" management endpoints logged). "/api/bill-share" is the Bill
+    // Splitter's public anonymous token read + claim — excluded for the same reason (live tokens out of the log).
     private static readonly string[] Excluded =
     {
         "/api/health", "/api/auth/me", "/api/auth/config", "/api/sync/status", "/api/presence", "/api/logs", "/api/share",
+        "/api/bill-share", // public bill-claim token read + claim; live tokens must never land in the action log
         "/api/ingest", // high-volume reporter pushes; the IngestKey LastUsed stamp is the activity trail
     };
 

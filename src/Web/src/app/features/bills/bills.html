@@ -1,0 +1,219 @@
+<div class="bills">
+  <header class="bills__head">
+    <div class="bills__titles">
+      <h1>Bill Splitter</h1>
+      <p class="bills__sub">Split a check, assign items to your contacts, and share a link so people can claim what they owe.</p>
+    </div>
+    <button mat-flat-button color="primary" class="bills__new" (click)="createBill()" [disabled]="busy()">
+      <mat-icon aria-hidden="true">add</mat-icon> New bill
+    </button>
+  </header>
+
+  @if (busy()) { <mat-progress-bar mode="indeterminate" class="bills__bar" /> }
+
+  @if (loading()) {
+    <div class="bills__loading"><mat-spinner diameter="36" /></div>
+  } @else {
+    <div class="bills__split">
+      <!-- ---- Master list ---- -->
+      <aside class="bills__list" aria-label="Your bills">
+        @if (bills().length === 0) {
+          <div class="bills__empty">
+            <mat-icon aria-hidden="true">receipt_long</mat-icon>
+            <p>No bills yet. Create one to start splitting.</p>
+          </div>
+        }
+        @for (b of bills(); track b.id) {
+          <button type="button" class="bill-row" [class.bill-row--active]="b.id === selectedId()"
+                  (click)="select(b.id)">
+            <span class="bill-row__id">
+              <span class="bill-row__title">{{ b.title }}</span>
+              <span class="bill-row__meta">{{ b.createdUtc | date: 'MMM d' }} · {{ b.items.length }} item{{ b.items.length === 1 ? '' : 's' }}</span>
+            </span>
+            <span class="bill-row__right">
+              @if (b.status === 'settled') { <span class="chip chip--settled">settled</span> }
+              @if (b.shareEnabled) { <mat-icon class="bill-row__share" aria-hidden="true" matTooltip="Public link is live">link</mat-icon> }
+            </span>
+          </button>
+        }
+      </aside>
+
+      <!-- ---- Detail ---- -->
+      <section class="bills__detail">
+        @if (selected(); as b) {
+          <div class="detail">
+            <!-- Title + actions -->
+            <div class="detail__head">
+              <input class="detail__title" [value]="b.title" (blur)="saveTitle(b, $any($event.target).value)"
+                     aria-label="Bill title" maxlength="200" />
+              <div class="detail__actions">
+                <button mat-stroked-button type="button" (click)="toggleSettled(b)">
+                  <mat-icon aria-hidden="true">{{ b.status === 'settled' ? 'lock_open' : 'check_circle' }}</mat-icon>
+                  {{ b.status === 'settled' ? 'Reopen' : 'Mark settled' }}
+                </button>
+                <button mat-icon-button type="button" [matMenuTriggerFor]="billMenu" aria-label="More actions">
+                  <mat-icon aria-hidden="true">more_vert</mat-icon>
+                </button>
+                <mat-menu #billMenu="matMenu">
+                  <button mat-menu-item (click)="deleteBill(b)">
+                    <mat-icon aria-hidden="true">delete</mat-icon><span>Delete bill</span>
+                  </button>
+                </mat-menu>
+              </div>
+            </div>
+
+            <!-- Items -->
+            <div class="detail__items">
+              @for (it of b.items; track it.id) {
+                <div class="item" [class.item--settled]="it.settled">
+                  <button class="item__settle" type="button" (click)="toggleItemSettled(b, it)"
+                          [matTooltip]="it.settled ? 'Mark unpaid' : 'Mark paid'"
+                          [attr.aria-label]="it.settled ? 'Mark unpaid' : 'Mark paid'">
+                    <mat-icon aria-hidden="true">{{ it.settled ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+                  </button>
+                  <input class="item__name" [value]="it.name" maxlength="200"
+                         (blur)="saveItem(b, it, $any($event.target).value, it.amount)" aria-label="Item name" />
+                  <div class="item__amt">
+                    <span class="item__cur">$</span>
+                    <input class="item__amt-in" type="number" min="0" step="0.01" inputmode="decimal"
+                           [value]="it.amount" aria-label="Item amount"
+                           (blur)="saveItem(b, it, it.name, $any($event.target).valueAsNumber)" />
+                  </div>
+                  <button class="item__assign" type="button" (click)="assign(b, it)"
+                          matTooltip="Assign to a contact">
+                    @if (it.assignedToName) {
+                      <mat-icon aria-hidden="true">person</mat-icon><span class="item__who">{{ it.assignedToName }}</span>
+                    } @else if (it.claimedByName) {
+                      <mat-icon aria-hidden="true">how_to_reg</mat-icon><span class="item__who item__who--claim">{{ it.claimedByName }}</span>
+                    } @else {
+                      <mat-icon aria-hidden="true">person_add</mat-icon><span class="item__who item__who--open">Open</span>
+                    }
+                  </button>
+                  <button class="item__del" type="button" (click)="deleteItem(b, it)" aria-label="Remove item">
+                    <mat-icon aria-hidden="true">close</mat-icon>
+                  </button>
+                </div>
+              }
+
+              <!-- Add item row -->
+              <div class="item item--new">
+                <span class="item__settle item__settle--ph" aria-hidden="true"></span>
+                <input class="item__name" placeholder="Add an item…" maxlength="200"
+                       [ngModel]="newName()" (ngModelChange)="newName.set($event)"
+                       (keyup.enter)="addItem(b)" aria-label="New item name" />
+                <div class="item__amt">
+                  <span class="item__cur">$</span>
+                  <input class="item__amt-in" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"
+                         [ngModel]="newAmount()" (ngModelChange)="newAmount.set($event)"
+                         (keyup.enter)="addItem(b)" aria-label="New item amount" />
+                </div>
+                <button mat-icon-button class="item__add" type="button" (click)="addItem(b)"
+                        [disabled]="!newName().trim() || (newAmount() ?? 0) <= 0" aria-label="Add item">
+                  <mat-icon aria-hidden="true">add</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <!-- Receipt AI + tax/tip -->
+            <div class="detail__tools">
+              @if (canUseVision()) {
+                <div class="detail__receipt">
+                  <button mat-stroked-button type="button" (click)="uploadReceipt(b, false)" [disabled]="busy()">
+                    <mat-icon aria-hidden="true">photo_camera</mat-icon> Upload a receipt
+                  </button>
+                  <button mat-stroked-button type="button" class="detail__receipt-cam"
+                          (click)="uploadReceipt(b, true)" [disabled]="busy()" matTooltip="Take a photo">
+                    <mat-icon aria-hidden="true">add_a_photo</mat-icon>
+                  </button>
+                </div>
+              }
+              <div class="detail__taxtip">
+                <label class="taxtip">Tax
+                  <span class="taxtip__cur">$</span>
+                  <input class="taxtip__in" type="number" min="0" step="0.01" inputmode="decimal"
+                         [value]="b.taxAmount ?? null" placeholder="0.00"
+                         (blur)="saveTax(b, $any($event.target).valueAsNumber)" aria-label="Tax amount" />
+                </label>
+                <label class="taxtip">Tip
+                  <span class="taxtip__cur">$</span>
+                  <input class="taxtip__in" type="number" min="0" step="0.01" inputmode="decimal"
+                         [value]="b.tipAmount ?? null" placeholder="0.00"
+                         (blur)="saveTip(b, $any($event.target).valueAsNumber)" aria-label="Tip amount" />
+                </label>
+              </div>
+            </div>
+
+            <!-- Per-person totals -->
+            <div class="detail__totals">
+              <div class="totals__head">
+                <h2>Who owes what</h2>
+                <span class="totals__grand">{{ billTotal() | currency: 'USD' }}</span>
+              </div>
+              @if (b.personTotals.length === 0 && b.unclaimedTotal === 0) {
+                <p class="totals__empty">Add items and assign or share them to see per-person totals.</p>
+              }
+              @for (p of b.personTotals; track p.name) {
+                <div class="person">
+                  <span class="person__name">{{ p.name }}</span>
+                  <span class="person__breakdown">
+                    {{ p.itemsTotal | currency: 'USD' }}
+                    @if (p.taxTipShare > 0) { <span class="person__tt">+ {{ p.taxTipShare | currency: 'USD' }} tax/tip</span> }
+                  </span>
+                  <span class="person__total">{{ p.total | currency: 'USD' }}</span>
+                </div>
+              }
+              @if (b.unclaimedTotal > 0) {
+                <div class="person person--open">
+                  <span class="person__name">Unclaimed</span>
+                  <span class="person__breakdown">items nobody has taken yet</span>
+                  <span class="person__total">{{ b.unclaimedTotal | currency: 'USD' }}</span>
+                </div>
+              }
+            </div>
+
+            <!-- Public claim link -->
+            <div class="detail__share">
+              <div class="share__row">
+                <mat-slide-toggle [checked]="b.shareEnabled" (change)="toggleShare(b)" color="primary">
+                  Public claim link
+                </mat-slide-toggle>
+                <span class="share__hint">People with the link can claim open items under their name.</span>
+              </div>
+              @if (b.shareEnabled && b.sharePath) {
+                <div class="share__link">
+                  <input class="share__url" [value]="shareUrl(b)" readonly aria-label="Public claim link"
+                         (focus)="$any($event.target).select()" />
+                  <button mat-stroked-button type="button" (click)="copyShare(b)">
+                    <mat-icon aria-hidden="true">content_copy</mat-icon> Copy
+                  </button>
+                  <a mat-stroked-button [href]="b.sharePath" target="_blank" rel="noopener">
+                    <mat-icon aria-hidden="true">open_in_new</mat-icon> Open
+                  </a>
+                </div>
+              }
+            </div>
+
+            <!-- Owner pay-me links -->
+            @if (payLinks().length) {
+              <div class="detail__pay">
+                <span class="pay__label">Your pay-me links</span>
+                <div class="pay__links">
+                  @for (l of payLinks(); track l.label) {
+                    <a class="pay__link" [href]="l.url" target="_blank" rel="noopener">
+                      <mat-icon aria-hidden="true">{{ l.icon }}</mat-icon>{{ l.label }}
+                    </a>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="bills__empty bills__empty--detail">
+            <mat-icon aria-hidden="true">splitscreen</mat-icon>
+            <p>Pick a bill, or create a new one to start.</p>
+          </div>
+        }
+      </section>
+    </div>
+  }
+</div>

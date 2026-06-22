@@ -96,6 +96,14 @@ export const routes: Routes = [
     title: 'Usage IQ · Tracker',
   },
   {
+    // Bill Splitter — its own permission-gated page. Owner-scoped CRUD + AI receipt breakdown + a public
+    // anonymous claim link (the bare /bill/:token route below).
+    path: 'bills',
+    canActivate: [permissionGuard(PERM.billsUse)],
+    loadComponent: () => import('./features/bills/bills').then(m => m.Bills),
+    title: 'Usage IQ · Bill Splitter',
+  },
+  {
     // 75 Hard — a six-task daily challenge layered on the tracker. Gated by the SAME tracker permission
     // (tracker.self); a coach/admin read of someone else is enforced server-side via tracker.viewall.
     path: 'challenge',
@@ -252,6 +260,12 @@ export const routes: Routes = [
     path: 'share/:token',
     loadComponent: () => import('./features/share/public-share').then(m => m.PublicShareView),
     title: 'Usage IQ · Shared view',
+  },
+  {
+    // Public, anonymous bill-claim view — intentionally no guard, bare shell (like /share/:token).
+    path: 'bill/:token',
+    loadComponent: () => import('./features/bills/public-bill').then(m => m.PublicBillView),
+    title: 'Usage IQ · Bill',
   },
   { path: '**', redirectTo: '' },
 ];

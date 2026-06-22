@@ -798,6 +798,12 @@ public static class AiEndpoints
     /// base64 must be present and decode cleanly, and the decoded payload must be under
     /// <see cref="GeminiService.MaxImageBytes"/>. On failure, <paramref name="bad"/> is a 400 result.
     /// </summary>
+    /// <summary>Reusable image validation for other endpoints (e.g. the Bill Splitter receipt route): same
+    /// mime/size/base64 checks as the photo routes, returning a 400 <paramref name="bad"/> on failure.</summary>
+    internal static bool TryValidateImageInternal(
+        ImageRequest? body, out string base64, out string mimeType, out IResult bad) =>
+        TryValidateImage(body, out base64, out mimeType, out bad);
+
     private static bool TryValidateImage(
         ImageRequest? body, out string base64, out string mimeType, out IResult bad)
     {
