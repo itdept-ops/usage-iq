@@ -88,7 +88,7 @@ export class HowItWorksPage {
     },
     {
       q: 'Who can sign in?',
-      a: 'Google accounts, each pinned to its Google subject id. An open sign-up policy with a default permission set lets new accounts in, governed by a kill switch you can flip; 25 server-enforced capabilities decide what each user can do, re-checked every request, and every request is written to an audit log.',
+      a: 'Google accounts, each pinned to its Google subject id. An open sign-up policy with a default permission set lets new accounts in, governed by a kill switch you can flip; 39 server-enforced capabilities across seven groups (AI permissions are their own group, off by default) decide what each user can do, re-checked every request, and every request is written to an audit log.',
     },
     {
       q: 'Can I sign someone out without locking them out?',

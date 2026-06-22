@@ -144,6 +144,96 @@ export class FeaturesPage {
       ],
     },
 
+    // ───────────────────────── A2) Family Hub ─────────────────────────
+    {
+      group: 'Family Hub',
+      icon: 'calendar_month',
+      kicker: 'One calendar',
+      title: 'The whole house, one calendar',
+      text: 'A Sunday–Saturday week, month, and agenda calendar backed by each member’s own Google Calendar. Opt in and everyone’s events overlay in one color-coded view — or drop in a photo of a schedule and let AI draft the events.',
+      points: [
+        'Synced with each member’s own Google Calendar',
+        'Opt-in, color-coded family overlay',
+        'Snap a schedule photo/PDF → AI drafts the events',
+      ],
+    },
+    {
+      group: 'Family Hub',
+      icon: 'restaurant_menu',
+      kicker: 'Meals → macros → groceries',
+      title: 'Plan dinner, get the grocery list',
+      text: 'Plan the week’s meals and the same data flows everywhere: pull each meal’s macros, push a planned meal straight into your fitness tracker, and extrapolate the ingredients into the shared grocery list.',
+      points: [
+        'Weekly meal planner for the household',
+        'Macros pulled per meal; push a meal to your tracker',
+        'Ingredients roll into the shared grocery list',
+      ],
+    },
+    {
+      group: 'Family Hub',
+      icon: 'checklist',
+      kicker: 'Stay on top of it',
+      title: 'Lists, notes, reminders, polls',
+      text: 'Shared grocery and to-do lists, family notes, reminders so nothing slips, shared timers, and quick polls to settle a plan or pick a time together.',
+      points: [
+        'Shared lists, notes, and reminders',
+        'Shared timers and countdowns',
+        'Polls to pick a time or settle a plan',
+      ],
+    },
+    {
+      group: 'Family Hub',
+      icon: 'savings',
+      kicker: 'Money & chores',
+      title: 'Budgets, bills, and a fair share of chores',
+      text: 'Track budgets, bills, and balances behind an extra finance permission, and split the household chores so everyone carries their part.',
+      points: [
+        'Finance double-gated for extra privacy',
+        'An “explain my month” + money-coach AI',
+        'Chores, shared fairly across the house',
+      ],
+    },
+
+    // ───────────────────────── A3) Locations ─────────────────────────
+    {
+      group: 'Locations',
+      icon: 'person_pin_circle',
+      kicker: 'Where’s everyone',
+      title: 'See the family on a map',
+      text: 'Members who opt in show up on a shared “Where’s everyone” map — by name, never by email. Your own location is private by default; you choose whether to share it with the household.',
+      points: [
+        'Opt-in only — private by default',
+        'A household “Where’s everyone” map (OpenStreetMap)',
+        'Your own location history, just for you',
+      ],
+    },
+
+    // ───────────────────────── A4) AI everywhere ─────────────────────────
+    {
+      group: 'AI everywhere',
+      icon: 'auto_awesome',
+      kicker: 'On your terms',
+      title: 'AI woven through — and off by default',
+      text: 'Google Gemini powers a schedule-from-photo, day / meal / finance coaches, and an action-taking family assistant. Every AI feature is gated by its own permission and is OFF for everyone until you turn it on.',
+      points: [
+        'Separate AI permissions — everyone starts AI-off',
+        'Schedule-from-photo, coaches, family assistant',
+        'Falls back to a plain summary when AI is off',
+      ],
+    },
+    {
+      group: 'AI everywhere',
+      icon: 'privacy_tip',
+      kicker: 'Private by design',
+      title: 'AI that respects your data',
+      text: 'AI sees only the minimal context a feature needs. Uploaded images are digested in memory and never stored, and an admin AI-usage log records metadata only — never your prompt content.',
+      points: [
+        'Images digested in-memory, never stored',
+        'AI-usage log: metadata only, never content',
+        'Fixed providers — no user-supplied URLs',
+      ],
+    },
+
     // ───────────────────────── B) Team chat ─────────────────────────
     {
       group: 'Team chat',
@@ -273,12 +363,12 @@ export class FeaturesPage {
       group: 'Security & access',
       icon: 'shield_person',
       kicker: 'Permissions',
-      title: '25 capabilities, server-enforced',
-      text: 'A catalog of 25 granular capabilities decides what each user can do, re-checked on the server every single request — not just hidden in the UI.',
+      title: '39 capabilities, server-enforced',
+      text: 'A catalog of 39 granular capabilities across seven groups decides what each user can do, re-checked on the server every single request — not just hidden in the UI. One-click presets get a friend, family member, teammate, or your kids set up fast.',
       points: [
-        '25-capability permission catalog',
+        '39-capability catalog (AI perms are their own group, off by default)',
         'Re-checked server-side on every request',
-        'Sensible defaults that never mint an admin',
+        'Presets + a home-page picker per user',
       ],
     },
     {
