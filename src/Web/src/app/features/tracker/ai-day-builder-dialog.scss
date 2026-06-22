@@ -253,3 +253,23 @@
   .db-num input, .db-num select { width: 56px; }
   .db-num--wide input, .db-select { width: 80px; }
 }
+
+@media (max-width: 400px) {
+  // On very narrow phones the food review row (4 macro inputs + meal select + delete) wraps into a
+  // ragged strip. Lay the four macro inputs as a tidy 2×2 grid and drop the meal select + delete onto
+  // their own full-width row so each food item reads as a clean block instead of a tall ragged cluster.
+  .db-macros--food {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    align-items: end;
+  }
+  .db-macros--food .db-num input { width: 100%; }
+  .db-macros--food .db-foodmeal {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .db-macros--food .db-rowdel {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}

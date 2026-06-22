@@ -2,7 +2,7 @@
 
   <!-- ───────────────────────── Combine / move ───────────────────────── -->
   @case ('reassign') {
-    <h2 mat-dialog-title><mat-icon class="ttl-icon">merge_type</mat-icon> Combine / move {{ kindNoun() }}</h2>
+    <h2 mat-dialog-title><mat-icon class="ttl-icon" aria-hidden="true">merge_type</mat-icon> Combine / move {{ kindNoun() }}</h2>
     <mat-dialog-content>
       <p class="fa-note">
         Move every usage record reported under <b class="fa-from">{{ data.label }}</b>
@@ -20,11 +20,11 @@
           <div class="fa-mode">
             <button mat-button type="button" class="fa-mode-btn" [class.active]="targetMode() === 'existing'"
                     (click)="targetMode.set('existing')">
-              <mat-icon>checklist</mat-icon> Existing
+              <mat-icon aria-hidden="true">checklist</mat-icon> Existing
             </button>
             <button mat-button type="button" class="fa-mode-btn" [class.active]="targetMode() === 'new'"
                     (click)="targetMode.set('new')">
-              <mat-icon>add</mat-icon> New / other name
+              <mat-icon aria-hidden="true">add</mat-icon> New / other name
             </button>
           </div>
         }
@@ -44,26 +44,26 @@
             <input matInput maxlength="200" [ngModel]="targetNew()" (ngModelChange)="targetNew.set($event)"
                    (keyup.enter)="canReassign() && confirm()" placeholder="e.g. build-server" />
           </mat-form-field>
-          <p class="fa-tip micro-label"><mat-icon>info</mat-icon> Leave empty to re-label to the local (file-sync) bucket.</p>
+          <p class="fa-tip micro-label"><mat-icon aria-hidden="true">info</mat-icon> Leave empty to re-label to the local (file-sync) bucket.</p>
         } @else {
           <!-- User dimension with no other users to combine into: nothing to pick. -->
-          <p class="fa-tip micro-label"><mat-icon>info</mat-icon> No other users to combine into.</p>
+          <p class="fa-tip micro-label"><mat-icon aria-hidden="true">info</mat-icon> No other users to combine into.</p>
         }
       </div>
 
-      @if (error()) { <div class="fa-error"><mat-icon>error</mat-icon><span>{{ error() }}</span></div> }
+      @if (error()) { <div class="fa-error"><mat-icon aria-hidden="true">error</mat-icon><span>{{ error() }}</span></div> }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close [disabled]="busy()">Cancel</button>
       <button mat-flat-button color="primary" [disabled]="busy() || !canReassign()" (click)="confirm()">
-        <mat-icon>merge_type</mat-icon> {{ busy() ? 'Moving…' : 'Move records' }}
+        <mat-icon aria-hidden="true">merge_type</mat-icon> {{ busy() ? 'Moving…' : 'Move records' }}
       </button>
     </mat-dialog-actions>
   }
 
   <!-- ───────────────────────── Delete ───────────────────────── -->
   @case ('delete') {
-    <h2 mat-dialog-title class="danger"><mat-icon class="ttl-icon">delete_forever</mat-icon> Delete {{ kindNoun() }}</h2>
+    <h2 mat-dialog-title class="danger"><mat-icon class="ttl-icon" aria-hidden="true">delete_forever</mat-icon> Delete {{ kindNoun() }}</h2>
     <mat-dialog-content>
       <p class="fa-note">
         This <strong>permanently deletes</strong> every usage record reported under
@@ -72,23 +72,23 @@
         The spend they contributed disappears from every chart and total. This <strong>cannot be undone</strong>.
       </p>
       <div class="fa-danger-box">
-        <mat-icon>warning</mat-icon>
+        <mat-icon aria-hidden="true">warning</mat-icon>
         <span><b class="mono">{{ data.records | number }}</b> record{{ data.records === 1 ? '' : 's' }} will be erased.</span>
       </div>
 
-      @if (error()) { <div class="fa-error"><mat-icon>error</mat-icon><span>{{ error() }}</span></div> }
+      @if (error()) { <div class="fa-error"><mat-icon aria-hidden="true">error</mat-icon><span>{{ error() }}</span></div> }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close [disabled]="busy()">Cancel</button>
       <button mat-flat-button class="fa-delete-btn" [disabled]="busy()" (click)="confirm()">
-        <mat-icon>delete_forever</mat-icon> {{ busy() ? 'Deleting…' : 'Delete permanently' }}
+        <mat-icon aria-hidden="true">delete_forever</mat-icon> {{ busy() ? 'Deleting…' : 'Delete permanently' }}
       </button>
     </mat-dialog-actions>
   }
 
   <!-- ───────────────────────── Revoke key ───────────────────────── -->
   @case ('revoke') {
-    <h2 mat-dialog-title class="danger"><mat-icon class="ttl-icon">block</mat-icon> Revoke ingest keys</h2>
+    <h2 mat-dialog-title class="danger"><mat-icon class="ttl-icon" aria-hidden="true">block</mat-icon> Revoke ingest keys</h2>
     <mat-dialog-content>
       <p class="fa-note">
         Revoke <strong>every active ingest key</strong> owned by <b class="fa-from">{{ data.label }}</b>.
@@ -96,12 +96,12 @@
         <strong>kept</strong> — this only cuts off future reporting until a new key is issued.
       </p>
 
-      @if (error()) { <div class="fa-error"><mat-icon>error</mat-icon><span>{{ error() }}</span></div> }
+      @if (error()) { <div class="fa-error"><mat-icon aria-hidden="true">error</mat-icon><span>{{ error() }}</span></div> }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close [disabled]="busy()">Cancel</button>
       <button mat-flat-button class="fa-delete-btn" [disabled]="busy()" (click)="confirm()">
-        <mat-icon>block</mat-icon> {{ busy() ? 'Revoking…' : 'Revoke keys' }}
+        <mat-icon aria-hidden="true">block</mat-icon> {{ busy() ? 'Revoking…' : 'Revoke keys' }}
       </button>
     </mat-dialog-actions>
   }

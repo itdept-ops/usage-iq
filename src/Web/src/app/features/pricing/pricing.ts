@@ -44,7 +44,20 @@ export class Pricing {
     });
   }
 
+  private readonly rateFields: (keyof PricingRow)[] = [
+    'inputPerMTok', 'outputPerMTok', 'cacheWrite5mPerMTok', 'cacheWrite1hPerMTok', 'cacheReadPerMTok',
+  ];
+
+  /** Coerce NaN/negative rates to 0 so a stray '-5' can't persist and corrupt cost recompute. */
+  private sanitizeRates(row: PricingRow): void {
+    for (const f of this.rateFields) {
+      const n = Number(row[f]);
+      (row[f] as number) = Number.isFinite(n) && n > 0 ? n : 0;
+    }
+  }
+
   save(row: PricingRow): void {
+    this.sanitizeRates(row);
     this.savingId.set(row.id);
     this.api.updatePricing(row.id, row).subscribe({
       next: () => { this.savingId.set(null); this.snack.open(`Saved ${row.modelPattern}`, 'OK', { duration: 2500 }); },

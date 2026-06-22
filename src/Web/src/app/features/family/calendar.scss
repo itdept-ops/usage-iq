@@ -806,6 +806,8 @@
   .cal-mcell { min-height: 78px; }
   .cal-overlay-bar { gap: 8px; }
   .cal-toolbar__nav { flex-wrap: wrap; }
+  .cal-toolbar__actions { flex-wrap: wrap; }
+  .cal-toolbar__view { order: -1; }
   .cal-toolbar__range { margin-left: 0; }
   .cal-toolbar__updated { flex-basis: 100%; }
   .cal-ai__bar { flex-wrap: wrap; }

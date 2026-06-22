@@ -59,6 +59,33 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   .full { width: 100%; }
 }
 
+/* Inline load-failure state (recoverable blank-page fallback) */
+.load-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--tech-space-3);
+
+  mat-icon {
+    color: var(--tech-text-tertiary);
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+  }
+  p {
+    margin: 0;
+    font-size: var(--tech-fs-body);
+    color: var(--tech-text-secondary);
+  }
+  button mat-icon {
+    font-size: var(--tech-fs-num);
+    width: auto;
+    height: auto;
+    color: inherit;
+  }
+}
+
 /* Ingestion field stack */
 .field-grid {
   display: flex;

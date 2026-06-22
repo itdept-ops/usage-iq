@@ -991,9 +991,11 @@
 .tracker__ai-btn mat-progress-spinner,
 .tracker__ai-refresh mat-progress-spinner { display: inline-block; }
 
-@media (max-width: 1024px) and (min-width: 721px) {
+@media (max-width: 1024px) and (min-width: 861px) {
   .tracker__ai-row { grid-template-columns: 1fr 1fr; }
 }
-@media (max-width: 720px) {
+// Collapse to one column at <=860px (matching .tracker__fitness) so the AI panels never get
+// narrower than the stats panels — at the 2-up boundary the action-button labels would otherwise pinch.
+@media (max-width: 860px) {
   .tracker__ai-row { grid-template-columns: 1fr; }
 }

@@ -1,4 +1,4 @@
-import { Component, HostListener, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, effect, signal } from '@angular/core';
 import { IsActiveMatchOptions, RouterLink, RouterLinkActive } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -16,9 +16,22 @@ const SUBSET_IGNORING_QUERY: IsActiveMatchOptions =
   templateUrl: './marketing-nav.html',
   styleUrl: './marketing-nav.scss',
 })
-export class MarketingNav {
+export class MarketingNav implements OnDestroy {
   readonly scrolled = signal(false);
   readonly menuOpen = signal(false);
+
+  constructor() {
+    // Lock page scroll while the mobile drawer is open so the long marketing
+    // pages don't scroll behind the overlay. Set inline since this component's
+    // styles are emulated-scoped and can't target the global <body>.
+    effect(() => {
+      document.body.style.overflow = this.menuOpen() ? 'hidden' : '';
+    });
+  }
+
+  ngOnDestroy(): void {
+    document.body.style.overflow = '';
+  }
 
   readonly links = [
     { path: '/login', label: 'Home', opts: EXACT_IGNORING_QUERY },

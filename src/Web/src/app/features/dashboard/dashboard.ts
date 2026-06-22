@@ -24,6 +24,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { ShareDialog } from '../share/share-dialog';
+import { FamilyConfirmDialog } from '../family/confirm-dialog';
+import { SaveViewDialog } from './save-view-dialog';
 import { AuthService } from '../../core/auth';
 import { CacheEfficiency, CalendarDay, GroupBy, IngestionSource, MachineStat, ModelStat, PagedResult, ProjectDto, SavedView, SummaryResponse, UsageFilter, UsageRecord, PERM } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
@@ -200,21 +202,23 @@ export class Dashboard {
 
   /** Save the current filter set as a named view (upsert-by-name on the server). */
   saveCurrentView(): void {
-    const name = (prompt('Save current filters as a view named:') ?? '').trim();
-    if (!name) return;
-    this.savingView.set(true);
-    this.api.saveView(this.viewPayload(name)).subscribe({
-      next: v => {
-        this.savingView.set(false);
-        // Upsert-by-name: replace if it already exists, else append; keep sorted by name.
-        this.savedViews.update(list => {
-          const rest = list.filter(x => x.id !== v.id && x.name.toLowerCase() !== v.name.toLowerCase());
-          return [...rest, v].sort((a, b) => a.name.localeCompare(b.name));
+    this.dialog.open(SaveViewDialog, { width: '420px', maxWidth: '94vw', autoFocus: false })
+      .afterClosed().subscribe((name?: string) => {
+        if (!name) return;
+        this.savingView.set(true);
+        this.api.saveView(this.viewPayload(name)).subscribe({
+          next: v => {
+            this.savingView.set(false);
+            // Upsert-by-name: replace if it already exists, else append; keep sorted by name.
+            this.savedViews.update(list => {
+              const rest = list.filter(x => x.id !== v.id && x.name.toLowerCase() !== v.name.toLowerCase());
+              return [...rest, v].sort((a, b) => a.name.localeCompare(b.name));
+            });
+            this.snack.open(`Saved view “${v.name}”`, 'OK', { duration: 2500 });
+          },
+          error: () => { this.savingView.set(false); this.snack.open('Could not save view', 'Dismiss', { duration: 4000 }); },
         });
-        this.snack.open(`Saved view “${v.name}”`, 'OK', { duration: 2500 });
-      },
-      error: () => { this.savingView.set(false); this.snack.open('Could not save view', 'Dismiss', { duration: 4000 }); },
-    });
+      });
   }
 
   /** Load a saved view's filters + groupBy into dashboard state and apply through the normal path. */
@@ -265,10 +269,15 @@ export class Dashboard {
 
   deleteView(v: SavedView, ev: Event): void {
     ev.stopPropagation();
-    if (!confirm(`Delete the saved view “${v.name}”?`)) return;
-    this.api.deleteView(v.id).subscribe({
-      next: () => this.savedViews.update(list => list.filter(x => x.id !== v.id)),
-      error: () => this.snack.open('Could not delete view', 'Dismiss', { duration: 4000 }),
+    this.dialog.open(FamilyConfirmDialog, {
+      width: '420px', maxWidth: '94vw', autoFocus: false,
+      data: { title: 'Delete saved view', message: `Delete the saved view “${v.name}”?`, destructive: true },
+    }).afterClosed().subscribe((ok?: boolean) => {
+      if (!ok) return;
+      this.api.deleteView(v.id).subscribe({
+        next: () => this.savedViews.update(list => list.filter(x => x.id !== v.id)),
+        error: () => this.snack.open('Could not delete view', 'Dismiss', { duration: 4000 }),
+      });
     });
   }
 
@@ -474,6 +483,12 @@ export class Dashboard {
 
   readonly modelChart = computed<EChartsOption>(() => {
     const ms = this.modelStats().filter(m => m.costUsd > 0);
+    // Mirror mainChart(): an empty filtered list during the first fetch should read as "Loading…",
+    // and a resolved-but-empty result as "No data" — not a blank ring with an empty legend.
+    if (ms.length === 0) {
+      const text = this.loading() ? 'Loading…' : 'No data';
+      return { title: { text, left: 'center', top: 'center', textStyle: { color: '#5e6c82' } } };
+    }
     return {
       tooltip: { trigger: 'item', formatter: (p: any) => `${p.name}: $${Number(p.value).toLocaleString()} (${p.percent}%)` },
       legend: { bottom: 0, type: 'scroll' },

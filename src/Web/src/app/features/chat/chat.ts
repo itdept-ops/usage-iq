@@ -2,6 +2,7 @@ import {
   AfterViewChecked, Component, ElementRef, OnDestroy, computed, effect, inject, signal, viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { ActivatedRoute } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { timer, switchMap, catchError, of } from 'rxjs';
@@ -59,7 +60,7 @@ const REACTION_EMOJIS: readonly string[] = [
 @Component({
   selector: 'app-chat',
   imports: [
-    FormsModule, MatIconModule, MatButtonModule, MatTooltipModule, MatMenuModule,
+    FormsModule, TextFieldModule, MatIconModule, MatButtonModule, MatTooltipModule, MatMenuModule,
     MatDialogModule, MatSnackBarModule,
   ],
   templateUrl: './chat.html',

@@ -546,6 +546,17 @@
   }
 }
 
+@media (max-width: 480px) {
+  // With AI on, .ax-mode has 4 segments and can't wrap (single flex row). Tighten the label
+  // padding/font and shrink the inline icon so all 4 fit the narrow dialog. Mirrors .af-mode.
+  .ax-mode {
+    font-size: var(--tech-fs-micro);
+
+    ::ng-deep .mat-button-toggle-label-content { padding: 6px 6px; }
+    mat-icon { font-size: 14px; width: 14px; height: 14px; margin-right: 2px; }
+  }
+}
+
 @media (max-width: 520px) {
   // Bump the remove (×) button to a >=44px touch target on mobile (Material's default is ~40px),
   // keeping the icon glyph centered. Matches the other tracker touch-target fixes.

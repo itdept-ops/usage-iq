@@ -17,6 +17,10 @@
       <span class="brand-word">Usage&nbsp;IQ</span>
     </a>
 
+    @if (menuOpen()) {
+      <div class="mnav-scrim" (click)="close()" aria-hidden="true"></div>
+    }
+
     <nav class="mnav-links" [class.open]="menuOpen()" aria-label="Primary">
       @for (l of links; track l.path) {
         <a [routerLink]="l.path" routerLinkActive="active" [routerLinkActiveOptions]="l.opts"
@@ -27,7 +31,7 @@
 
     <div class="mnav-right">
       <a class="gh" href="https://github.com/itdept-ops/usage-iq" target="_blank" rel="noopener" aria-label="GitHub">
-        <mat-icon>code</mat-icon>
+        <mat-icon aria-hidden="true">code</mat-icon>
       </a>
       <a class="mnav-cta desktop-only" routerLink="/signin">
         Sign in <span class="cta-arrow">→</span>

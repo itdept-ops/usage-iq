@@ -688,6 +688,10 @@ mat-slide-toggle {
 
   .user-list { grid-template-columns: 1fr; }
 
+  /* Bump primary chip/segment controls to the 44px touch minimum on phones. */
+  .chip, .role-chip { min-height: 44px; padding: 0 14px; }
+  .role-seg { min-height: 44px; }
+
   /* Logins: swap the wide table for stacked cards. */
   .logins-table { display: none; }
   .logins-cards { display: flex; flex-direction: column; gap: 8px; }

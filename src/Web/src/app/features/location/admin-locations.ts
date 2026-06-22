@@ -103,20 +103,23 @@ export class AdminLocations {
 
   /** Select a user (from the side list or a map pin). Clicking the selected one again clears the filter. */
   select(id: number | null | undefined): void {
-    if (id == null) return;
+    if (id == null || Number.isNaN(id)) return;
     this.selectedId.update(cur => (cur === id ? null : id));
   }
 
   /** Map pin-click handler: pin ids are "u:<userId>" (user) or "m:<name>" (machine). */
   onPinClick(id: string): void {
-    if (id.startsWith('u:')) this.select(+id.slice(2));
+    if (!id.startsWith('u:')) return;
+    const rest = id.slice(2);
+    if (rest === '') return;
+    this.select(+rest);
   }
 
   clearSelection(): void { this.selectedId.set(null); }
 
   private fixToPin(u: AdminUserLocation, f: LocationFix, emphasis: boolean): MapPin {
     return {
-      id: `u:${u.userId ?? u.name}`,
+      id: `u:${u.userId ?? ''}`,
       lat: f.lat,
       lng: f.lng,
       title: u.name,

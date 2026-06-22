@@ -139,8 +139,7 @@
   <span class="spacer"></span>
 
   @if (auth.isAuthenticated()) {
-    <span class="status" [attr.data-state]="state()" [matTooltip]="tooltip()" matTooltipClass="axon-tip"
-          aria-label="Sync status">
+    <span class="status" [attr.data-state]="state()" [matTooltip]="tooltip()" matTooltipClass="axon-tip">
       <span class="status__dot" aria-hidden="true"></span>
       <span class="status__text mono-num">{{ label() }}</span>
     </span>

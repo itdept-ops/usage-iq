@@ -94,7 +94,7 @@
   </div>
 </mat-card>
 
-@if (loading()) { <mat-progress-bar mode="indeterminate" /> }
+@if (loading() && rows().length) { <mat-progress-bar mode="indeterminate" /> }
 
 <!-- ===== Table ===== -->
 <mat-card appearance="outlined" class="panel table-card">
@@ -135,7 +135,7 @@
                 <span class="tok-split">({{ fmtNum(r.promptTokens) }}/{{ fmtNum(r.outputTokens) }})</span>
               }
             </td>
-            <td class="c-latency mono-num" data-label="Latency">{{ r.durationMs }} ms</td>
+            <td class="c-latency mono-num" data-label="Latency">{{ r.durationMs != null ? r.durationMs + ' ms' : '—' }}</td>
           </tr>
         }
         @if (loading() && !rows().length) {

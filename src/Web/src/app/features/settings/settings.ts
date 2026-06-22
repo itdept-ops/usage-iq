@@ -43,6 +43,7 @@ export class Settings {
   readonly model = signal<SettingsModel | null>(null);
   readonly sources = signal<IngestionSource[]>([]);
   readonly loading = signal(true);
+  readonly loadError = signal(false);
   readonly saving = signal(false);
   readonly savingSourceId = signal<number | null>(null);
   readonly syncing = signal(false);
@@ -106,11 +107,12 @@ export class Settings {
       .subscribe(s => { this.now.set(Date.now()); if (s) this.status.set(s); });
   }
 
-  private load(): void {
+  load(): void {
     this.loading.set(true);
+    this.loadError.set(false);
     this.api.settings().subscribe({
       next: s => { this.model.set(s); this.loading.set(false); },
-      error: () => { this.loading.set(false); this.snack.open('Failed to load settings', 'Dismiss', { duration: 4000 }); },
+      error: () => { this.loading.set(false); this.loadError.set(true); this.snack.open('Failed to load settings', 'Dismiss', { duration: 4000 }); },
     });
     this.api.sources().subscribe({
       next: s => this.sources.set(s),

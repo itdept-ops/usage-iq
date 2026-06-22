@@ -1019,9 +1019,14 @@
    reach the router-inserted page component, which doesn't carry this (encapsulated) component's scope. */
 
 /* ---- Responsive ---------------------------------------------------- */
-/* Below this width the inline links overflow the bar, so swap them for the
-   hamburger + drawer. Brand, sync pill, GitHub, and account menu stay inline. */
-@media (max-width: 860px) {
+/* Below this width the dense inline nav (esp. for an admin: Usage + Tracker +
+   Family + Chat + Admin) plus the full right cluster (status text + presence +
+   usercount + bell + GitHub + username) can't both fit, so swap the inline nav
+   for the hamburger + drawer well before they collide. Raised to 960px so the
+   inline nav is never rendered alongside the still-full right cluster in the
+   old 721–859px band, where the right items (flex:0 0 auto, no shrink) were
+   clipped off the right edge by mat-toolbar's overflow:hidden. */
+@media (max-width: 960px) {
   .nav {
     display: none;
   }

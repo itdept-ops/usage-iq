@@ -77,7 +77,7 @@
             <li class="plan-row">
               <div class="plan-row__head">
                 <span class="plan-row__day"><mat-icon aria-hidden="true">event</mat-icon>{{ p.dayLabel }}</span>
-                <button mat-icon-button class="plan-row__remove" matTooltip="Remove"
+                <button mat-icon-button class="plan-row__remove" matTooltip="Remove" aria-label="Remove"
                         (click)="removeProposal(p)" [disabled]="addingPlan()">
                   <mat-icon aria-hidden="true">close</mat-icon>
                 </button>
@@ -188,7 +188,7 @@
 
   <!-- ── Week navigator ──────────────────────────────────────────────── -->
   <div class="week-nav">
-    <button mat-icon-button matTooltip="Previous week" (click)="shiftWeek(-1)">
+    <button mat-icon-button matTooltip="Previous week" aria-label="Previous week" (click)="shiftWeek(-1)">
       <mat-icon aria-hidden="true">chevron_left</mat-icon>
     </button>
     <div class="week-nav__label">
@@ -199,7 +199,7 @@
         <button mat-button class="week-nav__reset" (click)="goThisWeek()">Jump to this week</button>
       }
     </div>
-    <button mat-icon-button matTooltip="Next week" (click)="shiftWeek(1)">
+    <button mat-icon-button matTooltip="Next week" aria-label="Next week" (click)="shiftWeek(1)">
       <mat-icon aria-hidden="true">chevron_right</mat-icon>
     </button>
   </div>
@@ -271,14 +271,14 @@
                   <div class="meal__actions">
                     @if (hasIngredients(meal)) {
                       <button mat-icon-button class="meal__btn" matTooltip="Add ingredients to grocery list"
-                              (click)="addMealToGrocery(meal)">
+                              aria-label="Add ingredients to grocery list" (click)="addMealToGrocery(meal)">
                         <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
                       </button>
                     }
-                    <button mat-icon-button class="meal__btn" matTooltip="Edit" (click)="editMeal(cell, meal)">
+                    <button mat-icon-button class="meal__btn" matTooltip="Edit" aria-label="Edit" (click)="editMeal(cell, meal)">
                       <mat-icon aria-hidden="true">edit</mat-icon>
                     </button>
-                    <button mat-icon-button class="meal__btn meal__delete" matTooltip="Remove" (click)="removeMeal(meal)">
+                    <button mat-icon-button class="meal__btn meal__delete" matTooltip="Remove" aria-label="Remove" (click)="removeMeal(meal)">
                       <mat-icon aria-hidden="true">delete_outline</mat-icon>
                     </button>
                   </div>

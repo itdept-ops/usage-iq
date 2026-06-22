@@ -117,15 +117,15 @@
     <div class="filter-chips" role="group" aria-label="Filters">
       <button type="button" class="chip" [class.on]="capFilter() === 'ai'"
               (click)="toggleCap('ai')" [attr.aria-pressed]="capFilter() === 'ai'">
-        <mat-icon class="shield">shield</mat-icon> Has AI
+        <mat-icon class="shield" aria-hidden="true">shield</mat-icon> Has AI
       </button>
       <button type="button" class="chip" [class.on]="capFilter() === 'enabled'"
               (click)="toggleCap('enabled')" [attr.aria-pressed]="capFilter() === 'enabled'">
-        <mat-icon>check_circle</mat-icon> Enabled
+        <mat-icon aria-hidden="true">check_circle</mat-icon> Enabled
       </button>
       <button type="button" class="chip" [class.on]="capFilter() === 'disabled'"
               (click)="toggleCap('disabled')" [attr.aria-pressed]="capFilter() === 'disabled'">
-        <mat-icon>block</mat-icon> Disabled
+        <mat-icon aria-hidden="true">block</mat-icon> Disabled
       </button>
 
       <mat-form-field appearance="outline" class="chip-select" subscriptSizing="dynamic">
@@ -186,7 +186,7 @@
                   <span class="row-email">{{ u.name }}</span>
                 } @else {
                   <span class="row-email email-hidden" role="img" aria-label="email hidden">
-                    <mat-icon class="email-hidden-icon">lock</mat-icon>••••••
+                    <mat-icon class="email-hidden-icon" aria-hidden="true">lock</mat-icon>••••••
                   </span>
                 }
                 @if (!u.isEnabled) { <span class="pill pill--off">Disabled</span> }
@@ -196,7 +196,7 @@
                 <span class="role-badge">{{ roleLabel(u) }}</span>
                 @if (hasAnyAi(u.permissions)) {
                   <span class="ai-badge" matTooltip="Holds AI (token-spending) capabilities">
-                    <mat-icon class="shield">shield</mat-icon> AI
+                    <mat-icon class="shield" aria-hidden="true">shield</mat-icon> AI
                   </span>
                 }
               </span>
@@ -235,7 +235,7 @@
               <span class="detail-email mono-num">{{ u.email }}</span>
             } @else {
               <span class="detail-email email-hidden" role="img" aria-label="email hidden">
-                <mat-icon class="email-hidden-icon">lock</mat-icon>•••••• <span class="reveal-hint">(reveal to show)</span>
+                <mat-icon class="email-hidden-icon" aria-hidden="true">lock</mat-icon>•••••• <span class="reveal-hint">(reveal to show)</span>
               </span>
             }
             <span class="detail-last micro-label">{{ u.lastLoginUtc ? 'last in ' + (u.lastLoginUtc | date: 'MMM d, HH:mm') : 'never signed in' }}</span>
@@ -639,7 +639,7 @@
             <span class="audit-actor mono-num">{{ a.actorEmail }}</span>
           } @else {
             <span class="audit-actor email-hidden" role="img" aria-label="email hidden">
-              <mat-icon class="email-hidden-icon">lock</mat-icon>••••••
+              <mat-icon class="email-hidden-icon" aria-hidden="true">lock</mat-icon>••••••
             </span>
           }
           @if (a.targetEmail) {

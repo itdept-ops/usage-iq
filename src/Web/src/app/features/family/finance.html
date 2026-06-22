@@ -228,7 +228,11 @@
 
           <section class="fin-card fin-chartcard">
             <h2 class="fin-card__title">12-month trend</h2>
-            <div class="fin-chart fin-chart--trend"><app-chart [option]="trendOption()" /></div>
+            @if (s.monthlyTrend.length) {
+              <div class="fin-chart fin-chart--trend"><app-chart [option]="trendOption()" /></div>
+            } @else {
+              <p class="fin-card__empty">Not enough history yet — import a few months to see the trend.</p>
+            }
           </section>
         </div>
       }

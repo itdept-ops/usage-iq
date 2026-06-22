@@ -36,8 +36,8 @@
     <span class="grow"></span>
 
     <div class="filter-actions">
-      <button mat-stroked-button class="btn-reset" (click)="resetFilters()"><mat-icon>clear</mat-icon> Reset</button>
-      <button mat-flat-button color="primary" class="btn-apply" (click)="applyFilters()"><mat-icon>filter_list</mat-icon> Apply</button>
+      <button mat-stroked-button class="btn-reset" (click)="resetFilters()"><mat-icon aria-hidden="true">clear</mat-icon> Reset</button>
+      <button mat-flat-button color="primary" class="btn-apply" (click)="applyFilters()"><mat-icon aria-hidden="true">filter_list</mat-icon> Apply</button>
     </div>
   </div>
 </section>
@@ -45,22 +45,22 @@
 <!-- ───────────────────────── Totals ───────────────────────── -->
 <div class="cards">
   <article class="kpi panel">
-    <div class="kpi-top"><span class="kpi-label">Machines</span><span class="kpi-icon"><mat-icon>dns</mat-icon></span></div>
+    <div class="kpi-top"><span class="kpi-label">Machines</span><span class="kpi-icon"><mat-icon aria-hidden="true">dns</mat-icon></span></div>
     <div class="kpi-value mono-num">{{ totals().machineCount | number }}</div>
     <div class="kpi-sub">reporting hosts</div>
   </article>
   <article class="kpi panel">
-    <div class="kpi-top"><span class="kpi-label">Users</span><span class="kpi-icon"><mat-icon>group</mat-icon></span></div>
+    <div class="kpi-top"><span class="kpi-label">Users</span><span class="kpi-icon"><mat-icon aria-hidden="true">group</mat-icon></span></div>
     <div class="kpi-value mono-num">{{ totals().userCount | number }}</div>
     <div class="kpi-sub">reporting accounts</div>
   </article>
   <article class="kpi panel kpi-tokens">
-    <div class="kpi-top"><span class="kpi-label">Total tokens</span><span class="kpi-icon"><mat-icon>data_usage</mat-icon></span></div>
+    <div class="kpi-top"><span class="kpi-label">Total tokens</span><span class="kpi-icon"><mat-icon aria-hidden="true">data_usage</mat-icon></span></div>
     <div class="kpi-value mono-num">{{ totals().tokens | compact }}</div>
     <div class="kpi-sub"><span class="mono-num">{{ totals().records | number }}</span> records</div>
   </article>
   <article class="kpi panel kpi-cost">
-    <div class="kpi-top"><span class="kpi-label">Total cost</span><span class="kpi-icon"><mat-icon>payments</mat-icon></span></div>
+    <div class="kpi-top"><span class="kpi-label">Total cost</span><span class="kpi-icon"><mat-icon aria-hidden="true">payments</mat-icon></span></div>
     <div class="kpi-value mono-num cost">{{ totals().cost | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
     <div class="kpi-sub">across the fleet</div>
   </article>
@@ -71,8 +71,8 @@
   <div class="board-head">
     <h3 class="panel-header">{{ board() === 'machines' ? 'Machines' : 'Users' }} · by cost</h3>
     <mat-button-toggle-group [value]="board()" (change)="board.set($event.value)" hideSingleSelectionIndicator>
-      <mat-button-toggle value="machines"><mat-icon>dns</mat-icon> Machines</mat-button-toggle>
-      <mat-button-toggle value="users"><mat-icon>group</mat-icon> Users</mat-button-toggle>
+      <mat-button-toggle value="machines"><mat-icon aria-hidden="true">dns</mat-icon> Machines</mat-button-toggle>
+      <mat-button-toggle value="users"><mat-icon aria-hidden="true">group</mat-icon> Users</mat-button-toggle>
     </mat-button-toggle-group>
   </div>
 
@@ -91,8 +91,8 @@
         <button class="lb-main" (click)="toggle(m.name)" [attr.aria-expanded]="isExpanded(m.name)">
           <span class="lb-rank mono-num">{{ i + 1 }}</span>
           <span class="lb-name">
-            <mat-icon class="lb-chev">{{ isExpanded(m.name) ? 'expand_more' : 'chevron_right' }}</mat-icon>
-            <mat-icon class="lb-kind">{{ isLocal(m.name) ? 'home' : 'dns' }}</mat-icon>
+            <mat-icon class="lb-chev" aria-hidden="true">{{ isExpanded(m.name) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+            <mat-icon class="lb-kind" aria-hidden="true">{{ isLocal(m.name) ? 'home' : 'dns' }}</mat-icon>
             <span class="lb-label" [title]="m.name">{{ isLocal(m.name) ? 'local (file sync)' : m.name }}</span>
             <span class="lb-tag micro-label">{{ m.users.length }} user{{ m.users.length === 1 ? '' : 's' }}</span>
           </span>
@@ -111,10 +111,10 @@
           </button>
           <mat-menu #machineMenu="matMenu">
             <button mat-menu-item (click)="combineMachine(m)">
-              <mat-icon>merge_type</mat-icon><span>Combine / move…</span>
+              <mat-icon aria-hidden="true">merge_type</mat-icon><span>Combine / move…</span>
             </button>
             <button mat-menu-item class="menu-danger" (click)="deleteMachine(m)">
-              <mat-icon>delete_forever</mat-icon><span>Delete…</span>
+              <mat-icon aria-hidden="true">delete_forever</mat-icon><span>Delete…</span>
             </button>
           </mat-menu>
         }
@@ -125,56 +125,56 @@
               <span class="lb-detail-lbl micro-label">Machine details</span>
               <dl class="meta-grid">
                 <div class="meta-item">
-                  <dt><mat-icon>lan</mat-icon> Local IP</dt>
+                  <dt><mat-icon aria-hidden="true">lan</mat-icon> Local IP</dt>
                   @if (m.localIp) { <dd class="mono-num">{{ m.localIp }}</dd> }
                   @else { <dd class="muted">unknown</dd> }
                 </div>
                 <div class="meta-item">
-                  <dt><mat-icon>public</mat-icon> Public IP</dt>
+                  <dt><mat-icon aria-hidden="true">public</mat-icon> Public IP</dt>
                   @if (m.publicIp) { <dd class="mono-num">{{ m.publicIp }}</dd> }
                   @else { <dd class="muted">unknown</dd> }
                 </div>
                 <div class="meta-item">
-                  <dt><mat-icon>computer</mat-icon> OS</dt>
+                  <dt><mat-icon aria-hidden="true">computer</mat-icon> OS</dt>
                   @if (m.os) {
                     <dd>{{ m.os }}@if (m.arch) { <span class="meta-sub">· {{ m.arch }}</span> }</dd>
                   } @else { <dd class="muted">unknown</dd> }
                 </div>
                 <div class="meta-item">
-                  <dt><mat-icon>account_circle</mat-icon> OS user</dt>
+                  <dt><mat-icon aria-hidden="true">account_circle</mat-icon> OS user</dt>
                   @if (m.osUser) { <dd class="mono-num">{{ m.osUser }}</dd> }
                   @else { <dd class="muted">unknown</dd> }
                 </div>
                 <div class="meta-item">
-                  <dt><mat-icon>memory</mat-icon> CPU cores</dt>
+                  <dt><mat-icon aria-hidden="true">memory</mat-icon> CPU cores</dt>
                   @if (m.cpuCount != null) { <dd class="mono-num">{{ m.cpuCount | number }}</dd> }
                   @else { <dd class="muted">unknown</dd> }
                 </div>
                 <div class="meta-item">
-                  <dt><mat-icon>devices</mat-icon> Agent</dt>
+                  <dt><mat-icon aria-hidden="true">devices</mat-icon> Agent</dt>
                   @if (m.agent) {
                     <dd>
                       <span class="agent-badge" [class.is-desktop]="agentLabel(m.agent) === 'Desktop'"
                             [class.is-console]="agentLabel(m.agent) === 'Console'">
-                        <mat-icon>{{ agentLabel(m.agent) === 'Desktop' ? 'desktop_windows' : 'terminal' }}</mat-icon>
+                        <mat-icon aria-hidden="true">{{ agentLabel(m.agent) === 'Desktop' ? 'desktop_windows' : 'terminal' }}</mat-icon>
                         {{ agentLabel(m.agent) }}
                       </span>
                     </dd>
                   } @else { <dd class="muted">unknown</dd> }
                 </div>
                 <div class="meta-item">
-                  <dt><mat-icon>verified</mat-icon> Reporter</dt>
+                  <dt><mat-icon aria-hidden="true">verified</mat-icon> Reporter</dt>
                   @if (m.reporterVersion) { <dd class="mono-num">v{{ m.reporterVersion }}</dd> }
                   @else { <dd class="muted">unknown</dd> }
                 </div>
                 <div class="meta-item">
-                  <dt><mat-icon>schedule</mat-icon> First seen</dt>
+                  <dt><mat-icon aria-hidden="true">schedule</mat-icon> First seen</dt>
                   @if (m.firstSeenUtc) {
                     <dd [title]="(m.firstSeenUtc | date: 'medium') || ''">{{ seen(m.firstSeenUtc) }}</dd>
                   } @else { <dd class="muted">unknown</dd> }
                 </div>
                 <div class="meta-item">
-                  <dt><mat-icon>update</mat-icon> Last seen</dt>
+                  <dt><mat-icon aria-hidden="true">update</mat-icon> Last seen</dt>
                   @if (m.lastSeenUtc) {
                     <dd [title]="(m.lastSeenUtc | date: 'medium') || ''">{{ seen(m.lastSeenUtc) }}</dd>
                   } @else { <dd class="muted">never</dd> }
@@ -186,7 +186,7 @@
             @if (m.users.length) {
               <div class="chips">
                 @for (u of m.users; track u) {
-                  <span class="ent-chip"><mat-icon>person</mat-icon>{{ u }}</span>
+                  <span class="ent-chip"><mat-icon aria-hidden="true">person</mat-icon>{{ u }}</span>
                 }
               </div>
             } @else {
@@ -204,8 +204,8 @@
         <button class="lb-main" (click)="toggle(userKey(u))" [attr.aria-expanded]="isExpanded(userKey(u))">
           <span class="lb-rank mono-num">{{ i + 1 }}</span>
           <span class="lb-name">
-            <mat-icon class="lb-chev">{{ isExpanded(userKey(u)) ? 'expand_more' : 'chevron_right' }}</mat-icon>
-            <mat-icon class="lb-kind">{{ isLocal(u.name) ? 'home' : 'person' }}</mat-icon>
+            <mat-icon class="lb-chev" aria-hidden="true">{{ isExpanded(userKey(u)) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+            <mat-icon class="lb-kind" aria-hidden="true">{{ isLocal(u.name) ? 'home' : 'person' }}</mat-icon>
             <span class="lb-label" [title]="u.name">{{ isLocal(u.name) ? 'local (file sync)' : u.name }}</span>
             <span class="lb-tag micro-label">{{ u.machines.length }} machine{{ u.machines.length === 1 ? '' : 's' }}</span>
           </span>
@@ -224,13 +224,13 @@
           </button>
           <mat-menu #userMenu="matMenu">
             <button mat-menu-item (click)="combineUser(u)">
-              <mat-icon>merge_type</mat-icon><span>Combine / move…</span>
+              <mat-icon aria-hidden="true">merge_type</mat-icon><span>Combine / move…</span>
             </button>
             <button mat-menu-item (click)="revokeUser(u)">
-              <mat-icon>block</mat-icon><span>Revoke key</span>
+              <mat-icon aria-hidden="true">block</mat-icon><span>Revoke key</span>
             </button>
             <button mat-menu-item class="menu-danger" (click)="deleteUser(u)">
-              <mat-icon>delete_forever</mat-icon><span>Delete…</span>
+              <mat-icon aria-hidden="true">delete_forever</mat-icon><span>Delete…</span>
             </button>
           </mat-menu>
         }
@@ -240,7 +240,7 @@
             @if (u.machines.length) {
               <div class="chips">
                 @for (mname of u.machines; track mname) {
-                  <span class="ent-chip"><mat-icon>dns</mat-icon>{{ isLocal(mname) ? 'local' : mname }}</span>
+                  <span class="ent-chip"><mat-icon aria-hidden="true">dns</mat-icon>{{ isLocal(mname) ? 'local' : mname }}</span>
                 }
               </div>
             } @else {

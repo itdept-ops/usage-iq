@@ -423,7 +423,7 @@ a.tile:focus-visible {
   a { color: var(--tech-accent); text-decoration: underline; }
   code { font-family: var(--tech-font-mono, monospace); font-size: 0.9em;
     background: var(--tech-bg-sunken); border: 1px solid var(--tech-border-subtle);
-    border-radius: 6px; padding: 1px 5px; }
+    border-radius: 6px; padding: 1px 5px; overflow-wrap: anywhere; }
   blockquote { margin: 0 0 0.6em; padding: 4px 12px; border-left: 3px solid var(--tech-border-strong);
     color: var(--tech-text-secondary); background: var(--tech-bg-sunken); border-radius: 0 8px 8px 0; }
   del { color: var(--tech-text-tertiary); }

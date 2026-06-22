@@ -214,7 +214,8 @@
                     <div class="cx-edit">
                       <textarea class="cx-edit__input" [ngModel]="editDraft()"
                                 (ngModelChange)="editDraft.set($event)"
-                                (keydown)="onEditKeydown($event, m)" rows="1"></textarea>
+                                (keydown)="onEditKeydown($event, m)" rows="1"
+                                cdkTextareaAutosize cdkAutosizeMinRows="1" cdkAutosizeMaxRows="6"></textarea>
                       <div class="cx-edit__actions">
                         <button mat-button (click)="cancelEdit()">Cancel</button>
                         <button mat-flat-button color="primary" (click)="saveEdit(m)">Save</button>
@@ -329,6 +330,7 @@
           @if (composePromptOpen()) {
             <div class="cx-compose__prompt">
               <textarea class="cx-compose__prompt-input" rows="1"
+                        cdkTextareaAutosize cdkAutosizeMinRows="1" cdkAutosizeMaxRows="4"
                         [ngModel]="composePrompt()" (ngModelChange)="composePrompt.set($event)"
                         (keydown)="onComposePromptKeydown($event)"
                         placeholder="Describe the message you want… (Enter to draft, Esc to close)"
@@ -387,6 +389,7 @@
             </mat-menu>
 
             <textarea #composer class="cx-composer__input" rows="1"
+                      cdkTextareaAutosize cdkAutosizeMinRows="1" cdkAutosizeMaxRows="6"
                       [ngModel]="draft()" (ngModelChange)="onDraftChange($event)"
                       (keydown)="onComposerKeydown($event)" (blur)="closeMentionsSoon()"
                       [placeholder]="'Message ' + ch.displayName + '… (Enter to send, Shift+Enter for newline, @ to mention)'"

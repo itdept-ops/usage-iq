@@ -1,4 +1,4 @@
-import { Component, computed, effect, HostListener, inject, signal } from '@angular/core';
+import { Component, computed, effect, ElementRef, HostListener, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { timer, switchMap, catchError, of, filter } from 'rxjs';
@@ -60,6 +60,7 @@ export class App {
   private locationCapture = inject(LocationCapture);
   private snack = inject(MatSnackBar);
   private dialog = inject(MatDialog);
+  private host = inject(ElementRef<HTMLElement>);
 
   /** Whether the quick-add dialog is currently open (so the shortcut + FAB don't stack copies). */
   private quickAddOpen = false;
@@ -79,8 +80,32 @@ export class App {
 
   /** Mobile hamburger drawer open-state (only used below the nav breakpoint). */
   readonly mobileNavOpen = signal(false);
-  toggleMobileNav(): void { this.mobileNavOpen.update(v => !v); }
-  closeMobileNav(): void { this.mobileNavOpen.set(false); }
+  toggleMobileNav(): void { this.mobileNavOpen() ? this.closeMobileNav() : this.openMobileNav(); }
+
+  /**
+   * Open the drawer and move focus into it (dialog-like contract): focus the first link so a
+   * keyboard / screen-reader user lands inside the drawer rather than behind it. Tab is trapped
+   * while open (see {@link onMobileNavKeydown}) and Escape returns focus to the burger.
+   */
+  openMobileNav(): void {
+    this.mobileNavOpen.set(true);
+    // Wait a frame for the drawer's *ngIf-gated content to be focusable, then focus the first item.
+    requestAnimationFrame(() => {
+      const root = this.host.nativeElement as HTMLElement;
+      const first = root.querySelector<HTMLElement>('#mobile-nav .mobile-nav__item');
+      first?.focus();
+    });
+  }
+
+  /** Close the drawer; restore focus to the burger so keyboard focus isn't lost to the page top. */
+  closeMobileNav(): void {
+    const wasOpen = this.mobileNavOpen();
+    this.mobileNavOpen.set(false);
+    if (wasOpen) {
+      const burger = (this.host.nativeElement as HTMLElement).querySelector<HTMLElement>('.navburger');
+      burger?.focus();
+    }
+  }
 
   /**
    * Widget pop-outs, public shared views, and the public marketing pages (landing / features /
@@ -389,6 +414,44 @@ export class App {
 
     e.preventDefault();
     this.openQuickAdd();
+  }
+
+  /**
+   * Keyboard contract for the open mobile drawer: Escape closes it (focus returns to the burger), and
+   * Tab is trapped within the drawer so focus can't slip to the page underneath (which is still in the
+   * DOM, just visually covered by the fixed drawer + scrim). No-op while the drawer is closed.
+   */
+  @HostListener('document:keydown', ['$event'])
+  onMobileNavKeydown(e: KeyboardEvent): void {
+    if (!this.mobileNavOpen()) return;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      this.closeMobileNav();
+      return;
+    }
+
+    if (e.key !== 'Tab') return;
+
+    const root = (this.host.nativeElement as HTMLElement).querySelector<HTMLElement>('#mobile-nav');
+    if (!root) return;
+    const items = Array.from(root.querySelectorAll<HTMLElement>('.mobile-nav__item'));
+    if (items.length === 0) return;
+
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+
+    // Wrap at the ends; if focus is somehow outside the drawer, pull it back to an edge.
+    if (e.shiftKey) {
+      if (active === first || !root.contains(active)) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (active === last || !root.contains(active)) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 
   /** True when the event target is a text field / editable element where a bare "q" should type normally. */

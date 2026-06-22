@@ -14,7 +14,7 @@
     @for (s of stages; track s.n) {
       <article class="flow-stage">
         <div class="flow-marker">
-          <span class="flow-icon"><mat-icon>{{ s.icon }}</mat-icon></span>
+          <span class="flow-icon"><mat-icon aria-hidden="true">{{ s.icon }}</mat-icon></span>
           <span class="flow-n">{{ s.n }}</span>
         </div>
         <div class="flow-body panel">
@@ -34,7 +34,7 @@
     <div class="faqs">
       @for (f of faqs; track f.q) {
         <details class="faq panel">
-          <summary>{{ f.q }}<mat-icon>expand_more</mat-icon></summary>
+          <summary>{{ f.q }}<mat-icon aria-hidden="true">expand_more</mat-icon></summary>
           <p>{{ f.a }}</p>
         </details>
       }

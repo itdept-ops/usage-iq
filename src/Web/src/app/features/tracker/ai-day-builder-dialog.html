@@ -166,7 +166,7 @@
                 @if (f.clamped) { <span class="db-clamped" matTooltip="A value was capped to a safe maximum">capped</span> }
               </div>
             </div>
-            <div class="db-macros">
+            <div class="db-macros db-macros--food">
               <label class="db-num"><span>kcal</span>
                 <input type="number" min="0" step="1" inputmode="numeric" class="mono-num"
                        [ngModel]="f.calories" (ngModelChange)="setFood(rm.meal, $index, { calories: +$event || 0 })"

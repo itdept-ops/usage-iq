@@ -189,4 +189,12 @@
       @if (r.warning) { <div class="kv warn"><span>Warning</span><b>{{ r.warning }}</b></div> }
     </mat-card>
   }
+} @else if (loadError()) {
+  <mat-card appearance="outlined" class="panel s-panel load-error">
+    <mat-icon aria-hidden="true">cloud_off</mat-icon>
+    <p>Couldn't load settings. Check your connection and try again.</p>
+    <button mat-stroked-button (click)="load()">
+      <mat-icon aria-hidden="true">refresh</mat-icon> Retry
+    </button>
+  </mat-card>
 }

@@ -71,7 +71,7 @@
             <li class="ai-row ai-row--suggest">
               <div class="ai-row__head">
                 @if (row.ageHint) { <span class="ai-row__hint"><mat-icon aria-hidden="true">child_care</mat-icon>{{ row.ageHint }}</span> }
-                <button mat-icon-button class="ai-row__remove" matTooltip="Remove"
+                <button mat-icon-button class="ai-row__remove" matTooltip="Remove" aria-label="Remove"
                         (click)="removeSuggestRow(row)" [disabled]="aiApplying()">
                   <mat-icon aria-hidden="true">close</mat-icon>
                 </button>
@@ -335,10 +335,10 @@
                 @if (busyId() === chore.id) {
                   <mat-spinner [diameter]="20" />
                 } @else {
-                  <button mat-icon-button matTooltip="Edit" (click)="edit(chore)">
+                  <button mat-icon-button matTooltip="Edit" aria-label="Edit" (click)="edit(chore)">
                     <mat-icon aria-hidden="true">edit</mat-icon>
                   </button>
-                  <button mat-icon-button matTooltip="Delete" class="chore__delete" (click)="remove(chore)">
+                  <button mat-icon-button matTooltip="Delete" aria-label="Delete" class="chore__delete" (click)="remove(chore)">
                     <mat-icon aria-hidden="true">delete_outline</mat-icon>
                   </button>
                 }
@@ -384,10 +384,10 @@
                   @if (busyId() === chore.id) {
                     <mat-spinner [diameter]="20" />
                   } @else {
-                    <button mat-icon-button matTooltip="Edit" (click)="edit(chore)">
+                    <button mat-icon-button matTooltip="Edit" aria-label="Edit" (click)="edit(chore)">
                       <mat-icon aria-hidden="true">edit</mat-icon>
                     </button>
-                    <button mat-icon-button matTooltip="Delete" class="chore__delete" (click)="remove(chore)">
+                    <button mat-icon-button matTooltip="Delete" aria-label="Delete" class="chore__delete" (click)="remove(chore)">
                       <mat-icon aria-hidden="true">delete_outline</mat-icon>
                     </button>
                   }

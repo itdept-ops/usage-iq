@@ -216,3 +216,9 @@
   .preset-grid { grid-template-columns: repeat(2, 1fr); }
   .timer-grid { grid-template-columns: 1fr; }
 }
+
+/* iOS Safari auto-zooms native inputs below 16px on focus; pin to 16px on phones
+   (mirrors .add-item__input/.ask-notes__input in lists.scss/family.scss). */
+@media (max-width: 640px) {
+  .quick-timer__input { font-size: 16px; }
+}
