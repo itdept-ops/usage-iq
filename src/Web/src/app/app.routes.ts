@@ -155,6 +155,15 @@ export const routes: Routes = [
         title: 'Usage IQ · Chores',
       },
       {
+        // Allowance manager — PARENT-only: gated by allowance.manage ON TOP OF the group's family.use. Every
+        // /api/family/allowance write is gated by allowance.manage server-side too; a child uses the kid-safe
+        // chores view (with their own balance), never this page.
+        path: 'allowance',
+        canActivate: [permissionGuard(PERM.allowanceManage)],
+        loadComponent: () => import('./features/family/allowance').then(m => m.FamilyAllowance),
+        title: 'Usage IQ · Allowance',
+      },
+      {
         path: 'calendar',
         loadComponent: () => import('./features/family/calendar').then(m => m.FamilyCalendar),
         title: 'Usage IQ · Family Calendar',

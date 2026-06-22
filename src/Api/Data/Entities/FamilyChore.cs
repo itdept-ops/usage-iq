@@ -34,6 +34,35 @@ public class FamilyChore
     /// <summary>How the chore repeats: "none" | "daily" | "weekly".</summary>
     public string Recurrence { get; set; } = "none";
 
+    // ---- Marketplace + allowance (the claim/approve lifecycle + monetary credits) ----
+
+    /// <summary>Money CREDITS awarded to the child on parent APPROVAL (cash given IRL). Default 0. Distinct
+    /// from <see cref="Points"/> (the existing stars strip): Points are the display tally, CreditValue is the
+    /// allowance amount that lands in the child's ledger.</summary>
+    public decimal CreditValue { get; set; }
+
+    /// <summary>Where the chore comes from: "assigned" (parent-assigned to a specific member, the existing
+    /// behaviour) | "pool" (the marketplace — anyone-claimable by a child). Default "assigned".</summary>
+    public string Source { get; set; } = "assigned";
+
+    /// <summary>The claim/approval state machine, distinct from the recurring <see cref="Done"/> flag:
+    /// "open" (claimable / not yet submitted) | "claimed" (a child grabbed a pool chore) |
+    /// "submitted" (a child marked it done, awaiting a parent) | "approved" (a parent approved + credits
+    /// awarded) | "rejected" (a parent sent it back). Default "open".</summary>
+    public string Status { get; set; } = "open";
+
+    /// <summary>AppUser id of the child who CLAIMED a pool chore; null when unclaimed.</summary>
+    public int? ClaimedByUserId { get; set; }
+
+    /// <summary>When the chore was claimed (UTC); null when unclaimed.</summary>
+    public DateTime? ClaimedUtc { get; set; }
+
+    /// <summary>AppUser id of the parent who APPROVED the chore; null until approved.</summary>
+    public int? ApprovedByUserId { get; set; }
+
+    /// <summary>When the chore was approved (UTC); null until approved.</summary>
+    public DateTime? ApprovedUtc { get; set; }
+
     /// <summary>AppUser id of whoever created the chore (identity is by id, never email).</summary>
     public int CreatedByUserId { get; set; }
 

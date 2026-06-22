@@ -403,6 +403,106 @@
 }
 
 /* ── Chore editor dialog bits ───────────────────────────────────────── */
+/* ── Marketplace / approval / kid view ─────────────────────────────────── */
+.board-section,
+.kid-section { margin-top: var(--tech-space-5, 20px); }
+.board-section__title,
+.kid-section__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  mat-icon { width: 20px; height: 20px; font-size: 20px; color: var(--tech-accent); }
+}
+.kid-section__empty {
+  margin: 8px 0 0;
+  color: var(--tech-text-secondary);
+  font-size: var(--tech-fs-body, 14px);
+}
+
+/* Approval queue — a gently highlighted "needs you" panel */
+.approval {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-4, 16px);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 38%, var(--tech-border));
+  border-radius: var(--tech-radius, 12px);
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--tech-accent) 12%, transparent), transparent 55%),
+    var(--tech-panel);
+}
+.approval__head { display: flex; align-items: center; gap: 10px; }
+.approval__title {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0;
+  font-size: var(--tech-fs-h1, 18px); font-weight: 700; color: var(--tech-text);
+  mat-icon { width: 20px; height: 20px; font-size: 20px; color: var(--tech-accent); }
+}
+.approval__count {
+  min-width: 22px; padding: 0 7px; height: 22px; line-height: 22px; text-align: center;
+  border-radius: 999px; font-weight: 800; font-size: var(--tech-fs-label);
+  color: var(--tech-text-on-accent); background: var(--tech-accent);
+}
+
+/* Money credit chip on a chore */
+.chore__credit {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--tech-positive, #34c759);
+  mat-icon { width: 16px; height: 16px; font-size: 16px; }
+  &--earned { color: var(--tech-positive, #34c759); }
+}
+
+/* Status chips */
+.chore__chip--pool { color: var(--tech-accent); border-color: color-mix(in srgb, var(--tech-accent) 40%, transparent); }
+.chore__chip--info { color: var(--tech-accent); }
+.chore__chip--warn { color: var(--tech-warn); }
+.chore--rejected { border-left: 3px solid var(--tech-warn); }
+.chore--submitted { background: color-mix(in srgb, var(--tech-accent) 6%, var(--tech-panel)); }
+.chore__reject { margin-left: 6px; }
+
+/* Kid balance hero */
+.kid-balance {
+  padding: var(--tech-space-5, 20px);
+  border-radius: var(--tech-radius, 12px);
+  border: 1px solid color-mix(in srgb, var(--tech-positive, #34c759) 32%, var(--tech-border));
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-positive, #34c759) 16%, transparent), transparent 60%),
+    var(--tech-panel);
+}
+.kid-balance__face { display: flex; align-items: center; gap: 16px; }
+.kid-balance__icon {
+  width: 44px; height: 44px; font-size: 44px;
+  color: var(--tech-positive, #34c759);
+}
+.kid-balance__label { margin: 0; font-size: var(--tech-fs-label); color: var(--tech-text-secondary); font-weight: 600; }
+.kid-balance__amount {
+  margin: 2px 0 0; font-size: 2.4rem; font-weight: 800; line-height: 1;
+  color: var(--tech-positive, #34c759); font-variant-numeric: tabular-nums;
+  &--neg { color: var(--tech-warn); }
+}
+
+/* Allowance ledger rows (kid view + reused in the manager) */
+.ledger { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ledger__row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: var(--tech-r-control, 8px);
+  background: var(--tech-bg-sunken);
+}
+.ledger__kind {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 999px;
+  background: color-mix(in srgb, var(--tech-text-tertiary) 18%, transparent);
+  mat-icon { width: 16px; height: 16px; font-size: 16px; color: var(--tech-text-secondary); }
+  &--earn { background: color-mix(in srgb, var(--tech-warn) 18%, transparent); mat-icon { color: var(--tech-warn); } }
+  &--payout { background: color-mix(in srgb, var(--tech-positive, #34c759) 18%, transparent); mat-icon { color: var(--tech-positive, #34c759); } }
+}
+.ledger__note { flex: 1; min-width: 0; color: var(--tech-text); font-size: var(--tech-fs-body, 14px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ledger__amount {
+  font-weight: 700; font-variant-numeric: tabular-nums;
+  &--pos { color: var(--tech-positive, #34c759); }
+  &--neg { color: var(--tech-warn); }
+}
+
 .chore-edit__body { min-width: min(420px, 84vw); }
 .chore-edit__anyone-icon { width: 16px !important; height: 16px !important; font-size: 16px !important; color: var(--tech-text-on-accent); }
 
@@ -452,6 +552,46 @@
     border-color: color-mix(in srgb, var(--tech-warn) 50%, transparent);
     background: var(--tech-warn-tint, rgba(255, 196, 0, 0.14));
   }
+}
+
+/* Source toggle (Assigned vs Marketplace) in the chore editor */
+.chore-edit__source {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.chore-edit__source-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-r-control, 8px);
+  background: var(--tech-bg-sunken);
+  color: var(--tech-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+  mat-icon { width: 20px; height: 20px; font-size: 20px; color: var(--tech-text-tertiary); }
+  &.is-on {
+    border-color: color-mix(in srgb, var(--tech-accent) 60%, transparent);
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    color: var(--tech-text);
+    mat-icon { color: var(--tech-accent); }
+  }
+}
+.chore-edit__source-name { font-weight: 700; font-size: var(--tech-fs-body, 14px); }
+.chore-edit__source-blurb { font-size: var(--tech-fs-label); color: var(--tech-text-tertiary); }
+
+.chore-edit__credit {
+  .chore-edit__points-label mat-icon { color: var(--tech-positive, #34c759); }
+}
+.chore-edit__credit-field { align-self: flex-start; width: 9rem; }
+.chore-edit__credit .chore-edit__preset.is-on {
+  color: var(--tech-positive, #34c759);
+  border-color: color-mix(in srgb, var(--tech-positive, #34c759) 50%, transparent);
+  background: color-mix(in srgb, var(--tech-positive, #34c759) 14%, transparent);
 }
 
 @media (max-width: 600px) {

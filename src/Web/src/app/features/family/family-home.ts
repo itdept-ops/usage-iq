@@ -40,7 +40,8 @@ const TILES: FeatureTile[] = [
   { key: 'timer', label: 'Timer', icon: 'timer', blurb: 'Shared timers and countdowns', route: '/family/timer' },
   { key: 'meals', label: 'Meal Planner', icon: 'restaurant', blurb: 'Plan the week around the table', route: '/family/meals' },
   { key: 'chores', label: 'Chores', icon: 'cleaning_services', blurb: 'Share the load, fairly', route: '/family/chores' },
-  { key: 'finance', label: 'Finance', icon: 'savings', blurb: 'Budgets, bills, and balances', route: '/family/finance', perm: PERM.familyFinance },
+  { key: 'allowance', label: 'Allowance', icon: 'savings', blurb: "Track each child's earned credits", route: '/family/allowance', perm: PERM.allowanceManage },
+  { key: 'finance', label: 'Finance', icon: 'account_balance_wallet', blurb: 'Budgets, bills, and balances', route: '/family/finance', perm: PERM.familyFinance },
   { key: 'calendar', label: 'Calendar', icon: 'calendar_month', blurb: 'The family calendar in one place', route: '/family/calendar' },
   { key: 'polls', label: 'Polls', icon: 'how_to_vote', blurb: 'Pick a time or settle a plan together', route: '/family/polls' },
   { key: 'locations', label: "Where's everyone", icon: 'person_pin_circle', blurb: 'See where the family is on a map', route: '/family/locations' },
@@ -82,10 +83,24 @@ export class FamilyHome implements OnDestroy {
   /** The local "YYYY-MM-DD" the briefing was last loaded for, so we can refresh when the day rolls over. */
   private briefingDay = '';
 
-  /** Feature tiles, filtered to the ones the caller may see (Finance hides without family.finance). */
+  /**
+   * Whether the caller is a CHILD: they hold the child chore capability (chore.claim) but NOT a parent
+   * capability (allowance.manage). A child gets a focused, kid-safe Family Hub — only the Chores room (which
+   * itself renders their own chores + balance) — never finance/admin/other-member nav.
+   */
+  readonly isChild = computed<boolean>(() => {
+    this.auth.permissions(); // re-run on permission changes
+    return this.auth.hasPermission(PERM.choreClaim) && !this.auth.hasPermission(PERM.allowanceManage);
+  });
+
+  /**
+   * Feature tiles, filtered to the ones the caller may see (perm-gated tiles hide without the grant). A child
+   * sees ONLY the Chores room — every other room is hidden so the kid view stays focused and safe.
+   */
   readonly tiles = computed<FeatureTile[]>(() => {
     this.auth.permissions(); // re-run on permission changes
-    return TILES.filter(t => !t.perm || this.auth.hasPermission(t.perm));
+    const visible = TILES.filter(t => !t.perm || this.auth.hasPermission(t.perm));
+    return this.isChild() ? visible.filter(t => t.key === 'chores') : visible;
   });
 
   /** The household's members in server order (owner first), or empty until loaded. */

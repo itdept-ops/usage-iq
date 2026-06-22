@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Ccusage.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Ccusage.Api.Migrations
 {
     [DbContext(typeof(UsageDbContext))]
-    partial class UsageDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260622172401_ChoreMarketplaceAllowance")]
+    partial class ChoreMarketplaceAllowance
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -79,7 +82,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("UserEmail", "WhenUtc");
 
-                    b.ToTable("AiUsageLogs", (string)null);
+                    b.ToTable("AiUsageLogs");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.AppConfig", b =>
@@ -124,7 +127,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("AppConfigs", (string)null);
+                    b.ToTable("AppConfigs");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.AppUser", b =>
@@ -193,7 +196,7 @@ namespace Ccusage.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"GoogleSubject\" IS NOT NULL");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.AuditEntry", b =>
@@ -229,7 +232,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("WhenUtc");
 
-                    b.ToTable("AuditEntries", (string)null);
+                    b.ToTable("AuditEntries");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ChatChannel", b =>
@@ -275,7 +278,7 @@ namespace Ccusage.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"DirectKey\" IS NOT NULL");
 
-                    b.ToTable("ChatChannels", (string)null);
+                    b.ToTable("ChatChannels");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ChatChannelMember", b =>
@@ -308,7 +311,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("ChannelId", "UserEmail")
                         .IsUnique();
 
-                    b.ToTable("ChatChannelMembers", (string)null);
+                    b.ToTable("ChatChannelMembers");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ChatContact", b =>
@@ -341,7 +344,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("OwnerEmail", "ContactEmail")
                         .IsUnique();
 
-                    b.ToTable("ChatContacts", (string)null);
+                    b.ToTable("ChatContacts");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ChatMessage", b =>
@@ -378,7 +381,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("ChannelId", "CreatedUtc");
 
-                    b.ToTable("ChatMessages", (string)null);
+                    b.ToTable("ChatMessages");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ChatMessageReaction", b =>
@@ -412,7 +415,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("MessageId", "UserEmail", "Emoji")
                         .IsUnique();
 
-                    b.ToTable("ChatMessageReactions", (string)null);
+                    b.ToTable("ChatMessageReactions");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.CoffeeEntry", b =>
@@ -448,7 +451,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("UserEmail", "LocalDate");
 
-                    b.ToTable("CoffeeEntries", (string)null);
+                    b.ToTable("CoffeeEntries");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.CustomExercise", b =>
@@ -496,7 +499,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail", "NameKey")
                         .IsUnique();
 
-                    b.ToTable("CustomExercises", (string)null);
+                    b.ToTable("CustomExercises");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.CustomFood", b =>
@@ -559,7 +562,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail", "Description", "Brand", "ServingDesc")
                         .IsUnique();
 
-                    b.ToTable("CustomFoods", (string)null);
+                    b.ToTable("CustomFoods");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.CycleDayLog", b =>
@@ -618,7 +621,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail", "LocalDate")
                         .IsUnique();
 
-                    b.ToTable("CycleDayLogs", (string)null);
+                    b.ToTable("CycleDayLogs");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.CyclePeriod", b =>
@@ -651,7 +654,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail", "StartDate")
                         .IsDescending(false, true);
 
-                    b.ToTable("CyclePeriods", (string)null);
+                    b.ToTable("CyclePeriods");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.CycleProfile", b =>
@@ -690,7 +693,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail")
                         .IsUnique();
 
-                    b.ToTable("CycleProfiles", (string)null);
+                    b.ToTable("CycleProfiles");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.DailyActivity", b =>
@@ -732,7 +735,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail", "LocalDate")
                         .IsUnique();
 
-                    b.ToTable("DailyActivities", (string)null);
+                    b.ToTable("DailyActivities");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ExerciseEntry", b =>
@@ -774,7 +777,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("UserEmail", "LocalDate");
 
-                    b.ToTable("ExerciseEntries", (string)null);
+                    b.ToTable("ExerciseEntries");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ExerciseLibrary", b =>
@@ -805,7 +808,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ExerciseLibrary", (string)null);
+                    b.ToTable("ExerciseLibrary");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyChore", b =>
@@ -896,7 +899,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("HouseholdId", "Status");
 
-                    b.ToTable("FamilyChores", (string)null);
+                    b.ToTable("FamilyChores");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyChoreCompletion", b =>
@@ -931,7 +934,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("ChoreId");
 
-                    b.ToTable("FamilyChoreCompletions", (string)null);
+                    b.ToTable("FamilyChoreCompletions");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyCreditEntry", b =>
@@ -982,7 +985,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("HouseholdId", "ChildUserId");
 
-                    b.ToTable("FamilyCreditEntries", (string)null);
+                    b.ToTable("FamilyCreditEntries");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyEventAnnouncement", b =>
@@ -1012,7 +1015,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("HouseholdId", "GoogleEventId")
                         .IsUnique();
 
-                    b.ToTable("FamilyEventAnnouncements", (string)null);
+                    b.ToTable("FamilyEventAnnouncements");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyList", b =>
@@ -1049,7 +1052,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("HouseholdId");
 
-                    b.ToTable("FamilyLists", (string)null);
+                    b.ToTable("FamilyLists");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyListItem", b =>
@@ -1087,7 +1090,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("ListId");
 
-                    b.ToTable("FamilyListItems", (string)null);
+                    b.ToTable("FamilyListItems");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyMeal", b =>
@@ -1165,7 +1168,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("HouseholdId", "LocalDate");
 
-                    b.ToTable("FamilyMeals", (string)null);
+                    b.ToTable("FamilyMeals");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyNote", b =>
@@ -1204,7 +1207,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("HouseholdId");
 
-                    b.ToTable("FamilyNotes", (string)null);
+                    b.ToTable("FamilyNotes");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyPlanPoll", b =>
@@ -1246,7 +1249,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("HouseholdId");
 
-                    b.ToTable("FamilyPlanPolls", (string)null);
+                    b.ToTable("FamilyPlanPolls");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyPlanPollOption", b =>
@@ -1277,7 +1280,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("PollId");
 
-                    b.ToTable("FamilyPlanPollOptions", (string)null);
+                    b.ToTable("FamilyPlanPollOptions");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyPlanPollVote", b =>
@@ -1302,7 +1305,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("OptionId", "UserId")
                         .IsUnique();
 
-                    b.ToTable("FamilyPlanPollVotes", (string)null);
+                    b.ToTable("FamilyPlanPollVotes");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyReminder", b =>
@@ -1350,7 +1353,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("Active", "DueUtc");
 
-                    b.ToTable("FamilyReminders", (string)null);
+                    b.ToTable("FamilyReminders");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyShare", b =>
@@ -1388,7 +1391,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("ItemType", "ItemId", "SharedWithUserId")
                         .IsUnique();
 
-                    b.ToTable("FamilyShares", (string)null);
+                    b.ToTable("FamilyShares");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FamilyTimer", b =>
@@ -1425,7 +1428,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("Done", "EndsUtc");
 
-                    b.ToTable("FamilyTimers", (string)null);
+                    b.ToTable("FamilyTimers");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FinanceAccount", b =>
@@ -1472,7 +1475,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("HouseholdId", "Name", "Institution")
                         .IsUnique();
 
-                    b.ToTable("FinanceAccounts", (string)null);
+                    b.ToTable("FinanceAccounts");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FinanceImport", b =>
@@ -1510,7 +1513,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("HouseholdId", "CreatedUtc");
 
-                    b.ToTable("FinanceImports", (string)null);
+                    b.ToTable("FinanceImports");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FinanceTransaction", b =>
@@ -1582,7 +1585,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("HouseholdId", "DedupHash")
                         .IsUnique();
 
-                    b.ToTable("FinanceTransactions", (string)null);
+                    b.ToTable("FinanceTransactions");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.FoodEntry", b =>
@@ -1642,7 +1645,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("UserEmail", "LocalDate");
 
-                    b.ToTable("FoodEntries", (string)null);
+                    b.ToTable("FoodEntries");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.GoogleCalendarConnection", b =>
@@ -1681,7 +1684,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("GoogleCalendarConnections", (string)null);
+                    b.ToTable("GoogleCalendarConnections");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.HardChallenge", b =>
@@ -1730,7 +1733,7 @@ namespace Ccusage.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"Status\" = 0");
 
-                    b.ToTable("HardChallenges", (string)null);
+                    b.ToTable("HardChallenges");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.HardChallengeDay", b =>
@@ -1801,7 +1804,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail", "LocalDate")
                         .IsUnique();
 
-                    b.ToTable("HardChallengeDays", (string)null);
+                    b.ToTable("HardChallengeDays");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.Household", b =>
@@ -1862,7 +1865,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Households", (string)null);
+                    b.ToTable("Households");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.HouseholdMember", b =>
@@ -1895,7 +1898,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("HouseholdId", "UserId")
                         .IsUnique();
 
-                    b.ToTable("HouseholdMembers", (string)null);
+                    b.ToTable("HouseholdMembers");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.HydrationEntry", b =>
@@ -1928,7 +1931,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("UserEmail", "LocalDate");
 
-                    b.ToTable("HydrationEntries", (string)null);
+                    b.ToTable("HydrationEntries");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.IngestKey", b =>
@@ -1982,7 +1985,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("IngestKeys", (string)null);
+                    b.ToTable("IngestKeys");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.IngestedFile", b =>
@@ -2015,7 +2018,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("Path")
                         .IsUnique();
 
-                    b.ToTable("IngestedFiles", (string)null);
+                    b.ToTable("IngestedFiles");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.IngestionSource", b =>
@@ -2049,7 +2052,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("IngestionSources", (string)null);
+                    b.ToTable("IngestionSources");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.LoginEvent", b =>
@@ -2099,7 +2102,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("Email", "WhenUtc")
                         .IsDescending(false, true);
 
-                    b.ToTable("LoginEvents", (string)null);
+                    b.ToTable("LoginEvents");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.MachineInfo", b =>
@@ -2184,7 +2187,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("MachineInfos", (string)null);
+                    b.ToTable("MachineInfos");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ModelPricing", b =>
@@ -2232,7 +2235,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("ModelPattern")
                         .IsUnique();
 
-                    b.ToTable("ModelPricings", (string)null);
+                    b.ToTable("ModelPricings");
 
                     b.HasData(
                         new
@@ -2388,7 +2391,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("RecipientEmail", "IsRead", "CreatedUtc");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.NotificationPreference", b =>
@@ -2442,7 +2445,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail")
                         .IsUnique();
 
-                    b.ToTable("NotificationPreferences", (string)null);
+                    b.ToTable("NotificationPreferences");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.NotificationSetting", b =>
@@ -2500,7 +2503,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("NotificationSettings", (string)null);
+                    b.ToTable("NotificationSettings");
 
                     b.HasData(
                         new
@@ -2545,7 +2548,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("RepoRoot")
                         .IsUnique();
 
-                    b.ToTable("Projects", (string)null);
+                    b.ToTable("Projects");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.RequestLog", b =>
@@ -2604,7 +2607,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("Id")
                         .IsDescending();
 
-                    b.ToTable("RequestLogs", (string)null);
+                    b.ToTable("RequestLogs");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.SavedView", b =>
@@ -2672,7 +2675,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("UserId", "Name");
 
-                    b.ToTable("SavedViews", (string)null);
+                    b.ToTable("SavedViews");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ShareAccess", b =>
@@ -2697,7 +2700,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("ShareLinkId", "WhenUtc");
 
-                    b.ToTable("ShareAccesses", (string)null);
+                    b.ToTable("ShareAccesses");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ShareLink", b =>
@@ -2769,7 +2772,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("TokenHash")
                         .IsUnique();
 
-                    b.ToTable("ShareLinks", (string)null);
+                    b.ToTable("ShareLinks");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.SyncStatus", b =>
@@ -2800,7 +2803,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("SyncStatuses", (string)null);
+                    b.ToTable("SyncStatuses");
 
                     b.HasData(
                         new
@@ -2882,7 +2885,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail")
                         .IsUnique();
 
-                    b.ToTable("TrackerProfiles", (string)null);
+                    b.ToTable("TrackerProfiles");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.UsageRecord", b =>
@@ -3011,7 +3014,7 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("ProjectId", "LocalDate");
 
-                    b.ToTable("UsageRecords", (string)null);
+                    b.ToTable("UsageRecords");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.UserLocation", b =>
@@ -3063,7 +3066,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail", "CapturedUtc")
                         .IsDescending(false, true);
 
-                    b.ToTable("UserLocations", (string)null);
+                    b.ToTable("UserLocations");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.UserPermission", b =>
@@ -3087,7 +3090,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserId", "Permission")
                         .IsUnique();
 
-                    b.ToTable("UserPermissions", (string)null);
+                    b.ToTable("UserPermissions");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.WeightEntry", b =>
@@ -3120,7 +3123,7 @@ namespace Ccusage.Api.Migrations
                     b.HasIndex("UserEmail", "LocalDate", "Slot")
                         .IsUnique();
 
-                    b.ToTable("WeightEntries", (string)null);
+                    b.ToTable("WeightEntries");
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ChatChannelMember", b =>

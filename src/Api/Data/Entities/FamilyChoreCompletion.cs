@@ -23,4 +23,10 @@ public class FamilyChoreCompletion
 
     /// <summary>Stars earned by this completion (snapshotted from the chore's points at completion time).</summary>
     public int Points { get; set; }
+
+    /// <summary>Money CREDITS awarded by this approved completion (snapshotted from the chore's
+    /// <see cref="FamilyChore.CreditValue"/> at approval). Default 0. This is the chore-HISTORY snapshot;
+    /// the per-child balance is summed from the <see cref="FamilyCreditEntry"/> ledger (the money-history),
+    /// not from here — keeping the two avoids double-counting (one earn row per approval links back here).</summary>
+    public decimal Credits { get; set; }
 }

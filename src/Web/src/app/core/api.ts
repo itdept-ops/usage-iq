@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatMessageDto, ChatRepliesResult, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
-  FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, RecipeBreakdownResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation,
+  FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChoreSource, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, Allowance, AllowanceMe, AllowanceMoveRequest, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, RecipeBreakdownResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation,
   CoffeeEntryDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   AiUsageFilter, AiUsageResponse,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, PermissionPreset, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
@@ -1324,30 +1324,84 @@ export class Api {
   }
 
   /**
-   * Add a chore. `assignedToUserId` must be a household member (omit/null = unassigned); `points` are the
-   * stars per completion (default 1); `recurrence` is none/daily/weekly. Returns the full updated board.
+   * Add a chore (PARENT only — a child cannot create chores). `source` is `assigned` (to a specific child via
+   * `assignedToUserId`) or `pool` (anyone-claimable marketplace chore); `creditValue` is the allowance money
+   * awarded on approval; `points` are the stars per completion (default 1); `recurrence` is none/daily/weekly.
+   * Returns the full updated board.
    */
   createFamilyChore(req: {
     title: string; assignedToUserId?: number | null; points?: number; recurrence?: FamilyChoreRecurrence;
+    source?: FamilyChoreSource; creditValue?: number;
   }): Observable<FamilyChores> {
     return this.http.post<FamilyChores>(`${this.base}/family/chores`, req);
   }
 
   /**
-   * Patch a chore (any household member): edit title/assignee/points/recurrence, or toggle `done`. Checking
-   * it (done:true) stamps the caller and stars them in the ledger; un-checking clears the stamp but keeps
-   * the stars. Omitted fields are unchanged. Returns the full updated board.
+   * Patch a chore (PARENT only): edit title/assignee/points/recurrence/source/creditValue, or toggle the
+   * legacy `done` flag. Omitted fields are unchanged. Returns the full updated board.
    */
   patchFamilyChore(id: number, req: {
     title?: string; assignedToUserId?: number | null; points?: number;
     recurrence?: FamilyChoreRecurrence; done?: boolean;
+    source?: FamilyChoreSource; creditValue?: number;
   }): Observable<FamilyChores> {
     return this.http.patch<FamilyChores>(`${this.base}/family/chores/${id}`, req);
   }
 
-  /** Delete a chore (any household member); its completion ledger cascades. Returns nothing (the page reloads). */
+  /** Delete a chore (PARENT only); its completion ledger cascades. Returns nothing (the page reloads). */
   deleteFamilyChore(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/family/chores/${id}`);
+  }
+
+  // ---- Chore marketplace: the claim → submit → approve/reject state machine ----
+  // Each returns the full updated board (rescoped server-side by the caller's role). Claim/submit are CHILD
+  // actions (chore.claim); approve/reject are PARENT actions (allowance.manage).
+
+  /** A CHILD claims an OPEN pool (marketplace) chore → it becomes theirs to do. */
+  claimFamilyChore(id: number): Observable<FamilyChores> {
+    return this.http.post<FamilyChores>(`${this.base}/family/chores/${id}/claim`, {});
+  }
+
+  /** A CHILD marks their claimed/assigned chore done → submitted, awaiting a parent's approval (no credits yet). */
+  submitFamilyChore(id: number): Observable<FamilyChores> {
+    return this.http.post<FamilyChores>(`${this.base}/family/chores/${id}/submit`, {});
+  }
+
+  /** A PARENT approves a submitted chore → credits are awarded to the child exactly once. */
+  approveFamilyChore(id: number): Observable<FamilyChores> {
+    return this.http.post<FamilyChores>(`${this.base}/family/chores/${id}/approve`, {});
+  }
+
+  /** A PARENT rejects a submitted chore → sent back to the child to retry (awards nothing); optional `note`. */
+  rejectFamilyChore(id: number, note?: string): Observable<FamilyChores> {
+    return this.http.post<FamilyChores>(`${this.base}/family/chores/${id}/reject`, { note: note ?? null });
+  }
+
+  // ---- Allowance: the per-child credit ledger + balance (cash given IRL; recorded here) ----
+
+  /** A CHILD's OWN balance + ledger (kid-safe; only theirs). Gated by chore.claim server-side. */
+  myAllowance(): Observable<AllowanceMe> {
+    return this.http.get<AllowanceMe>(`${this.base}/family/allowance/me`);
+  }
+
+  /** The PARENT manager: every household child's balance + a recent ledger. Gated by allowance.manage. */
+  allowance(): Observable<Allowance> {
+    return this.http.get<Allowance>(`${this.base}/family/allowance`);
+  }
+
+  /** Record a cash PAYOUT handed over IRL (debits the in-app balance). Returns the refreshed manager view. */
+  allowancePayout(childUserId: number, req: AllowanceMoveRequest): Observable<Allowance> {
+    return this.http.post<Allowance>(`${this.base}/family/allowance/${childUserId}/payout`, req);
+  }
+
+  /** Record a SPEND against the balance (with an optional category). Returns the refreshed manager view. */
+  allowanceSpend(childUserId: number, req: AllowanceMoveRequest): Observable<Allowance> {
+    return this.http.post<Allowance>(`${this.base}/family/allowance/${childUserId}/spend`, req);
+  }
+
+  /** Record a manual ADJUST (bonus = sign +1, penalty = sign −1). Returns the refreshed manager view. */
+  allowanceAdjust(childUserId: number, req: AllowanceMoveRequest): Observable<Allowance> {
+    return this.http.post<Allowance>(`${this.base}/family/allowance/${childUserId}/adjust`, req);
   }
 
   // ---- Family Hub F4: chore-board AI assists (suggest / balance / values / "good job" summary) ----

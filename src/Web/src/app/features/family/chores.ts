@@ -1,14 +1,13 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { catchError, firstValueFrom, of } from 'rxjs';
+import { catchError, firstValueFrom, of, Observable } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatDialog } from '@angular/material/dialog';
@@ -16,8 +15,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import {
-  ChoreSummaryAiResult, FamilyChore, FamilyChoreRecurrence, FamilyChores as FamilyChoresDto,
-  FamilyChoreTally, Household, HouseholdMember,
+  AllowanceMe, ChoreSummaryAiResult, FamilyChore, FamilyChoreRecurrence, FamilyChores as FamilyChoresDto,
+  FamilyChoreTally, FamilyHouseholdRole, Household, HouseholdMember,
 } from '../../core/models';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { ChoreEditorDialog, ChoreEditorData, ChoreEditorResult } from './chore-editor-dialog';
@@ -78,7 +77,7 @@ interface ValueRow {
   selector: 'app-family-chores',
   imports: [
     FormsModule, RouterLink, MatIconModule, MatButtonModule, MatTooltipModule, MatProgressSpinnerModule,
-    MatCheckboxModule, MatFormFieldModule, MatInputModule, MatSnackBarModule,
+    MatFormFieldModule, MatInputModule, MatSnackBarModule,
   ],
   templateUrl: './chores.html',
   styleUrls: ['./family.scss', './chores.scss'],
@@ -94,10 +93,42 @@ export class FamilyChores {
   readonly members = signal<HouseholdMember[]>([]);
   readonly loading = signal(true);
   readonly error = signal(false);
-  /** The chore whose check-off is in flight (locks its checkbox briefly). */
+  /** The chore whose action (check-off / claim / submit / approve / reject) is in flight (locks its row). */
   readonly busyId = signal<number | null>(null);
 
-  /** Open chores (server already orders open-first; we split by `done`). */
+  /** The caller's household role — drives the parent marketplace view vs the kid-safe scoped view. */
+  readonly role = signal<FamilyHouseholdRole>('adult');
+  /** True for an owner/adult (the parent capabilities: create chores, approve/reject, manage allowance). */
+  readonly canManage = signal(true);
+  /** True when the caller is a CHILD — render the kid-safe view (claim / mark done / my balance). */
+  readonly isChild = computed(() => this.role() === 'child');
+
+  /** The child's OWN allowance (balance + ledger), loaded only in the kid view; null until loaded. */
+  readonly myAllowance = signal<AllowanceMe | null>(null);
+
+  // ── PARENT marketplace buckets (the whole board, split by lifecycle) ──
+  /** Submitted chores awaiting a parent's approve/reject (the approval queue). */
+  readonly awaitingApproval = computed(() => this.chores().filter(c => c.status === 'submitted'));
+  /** Open marketplace (pool) chores kids can claim. */
+  readonly poolOpen = computed(() => this.chores().filter(c => c.source === 'pool' && c.status === 'open'));
+  /** In-progress chores (claimed or rejected-awaiting-retry), not yet submitted/approved. */
+  readonly inProgress = computed(() =>
+    this.chores().filter(c => c.status === 'claimed' || c.status === 'rejected'));
+  /** Assigned chores still to do (open + not yet claimed/submitted), excluding pool chores. */
+  readonly assignedOpen = computed(() =>
+    this.chores().filter(c => c.source === 'assigned' && c.status === 'open'));
+
+  // ── CHILD scoped buckets (already rescoped server-side to the child's own + open pool) ──
+  /** Marketplace chores the child can grab (open pool chores). */
+  readonly kidPool = computed(() => this.chores().filter(c => c.source === 'pool' && c.status === 'open'));
+  /** The child's own chores in progress (claimed/assigned/rejected, not yet submitted/approved). */
+  readonly kidMine = computed(() =>
+    this.chores().filter(c => c.status === 'claimed' || c.status === 'rejected'
+      || (c.source === 'assigned' && c.status === 'open')));
+  /** The child's chores waiting on a parent's nod. */
+  readonly kidPending = computed(() => this.chores().filter(c => c.status === 'submitted'));
+
+  /** Open chores (server already orders open-first; we split by `done`). Used by the legacy shared list. */
   readonly open = computed(() => this.chores().filter(c => !c.done));
   readonly done = computed(() => this.chores().filter(c => c.done));
 
@@ -134,12 +165,14 @@ export class FamilyChores {
 
   constructor() {
     this.reload(true);
-    this.loadSummary();
     // Household members drive the assignee picker (display identity only).
     this.api.getHousehold()
       .pipe(catchError(() => of<Household | null>(null)), takeUntilDestroyed())
       .subscribe(h => { if (h) this.members.set(h.members); });
   }
+
+  /** The household's children (Role="child") — the assignee pool for an "assigned" chore. */
+  readonly childMembers = computed(() => this.members().filter(m => m.role === 'child'));
 
   /**
    * Load the warm "Good job" weekly summary. It NEVER 503s server-side (a deterministic plain floor with
@@ -157,7 +190,7 @@ export class FamilyChores {
       .pipe(catchError(() => { if (initial) this.error.set(true); return of<FamilyChoresDto | null>(null); }),
         takeUntilDestroyed(this.destroyRef))
       .subscribe(board => {
-        if (board) { this.chores.set(board.chores); this.tally.set(board.tally); }
+        if (board) this.apply(board);
         this.loading.set(false);
       });
   }
@@ -165,6 +198,22 @@ export class FamilyChores {
   private apply(board: FamilyChoresDto): void {
     this.chores.set(board.chores);
     this.tally.set(board.tally);
+    const wasChild = this.role() === 'child';
+    this.role.set(board.role);
+    this.canManage.set(board.canManage);
+    // The "good job" summary + allowance views are role-specific — load the right one once we know the role.
+    if (board.role === 'child') {
+      this.loadMyAllowance();
+    } else if (this.summary() === null || wasChild) {
+      this.loadSummary();
+    }
+  }
+
+  /** Load the child's OWN balance + ledger (kid view only). Best-effort; a blip just hides the balance card. */
+  private loadMyAllowance(): void {
+    this.api.myAllowance()
+      .pipe(catchError(() => of<AllowanceMe | null>(null)), takeUntilDestroyed(this.destroyRef))
+      .subscribe(a => this.myAllowance.set(a));
   }
 
   recurrenceLabel(r: FamilyChoreRecurrence): string {
@@ -186,25 +235,9 @@ export class FamilyChores {
     return Array.from({ length: Math.min(5, Math.max(1, points)) }, (_, i) => i);
   }
 
-  // ---- Check off ----
-
-  /** Toggle a chore done/not-done. Checking it stars the caller in the ledger (server-side). */
-  async toggle(chore: FamilyChore): Promise<void> {
-    if (this.busyId() != null) return;
-    this.busyId.set(chore.id);
-    const checking = !chore.done;
-    try {
-      const board = await firstValueFrom(this.api.patchFamilyChore(chore.id, { done: checking }));
-      this.apply(board);
-      if (checking && chore.points > 0) {
-        const star = chore.points === 1 ? 'star' : 'stars';
-        this.snack.open(`Nice! ${chore.points} ${star} earned ⭐`, undefined, { duration: 2200 });
-      }
-    } catch (e) {
-      this.snack.open(this.messageOf(e, "Couldn't update that chore."), 'OK', { duration: 4000 });
-    } finally {
-      this.busyId.set(null);
-    }
+  /** Format a credit amount as money (e.g. 1.5 → "$1.50"); the sign is handled by the caller. */
+  money(amount: number): string {
+    return `$${Math.abs(amount).toFixed(2)}`;
   }
 
   // ---- Add / edit / delete ----
@@ -216,6 +249,7 @@ export class FamilyChores {
       const board = await firstValueFrom(this.api.createFamilyChore({
         title: result.title, assignedToUserId: result.assignedToUserId,
         points: result.points, recurrence: result.recurrence,
+        source: result.source, creditValue: result.creditValue,
       }));
       this.apply(board);
     } catch (e) {
@@ -230,10 +264,63 @@ export class FamilyChores {
       const board = await firstValueFrom(this.api.patchFamilyChore(chore.id, {
         title: result.title, assignedToUserId: result.assignedToUserId,
         points: result.points, recurrence: result.recurrence,
+        source: result.source, creditValue: result.creditValue,
       }));
       this.apply(board);
     } catch (e) {
       this.snack.open(this.messageOf(e, "Couldn't save that chore. Please try again."), 'OK', { duration: 4000 });
+    }
+  }
+
+  // =====================================================================================
+  // Marketplace state machine — claim (kid) / submit (kid) / approve · reject (parent).
+  // Each action returns the full updated board (rescoped server-side); a busy row locks meanwhile.
+  // =====================================================================================
+
+  /** A kid claims an open marketplace chore. */
+  async claim(chore: FamilyChore): Promise<void> {
+    await this.runChoreAction(chore, () => this.api.claimFamilyChore(chore.id),
+      'Claimed! It’s yours now 🙌', "Couldn't claim that chore.");
+  }
+
+  /** A kid marks their claimed/assigned chore done → it goes to a parent for approval. */
+  async submit(chore: FamilyChore): Promise<void> {
+    await this.runChoreAction(chore, () => this.api.submitFamilyChore(chore.id),
+      'Sent for approval ✅', "Couldn't submit that chore.");
+  }
+
+  /** A parent approves a submitted chore → credits are awarded to the child. */
+  async approve(chore: FamilyChore): Promise<void> {
+    const credit = chore.creditValue > 0 ? ` ${this.money(chore.creditValue)} earned 💰` : '';
+    await this.runChoreAction(chore, () => this.api.approveFamilyChore(chore.id),
+      `Approved!${credit}`, "Couldn't approve that chore.");
+  }
+
+  /** A parent rejects a submitted chore → it goes back to the child to retry (awards nothing). */
+  async reject(chore: FamilyChore): Promise<void> {
+    const ok = await this.confirm({
+      title: 'Send this back?',
+      message: `“${chore.title}” will go back to ${chore.claimedByName ?? chore.assignedToName ?? 'the child'} to try again. Nothing is awarded.`,
+    });
+    if (!ok) return;
+    await this.runChoreAction(chore, () => this.api.rejectFamilyChore(chore.id),
+      'Sent back to try again.', "Couldn't reject that chore.");
+  }
+
+  /** Shared action runner: lock the row, call the endpoint, apply the refreshed board, toast the outcome. */
+  private async runChoreAction(
+    chore: FamilyChore, call: () => Observable<FamilyChoresDto>,
+    okMsg: string, failMsg: string): Promise<void> {
+    if (this.busyId() != null) return;
+    this.busyId.set(chore.id);
+    try {
+      const board = await firstValueFrom(call());
+      this.apply(board);
+      this.snack.open(okMsg, undefined, { duration: 2400 });
+    } catch (e) {
+      this.snack.open(this.messageOf(e, failMsg), 'OK', { duration: 4000 });
+    } finally {
+      this.busyId.set(null);
     }
   }
 

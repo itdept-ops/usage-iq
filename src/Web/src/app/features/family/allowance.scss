@@ -1,0 +1,138 @@
+/* Allowance Manager — a parent's view of each child's earned credits + the credit ledger. Reuses family tokens. */
+
+.family__hero--allowance {
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--tech-positive, #34c759) 16%, transparent), transparent 55%),
+    radial-gradient(120% 140% at 100% 0%, rgba(139, 124, 255, 0.12), transparent 55%),
+    var(--tech-panel);
+  .family__crest mat-icon { color: var(--tech-positive, #34c759); }
+}
+
+.allowance__total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.allowance__total-label {
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+  font-weight: 600;
+}
+.allowance__total-amount {
+  font-size: var(--tech-fs-h1, 22px);
+  font-weight: 800;
+  color: var(--tech-positive, #34c759);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Per-child balance cards */
+.child-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--tech-space-4, 16px);
+}
+.child-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-4, 16px);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius, 12px);
+  background: var(--tech-panel);
+}
+.child-card__head { display: flex; align-items: center; gap: 12px; }
+.child-card__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--tech-text-on-accent);
+  background: linear-gradient(135deg, var(--tech-accent), color-mix(in srgb, var(--tech-accent) 60%, #8b7cff));
+}
+.child-card__id { min-width: 0; }
+.child-card__name {
+  margin: 0;
+  font-weight: 700;
+  color: var(--tech-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.child-card__balance {
+  margin: 2px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--tech-positive, #34c759);
+  font-variant-numeric: tabular-nums;
+  &--neg { color: var(--tech-warn); }
+}
+.child-card__warn mat-icon {
+  width: 18px; height: 18px; font-size: 18px; color: var(--tech-warn);
+}
+
+.child-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  button {
+    min-width: 0;
+    &.is-on {
+      border-color: color-mix(in srgb, var(--tech-accent) 55%, transparent);
+      background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+      color: var(--tech-text);
+    }
+    mat-icon { width: 18px; height: 18px; font-size: 18px; }
+  }
+}
+
+/* Inline money-move form */
+.move {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--tech-space-3, 12px);
+  border-radius: var(--tech-r-control, 8px);
+  background: var(--tech-bg-sunken);
+  border: 1px solid var(--tech-border-subtle);
+}
+.move__row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+.move__amount { width: 8rem; }
+.move__category { min-width: 9rem; flex: 1; }
+.move__note { width: 100%; }
+.move__sign { display: inline-flex; gap: 6px; }
+.move__sign-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--tech-border-subtle);
+  border-radius: 999px;
+  background: var(--tech-panel);
+  color: var(--tech-text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  mat-icon { width: 18px; height: 18px; font-size: 18px; }
+  &.is-on {
+    color: var(--tech-positive, #34c759);
+    border-color: color-mix(in srgb, var(--tech-positive, #34c759) 50%, transparent);
+    background: color-mix(in srgb, var(--tech-positive, #34c759) 12%, transparent);
+  }
+  &--neg.is-on {
+    color: var(--tech-warn);
+    border-color: color-mix(in srgb, var(--tech-warn) 50%, transparent);
+    background: color-mix(in srgb, var(--tech-warn) 12%, transparent);
+  }
+}
+.move__actions { display: flex; justify-content: flex-end; gap: 8px; }

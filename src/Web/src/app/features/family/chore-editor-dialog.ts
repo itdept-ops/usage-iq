@@ -8,7 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 
-import { FamilyChore, FamilyChoreRecurrence, HouseholdMember } from '../../core/models';
+import { FamilyChore, FamilyChoreRecurrence, FamilyChoreSource, HouseholdMember } from '../../core/models';
 
 /** Sentinel for the "Anyone" (unassigned) option in the assignee select. */
 export const UNASSIGNED = 0;
@@ -19,12 +19,18 @@ export interface ChoreEditorData {
   members: HouseholdMember[];
 }
 
-/** The result the editor returns. `assignedToUserId` is null when "Anyone" (unassigned) is chosen. */
+/**
+ * The result the editor returns. `source` is `pool` (a marketplace chore any child can claim — no fixed
+ * assignee) or `assigned` (given to a specific child via `assignedToUserId`, null = anyone). `creditValue`
+ * is the allowance money awarded on approval (0 = stars-only).
+ */
 export interface ChoreEditorResult {
   title: string;
   assignedToUserId: number | null;
   points: number;
   recurrence: FamilyChoreRecurrence;
+  source: FamilyChoreSource;
+  creditValue: number;
 }
 
 /** Recurrence choices (chores repeat none/daily/weekly — no "weekdays"). */
@@ -36,6 +42,9 @@ const RECURRENCES: { value: FamilyChoreRecurrence; label: string }[] = [
 
 /** Quick star presets for the points stepper. */
 const POINT_PRESETS = [1, 2, 3, 5, 10];
+
+/** Quick credit-value presets ($) for the allowance stepper. */
+const CREDIT_PRESETS = [0, 0.25, 0.5, 1, 2, 5];
 
 /**
  * Create / edit a household chore. A chore has a title, an optional assignee (a household member by userId,
@@ -56,6 +65,7 @@ export class ChoreEditorDialog {
 
   readonly recurrences = RECURRENCES;
   readonly pointPresets = POINT_PRESETS;
+  readonly creditPresets = CREDIT_PRESETS;
   readonly unassigned = UNASSIGNED;
   readonly isEdit = !!this.data.chore;
 
@@ -64,6 +74,13 @@ export class ChoreEditorDialog {
   readonly assignee = signal<number>(this.data.chore?.assignedToUserId ?? UNASSIGNED);
   readonly points = signal<number>(this.data.chore?.points ?? 1);
   readonly recurrence = signal<FamilyChoreRecurrence>(this.data.chore?.recurrence ?? 'none');
+  /** `pool` = a marketplace chore any child can claim; `assigned` = given to a specific child. */
+  readonly source = signal<FamilyChoreSource>(this.data.chore?.source ?? 'assigned');
+  /** The allowance money ($) awarded on approval (0 = stars-only). */
+  readonly creditValue = signal<number>(this.data.chore?.creditValue ?? 0);
+
+  /** Only the assignee picker shows for an `assigned` chore — a pool chore is claimed by anyone. */
+  readonly showAssignee = computed(() => this.source() === 'assigned');
 
   readonly canSave = computed(() => this.title().trim().length > 0);
 
@@ -86,14 +103,32 @@ export class ChoreEditorDialog {
     return Math.min(1000, Math.max(0, Math.round(p)));
   }
 
+  setSource(source: FamilyChoreSource): void {
+    this.source.set(source);
+  }
+
+  setCredit(c: number): void {
+    this.creditValue.set(this.clampCredit(c));
+  }
+
+  /** Clamp the credit value to 0..1000, rounded to cents (matches the server's numeric(10,2) intent). */
+  private clampCredit(c: number): number {
+    if (!Number.isFinite(c) || c < 0) return 0;
+    return Math.min(1000, Math.round(c * 100) / 100);
+  }
+
   save(): void {
     if (!this.canSave()) return;
+    const source = this.source();
     const assignee = this.assignee();
     this.ref.close({
       title: this.title().trim(),
-      assignedToUserId: assignee === UNASSIGNED ? null : assignee,
+      // A pool chore is claimed by anyone, so it never carries a fixed assignee.
+      assignedToUserId: source === 'pool' || assignee === UNASSIGNED ? null : assignee,
       points: this.clampPoints(this.points()),
       recurrence: this.recurrence(),
+      source,
+      creditValue: this.clampCredit(this.creditValue()),
     });
   }
 }

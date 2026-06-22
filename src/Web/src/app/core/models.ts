@@ -2509,6 +2509,29 @@ export type FamilyMealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 /** How a chore repeats (mirrors the backend's lowercase strings). Note: chores have no "weekdays". */
 export type FamilyChoreRecurrence = 'none' | 'daily' | 'weekly';
 
+/**
+ * Where a chore came from (mirrors the backend vocabulary). `assigned` = a parent gave it to a specific
+ * child; `pool` = a marketplace chore any child can claim.
+ */
+export type FamilyChoreSource = 'assigned' | 'pool';
+
+/**
+ * The marketplace lifecycle status (mirrors the backend state machine). `open` (claimable / to-do) →
+ * `claimed` (a child grabbed a pool chore) → `submitted` (the child marked it done, awaiting a parent) →
+ * `approved` (the parent approved; credits awarded) | `rejected` (sent back to the child to retry).
+ */
+export type FamilyChoreStatus = 'open' | 'claimed' | 'submitted' | 'approved' | 'rejected';
+
+/** The caller's role in their household (mirrors HouseholdMember.Role). Drives the parent-vs-kid chore view. */
+export type FamilyHouseholdRole = 'owner' | 'adult' | 'child';
+
+/** One spend category for the allowance manager (a small fixed enum; mirrors the backend SpendCategories). */
+export type AllowanceSpendCategory =
+  'toys' | 'games' | 'books' | 'clothes' | 'treats' | 'savings' | 'other';
+
+/** The kind of an allowance ledger row (mirrors FamilyCreditEntry.Kind). */
+export type AllowanceEntryKind = 'earn' | 'spend' | 'payout' | 'adjust';
+
 // ---- Family Assistant: one ask-anything box over the whole household ----
 
 /**
@@ -2797,6 +2820,20 @@ export interface FamilyChore {
   doneUtc?: string | null;
   points: number;
   recurrence: FamilyChoreRecurrence;
+  // ── Marketplace + allowance fields (mirror ChoreDto) ──
+  /** The money credits awarded to a child on parent approval (allowance currency; 0 = stars-only). */
+  creditValue: number;
+  /** `assigned` (to a specific child) or `pool` (anyone-claimable marketplace chore). */
+  source: FamilyChoreSource;
+  /** The marketplace lifecycle status (drives the claim/submit/approve queue). */
+  status: FamilyChoreStatus;
+  /** The child who claimed a pool chore (+ name); null when nobody has claimed it yet. */
+  claimedByUserId?: number | null;
+  claimedByName?: string | null;
+  claimedUtc?: string | null;
+  /** The parent who approved it (+ when); null until approved. */
+  approvedByUserId?: number | null;
+  approvedUtc?: string | null;
 }
 
 /**
@@ -2816,6 +2853,71 @@ export interface FamilyChoreTally {
 export interface FamilyChores {
   chores: FamilyChore[];
   tally: FamilyChoreTally[];
+  /**
+   * The caller's household role ("owner"|"adult"|"child"), so the page can render the parent marketplace
+   * view vs the kid-safe scoped view. For a CHILD caller the chores are already rescoped server-side to pool
+   * (open) + their own claimed/assigned chores, and the tally is empty.
+   */
+  role: FamilyHouseholdRole;
+  /** True for an owner/adult (the parent capabilities: create chores, approve/reject, manage allowance). */
+  canManage: boolean;
+}
+
+// ── Family Hub: chore marketplace + allowance (kid earns CREDITS, cash given IRL) ──────────────────
+// All mirror the server DTOs in FamilyMealsChoresEndpoints. People throughout are by userId + name only —
+// never an email (email-privacy). A child only ever sees / acts on their OWN data.
+
+/** One allowance ledger row as seen on the wire (mirrors CreditEntryDto; people by id, never email). */
+export interface FamilyCreditEntry {
+  id: number;
+  kind: AllowanceEntryKind;
+  /** Signed: + for earn/adjust-bonus, − for spend/payout/adjust-penalty. */
+  amount: number;
+  /** The spend category (only for `spend` rows); null otherwise. */
+  category?: AllowanceSpendCategory | string | null;
+  /** Links an `earn` row to its chore completion; null otherwise. */
+  choreCompletionId?: number | null;
+  note?: string | null;
+  createdByUserId: number;
+  createdUtc: string;
+}
+
+/**
+ * A child's OWN allowance (GET /api/family/allowance/me; mirrors AllowanceMeDto): their derived `balance`
+ * (sum of their ledger) + their own `ledger` rows. Kid-safe — only ever the caller's own data.
+ */
+export interface AllowanceMe {
+  childUserId: number;
+  balance: number;
+  ledger: FamilyCreditEntry[];
+}
+
+/** One child's balance card for the parent manager (mirrors ChildBalanceDto; id + name only, never email). */
+export interface ChildBalance {
+  childUserId: number;
+  name: string;
+  balance: number;
+}
+
+/**
+ * The parent allowance manager (GET /api/family/allowance; mirrors AllowanceDto): every household child's
+ * balance + a recent ledger across them. Gated by allowance.manage server-side.
+ */
+export interface Allowance {
+  children: ChildBalance[];
+  recent: FamilyCreditEntry[];
+}
+
+/**
+ * Record a spend/payout/adjust against a child's balance (mirrors AllowanceMoveRequest). `amount` is the
+ * MAGNITUDE (always positive); the server signs it (− for spend/payout; ± for adjust per `sign`). `category`
+ * is used for spends only; `sign` (-1 = dock, +1 = bonus) for adjusts only.
+ */
+export interface AllowanceMoveRequest {
+  amount: number;
+  category?: AllowanceSpendCategory | null;
+  note?: string | null;
+  sign?: number | null;
 }
 
 // ── Family Hub F4: chore-board AI assists (suggest / balance / values / "good job" summary) ───────
@@ -3374,6 +3476,10 @@ export const PERM = {
   familyUse: 'family.use',
   familyFinance: 'family.finance',
   cycleTrack: 'cycle.track',
+  /** A CHILD capability: claim/submit chores from the marketplace + see their OWN allowance (never default). */
+  choreClaim: 'chore.claim',
+  /** A PARENT capability: approve/reject chores + manage every child's allowance (never default). */
+  allowanceManage: 'allowance.manage',
   // ---- Location (GPS feature; group "Location"; never default) ----
   locationSelf: 'location.self',
   locationShare: 'location.share',
@@ -3421,6 +3527,8 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   [PERM.familyUse]: 'Family',
   [PERM.familyFinance]: 'Family',
   [PERM.cycleTrack]: 'Family',
+  [PERM.choreClaim]: 'Family',
+  [PERM.allowanceManage]: 'Family',
   // ---- Chat ----
   [PERM.chatRead]: 'Chat',
   [PERM.chatSend]: 'Chat',

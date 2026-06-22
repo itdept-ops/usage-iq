@@ -53,6 +53,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<FamilyMeal> FamilyMeals => Set<FamilyMeal>();
     public DbSet<FamilyChore> FamilyChores => Set<FamilyChore>();
     public DbSet<FamilyChoreCompletion> FamilyChoreCompletions => Set<FamilyChoreCompletion>();
+    public DbSet<FamilyCreditEntry> FamilyCreditEntries => Set<FamilyCreditEntry>();
     public DbSet<FinanceAccount> FinanceAccounts => Set<FinanceAccount>();
     public DbSet<FinanceTransaction> FinanceTransactions => Set<FinanceTransaction>();
     public DbSet<FinanceImport> FinanceImports => Set<FinanceImport>();
@@ -629,15 +630,27 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.Recurrence).HasMaxLength(16).HasDefaultValue("none");
             e.Property(x => x.DoneUtc).HasColumnType("timestamp with time zone");
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // Marketplace + allowance: existing rows backfill via these defaults (Status="open",
+            // Source="assigned", CreditValue=0) so live data migrates cleanly.
+            e.Property(x => x.CreditValue).HasPrecision(10, 2).HasDefaultValue(0m);
+            e.Property(x => x.Source).HasMaxLength(16).HasDefaultValue("assigned");
+            e.Property(x => x.Status).HasMaxLength(16).HasDefaultValue("open");
+            e.Property(x => x.ClaimedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.ApprovedUtc).HasColumnType("timestamp with time zone");
             // The family's chore board reads one household's chores.
             e.HasIndex(x => x.HouseholdId);
             // The tick scans recurring, currently-done chores across all households for a period reset.
             e.HasIndex(x => new { x.Done, x.Recurrence });
+            // The board/queue filters one household's chores by lifecycle status.
+            e.HasIndex(x => new { x.HouseholdId, x.Status });
+            // A child's "my claimed chores" view reads by claimant.
+            e.HasIndex(x => x.ClaimedByUserId);
         });
 
         b.Entity<FamilyChoreCompletion>(e =>
         {
             e.Property(x => x.AtUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.Credits).HasPrecision(10, 2).HasDefaultValue(0m);
             // The points tally sums completions per (chore's household via the chore) — load by chore.
             e.HasIndex(x => x.ChoreId);
             // The per-member tally aggregates a member's completions.
@@ -645,6 +658,23 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             // A completion belongs to a chore; cascade-deletes with it (the chore owns its ledger).
             e.HasOne(x => x.Chore).WithMany()
                 .HasForeignKey(x => x.ChoreId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<FamilyCreditEntry>(e =>
+        {
+            e.Property(x => x.Kind).HasMaxLength(16).HasDefaultValue("earn");
+            e.Property(x => x.Amount).HasPrecision(10, 2);
+            e.Property(x => x.Category).HasMaxLength(32);
+            e.Property(x => x.Note).HasMaxLength(256);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // The allowance read sums/lists one child's rows within a household.
+            e.HasIndex(x => new { x.HouseholdId, x.ChildUserId });
+            // Look up the earn row linked to a completion.
+            e.HasIndex(x => x.ChoreCompletionId);
+            // An earn row links to its completion; ON DELETE SET NULL preserves the money-history when a
+            // chore (and thus its completions) is deleted — the balance already reflects the past earn.
+            e.HasOne<FamilyChoreCompletion>().WithMany()
+                .HasForeignKey(x => x.ChoreCompletionId).OnDelete(DeleteBehavior.SetNull);
         });
 
         b.Entity<FinanceAccount>(e =>

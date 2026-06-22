@@ -34,7 +34,10 @@ public static class FamilyEndpoints
     public sealed record CandidateDto(int UserId, string Name, string? Picture);
 
     public sealed record RenameRequest(string? Name);
-    public sealed record AddMemberRequest(int UserId);
+
+    /// <summary>Add a member. <see cref="Role"/> is optional: "adult" (default) for a full member, or "child"
+    /// for a kid (a chore.claim holder). "owner" is never accepted here (the owner is the household creator).</summary>
+    public sealed record AddMemberRequest(int UserId, string? Role);
 
     public static void MapFamilyEndpoints(this WebApplication app)
     {
@@ -78,7 +81,12 @@ public static class FamilyEndpoints
             CurrentUserAccessor me, CurrentHouseholdAccessor households, UsageDbContext db, CancellationToken ct) =>
         {
             var caller = (await me.GetUserAsync(ct))!;
-            await households.GetOrCreateForCallerAsync(caller, ct); // ensure provisioned (consistency)
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+            // Owner-only — the candidate picker is the "add a member" surface, which is itself owner-only. A
+            // non-owner member (e.g. a child holding family.use) must never see the contacts/add-candidate list.
+            if (!await IsOwnerAsync(db, household.Id, caller.Id, ct))
+                return Forbidden("Only the household owner can add members.");
 
             return Results.Ok(await CandidatesForAsync(db, caller.Id, caller.Email, ct));
         });
@@ -93,15 +101,31 @@ public static class FamilyEndpoints
             if (!await IsOwnerAsync(db, household.Id, caller.Id, ct))
                 return Forbidden("Only the household owner can add members.");
 
-            // The target must exist AND be enabled AND hold family.use.
+            // The requested role: "adult" (default, a full member) or "child" (a kid). "owner" is never
+            // accepted here — the owner is the household creator. An unknown value is rejected.
+            var role = (req.Role ?? "adult").Trim().ToLowerInvariant();
+            if (role is not ("adult" or "child"))
+                return Results.BadRequest(new { message = "Role must be adult or child." });
+
+            // The target must exist AND be enabled AND hold the right Family Hub access for their role:
+            // a full member needs family.use; a child needs chore.claim (their kid capability). The "child"
+            // preset grants both, so a child also has family.use, but we accept a chore.claim holder explicitly
+            // so the gate matches the role.
             var target = await db.Users.AsNoTracking()
                 .Where(u => u.Id == req.UserId)
                 .Select(u => new { u.Id, u.IsEnabled, Perms = u.Permissions.Select(p => p.Permission) })
                 .FirstOrDefaultAsync(ct);
             if (target is null || !target.IsEnabled)
                 return Results.NotFound(new { message = "That person doesn't exist or is disabled." });
-            if (!target.Perms.Contains(Permissions.FamilyUse))
-                return Results.BadRequest(new { message = "That person doesn't have Family Hub access yet." });
+
+            var perms = target.Perms.ToHashSet(StringComparer.Ordinal);
+            var hasAccess = role == "child"
+                ? perms.Contains(Permissions.ChoreClaim)   // a kid is admitted by their chore.claim capability
+                : perms.Contains(Permissions.FamilyUse);   // a full member needs Family Hub access
+            if (!hasAccess)
+                return Results.BadRequest(new { message = role == "child"
+                    ? "That child doesn't have chore access yet (apply the Child preset on the Users page)."
+                    : "That person doesn't have Family Hub access yet." });
 
             // One household per user — reject anyone already in a household (including this one).
             if (await db.HouseholdMembers.AsNoTracking().AnyAsync(m => m.UserId == req.UserId, ct))
@@ -109,7 +133,7 @@ public static class FamilyEndpoints
 
             db.HouseholdMembers.Add(new HouseholdMember
             {
-                HouseholdId = household.Id, UserId = req.UserId, Role = "adult", JoinedUtc = DateTime.UtcNow,
+                HouseholdId = household.Id, UserId = req.UserId, Role = role, JoinedUtc = DateTime.UtcNow,
             });
             try
             {

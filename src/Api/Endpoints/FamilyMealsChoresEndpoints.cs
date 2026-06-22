@@ -136,16 +136,54 @@ public static class FamilyMealsChoresEndpoints
         long Id, string Title,
         int? AssignedToUserId, string? AssignedToName,
         bool Done, int? DoneByUserId, string? DoneByName, DateTime? DoneUtc,
-        int Points, string Recurrence);
+        int Points, string Recurrence,
+        // Marketplace + allowance fields.
+        decimal CreditValue, string Source, string Status,
+        int? ClaimedByUserId, string? ClaimedByName, DateTime? ClaimedUtc,
+        int? ApprovedByUserId, DateTime? ApprovedUtc);
 
     /// <summary>A member's all-time points tally (sum of their completion ledger).</summary>
     public sealed record TallyEntryDto(int UserId, string Name, int Points);
 
-    public sealed record ChoresDto(IReadOnlyList<ChoreDto> Chores, IReadOnlyList<TallyEntryDto> Tally);
+    /// <summary>The caller's chore board. <see cref="Role"/> is the caller's household role
+    /// ("owner"|"adult"|"child") so the frontend can render the parent vs kid view; <see cref="CanManage"/>
+    /// is true for an owner/adult (the parent capabilities). For a CHILD caller the chores are rescoped to
+    /// pool (open) + their own claimed/assigned chores, and the tally is omitted (kids see their balance,
+    /// not the whole household points tally).</summary>
+    public sealed record ChoresDto(
+        IReadOnlyList<ChoreDto> Chores, IReadOnlyList<TallyEntryDto> Tally, string Role, bool CanManage);
 
-    public sealed record ChoreCreateRequest(string? Title, int? AssignedToUserId, int? Points, string? Recurrence);
+    public sealed record ChoreCreateRequest(
+        string? Title, int? AssignedToUserId, int? Points, string? Recurrence,
+        string? Source, decimal? CreditValue);
     public sealed record ChorePatchRequest(
-        string? Title, int? AssignedToUserId, int? Points, string? Recurrence, bool? Done);
+        string? Title, int? AssignedToUserId, int? Points, string? Recurrence, bool? Done,
+        string? Source, decimal? CreditValue);
+
+    /// <summary>Reject a submitted chore (parent): an optional note for the kid.</summary>
+    public sealed record ChoreRejectRequest(string? Note);
+
+    // ---- Allowance DTOs (the credit ledger / balance) ----
+
+    /// <summary>One ledger row as seen on the wire (people by id; never email).</summary>
+    public sealed record CreditEntryDto(
+        long Id, string Kind, decimal Amount, string? Category, long? ChoreCompletionId, string? Note,
+        int CreatedByUserId, DateTime CreatedUtc);
+
+    /// <summary>A child's allowance: their derived balance + their own ledger rows (kid-safe — only theirs).</summary>
+    public sealed record AllowanceMeDto(int ChildUserId, decimal Balance, IReadOnlyList<CreditEntryDto> Ledger);
+
+    /// <summary>One child's balance card for the parent manager (id + display name only; never email).</summary>
+    public sealed record ChildBalanceDto(int ChildUserId, string Name, decimal Balance);
+
+    /// <summary>The parent allowance manager: every household child's balance + recent ledger across them.</summary>
+    public sealed record AllowanceDto(
+        IReadOnlyList<ChildBalanceDto> Children, IReadOnlyList<CreditEntryDto> Recent);
+
+    /// <summary>Record a spend/payout/adjust against a child's balance (parent). Amount is the MAGNITUDE
+    /// (always positive in the body); the server signs it (− for spend/payout, ± for adjust per
+    /// <see cref="Sign"/>).</summary>
+    public sealed record AllowanceMoveRequest(decimal? Amount, string? Category, string? Note, int? Sign);
 
     // ---- CHORES AI-assist DTOs (suggest / balance / values / "good job" summary) ----
 
@@ -183,6 +221,12 @@ public static class FamilyMealsChoresEndpoints
 
     private static readonly string[] Slots = { "breakfast", "lunch", "dinner", "snack" };
     private static readonly string[] Recurrences = { "none", "daily", "weekly" };
+    private static readonly string[] ChoreSources = { "assigned", "pool" };
+    /// <summary>The allowed spend categories (a small fixed enum; free-text note alongside).</summary>
+    private static readonly string[] SpendCategories =
+        { "toys", "games", "books", "clothes", "treats", "savings", "other" };
+    /// <summary>Max magnitude for one credit move (a sane upper bound for an allowance row).</summary>
+    private const decimal MaxCreditAmount = 100000m;
 
     public static void MapFamilyMealsChoresEndpoints(this WebApplication app)
     {
@@ -728,32 +772,53 @@ public static class FamilyMealsChoresEndpoints
 
     private static void MapChores(RouteGroupBuilder g)
     {
-        // ---- GET /chores : the household's chores (open first) + the all-time points tally ----
+        // ---- GET /chores : the household's chores + tally, RESCOPED by the caller's household role ----
+        // A PARENT (owner/adult) sees the WHOLE board incl. the submitted-awaiting-approval queue + the
+        // points tally. A CHILD caller is filtered SERVER-SIDE to pool (open) chores + their OWN
+        // claimed/assigned chores (never another child's chore, never any email), and the tally is omitted.
         g.MapGet("/chores", async (
             CurrentUserAccessor me, CurrentHouseholdAccessor households, UsageDbContext db, CancellationToken ct) =>
         {
             var caller = (await me.GetUserAsync(ct))!;
             var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var role = await RoleInHouseholdAsync(db, household.Id, caller.Id, ct);
 
-            var chores = await db.FamilyChores.AsNoTracking()
+            var all = await db.FamilyChores.AsNoTracking()
                 .Where(c => c.HouseholdId == household.Id)
                 .ToListAsync(ct);
 
-            return Results.Ok(await BuildChoresDtoAsync(db, household.Id, chores, ct));
+            if (IsChild(role))
+            {
+                // Child sees: open pool chores (claimable) + chores they claimed or are assigned to. Nothing
+                // else — never another member's chore, and the tally is dropped (kids see their balance).
+                var mine = all.Where(c =>
+                        (c.Source == "pool" && c.Status == "open")
+                        || c.ClaimedByUserId == caller.Id
+                        || c.AssignedToUserId == caller.Id)
+                    .ToList();
+                var childChores = await BuildChoreListAsync(db, mine, ct);
+                return Results.Ok(new ChoresDto(childChores, Array.Empty<TallyEntryDto>(), "child", CanManage: false));
+            }
+
+            return Results.Ok(await BuildChoresDtoAsync(db, household.Id, all, role, ct));
         });
 
-        // ---- POST /chores ----
+        // ---- POST /chores : create (PARENT only — a child cannot create chores) ----
         g.MapPost("/chores", async (
             ChoreCreateRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
             UsageDbContext db, CancellationToken ct) =>
         {
             var caller = (await me.GetUserAsync(ct))!;
             var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var role = await RoleInHouseholdAsync(db, household.Id, caller.Id, ct);
+            if (IsChild(role)) return ChildForbidden("Only a parent can create chores.");
 
             var title = (req.Title ?? "").Trim();
             if (string.IsNullOrEmpty(title)) return Results.BadRequest(new { message = "A chore title is required." });
             if (!TryNormalizeRecurrence(req.Recurrence, out var recurrence))
                 return Results.BadRequest(new { message = "Recurrence must be none, daily, or weekly." });
+            if (!TryNormalizeSource(req.Source, out var source))
+                return Results.BadRequest(new { message = "Source must be assigned or pool." });
 
             int? assignee = null;
             if (req.AssignedToUserId is int aId)
@@ -762,6 +827,8 @@ public static class FamilyMealsChoresEndpoints
                     return Results.BadRequest(new { message = "The chore assignee must be a member of your family." });
                 assignee = aId;
             }
+            // A pool chore is anyone-claimable, so it carries no fixed assignee.
+            if (source == "pool") assignee = null;
 
             var chore = new FamilyChore
             {
@@ -771,22 +838,29 @@ public static class FamilyMealsChoresEndpoints
                 Done = false,
                 Points = NormalizePoints(req.Points),
                 Recurrence = recurrence,
+                Source = source,
+                Status = "open",
+                CreditValue = NormalizeCredit(req.CreditValue),
                 CreatedByUserId = caller.Id,
                 CreatedUtc = DateTime.UtcNow,
             };
             db.FamilyChores.Add(chore);
             await db.SaveChangesAsync(ct);
 
-            return Results.Ok(await BuildChoresDtoAsync(db, household.Id, null, ct));
+            return Results.Ok(await BuildChoresDtoAsync(db, household.Id, null, role, ct));
         });
 
-        // ---- PATCH /chores/{id} ----
+        // ---- PATCH /chores/{id} : edit / mark done (PARENT only) ----
+        // The legacy done flag is kept for backward-compat with the shared board. The marketplace lifecycle
+        // (claim/submit/approve/reject) lives on the dedicated endpoints below.
         g.MapPatch("/chores/{id:long}", async (
             long id, ChorePatchRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
             UsageDbContext db, CancellationToken ct) =>
         {
             var caller = (await me.GetUserAsync(ct))!;
             var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var role = await RoleInHouseholdAsync(db, household.Id, caller.Id, ct);
+            if (IsChild(role)) return ChildForbidden("Only a parent can edit chores.");
 
             var chore = await db.FamilyChores.FirstOrDefaultAsync(c => c.Id == id, ct);
             if (chore is null || chore.HouseholdId != household.Id) return NotFound();
@@ -804,6 +878,13 @@ public static class FamilyMealsChoresEndpoints
                 chore.AssignedToUserId = aId;
             }
             if (req.Points is not null) chore.Points = NormalizePoints(req.Points);
+            if (req.CreditValue is not null) chore.CreditValue = NormalizeCredit(req.CreditValue);
+            if (req.Source is not null)
+            {
+                if (!TryNormalizeSource(req.Source, out var source))
+                    return Results.BadRequest(new { message = "Source must be assigned or pool." });
+                chore.Source = source;
+            }
             if (req.Recurrence is not null)
             {
                 if (!TryNormalizeRecurrence(req.Recurrence, out var recurrence))
@@ -838,26 +919,370 @@ public static class FamilyMealsChoresEndpoints
             }
 
             await db.SaveChangesAsync(ct);
-            return Results.Ok(await BuildChoresDtoAsync(db, household.Id, null, ct));
+            return Results.Ok(await BuildChoresDtoAsync(db, household.Id, null, role, ct));
         });
 
-        // ---- DELETE /chores/{id} ----
+        // ---- DELETE /chores/{id} : (PARENT only) ----
         g.MapDelete("/chores/{id:long}", async (
             long id, CurrentUserAccessor me, CurrentHouseholdAccessor households,
             UsageDbContext db, CancellationToken ct) =>
         {
             var caller = (await me.GetUserAsync(ct))!;
             var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var role = await RoleInHouseholdAsync(db, household.Id, caller.Id, ct);
+            if (IsChild(role)) return ChildForbidden("Only a parent can delete chores.");
 
             var chore = await db.FamilyChores.FirstOrDefaultAsync(c => c.Id == id, ct);
             if (chore is null || chore.HouseholdId != household.Id) return NotFound();
 
-            db.FamilyChores.Remove(chore); // completions cascade
+            db.FamilyChores.Remove(chore); // completions cascade; the earn ledger rows SET NULL (money kept)
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
 
+        MapChoreMarketplace(g);
+        MapAllowance(g);
         MapChoresAi(g);
+    }
+
+    // =====================================================================================
+    // CHORE MARKETPLACE — the claim → submit → approve/reject state machine
+    // =====================================================================================
+    // Lifecycle: a CHILD claims a pool chore (open → claimed) or directly submits an assigned chore; the
+    // child SUBMITS a claimed/assigned chore (→ submitted, awaiting a parent); a PARENT APPROVES (→ approved:
+    // append ONE FamilyChoreCompletion snapshot + ONE FamilyCreditEntry earn row, awarding credits EXACTLY
+    // once) or REJECTS (→ back to open for a pool chore, or claimed for an assigned one). Recurring chores
+    // reset to open/unclaimed on approval for the next period. Every endpoint is household-scoped (a foreign
+    // chore is a 404) with explicit child-vs-parent gating.
+
+    private static void MapChoreMarketplace(RouteGroupBuilder g)
+    {
+        // ---- POST /chores/{id}/claim : a CHILD claims an OPEN pool chore ----
+        g.MapPost("/chores/{id:long}/claim", async (
+            long id, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            // A claim is a CHILD action — gated by chore.claim.
+            if (!caller.Permissions.Contains(Permissions.ChoreClaim))
+                return ChildForbidden("Only a child can claim chores.");
+            if (!await IsHouseholdMemberAsync(db, household.Id, caller.Id, ct))
+                return ChildForbidden("You aren't a member of this family.");
+
+            var chore = await db.FamilyChores.FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (chore is null || chore.HouseholdId != household.Id) return NotFound();
+            if (chore.Source != "pool")
+                return Results.BadRequest(new { message = "Only marketplace (pool) chores can be claimed." });
+            if (chore.Status != "open" || chore.ClaimedByUserId is not null)
+                return Conflict("That chore has already been claimed.");
+
+            chore.Status = "claimed";
+            chore.ClaimedByUserId = caller.Id;
+            chore.ClaimedUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(await BuildMyChoresDtoAsync(db, household.Id, caller.Id, ct));
+        });
+
+        // ---- POST /chores/{id}/submit : the CHILD marks their claimed/assigned chore done (→ submitted) ----
+        g.MapPost("/chores/{id:long}/submit", async (
+            long id, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            if (!caller.Permissions.Contains(Permissions.ChoreClaim))
+                return ChildForbidden("Only a child submits a chore for approval.");
+
+            var chore = await db.FamilyChores.FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (chore is null || chore.HouseholdId != household.Id) return NotFound();
+
+            // The caller must own this chore (their claim or their assignment) — never someone else's.
+            var ownsIt = chore.ClaimedByUserId == caller.Id || chore.AssignedToUserId == caller.Id;
+            if (!ownsIt) return ChildForbidden("That isn't your chore.");
+            if (chore.Status is not ("open" or "claimed" or "rejected"))
+                return Conflict("That chore can't be submitted from its current state.");
+
+            // An assigned chore the child hasn't formally claimed: stamp the claim now so the lifecycle/credit
+            // award has a claimant to attribute (the assignee).
+            if (chore.ClaimedByUserId is null)
+            {
+                chore.ClaimedByUserId = caller.Id;
+                chore.ClaimedUtc ??= DateTime.UtcNow;
+            }
+            chore.Status = "submitted";
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(await BuildMyChoresDtoAsync(db, household.Id, caller.Id, ct));
+        });
+
+        // ---- POST /chores/{id}/approve : a PARENT approves → award credits EXACTLY once ----
+        g.MapPost("/chores/{id:long}/approve", async (
+            long id, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            AuditLogger audit, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var role = await RoleInHouseholdAsync(db, household.Id, caller.Id, ct);
+            if (!IsParent(role)) return ChildForbidden("Only a parent can approve chores.");
+
+            var chore = await db.FamilyChores.FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (chore is null || chore.HouseholdId != household.Id) return NotFound();
+            // Idempotent: re-approving an already-approved chore is a no-op (never double-awards).
+            if (chore.Status == "approved")
+                return Results.Ok(await BuildChoresDtoAsync(db, household.Id, null, role, ct));
+            if (chore.Status != "submitted")
+                return Conflict("Only a submitted chore can be approved.");
+
+            var now = DateTime.UtcNow;
+            var claimant = chore.ClaimedByUserId ?? chore.AssignedToUserId;
+            chore.Status = "approved";
+            chore.ApprovedByUserId = caller.Id;
+            chore.ApprovedUtc = now;
+            // Mark the legacy done flag + stamp for the shared board / "good job" summary continuity.
+            chore.Done = true;
+            chore.DoneByUserId = claimant;
+            chore.DoneUtc = now;
+
+            // Build ONE completion snapshot (chore-history) AND, when a child claimant earns money, ONE earn
+            // ledger row (the money-history the balance sums). Credits are awarded EXACTLY once per approval.
+            FamilyChoreCompletion? completion = null;
+            var awardCredit = false;
+            if (claimant is int childId)
+            {
+                completion = new FamilyChoreCompletion
+                {
+                    ChoreId = chore.Id,
+                    ByUserId = childId,
+                    AtUtc = now,
+                    Points = chore.Points,
+                    Credits = chore.CreditValue,
+                };
+                db.FamilyChoreCompletions.Add(completion);
+                // Only a CHILD member accrues an allowance balance (an adult claimant just gets the points).
+                awardCredit = chore.CreditValue > 0 && await IsChildMemberAsync(db, household.Id, childId, ct);
+            }
+
+            // Recurring chore: reset the marketplace lifecycle for the next period (the earn ledger is kept).
+            if (chore.Recurrence != "none")
+            {
+                chore.Status = "open";
+                chore.ClaimedByUserId = null;
+                chore.ClaimedUtc = null;
+                chore.ApprovedByUserId = null;
+                chore.ApprovedUtc = null;
+                // Leave Done=true/DoneUtc=now so the existing background tick resets the done flag next period.
+            }
+
+            // Persist atomically: the status change, the completion, AND the earn row commit together or not at
+            // all — so a failure can never leave an approved chore WITHOUT its credit award (which the idempotent
+            // re-approve guard would then never retry → lost credits). Wrapped in the execution strategy because
+            // Npgsql retry-on-failure forbids a bare BeginTransactionAsync.
+            var strategy = db.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
+                await db.SaveChangesAsync(ct); // status + completion (the completion gets its Id here)
+                if (awardCredit && completion is not null)
+                {
+                    db.FamilyCreditEntries.Add(new FamilyCreditEntry
+                    {
+                        HouseholdId = household.Id,
+                        ChildUserId = completion.ByUserId,
+                        Kind = "earn",
+                        Amount = chore.CreditValue,
+                        ChoreCompletionId = completion.Id,
+                        Note = chore.Title,
+                        CreatedByUserId = completion.ByUserId,
+                        CreatedUtc = now,
+                    });
+                    await db.SaveChangesAsync(ct);
+                }
+                await tx.CommitAsync(ct);
+            });
+            await audit.LogAsync("family.chore.approve", targetEmail: null,
+                detail: $"chore={chore.Id} credits={chore.CreditValue}", ct: ct);
+
+            return Results.Ok(await BuildChoresDtoAsync(db, household.Id, null, role, ct));
+        }).RequirePermission(Permissions.AllowanceManage);
+
+        // ---- POST /chores/{id}/reject : a PARENT sends a submitted chore back (awards nothing) ----
+        g.MapPost("/chores/{id:long}/reject", async (
+            long id, ChoreRejectRequest? req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            var role = await RoleInHouseholdAsync(db, household.Id, caller.Id, ct);
+            if (!IsParent(role)) return ChildForbidden("Only a parent can reject chores.");
+
+            var chore = await db.FamilyChores.FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (chore is null || chore.HouseholdId != household.Id) return NotFound();
+            if (chore.Status != "submitted")
+                return Conflict("Only a submitted chore can be rejected.");
+
+            // Pool chore → back to OPEN + unclaimed (anyone can grab it again). Assigned chore → back to the
+            // child to retry (status "rejected", keeping their assignment/claim). Awards nothing.
+            if (chore.Source == "pool")
+            {
+                chore.Status = "open";
+                chore.ClaimedByUserId = null;
+                chore.ClaimedUtc = null;
+            }
+            else
+            {
+                chore.Status = "rejected";
+            }
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(await BuildChoresDtoAsync(db, household.Id, null, role, ct));
+        }).RequirePermission(Permissions.AllowanceManage);
+    }
+
+    // =====================================================================================
+    // ALLOWANCE — the credit ledger / per-child balance (derived = SUM of the child's rows)
+    // =====================================================================================
+
+    private static void MapAllowance(RouteGroupBuilder g)
+    {
+        // ---- GET /allowance/me : a CHILD's OWN balance + ledger (kid-safe; only theirs) ----
+        g.MapGet("/allowance/me", async (
+            CurrentUserAccessor me, CurrentHouseholdAccessor households, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            if (!caller.Permissions.Contains(Permissions.ChoreClaim))
+                return ChildForbidden("Only a child has an allowance view.");
+
+            var rows = await db.FamilyCreditEntries.AsNoTracking()
+                .Where(e => e.HouseholdId == household.Id && e.ChildUserId == caller.Id)
+                .OrderByDescending(e => e.CreatedUtc).ThenByDescending(e => e.Id)
+                .ToListAsync(ct);
+            var balance = rows.Sum(r => r.Amount);
+
+            return Results.Ok(new AllowanceMeDto(caller.Id, balance, rows.Select(ToCreditDto).ToList()));
+        }).RequirePermission(Permissions.ChoreClaim);
+
+        // ---- GET /allowance : the PARENT manager — every household child's balance + recent ledger ----
+        g.MapGet("/allowance", async (
+            CurrentUserAccessor me, CurrentHouseholdAccessor households, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+            var childIds = await ChildMemberIdsAsync(db, household.Id, ct);
+            var names = await NamesAsync(db, childIds, ct);
+
+            var entries = await db.FamilyCreditEntries.AsNoTracking()
+                .Where(e => e.HouseholdId == household.Id)
+                .ToListAsync(ct);
+            var balanceById = entries.GroupBy(e => e.ChildUserId)
+                .ToDictionary(grp => grp.Key, grp => grp.Sum(x => x.Amount));
+
+            var children = childIds
+                .Select(cid => new ChildBalanceDto(cid, Name(names, cid), balanceById.GetValueOrDefault(cid)))
+                .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var recent = entries
+                .OrderByDescending(e => e.CreatedUtc).ThenByDescending(e => e.Id)
+                .Take(100)
+                .Select(ToCreditDto)
+                .ToList();
+
+            return Results.Ok(new AllowanceDto(children, recent));
+        }).RequirePermission(Permissions.AllowanceManage);
+
+        // ---- POST /allowance/{childUserId}/payout : record cash handed over IRL (debits the balance) ----
+        g.MapPost("/allowance/{childUserId:int}/payout", async (
+            int childUserId, AllowanceMoveRequest req, CurrentUserAccessor me,
+            CurrentHouseholdAccessor households, AuditLogger audit, UsageDbContext db, CancellationToken ct) =>
+            await RecordMoveAsync(db, audit, me, households, childUserId, req, "payout", ct))
+            .RequirePermission(Permissions.AllowanceManage);
+
+        // ---- POST /allowance/{childUserId}/spend : record a purchase against the balance ----
+        g.MapPost("/allowance/{childUserId:int}/spend", async (
+            int childUserId, AllowanceMoveRequest req, CurrentUserAccessor me,
+            CurrentHouseholdAccessor households, AuditLogger audit, UsageDbContext db, CancellationToken ct) =>
+            await RecordMoveAsync(db, audit, me, households, childUserId, req, "spend", ct))
+            .RequirePermission(Permissions.AllowanceManage);
+
+        // ---- POST /allowance/{childUserId}/adjust : a manual correction (bonus/penalty) ----
+        g.MapPost("/allowance/{childUserId:int}/adjust", async (
+            int childUserId, AllowanceMoveRequest req, CurrentUserAccessor me,
+            CurrentHouseholdAccessor households, AuditLogger audit, UsageDbContext db, CancellationToken ct) =>
+            await RecordMoveAsync(db, audit, me, households, childUserId, req, "adjust", ct))
+            .RequirePermission(Permissions.AllowanceManage);
+    }
+
+    /// <summary>The shared spend/payout/adjust write path (parent, gated allowance.manage). Validates the
+    /// target is a CHILD member of the caller's household (a foreign/non-child id is a 404 — existence never
+    /// leaked), signs the amount (− for spend/payout; ± for adjust per the request's sign), and appends ONE
+    /// ledger row. Returns the parent allowance view. Overdraw is allowed (parents may advance cash) — the
+    /// balance can go negative; the frontend surfaces a warning. No email anywhere.</summary>
+    private static async Task<IResult> RecordMoveAsync(
+        UsageDbContext db, AuditLogger audit, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+        int childUserId, AllowanceMoveRequest req, string kind, CancellationToken ct)
+    {
+        var caller = (await me.GetUserAsync(ct))!;
+        var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+        // The target must be a CHILD member of THIS household — else 404 (never act on another's data).
+        if (!await IsChildMemberAsync(db, household.Id, childUserId, ct)) return NotFound();
+
+        var magnitude = req.Amount ?? 0m;
+        if (magnitude <= 0m || magnitude > MaxCreditAmount)
+            return Results.BadRequest(new { message = "Enter an amount greater than zero." });
+        magnitude = Math.Round(magnitude, 2, MidpointRounding.AwayFromZero);
+
+        decimal amount;
+        string? category = null;
+        switch (kind)
+        {
+            case "payout":
+                amount = -magnitude;
+                break;
+            case "spend":
+                amount = -magnitude;
+                category = NormalizeCategory(req.Category);
+                break;
+            default: // adjust: sign per the request (default +), so a parent can dock or bonus.
+                amount = (req.Sign is < 0) ? -magnitude : magnitude;
+                break;
+        }
+
+        db.FamilyCreditEntries.Add(new FamilyCreditEntry
+        {
+            HouseholdId = household.Id,
+            ChildUserId = childUserId,
+            Kind = kind,
+            Amount = amount,
+            Category = category,
+            Note = string.IsNullOrWhiteSpace(req.Note) ? null : Clamp(req.Note, 256),
+            CreatedByUserId = caller.Id,
+            CreatedUtc = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+        await audit.LogAsync($"family.allowance.{kind}", targetEmail: null,
+            detail: $"child={childUserId} amount={amount}", ct: ct);
+
+        // Return the refreshed parent manager view.
+        var childIds = await ChildMemberIdsAsync(db, household.Id, ct);
+        var names = await NamesAsync(db, childIds, ct);
+        var entries = await db.FamilyCreditEntries.AsNoTracking()
+            .Where(e => e.HouseholdId == household.Id)
+            .ToListAsync(ct);
+        var balanceById = entries.GroupBy(e => e.ChildUserId)
+            .ToDictionary(grp => grp.Key, grp => grp.Sum(x => x.Amount));
+        var children = childIds
+            .Select(cid => new ChildBalanceDto(cid, Name(names, cid), balanceById.GetValueOrDefault(cid)))
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var recent = entries
+            .OrderByDescending(e => e.CreatedUtc).ThenByDescending(e => e.Id).Take(100)
+            .Select(ToCreditDto).ToList();
+        return Results.Ok(new AllowanceDto(children, recent));
     }
 
     // =====================================================================================
@@ -1130,8 +1555,9 @@ public static class FamilyMealsChoresEndpoints
     /// re-read, or null to load them here.
     /// </summary>
     private static async Task<ChoresDto> BuildChoresDtoAsync(
-        UsageDbContext db, int householdId, List<FamilyChore>? preloaded, CancellationToken ct)
+        UsageDbContext db, int householdId, List<FamilyChore>? preloaded, string? role, CancellationToken ct)
     {
+        role ??= "adult"; // a parent caller with no explicit row is treated as a full member
         var chores = preloaded ?? await db.FamilyChores.AsNoTracking()
             .Where(c => c.HouseholdId == householdId)
             .ToListAsync(ct);
@@ -1150,12 +1576,29 @@ public static class FamilyMealsChoresEndpoints
                 .ToListAsync(ct))
                 .Select(x => (x.ByUserId, x.Points)).ToList();
 
+        var orderedChores = await BuildChoreListAsync(db, chores, ct);
+
+        var names = await NamesAsync(db, tallyRows.Select(t => t.ByUserId), ct);
+        var tally = tallyRows
+            .OrderByDescending(t => t.Points).ThenBy(t => Name(names, t.ByUserId), StringComparer.OrdinalIgnoreCase)
+            .Select(t => new TallyEntryDto(t.ByUserId, Name(names, t.ByUserId), t.Points))
+            .ToList();
+
+        return new ChoresDto(orderedChores, tally, role, CanManage: IsParent(role));
+    }
+
+    /// <summary>Order a set of chores (open first, then done; by assignee then title) and resolve every person
+    /// field (assignee/doneBy/claimedBy) to a display name — never email. Shared by the parent board + the
+    /// child rescoped list so both render identically.</summary>
+    private static async Task<List<ChoreDto>> BuildChoreListAsync(
+        UsageDbContext db, List<FamilyChore> chores, CancellationToken ct)
+    {
         var personIds = chores.Where(c => c.AssignedToUserId is not null).Select(c => c.AssignedToUserId!.Value)
             .Concat(chores.Where(c => c.DoneByUserId is not null).Select(c => c.DoneByUserId!.Value))
-            .Concat(tallyRows.Select(t => t.ByUserId));
+            .Concat(chores.Where(c => c.ClaimedByUserId is not null).Select(c => c.ClaimedByUserId!.Value));
         var names = await NamesAsync(db, personIds, ct);
 
-        var ordered = chores
+        return chores
             // Open first, then done; within a group, by assignee (unassigned last), then title.
             .OrderBy(c => c.Done ? 1 : 0)
             .ThenBy(c => c.AssignedToUserId is null ? 1 : 0)
@@ -1164,13 +1607,22 @@ public static class FamilyMealsChoresEndpoints
             .ThenBy(c => c.Id)
             .Select(c => ToChoreDto(c, names))
             .ToList();
+    }
 
-        var tally = tallyRows
-            .OrderByDescending(t => t.Points).ThenBy(t => Name(names, t.ByUserId), StringComparer.OrdinalIgnoreCase)
-            .Select(t => new TallyEntryDto(t.ByUserId, Name(names, t.ByUserId), t.Points))
-            .ToList();
-
-        return new ChoresDto(ordered, tally);
+    /// <summary>Build the CHILD-rescoped chores response for a child caller: pool (open) chores + the child's
+    /// own claimed/assigned chores only (never another member's), with no tally. Used by the marketplace
+    /// state-machine endpoints so a child always gets back exactly their kid-safe board.</summary>
+    private static async Task<ChoresDto> BuildMyChoresDtoAsync(
+        UsageDbContext db, int householdId, int childUserId, CancellationToken ct)
+    {
+        var mine = await db.FamilyChores.AsNoTracking()
+            .Where(c => c.HouseholdId == householdId
+                && ((c.Source == "pool" && c.Status == "open")
+                    || c.ClaimedByUserId == childUserId
+                    || c.AssignedToUserId == childUserId))
+            .ToListAsync(ct);
+        var list = await BuildChoreListAsync(db, mine, ct);
+        return new ChoresDto(list, Array.Empty<TallyEntryDto>(), "child", CanManage: false);
     }
 
     // =====================================================================================
@@ -1320,7 +1772,13 @@ public static class FamilyMealsChoresEndpoints
         new(c.Id, c.Title,
             c.AssignedToUserId, c.AssignedToUserId is int a ? Name(names, a) : null,
             c.Done, c.DoneByUserId, c.DoneByUserId is int d ? Name(names, d) : null, c.DoneUtc,
-            c.Points, c.Recurrence);
+            c.Points, c.Recurrence,
+            c.CreditValue, c.Source, c.Status,
+            c.ClaimedByUserId, c.ClaimedByUserId is int cl ? Name(names, cl) : null, c.ClaimedUtc,
+            c.ApprovedByUserId, c.ApprovedUtc);
+
+    private static CreditEntryDto ToCreditDto(FamilyCreditEntry e) =>
+        new(e.Id, e.Kind, e.Amount, e.Category, e.ChoreCompletionId, e.Note, e.CreatedByUserId, e.CreatedUtc);
 
     private static string NormalizeSlot(string? slot)
     {
@@ -1371,6 +1829,64 @@ public static class FamilyMealsChoresEndpoints
         UsageDbContext db, int householdId, int userId, CancellationToken ct) =>
         await db.HouseholdMembers.AsNoTracking()
             .AnyAsync(m => m.HouseholdId == householdId && m.UserId == userId, ct);
+
+    // ---- Marketplace role + normalization helpers ----
+
+    /// <summary>The caller's role in the household ("owner"|"adult"|"child"), or null if not a member.</summary>
+    private static async Task<string?> RoleInHouseholdAsync(
+        UsageDbContext db, int householdId, int userId, CancellationToken ct) =>
+        await db.HouseholdMembers.AsNoTracking()
+            .Where(m => m.HouseholdId == householdId && m.UserId == userId)
+            .Select(m => m.Role)
+            .FirstOrDefaultAsync(ct);
+
+    /// <summary>A child caller (the kid view): role is exactly "child".</summary>
+    private static bool IsChild(string? role) => role == "child";
+
+    /// <summary>A parent caller (full management): an owner or adult member. A non-member is NOT a parent.</summary>
+    private static bool IsParent(string? role) => role is "owner" or "adult";
+
+    /// <summary>Whether <paramref name="userId"/> is a CHILD member of the household.</summary>
+    private static async Task<bool> IsChildMemberAsync(
+        UsageDbContext db, int householdId, int userId, CancellationToken ct) =>
+        await db.HouseholdMembers.AsNoTracking()
+            .AnyAsync(m => m.HouseholdId == householdId && m.UserId == userId && m.Role == "child", ct);
+
+    /// <summary>The AppUser ids of every CHILD member of the household.</summary>
+    private static async Task<List<int>> ChildMemberIdsAsync(
+        UsageDbContext db, int householdId, CancellationToken ct) =>
+        await db.HouseholdMembers.AsNoTracking()
+            .Where(m => m.HouseholdId == householdId && m.Role == "child")
+            .Select(m => m.UserId)
+            .ToListAsync(ct);
+
+    private static bool TryNormalizeSource(string? raw, out string source)
+    {
+        source = string.IsNullOrWhiteSpace(raw) ? "assigned" : raw.Trim().ToLowerInvariant();
+        return ChoreSources.Contains(source);
+    }
+
+    /// <summary>Clamp a chore's credit value to a sane non-negative range, rounded to cents.</summary>
+    private static decimal NormalizeCredit(decimal? v)
+    {
+        var c = v ?? 0m;
+        if (c < 0m) c = 0m;
+        if (c > MaxCreditAmount) c = MaxCreditAmount;
+        return Math.Round(c, 2, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>Normalise a spend category to the fixed enum; unknown/blank → "other".</summary>
+    private static string NormalizeCategory(string? s)
+    {
+        var v = (s ?? "").Trim().ToLowerInvariant();
+        return SpendCategories.Contains(v) ? v : "other";
+    }
+
+    private static IResult ChildForbidden(string message) =>
+        Results.Json(new { message }, statusCode: StatusCodes.Status403Forbidden);
+
+    private static IResult Conflict(string message) =>
+        Results.Json(new { message }, statusCode: StatusCodes.Status409Conflict);
 
     /// <summary>Resolve a set of userIds to display names (email is never read). Missing → "Unknown user".</summary>
     private static async Task<Dictionary<int, string>> NamesAsync(

@@ -6,7 +6,7 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 39 keys.
+    // The full catalog of 41 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
@@ -18,7 +18,7 @@ public class PermissionsTests
         "chat.read", "chat.send", "chat.moderate", "chat.contacts.manage",
         "tracker.self", "tracker.viewall",
         "shares.view", "shares.manage",
-        "family.use", "family.finance", "cycle.track",
+        "family.use", "family.finance", "cycle.track", "chore.claim", "allowance.manage",
         "location.self", "location.share", "location.view-all",
         "users.view", "users.manage", "activity.view", "ai.usage.view",
         "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision",
@@ -51,6 +51,8 @@ public class PermissionsTests
     [InlineData("family.use")]
     [InlineData("family.finance")]
     [InlineData("cycle.track")]
+    [InlineData("chore.claim")]
+    [InlineData("allowance.manage")]
     [InlineData("location.self")]
     [InlineData("location.share")]
     [InlineData("location.view-all")]
@@ -108,6 +110,8 @@ public class PermissionsTests
         Permissions.FamilyUse.Should().Be("family.use");
         Permissions.FamilyFinance.Should().Be("family.finance");
         Permissions.CycleTrack.Should().Be("cycle.track");
+        Permissions.ChoreClaim.Should().Be("chore.claim");
+        Permissions.AllowanceManage.Should().Be("allowance.manage");
         Permissions.LocationSelf.Should().Be("location.self");
         Permissions.LocationShare.Should().Be("location.share");
         Permissions.LocationViewAll.Should().Be("location.view-all");
@@ -124,9 +128,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_thirty_nine_known_keys()
+    public void All_contains_exactly_the_forty_one_known_keys()
     {
-        Permissions.All.Should().HaveCount(39);
+        Permissions.All.Should().HaveCount(41);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -137,9 +141,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_thirty_nine_entries()
+    public void Catalog_has_forty_one_entries()
     {
-        Permissions.Catalog.Should().HaveCount(39);
+        Permissions.Catalog.Should().HaveCount(41);
     }
 
     [Fact]
@@ -238,6 +242,48 @@ public class PermissionsTests
     }
 
     [Fact]
+    public void Chore_marketplace_keys_are_in_the_Family_group_non_ai_and_not_defaultable()
+    {
+        // chore.claim (a child capability) and allowance.manage (a parent capability) live in the Family
+        // group, are NOT AI keys, and are never defaultable — granted deliberately via the presets so open
+        // sign-up can never auto-mint a child or an allowance manager.
+        foreach (var key in new[] { Permissions.ChoreClaim, Permissions.AllowanceManage })
+        {
+            Permissions.Catalog.Single(p => p.Key == key).Group.Should().Be("Family");
+            Permissions.Catalog.Single(p => p.Key == key).IsAi.Should().BeFalse();
+            Permissions.IsAi(key).Should().BeFalse();
+            Permissions.IsDefaultable(key).Should().BeFalse();
+            Permissions.Views.Should().NotContain(key); // not a page-view gate
+        }
+    }
+
+    [Fact]
+    public void Child_preset_is_minimal_family_use_plus_chore_claim_and_nothing_privileged()
+    {
+        var child = Permissions.Presets.Single(p => p.Key == "child");
+        // Exactly the two keys: the minimal family.use (to be a household member) + the chore.claim capability.
+        child.Permissions.Should().BeEquivalentTo(new[] { Permissions.FamilyUse, Permissions.ChoreClaim });
+        // It must NOT carry any privileged/parent/AI/admin/finance/location/tracker key.
+        child.Permissions.Should().NotContain(Permissions.AllowanceManage);
+        child.Permissions.Should().NotContain(Permissions.FamilyFinance);
+        child.Permissions.Should().NotContain(Permissions.CycleTrack);
+        child.Permissions.Should().NotContain(Permissions.UsersManage);
+        child.Permissions.Should().NotContain(Permissions.TrackerSelf);
+        child.Permissions.Should().NotContain(Permissions.ChatRead);
+        foreach (var ai in Permissions.AiKeys) child.Permissions.Should().NotContain(ai);
+        foreach (var loc in Permissions.LocationKeys) child.Permissions.Should().NotContain(loc);
+    }
+
+    [Fact]
+    public void Family_member_preset_includes_allowance_manage_but_not_chore_claim()
+    {
+        // A full member is a PARENT: they manage allowance; they are not a chore-claiming child.
+        var member = Permissions.Presets.Single(p => p.Key == "family-member");
+        member.Permissions.Should().Contain(Permissions.AllowanceManage);
+        member.Permissions.Should().NotContain(Permissions.ChoreClaim);
+    }
+
+    [Fact]
     public void Ai_permissions_are_not_defaultable_and_are_not_page_view_gates()
     {
         // AI capabilities spend tokens, so NONE are defaultable — every new account starts AI-off and they
@@ -297,9 +343,9 @@ public class PermissionsTests
     public void Presets_reference_only_valid_keys_and_administrator_is_everything()
     {
         var valid = Permissions.All.ToHashSet();
-        Permissions.Presets.Should().HaveCount(4);
+        Permissions.Presets.Should().HaveCount(5);
         Permissions.Presets.Select(p => p.Key).Should()
-            .BeEquivalentTo(new[] { "administrator", "family-member", "friend-tracker", "viewer" });
+            .BeEquivalentTo(new[] { "administrator", "family-member", "child", "friend-tracker", "viewer" });
 
         // Every preset only grants real catalog keys.
         foreach (var preset in Permissions.Presets)

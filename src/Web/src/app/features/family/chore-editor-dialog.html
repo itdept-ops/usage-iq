@@ -10,6 +10,23 @@
            [ngModel]="title()" (ngModelChange)="title.set($event)" (keydown.enter)="save()" />
   </mat-form-field>
 
+  <!-- Source: assigned to a child, or a marketplace chore anyone can claim -->
+  <div class="chore-edit__source" role="group" aria-label="Chore type">
+    <button type="button" class="chore-edit__source-opt" [class.is-on]="source() === 'assigned'"
+            (click)="setSource('assigned')">
+      <mat-icon aria-hidden="true">assignment_ind</mat-icon>
+      <span class="chore-edit__source-name">Assigned</span>
+      <span class="chore-edit__source-blurb">Given to one person</span>
+    </button>
+    <button type="button" class="chore-edit__source-opt" [class.is-on]="source() === 'pool'"
+            (click)="setSource('pool')">
+      <mat-icon aria-hidden="true">storefront</mat-icon>
+      <span class="chore-edit__source-name">Marketplace</span>
+      <span class="chore-edit__source-blurb">Any kid can claim it</span>
+    </button>
+  </div>
+
+  @if (showAssignee()) {
   <mat-form-field appearance="outline" class="note-edit__field">
     <mat-label>Who's it for?</mat-label>
     <mat-select [ngModel]="assignee()" (ngModelChange)="assignee.set($event)">
@@ -35,6 +52,25 @@
       }
     </mat-select>
   </mat-form-field>
+  }
+
+  <!-- Allowance credit value ($) awarded to a child on approval -->
+  <div class="chore-edit__points chore-edit__credit">
+    <span class="chore-edit__points-label"><mat-icon aria-hidden="true">payments</mat-icon> Allowance reward</span>
+    <mat-form-field appearance="outline" class="chore-edit__credit-field" subscriptSizing="dynamic">
+      <span matTextPrefix>$&nbsp;</span>
+      <input matInput type="number" min="0" max="1000" step="0.25" inputmode="decimal"
+             [ngModel]="creditValue()" (ngModelChange)="setCredit($event)" />
+    </mat-form-field>
+    <div class="chore-edit__presets">
+      @for (c of creditPresets; track c) {
+        <button mat-stroked-button type="button" class="chore-edit__preset"
+                [class.is-on]="creditValue() === c" (click)="setCredit(c)">
+          {{ c === 0 ? 'None' : '$' + c }}
+        </button>
+      }
+    </div>
+  </div>
 
   <!-- Stars / points -->
   <div class="chore-edit__points">

@@ -1,0 +1,159 @@
+<section class="family">
+  <a class="family__back" routerLink="/family/chores">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon> Chores
+  </a>
+
+  <header class="family__hero family__hero--page family__hero--allowance">
+    <div class="family__hero-id">
+      <span class="family__crest" aria-hidden="true"><mat-icon>savings</mat-icon></span>
+      <div>
+        <p class="family__eyebrow">Family Hub</p>
+        <h1 class="family__name">Allowance</h1>
+        <p class="family__sub">Track what each child has earned</p>
+      </div>
+    </div>
+    @if (!loading() && !error() && children().length > 0) {
+      <div class="allowance__total">
+        <span class="allowance__total-label">Family total</span>
+        <span class="allowance__total-amount">{{ money(totalBalance()) }}</span>
+      </div>
+    }
+  </header>
+
+  @if (loading()) {
+    <div class="family__loading">
+      <mat-spinner [diameter]="28" />
+      <span>Counting the credits…</span>
+    </div>
+  } @else if (error()) {
+    <div class="family__error">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <p>We couldn't load the allowance manager just now. Please try again in a moment.</p>
+    </div>
+  } @else if (children().length === 0) {
+    <div class="family__empty">
+      <mat-icon aria-hidden="true">child_care</mat-icon>
+      <h2>No children yet</h2>
+      <p>
+        Add a child from the <strong>Users</strong> admin: enter their Google email and apply the
+        <em>Child</em> preset, then add them to your household. Once they sign in with their own Google
+        account, their earned credits will show up here.
+      </p>
+      <a mat-stroked-button routerLink="/users">
+        <mat-icon aria-hidden="true">group_add</mat-icon> Open Users admin
+      </a>
+    </div>
+  } @else {
+    <!-- ── Per-child balance cards ───────────────────────────────────────── -->
+    <ul class="child-cards">
+      @for (child of children(); track child.childUserId) {
+        <li class="child-card">
+          <div class="child-card__head">
+            <span class="child-card__avatar" aria-hidden="true">{{ initials(child.name) }}</span>
+            <div class="child-card__id">
+              <p class="child-card__name">{{ child.name }}</p>
+              <p class="child-card__balance" [class.child-card__balance--neg]="child.balance < 0">
+                {{ child.balance < 0 ? '−' : '' }}{{ money(child.balance) }}
+                @if (child.balance < 0) {
+                  <span class="child-card__warn" matTooltip="This child owes against their balance">
+                    <mat-icon aria-hidden="true">warning</mat-icon>
+                  </span>
+                }
+              </p>
+            </div>
+          </div>
+
+          <div class="child-card__actions">
+            <button mat-stroked-button [class.is-on]="isOpen(child, 'payout')"
+                    (click)="toggleMove(child, 'payout')">
+              <mat-icon aria-hidden="true">payments</mat-icon> Pay out
+            </button>
+            <button mat-stroked-button [class.is-on]="isOpen(child, 'spend')"
+                    (click)="toggleMove(child, 'spend')">
+              <mat-icon aria-hidden="true">shopping_bag</mat-icon> Spend
+            </button>
+            <button mat-stroked-button [class.is-on]="isOpen(child, 'adjust')"
+                    (click)="toggleMove(child, 'adjust')">
+              <mat-icon aria-hidden="true">tune</mat-icon> Adjust
+            </button>
+          </div>
+
+          <!-- Inline money-move form -->
+          @if (openChildId() === child.childUserId) {
+            <form class="move" (submit)="$event.preventDefault(); save(child)">
+              <div class="move__row">
+                <mat-form-field appearance="outline" class="move__amount" subscriptSizing="dynamic">
+                  <mat-label>Amount</mat-label>
+                  <span matTextPrefix>$&nbsp;</span>
+                  <input matInput type="number" min="0.01" step="0.25" inputmode="decimal" cdkFocusInitial
+                         [ngModel]="amount()" (ngModelChange)="amount.set($event)" name="amount" />
+                </mat-form-field>
+
+                @if (moveKind() === 'spend') {
+                  <mat-form-field appearance="outline" class="move__category" subscriptSizing="dynamic">
+                    <mat-label>Category</mat-label>
+                    <mat-select [ngModel]="category()" (ngModelChange)="category.set($event)" name="category">
+                      @for (c of categories; track c.value) {
+                        <mat-option [value]="c.value">{{ c.label }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                }
+
+                @if (moveKind() === 'adjust') {
+                  <div class="move__sign" role="group" aria-label="Adjustment direction">
+                    <button type="button" class="move__sign-opt" [class.is-on]="adjustSign() === 1"
+                            (click)="adjustSign.set(1)"><mat-icon aria-hidden="true">add</mat-icon> Bonus</button>
+                    <button type="button" class="move__sign-opt move__sign-opt--neg" [class.is-on]="adjustSign() === -1"
+                            (click)="adjustSign.set(-1)"><mat-icon aria-hidden="true">remove</mat-icon> Dock</button>
+                  </div>
+                }
+              </div>
+
+              <mat-form-field appearance="outline" class="move__note" subscriptSizing="dynamic">
+                <mat-label>Note (optional)</mat-label>
+                <input matInput maxlength="256" [ngModel]="note()" (ngModelChange)="note.set($event)" name="note"
+                       [placeholder]="moveKind() === 'payout' ? 'e.g. Cash for the movies' : 'e.g. New Lego set'" />
+              </mat-form-field>
+
+              <div class="move__actions">
+                <button mat-button type="button" (click)="openChildId.set(null)" [disabled]="saving()">Cancel</button>
+                <button mat-flat-button color="primary" type="submit" [disabled]="!canSave() || saving()">
+                  @if (saving()) {
+                    <mat-spinner [diameter]="18" /><span>Saving…</span>
+                  } @else {
+                    <span>
+                      {{ moveKind() === 'payout' ? 'Record payout' : moveKind() === 'spend' ? 'Record spend' : 'Apply adjustment' }}
+                    </span>
+                  }
+                </button>
+              </div>
+            </form>
+          }
+        </li>
+      }
+    </ul>
+
+    <!-- ── Recent activity across the family ─────────────────────────────── -->
+    @if (recent().length > 0) {
+      <section class="board-section" aria-label="Recent activity">
+        <h2 class="family__card-title board-section__title">
+          <mat-icon aria-hidden="true">receipt_long</mat-icon> Recent activity
+        </h2>
+        <ul class="ledger">
+          @for (row of recent(); track row.id) {
+            <li class="ledger__row">
+              <span class="ledger__kind ledger__kind--{{ row.kind }}">
+                <mat-icon aria-hidden="true">{{ ledgerIcon(row.kind) }}</mat-icon>
+              </span>
+              <span class="ledger__note">{{ row.note || (row.kind === 'earn' ? 'Chore reward' : row.category || row.kind) }}</span>
+              <span class="ledger__amount" [class.ledger__amount--pos]="row.amount >= 0" [class.ledger__amount--neg]="row.amount < 0">
+                {{ row.amount >= 0 ? '+' : '−' }}{{ money(row.amount) }}
+              </span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</section>

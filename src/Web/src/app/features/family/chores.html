@@ -9,235 +9,43 @@
       <div>
         <p class="family__eyebrow">Family Hub</p>
         <h1 class="family__name">Chores</h1>
-        <p class="family__sub">Share the load, earn some stars</p>
+        <p class="family__sub">{{ isChild() ? 'Grab a chore, earn your allowance' : 'Share the load, earn some stars' }}</p>
       </div>
     </div>
-    <div class="chores__hero-actions">
-      <button mat-stroked-button class="family__settings-btn chore-ai__btn"
-              [class.chore-ai__btn--open]="aiPanel() === 'suggest'"
-              [disabled]="aiBusy() || aiApplying()" (click)="togglePanel('suggest')"
-              [attr.aria-expanded]="aiPanel() === 'suggest'">
-        <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
-        Suggest chores
-      </button>
-      <button mat-stroked-button class="family__settings-btn chore-ai__btn"
-              [class.chore-ai__btn--open]="aiPanel() === 'balance'"
-              [disabled]="aiBusy() || aiApplying()" (click)="togglePanel('balance')"
-              [attr.aria-expanded]="aiPanel() === 'balance'">
-        <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
-        Balance
-      </button>
-      <button mat-stroked-button class="family__settings-btn chore-ai__btn"
-              [class.chore-ai__btn--open]="aiPanel() === 'values'"
-              [disabled]="aiBusy() || aiApplying()" (click)="togglePanel('values')"
-              [attr.aria-expanded]="aiPanel() === 'values'">
-        <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
-        Suggest stars
-      </button>
-      <button mat-flat-button color="primary" class="family__settings-btn" (click)="create()">
-        <mat-icon aria-hidden="true">add</mat-icon>
-        New chore
-      </button>
-    </div>
+    @if (canManage()) {
+      <div class="chores__hero-actions">
+        <a mat-stroked-button class="family__settings-btn" routerLink="/family/allowance">
+          <mat-icon aria-hidden="true">savings</mat-icon>
+          Allowance
+        </a>
+        <button mat-stroked-button class="family__settings-btn chore-ai__btn"
+                [class.chore-ai__btn--open]="aiPanel() === 'suggest'"
+                [disabled]="aiBusy() || aiApplying()" (click)="togglePanel('suggest')"
+                [attr.aria-expanded]="aiPanel() === 'suggest'">
+          <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+          Suggest chores
+        </button>
+        <button mat-stroked-button class="family__settings-btn chore-ai__btn"
+                [class.chore-ai__btn--open]="aiPanel() === 'balance'"
+                [disabled]="aiBusy() || aiApplying()" (click)="togglePanel('balance')"
+                [attr.aria-expanded]="aiPanel() === 'balance'">
+          <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+          Balance
+        </button>
+        <button mat-stroked-button class="family__settings-btn chore-ai__btn"
+                [class.chore-ai__btn--open]="aiPanel() === 'values'"
+                [disabled]="aiBusy() || aiApplying()" (click)="togglePanel('values')"
+                [attr.aria-expanded]="aiPanel() === 'values'">
+          <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+          Suggest stars
+        </button>
+        <button mat-flat-button color="primary" class="family__settings-btn" (click)="create()">
+          <mat-icon aria-hidden="true">add</mat-icon>
+          New chore
+        </button>
+      </div>
+    }
   </header>
-
-  <!-- ── ✨ AI assists (suggest / balance / values) — review then explicit apply; nothing auto-applies ── -->
-  @if (aiPanel() === 'suggest') {
-    <section class="chore-ai" aria-label="Suggest chores with AI">
-      <div class="chore-ai__form">
-        <mat-form-field appearance="outline" class="chore-ai__ages" subscriptSizing="dynamic">
-          <mat-label>Kids' ages</mat-label>
-          <input matInput maxlength="40" [ngModel]="suggestAges()" (ngModelChange)="suggestAges.set($event)"
-                 (keydown.enter)="suggest()" placeholder="8, 5" [disabled]="aiBusy() || aiApplying()" />
-        </mat-form-field>
-        <button mat-flat-button color="primary" class="chore-ai__go"
-                [disabled]="aiBusy() || aiApplying()" (click)="suggest()">
-          @if (aiBusy()) {
-            <mat-spinner [diameter]="18" /><span>Thinking…</span>
-          } @else {
-            <ng-container>
-              <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
-              <span>{{ suggestRows().length ? 'Regenerate' : 'Suggest chores' }}</span>
-            </ng-container>
-          }
-        </button>
-      </div>
-
-      @if (aiStatus(); as msg) { <p class="chore-ai__status" aria-live="polite">{{ msg }}</p> }
-
-      @if (suggestRows().length) {
-        <ul class="chore-ai__rows">
-          @for (row of suggestRows(); track row.key) {
-            <li class="ai-row ai-row--suggest">
-              <div class="ai-row__head">
-                @if (row.ageHint) { <span class="ai-row__hint"><mat-icon aria-hidden="true">child_care</mat-icon>{{ row.ageHint }}</span> }
-                <button mat-icon-button class="ai-row__remove" matTooltip="Remove" aria-label="Remove"
-                        (click)="removeSuggestRow(row)" [disabled]="aiApplying()">
-                  <mat-icon aria-hidden="true">close</mat-icon>
-                </button>
-              </div>
-              <mat-form-field appearance="outline" class="ai-row__title" subscriptSizing="dynamic">
-                <mat-label>Chore</mat-label>
-                <input matInput maxlength="200" [ngModel]="row.title"
-                       (ngModelChange)="setSuggestTitle(row, $event)" [disabled]="aiApplying()" />
-              </mat-form-field>
-              <div class="ai-row__controls">
-                <mat-form-field appearance="outline" class="ai-row__points" subscriptSizing="dynamic">
-                  <mat-label>Stars</mat-label>
-                  <input matInput type="number" min="0" max="1000" [ngModel]="row.points"
-                         (ngModelChange)="setSuggestPoints(row, $event)" [disabled]="aiApplying()" />
-                </mat-form-field>
-                <div class="ai-row__repeat" role="group" aria-label="Repeat">
-                  @for (opt of recurrenceOptions; track opt) {
-                    <button type="button" class="ai-row__repeat-opt" [class.is-on]="row.recurrence === opt"
-                            [disabled]="aiApplying()" (click)="setSuggestRecurrence(row, opt)">
-                      {{ recurrenceShort(opt) }}
-                    </button>
-                  }
-                </div>
-              </div>
-            </li>
-          }
-        </ul>
-
-        <div class="chore-ai__actions">
-          <button mat-button type="button" (click)="clearSuggest()" [disabled]="aiApplying()">Discard</button>
-          <button mat-button type="button" (click)="regenerateSuggest()" [disabled]="aiApplying() || aiBusy()">
-            <mat-icon aria-hidden="true">refresh</mat-icon> Regenerate
-          </button>
-          <button mat-flat-button color="primary" type="button" (click)="addSuggested()" [disabled]="aiApplying()">
-            @if (aiApplying()) {
-              <mat-spinner [diameter]="18" /><span>Adding…</span>
-            } @else {
-              <ng-container>
-                <mat-icon aria-hidden="true">playlist_add</mat-icon>
-                <span>Add {{ suggestRows().length === 1 ? 'chore' : suggestRows().length + ' chores' }}</span>
-              </ng-container>
-            }
-          </button>
-        </div>
-      }
-    </section>
-  }
-
-  @if (aiPanel() === 'balance') {
-    <section class="chore-ai" aria-label="Balance chores with AI">
-      <div class="chore-ai__form">
-        <p class="chore-ai__lead">Let AI fairly share the chores across the family.</p>
-        <button mat-flat-button color="primary" class="chore-ai__go"
-                [disabled]="aiBusy() || aiApplying()" (click)="balance()">
-          @if (aiBusy()) {
-            <mat-spinner [diameter]="18" /><span>Balancing…</span>
-          } @else {
-            <ng-container>
-              <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
-              <span>{{ balanceRows().length ? 'Regenerate' : 'Balance chores' }}</span>
-            </ng-container>
-          }
-        </button>
-      </div>
-
-      @if (aiStatus(); as msg) { <p class="chore-ai__status" aria-live="polite">{{ msg }}</p> }
-
-      @if (balanceRows().length) {
-        <ul class="chore-ai__rows">
-          @for (row of balanceRows(); track row.choreId) {
-            <li class="ai-row ai-row--assign" [class.ai-row--skipped]="!row.accept">
-              <div class="ai-row__assign-main">
-                <p class="ai-row__chore-title">{{ row.title }}</p>
-                <div class="ai-row__assign-to">
-                  @if (row.currentName) {
-                    <span class="ai-row__from">{{ row.currentName }}</span>
-                    <mat-icon class="ai-row__arrow" aria-hidden="true">arrow_forward</mat-icon>
-                  }
-                  <span class="ai-row__avatar" aria-hidden="true">{{ initials(row.assignedToName) }}</span>
-                  <span class="ai-row__to">{{ row.assignedToName }}</span>
-                </div>
-              </div>
-              <button mat-stroked-button class="ai-row__toggle" [class.is-on]="row.accept"
-                      (click)="toggleBalanceRow(row)" [disabled]="aiApplying()">
-                <mat-icon aria-hidden="true">{{ row.accept ? 'check' : 'add' }}</mat-icon>
-                {{ row.accept ? 'Accepted' : 'Skipped' }}
-              </button>
-            </li>
-          }
-        </ul>
-
-        <div class="chore-ai__actions">
-          <button mat-button type="button" (click)="clearBalance()" [disabled]="aiApplying()">Discard</button>
-          <button mat-flat-button color="primary" type="button" (click)="applyBalance()"
-                  [disabled]="aiApplying() || balanceAcceptedCount() === 0">
-            @if (aiApplying()) {
-              <mat-spinner [diameter]="18" /><span>Applying…</span>
-            } @else {
-              <ng-container>
-                <mat-icon aria-hidden="true">done_all</mat-icon>
-                <span>Apply {{ balanceAcceptedCount() }}</span>
-              </ng-container>
-            }
-          </button>
-        </div>
-      }
-    </section>
-  }
-
-  @if (aiPanel() === 'values') {
-    <section class="chore-ai" aria-label="Suggest star values with AI">
-      <div class="chore-ai__form">
-        <p class="chore-ai__lead">Let AI propose fair star values for each chore.</p>
-        <button mat-flat-button color="primary" class="chore-ai__go"
-                [disabled]="aiBusy() || aiApplying()" (click)="suggestValues()">
-          @if (aiBusy()) {
-            <mat-spinner [diameter]="18" /><span>Weighing…</span>
-          } @else {
-            <ng-container>
-              <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
-              <span>{{ valueRows().length ? 'Regenerate' : 'Suggest stars' }}</span>
-            </ng-container>
-          }
-        </button>
-      </div>
-
-      @if (aiStatus(); as msg) { <p class="chore-ai__status" aria-live="polite">{{ msg }}</p> }
-
-      @if (valueRows().length) {
-        <ul class="chore-ai__rows">
-          @for (row of valueRows(); track row.choreId) {
-            <li class="ai-row ai-row--value" [class.ai-row--skipped]="!row.accept">
-              <div class="ai-row__assign-main">
-                <p class="ai-row__chore-title">{{ row.title }}</p>
-                <div class="ai-row__value-change">
-                  <span class="ai-row__from">{{ row.current }} <mat-icon aria-hidden="true">star</mat-icon></span>
-                  <mat-icon class="ai-row__arrow" aria-hidden="true">arrow_forward</mat-icon>
-                  <span class="ai-row__to-value">{{ row.points }} <mat-icon aria-hidden="true">star</mat-icon></span>
-                </div>
-              </div>
-              <button mat-stroked-button class="ai-row__toggle" [class.is-on]="row.accept"
-                      (click)="toggleValueRow(row)" [disabled]="aiApplying()">
-                <mat-icon aria-hidden="true">{{ row.accept ? 'check' : 'add' }}</mat-icon>
-                {{ row.accept ? 'Accepted' : 'Skipped' }}
-              </button>
-            </li>
-          }
-        </ul>
-
-        <div class="chore-ai__actions">
-          <button mat-button type="button" (click)="clearValues()" [disabled]="aiApplying()">Discard</button>
-          <button mat-flat-button color="primary" type="button" (click)="applyValues()"
-                  [disabled]="aiApplying() || valuesAcceptedCount() === 0">
-            @if (aiApplying()) {
-              <mat-spinner [diameter]="18" /><span>Updating…</span>
-            } @else {
-              <ng-container>
-                <mat-icon aria-hidden="true">done_all</mat-icon>
-                <span>Apply {{ valuesAcceptedCount() }}</span>
-              </ng-container>
-            }
-          </button>
-        </div>
-      }
-    </section>
-  }
 
   @if (loading()) {
     <div class="family__loading">
@@ -249,7 +57,389 @@
       <mat-icon aria-hidden="true">error_outline</mat-icon>
       <p>We couldn't load the chore board just now. Please try again in a moment.</p>
     </div>
+  } @else if (isChild()) {
+    <!-- ════════════════════════ KID-SAFE SCOPED VIEW ════════════════════════ -->
+    <!-- Only the child's own chores + their own balance. No other members, no emails, no admin/finance nav. -->
+
+    <!-- My allowance — a big friendly balance -->
+    @if (myAllowance(); as a) {
+      <section class="kid-balance" aria-label="My allowance balance">
+        <div class="kid-balance__face">
+          <mat-icon class="kid-balance__icon" aria-hidden="true">savings</mat-icon>
+          <div>
+            <p class="kid-balance__label">My allowance</p>
+            <p class="kid-balance__amount" [class.kid-balance__amount--neg]="a.balance < 0">
+              {{ a.balance < 0 ? '−' : '' }}{{ money(a.balance) }}
+            </p>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- Chores I can grab (open marketplace pool) -->
+    <section class="kid-section" aria-label="Chores I can grab">
+      <h2 class="family__card-title kid-section__title">
+        <mat-icon aria-hidden="true">storefront</mat-icon> Chores I can grab
+      </h2>
+      @if (kidPool().length === 0) {
+        <p class="kid-section__empty">Nothing up for grabs right now — check back soon!</p>
+      } @else {
+        <ul class="chore-list">
+          @for (chore of kidPool(); track chore.id) {
+            <li class="chore chore--pool">
+              <div class="chore__main">
+                <p class="chore__title">{{ chore.title }}</p>
+                <div class="chore__meta">
+                  @if (chore.creditValue > 0) {
+                    <span class="chore__credit"><mat-icon aria-hidden="true">payments</mat-icon>{{ money(chore.creditValue) }}</span>
+                  }
+                  <span class="chore__stars" [matTooltip]="chore.points + ' stars when finished'">
+                    {{ chore.points }} <mat-icon aria-hidden="true">star</mat-icon>
+                  </span>
+                  @if (chore.recurrence !== 'none') {
+                    <span class="chore__chip"><mat-icon aria-hidden="true">repeat</mat-icon> {{ recurrenceLabel(chore.recurrence) }}</span>
+                  }
+                </div>
+              </div>
+              <div class="chore__actions">
+                @if (busyId() === chore.id) { <mat-spinner [diameter]="20" /> }
+                @else {
+                  <button mat-flat-button color="primary" (click)="claim(chore)">
+                    <mat-icon aria-hidden="true">pan_tool</mat-icon> Grab it
+                  </button>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <!-- My chores (claimed/assigned/rejected) → Mark done -->
+    <section class="kid-section" aria-label="My chores">
+      <h2 class="family__card-title kid-section__title">
+        <mat-icon aria-hidden="true">assignment</mat-icon> My chores
+      </h2>
+      @if (kidMine().length === 0) {
+        <p class="kid-section__empty">No chores on your plate. Grab one above!</p>
+      } @else {
+        <ul class="chore-list">
+          @for (chore of kidMine(); track chore.id) {
+            <li class="chore" [class.chore--rejected]="chore.status === 'rejected'">
+              <div class="chore__main">
+                <p class="chore__title">{{ chore.title }}</p>
+                <div class="chore__meta">
+                  @if (chore.status === 'rejected') {
+                    <span class="chore__chip chore__chip--warn"><mat-icon aria-hidden="true">replay</mat-icon> Try again</span>
+                  }
+                  @if (chore.creditValue > 0) {
+                    <span class="chore__credit"><mat-icon aria-hidden="true">payments</mat-icon>{{ money(chore.creditValue) }}</span>
+                  }
+                  <span class="chore__stars">{{ chore.points }} <mat-icon aria-hidden="true">star</mat-icon></span>
+                </div>
+              </div>
+              <div class="chore__actions">
+                @if (busyId() === chore.id) { <mat-spinner [diameter]="20" /> }
+                @else {
+                  <button mat-flat-button color="primary" (click)="submit(chore)">
+                    <mat-icon aria-hidden="true">check</mat-icon> Mark done
+                  </button>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <!-- Waiting on a grown-up -->
+    @if (kidPending().length > 0) {
+      <section class="kid-section" aria-label="Waiting for approval">
+        <h2 class="family__card-title kid-section__title">
+          <mat-icon aria-hidden="true">hourglass_top</mat-icon> Waiting for a grown-up
+        </h2>
+        <ul class="chore-list">
+          @for (chore of kidPending(); track chore.id) {
+            <li class="chore chore--pending">
+              <div class="chore__main">
+                <p class="chore__title">{{ chore.title }}</p>
+                <div class="chore__meta">
+                  <span class="chore__chip"><mat-icon aria-hidden="true">hourglass_top</mat-icon> Awaiting approval</span>
+                  @if (chore.creditValue > 0) {
+                    <span class="chore__credit"><mat-icon aria-hidden="true">payments</mat-icon>{{ money(chore.creditValue) }}</span>
+                  }
+                </div>
+              </div>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    <!-- My credits history (the child's own ledger) -->
+    @if (myAllowance(); as a) {
+      @if (a.ledger.length > 0) {
+        <section class="kid-section" aria-label="My credits history">
+          <h2 class="family__card-title kid-section__title">
+            <mat-icon aria-hidden="true">receipt_long</mat-icon> My credits
+          </h2>
+          <ul class="ledger">
+            @for (row of a.ledger; track row.id) {
+              <li class="ledger__row">
+                <span class="ledger__kind ledger__kind--{{ row.kind }}">
+                  <mat-icon aria-hidden="true">{{ row.kind === 'earn' ? 'star' : row.kind === 'spend' ? 'shopping_bag' : row.kind === 'payout' ? 'payments' : 'tune' }}</mat-icon>
+                </span>
+                <span class="ledger__note">{{ row.note || (row.kind === 'earn' ? 'Chore reward' : row.category || row.kind) }}</span>
+                <span class="ledger__amount" [class.ledger__amount--pos]="row.amount >= 0" [class.ledger__amount--neg]="row.amount < 0">
+                  {{ row.amount >= 0 ? '+' : '−' }}{{ money(row.amount) }}
+                </span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
   } @else {
+    <!-- ════════════════════════ PARENT MARKETPLACE VIEW ════════════════════════ -->
+
+    @if (aiPanel() === 'suggest') {
+      <section class="chore-ai" aria-label="Suggest chores with AI">
+        <div class="chore-ai__form">
+          <mat-form-field appearance="outline" class="chore-ai__ages" subscriptSizing="dynamic">
+            <mat-label>Kids' ages</mat-label>
+            <input matInput maxlength="40" [ngModel]="suggestAges()" (ngModelChange)="suggestAges.set($event)"
+                   (keydown.enter)="suggest()" placeholder="8, 5" [disabled]="aiBusy() || aiApplying()" />
+          </mat-form-field>
+          <button mat-flat-button color="primary" class="chore-ai__go"
+                  [disabled]="aiBusy() || aiApplying()" (click)="suggest()">
+            @if (aiBusy()) {
+              <mat-spinner [diameter]="18" /><span>Thinking…</span>
+            } @else {
+              <ng-container>
+                <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+                <span>{{ suggestRows().length ? 'Regenerate' : 'Suggest chores' }}</span>
+              </ng-container>
+            }
+          </button>
+        </div>
+
+        @if (aiStatus(); as msg) { <p class="chore-ai__status" aria-live="polite">{{ msg }}</p> }
+
+        @if (suggestRows().length) {
+          <ul class="chore-ai__rows">
+            @for (row of suggestRows(); track row.key) {
+              <li class="ai-row ai-row--suggest">
+                <div class="ai-row__head">
+                  @if (row.ageHint) { <span class="ai-row__hint"><mat-icon aria-hidden="true">child_care</mat-icon>{{ row.ageHint }}</span> }
+                  <button mat-icon-button class="ai-row__remove" matTooltip="Remove" aria-label="Remove"
+                          (click)="removeSuggestRow(row)" [disabled]="aiApplying()">
+                    <mat-icon aria-hidden="true">close</mat-icon>
+                  </button>
+                </div>
+                <mat-form-field appearance="outline" class="ai-row__title" subscriptSizing="dynamic">
+                  <mat-label>Chore</mat-label>
+                  <input matInput maxlength="200" [ngModel]="row.title"
+                         (ngModelChange)="setSuggestTitle(row, $event)" [disabled]="aiApplying()" />
+                </mat-form-field>
+                <div class="ai-row__controls">
+                  <mat-form-field appearance="outline" class="ai-row__points" subscriptSizing="dynamic">
+                    <mat-label>Stars</mat-label>
+                    <input matInput type="number" min="0" max="1000" [ngModel]="row.points"
+                           (ngModelChange)="setSuggestPoints(row, $event)" [disabled]="aiApplying()" />
+                  </mat-form-field>
+                  <div class="ai-row__repeat" role="group" aria-label="Repeat">
+                    @for (opt of recurrenceOptions; track opt) {
+                      <button type="button" class="ai-row__repeat-opt" [class.is-on]="row.recurrence === opt"
+                              [disabled]="aiApplying()" (click)="setSuggestRecurrence(row, opt)">
+                        {{ recurrenceShort(opt) }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              </li>
+            }
+          </ul>
+
+          <div class="chore-ai__actions">
+            <button mat-button type="button" (click)="clearSuggest()" [disabled]="aiApplying()">Discard</button>
+            <button mat-button type="button" (click)="regenerateSuggest()" [disabled]="aiApplying() || aiBusy()">
+              <mat-icon aria-hidden="true">refresh</mat-icon> Regenerate
+            </button>
+            <button mat-flat-button color="primary" type="button" (click)="addSuggested()" [disabled]="aiApplying()">
+              @if (aiApplying()) {
+                <mat-spinner [diameter]="18" /><span>Adding…</span>
+              } @else {
+                <ng-container>
+                  <mat-icon aria-hidden="true">playlist_add</mat-icon>
+                  <span>Add {{ suggestRows().length === 1 ? 'chore' : suggestRows().length + ' chores' }}</span>
+                </ng-container>
+              }
+            </button>
+          </div>
+        }
+      </section>
+    }
+
+    @if (aiPanel() === 'balance') {
+      <section class="chore-ai" aria-label="Balance chores with AI">
+        <div class="chore-ai__form">
+          <p class="chore-ai__lead">Let AI fairly share the chores across the family.</p>
+          <button mat-flat-button color="primary" class="chore-ai__go"
+                  [disabled]="aiBusy() || aiApplying()" (click)="balance()">
+            @if (aiBusy()) {
+              <mat-spinner [diameter]="18" /><span>Balancing…</span>
+            } @else {
+              <ng-container>
+                <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+                <span>{{ balanceRows().length ? 'Regenerate' : 'Balance chores' }}</span>
+              </ng-container>
+            }
+          </button>
+        </div>
+
+        @if (aiStatus(); as msg) { <p class="chore-ai__status" aria-live="polite">{{ msg }}</p> }
+
+        @if (balanceRows().length) {
+          <ul class="chore-ai__rows">
+            @for (row of balanceRows(); track row.choreId) {
+              <li class="ai-row ai-row--assign" [class.ai-row--skipped]="!row.accept">
+                <div class="ai-row__assign-main">
+                  <p class="ai-row__chore-title">{{ row.title }}</p>
+                  <div class="ai-row__assign-to">
+                    @if (row.currentName) {
+                      <span class="ai-row__from">{{ row.currentName }}</span>
+                      <mat-icon class="ai-row__arrow" aria-hidden="true">arrow_forward</mat-icon>
+                    }
+                    <span class="ai-row__avatar" aria-hidden="true">{{ initials(row.assignedToName) }}</span>
+                    <span class="ai-row__to">{{ row.assignedToName }}</span>
+                  </div>
+                </div>
+                <button mat-stroked-button class="ai-row__toggle" [class.is-on]="row.accept"
+                        (click)="toggleBalanceRow(row)" [disabled]="aiApplying()">
+                  <mat-icon aria-hidden="true">{{ row.accept ? 'check' : 'add' }}</mat-icon>
+                  {{ row.accept ? 'Accepted' : 'Skipped' }}
+                </button>
+              </li>
+            }
+          </ul>
+
+          <div class="chore-ai__actions">
+            <button mat-button type="button" (click)="clearBalance()" [disabled]="aiApplying()">Discard</button>
+            <button mat-flat-button color="primary" type="button" (click)="applyBalance()"
+                    [disabled]="aiApplying() || balanceAcceptedCount() === 0">
+              @if (aiApplying()) {
+                <mat-spinner [diameter]="18" /><span>Applying…</span>
+              } @else {
+                <ng-container>
+                  <mat-icon aria-hidden="true">done_all</mat-icon>
+                  <span>Apply {{ balanceAcceptedCount() }}</span>
+                </ng-container>
+              }
+            </button>
+          </div>
+        }
+      </section>
+    }
+
+    @if (aiPanel() === 'values') {
+      <section class="chore-ai" aria-label="Suggest star values with AI">
+        <div class="chore-ai__form">
+          <p class="chore-ai__lead">Let AI propose fair star values for each chore.</p>
+          <button mat-flat-button color="primary" class="chore-ai__go"
+                  [disabled]="aiBusy() || aiApplying()" (click)="suggestValues()">
+            @if (aiBusy()) {
+              <mat-spinner [diameter]="18" /><span>Weighing…</span>
+            } @else {
+              <ng-container>
+                <mat-icon class="chore-ai__spark" aria-hidden="true">auto_awesome</mat-icon>
+                <span>{{ valueRows().length ? 'Regenerate' : 'Suggest stars' }}</span>
+              </ng-container>
+            }
+          </button>
+        </div>
+
+        @if (aiStatus(); as msg) { <p class="chore-ai__status" aria-live="polite">{{ msg }}</p> }
+
+        @if (valueRows().length) {
+          <ul class="chore-ai__rows">
+            @for (row of valueRows(); track row.choreId) {
+              <li class="ai-row ai-row--value" [class.ai-row--skipped]="!row.accept">
+                <div class="ai-row__assign-main">
+                  <p class="ai-row__chore-title">{{ row.title }}</p>
+                  <div class="ai-row__value-change">
+                    <span class="ai-row__from">{{ row.current }} <mat-icon aria-hidden="true">star</mat-icon></span>
+                    <mat-icon class="ai-row__arrow" aria-hidden="true">arrow_forward</mat-icon>
+                    <span class="ai-row__to-value">{{ row.points }} <mat-icon aria-hidden="true">star</mat-icon></span>
+                  </div>
+                </div>
+                <button mat-stroked-button class="ai-row__toggle" [class.is-on]="row.accept"
+                        (click)="toggleValueRow(row)" [disabled]="aiApplying()">
+                  <mat-icon aria-hidden="true">{{ row.accept ? 'check' : 'add' }}</mat-icon>
+                  {{ row.accept ? 'Accepted' : 'Skipped' }}
+                </button>
+              </li>
+            }
+          </ul>
+
+          <div class="chore-ai__actions">
+            <button mat-button type="button" (click)="clearValues()" [disabled]="aiApplying()">Discard</button>
+            <button mat-flat-button color="primary" type="button" (click)="applyValues()"
+                    [disabled]="aiApplying() || valuesAcceptedCount() === 0">
+              @if (aiApplying()) {
+                <mat-spinner [diameter]="18" /><span>Updating…</span>
+              } @else {
+                <ng-container>
+                  <mat-icon aria-hidden="true">done_all</mat-icon>
+                  <span>Apply {{ valuesAcceptedCount() }}</span>
+                </ng-container>
+              }
+            </button>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- ── Approval queue: submitted chores awaiting a parent's approve/reject ─────────── -->
+    @if (awaitingApproval().length > 0) {
+      <section class="approval" aria-label="Awaiting approval">
+        <div class="approval__head">
+          <h2 class="approval__title"><mat-icon aria-hidden="true">fact_check</mat-icon> Awaiting approval</h2>
+          <span class="approval__count">{{ awaitingApproval().length }}</span>
+        </div>
+        <ul class="chore-list">
+          @for (chore of awaitingApproval(); track chore.id) {
+            <li class="chore chore--submitted">
+              <div class="chore__main">
+                <p class="chore__title">{{ chore.title }}</p>
+                <div class="chore__meta">
+                  @if (chore.claimedByName || chore.assignedToName; as who) {
+                    <span class="chore__assignee" [matTooltip]="'Done by ' + who">
+                      <span class="chore__avatar" aria-hidden="true">{{ initials(who) }}</span> {{ who }}
+                    </span>
+                  }
+                  @if (chore.creditValue > 0) {
+                    <span class="chore__credit"><mat-icon aria-hidden="true">payments</mat-icon>{{ money(chore.creditValue) }}</span>
+                  }
+                  <span class="chore__stars">{{ chore.points }} <mat-icon aria-hidden="true">star</mat-icon></span>
+                </div>
+              </div>
+              <div class="chore__actions">
+                @if (busyId() === chore.id) { <mat-spinner [diameter]="20" /> }
+                @else {
+                  <button mat-flat-button color="primary" (click)="approve(chore)">
+                    <mat-icon aria-hidden="true">check_circle</mat-icon> Approve
+                  </button>
+                  <button mat-stroked-button class="chore__reject" (click)="reject(chore)">
+                    <mat-icon aria-hidden="true">undo</mat-icon> Send back
+                  </button>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
     <!-- ── Stars tally strip (the kid-reward foundation) ───────────────── -->
     @if (tally().length > 0) {
       <section class="stars" aria-label="Stars earned">
@@ -286,78 +476,103 @@
       }
     }
 
-    @if (open().length === 0 && done().length === 0) {
+    @if (chores().length === 0) {
       <div class="family__empty">
         <mat-icon aria-hidden="true">checklist</mat-icon>
         <h2>No chores yet</h2>
-        <p>Add a chore, assign it to someone (or leave it for anyone), and set how many stars it's worth.</p>
+        <p>Add a chore — assign it to a child, or post it to the marketplace for any kid to claim — and set how many stars and how much allowance it's worth.</p>
         <button mat-flat-button color="primary" (click)="create()">
           <mat-icon aria-hidden="true">add</mat-icon> New chore
         </button>
       </div>
     } @else {
-      <!-- ── Open chores ───────────────────────────────────────────────── -->
-      @if (open().length > 0) {
-        <ul class="chore-list">
-          @for (chore of open(); track chore.id) {
-            <li class="chore">
-              <mat-checkbox class="chore__check" [checked]="false" [disabled]="busyId() === chore.id"
-                            (change)="toggle(chore)" [matTooltip]="'Mark done'" />
-
-              <div class="chore__main">
-                <p class="chore__title">{{ chore.title }}</p>
-                <div class="chore__meta">
-                  <span class="chore__stars" [matTooltip]="chore.points + ' stars when finished'">
-                    @for (pip of starPips(chore.points); track pip) {
-                      <mat-icon aria-hidden="true">star</mat-icon>
+      <!-- ── Marketplace: open pool chores any kid can claim ─────────────── -->
+      @if (poolOpen().length > 0) {
+        <section class="board-section" aria-label="Marketplace">
+          <h2 class="family__card-title board-section__title">
+            <mat-icon aria-hidden="true">storefront</mat-icon> Marketplace
+          </h2>
+          <ul class="chore-list">
+            @for (chore of poolOpen(); track chore.id) {
+              <li class="chore chore--pool">
+                <div class="chore__main">
+                  <p class="chore__title">{{ chore.title }}</p>
+                  <div class="chore__meta">
+                    <span class="chore__chip chore__chip--pool"><mat-icon aria-hidden="true">storefront</mat-icon> Up for grabs</span>
+                    @if (chore.creditValue > 0) {
+                      <span class="chore__credit"><mat-icon aria-hidden="true">payments</mat-icon>{{ money(chore.creditValue) }}</span>
                     }
-                    <span class="chore__stars-n">{{ chore.points }}</span>
-                  </span>
-                  @if (chore.recurrence !== 'none') {
-                    <span class="chore__chip">
-                      <mat-icon aria-hidden="true">repeat</mat-icon> {{ recurrenceLabel(chore.recurrence) }}
-                    </span>
-                  }
-                  @if (chore.assignedToName) {
-                    <span class="chore__assignee" [matTooltip]="'For ' + chore.assignedToName">
-                      <span class="chore__avatar" aria-hidden="true">{{ initials(chore.assignedToName) }}</span>
-                      {{ chore.assignedToName }}
-                    </span>
-                  } @else {
-                    <span class="chore__assignee chore__assignee--anyone">
-                      <mat-icon aria-hidden="true">groups</mat-icon> Anyone
-                    </span>
+                    <span class="chore__stars">{{ chore.points }} <mat-icon aria-hidden="true">star</mat-icon></span>
+                    @if (chore.recurrence !== 'none') {
+                      <span class="chore__chip"><mat-icon aria-hidden="true">repeat</mat-icon> {{ recurrenceLabel(chore.recurrence) }}</span>
+                    }
+                  </div>
+                </div>
+                <div class="chore__actions">
+                  @if (busyId() === chore.id) { <mat-spinner [diameter]="20" /> }
+                  @else {
+                    <button mat-icon-button matTooltip="Edit" aria-label="Edit" (click)="edit(chore)"><mat-icon aria-hidden="true">edit</mat-icon></button>
+                    <button mat-icon-button matTooltip="Delete" aria-label="Delete" class="chore__delete" (click)="remove(chore)"><mat-icon aria-hidden="true">delete_outline</mat-icon></button>
                   }
                 </div>
-              </div>
-
-              <div class="chore__actions">
-                @if (busyId() === chore.id) {
-                  <mat-spinner [diameter]="20" />
-                } @else {
-                  <button mat-icon-button matTooltip="Edit" aria-label="Edit" (click)="edit(chore)">
-                    <mat-icon aria-hidden="true">edit</mat-icon>
-                  </button>
-                  <button mat-icon-button matTooltip="Delete" aria-label="Delete" class="chore__delete" (click)="remove(chore)">
-                    <mat-icon aria-hidden="true">delete_outline</mat-icon>
-                  </button>
-                }
-              </div>
-            </li>
-          }
-        </ul>
+              </li>
+            }
+          </ul>
+        </section>
       }
 
-      <!-- ── Done chores ───────────────────────────────────────────────── -->
+      <!-- ── Assigned & in-progress chores ─────────────────────────────── -->
+      @if (assignedOpen().length > 0 || inProgress().length > 0) {
+        <section class="board-section" aria-label="Assigned chores">
+          <h2 class="family__card-title board-section__title">
+            <mat-icon aria-hidden="true">assignment_ind</mat-icon> Assigned
+          </h2>
+          <ul class="chore-list">
+            @for (chore of assignedOpen().concat(inProgress()); track chore.id) {
+              <li class="chore" [class.chore--rejected]="chore.status === 'rejected'">
+                <div class="chore__main">
+                  <p class="chore__title">{{ chore.title }}</p>
+                  <div class="chore__meta">
+                    @switch (chore.status) {
+                      @case ('claimed') { <span class="chore__chip chore__chip--info"><mat-icon aria-hidden="true">pan_tool</mat-icon> Claimed</span> }
+                      @case ('rejected') { <span class="chore__chip chore__chip--warn"><mat-icon aria-hidden="true">replay</mat-icon> Sent back</span> }
+                    }
+                    @if (chore.creditValue > 0) {
+                      <span class="chore__credit"><mat-icon aria-hidden="true">payments</mat-icon>{{ money(chore.creditValue) }}</span>
+                    }
+                    <span class="chore__stars">{{ chore.points }} <mat-icon aria-hidden="true">star</mat-icon></span>
+                    @if (chore.recurrence !== 'none') {
+                      <span class="chore__chip"><mat-icon aria-hidden="true">repeat</mat-icon> {{ recurrenceLabel(chore.recurrence) }}</span>
+                    }
+                    @if (chore.assignedToName || chore.claimedByName; as who) {
+                      <span class="chore__assignee" [matTooltip]="'For ' + who">
+                        <span class="chore__avatar" aria-hidden="true">{{ initials(who) }}</span> {{ who }}
+                      </span>
+                    } @else {
+                      <span class="chore__assignee chore__assignee--anyone"><mat-icon aria-hidden="true">groups</mat-icon> Anyone</span>
+                    }
+                  </div>
+                </div>
+                <div class="chore__actions">
+                  @if (busyId() === chore.id) { <mat-spinner [diameter]="20" /> }
+                  @else {
+                    <button mat-icon-button matTooltip="Edit" aria-label="Edit" (click)="edit(chore)"><mat-icon aria-hidden="true">edit</mat-icon></button>
+                    <button mat-icon-button matTooltip="Delete" aria-label="Delete" class="chore__delete" (click)="remove(chore)"><mat-icon aria-hidden="true">delete_outline</mat-icon></button>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      <!-- ── Done chores (legacy shared-board flag / approved one-time chores) ───────────── -->
       @if (done().length > 0) {
         <section class="chore-done">
           <h2 class="family__card-title chore-done__title">Done</h2>
           <ul class="chore-list">
             @for (chore of done(); track chore.id) {
               <li class="chore chore--done">
-                <mat-checkbox class="chore__check" [checked]="true" [disabled]="busyId() === chore.id"
-                              (change)="toggle(chore)" [matTooltip]="'Mark not done'" />
-
                 <div class="chore__main">
                   <p class="chore__title">{{ chore.title }}</p>
                   <div class="chore__meta">
@@ -369,27 +584,22 @@
                         {{ chore.doneByName }}
                       </span>
                     }
+                    @if (chore.creditValue > 0) {
+                      <span class="chore__credit chore__credit--earned"><mat-icon aria-hidden="true">payments</mat-icon>+{{ money(chore.creditValue) }}</span>
+                    }
                     <span class="chore__stars chore__stars--earned" [matTooltip]="chore.points + ' stars earned'">
                       +{{ chore.points }} <mat-icon aria-hidden="true">star</mat-icon>
                     </span>
                     @if (chore.recurrence !== 'none') {
-                      <span class="chore__chip">
-                        <mat-icon aria-hidden="true">repeat</mat-icon> {{ recurrenceLabel(chore.recurrence) }}
-                      </span>
+                      <span class="chore__chip"><mat-icon aria-hidden="true">repeat</mat-icon> {{ recurrenceLabel(chore.recurrence) }}</span>
                     }
                   </div>
                 </div>
-
                 <div class="chore__actions">
-                  @if (busyId() === chore.id) {
-                    <mat-spinner [diameter]="20" />
-                  } @else {
-                    <button mat-icon-button matTooltip="Edit" aria-label="Edit" (click)="edit(chore)">
-                      <mat-icon aria-hidden="true">edit</mat-icon>
-                    </button>
-                    <button mat-icon-button matTooltip="Delete" aria-label="Delete" class="chore__delete" (click)="remove(chore)">
-                      <mat-icon aria-hidden="true">delete_outline</mat-icon>
-                    </button>
+                  @if (busyId() === chore.id) { <mat-spinner [diameter]="20" /> }
+                  @else {
+                    <button mat-icon-button matTooltip="Edit" aria-label="Edit" (click)="edit(chore)"><mat-icon aria-hidden="true">edit</mat-icon></button>
+                    <button mat-icon-button matTooltip="Delete" aria-label="Delete" class="chore__delete" (click)="remove(chore)"><mat-icon aria-hidden="true">delete_outline</mat-icon></button>
                   }
                 </div>
               </li>

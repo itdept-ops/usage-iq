@@ -57,6 +57,15 @@ public static class Permissions
     /// <summary>Cycle tracker (PRIVATE health data). Never default — an admin grants it deliberately to the
     /// person who tracks; the LOG is private to its owner and the family overlay is a further per-user opt-in.</summary>
     public const string CycleTrack = "cycle.track";
+    /// <summary>A CHILD capability (chore marketplace): claim pool chores, submit their own claimed/assigned
+    /// chores, and view their OWN allowance balance + ledger. Never default — granted deliberately to a child
+    /// (the "child" preset). On its own it grants nothing else: every family endpoint a child can reach is
+    /// rescoped server-side to the child's own data (never another member's, never any email).</summary>
+    public const string ChoreClaim = "chore.claim";
+    /// <summary>A PARENT capability (chore marketplace): approve/reject submitted chores and record allowance
+    /// payouts/spends/adjustments + view all household children's balances. Never default — granted to an
+    /// owner/adult, never to a child.</summary>
+    public const string AllowanceManage = "allowance.manage";
 
     // ---- Location (GPS feature; never default) ----
     public const string LocationSelf = "location.self";
@@ -113,6 +122,8 @@ public static class Permissions
         new PermissionInfo(FamilyUse, "Family", "Use Family Hub", "Access the Family Hub: see your household, its members, and shared family data."),
         new PermissionInfo(FamilyFinance, "Family", "Manage family finances", "View and manage the household's shared finances (budgets, bills, balances)."),
         new PermissionInfo(CycleTrack, "Family", "Track cycle", "Log and view your own private cycle calendar (informational, non-medical), and choose whether to overlay only predicted phases on the family calendar."),
+        new PermissionInfo(ChoreClaim, "Family", "Claim chores (child)", "A child capability: claim chores from the family chore marketplace, submit your own chores for approval, and view your own allowance balance and history (only your own — never another member's)."),
+        new PermissionInfo(AllowanceManage, "Family", "Manage allowance", "A parent capability: approve or reject submitted chores, record cash payouts, spends, and adjustments, and view every household child's allowance balance."),
 
         // ---- Chat ----
         new PermissionInfo(ChatRead, "Chat", "View chat", "See channels and direct messages you belong to and read their messages."),
@@ -174,11 +185,25 @@ public static class Permissions
             new[]
             {
                 FamilyUse, FamilyFinance,
+                // A full member is a PARENT — they manage the chore marketplace + allowance.
+                AllowanceManage,
                 ChatRead, ChatSend,
                 TrackerSelf,
                 CalendarView, DashboardView,
                 // AI (the full member gets the lot)
                 TrackerAi, FamilyAi, FamilyAiAssistant, FinanceAi, ChatAi, AiVision,
+            }),
+
+        new PermissionPreset("child", "Child",
+            "A kid with their own login: the chore marketplace + their own allowance, and nothing else. " +
+            "They belong to the household (family.use) but every family endpoint they reach is rescoped to " +
+            "their OWN chores + balance — never another member's data, never any finances, AI, or admin.",
+            new[]
+            {
+                // The MINIMAL family.use so the household-scoped /api/family group admits them and they can be
+                // a household member, PLUS the child capability. Deliberately OMITS family.finance, cycle.track,
+                // allowance.manage, all AI keys, all admin/usage keys, tracker, chat, and location.
+                FamilyUse, ChoreClaim,
             }),
 
         new PermissionPreset("friend-tracker", "Friend (Tracker)",
@@ -206,6 +231,10 @@ public static class Permissions
     /// inherited by every new account.
     /// Likewise excludes <see cref="AiUsageView"/>: the AI usage log is admin oversight of who spends
     /// tokens, so it must be granted deliberately, never inherited by every new account.
+    /// Likewise excludes the chore-marketplace keys (<see cref="ChoreClaim"/>, <see cref="AllowanceManage"/>):
+    /// a child capability and a parent allowance-management capability respectively, both granted deliberately
+    /// (via the "child"/"family-member" presets) so open sign-up can never auto-mint a child or an allowance
+    /// manager.
     /// Finally excludes ALL AI keys (<see cref="AiKeys"/>) and ALL Location keys (<see cref="LocationKeys"/>):
     /// AI capabilities spend tokens and the Location feature reveals where a user is, so both must be
     /// granted deliberately per user — every new account starts with AI off and location off.
@@ -213,6 +242,7 @@ public static class Permissions
     public static bool IsDefaultable(string key) =>
         IsValid(key) && key != UsersManage && key != ChatModerate && key != ChatContactsManage
         && key != TrackerViewAll && key != FamilyUse && key != FamilyFinance && key != CycleTrack
+        && key != ChoreClaim && key != AllowanceManage
         && key != AiUsageView
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }
