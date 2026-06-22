@@ -6,6 +6,7 @@
   --cyc-period-soft: rgba(225, 29, 72, 0.16);
   --cyc-fertile: #0d9488;         /* teal-600 — fertile window */
   --cyc-fertile-soft: rgba(13, 148, 136, 0.16);
+  --cyc-log: #8b5cf6;             /* violet-500 — owner-only "has a daily log" dot (distinct from phases) */
 }
 
 .cycle__loading {
@@ -96,9 +97,38 @@
   color: var(--tech-text);
   font-size: var(--tech-fs-caption, 0.82rem);
   font-variant-numeric: tabular-nums;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+
+  &:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--tech-text-accent) 35%, transparent); }
+  &:active { transform: scale(0.95); }
+  &:focus-visible { outline: 2px solid var(--tech-text-accent); outline-offset: 1px; }
 }
 .cycle__cell--out { opacity: 0.38; }
 .cycle__cell--today { outline: 2px solid var(--tech-text-accent); outline-offset: -1px; font-weight: 700; }
+.cycle__cell--selected { box-shadow: 0 0 0 2px var(--tech-text-accent); }
+
+/* Owner-only "has a daily log" marker — a small violet dot, distinct from the period/fertile phases. */
+.cycle__cell-logdot {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cyc-log);
+}
+/* On a solid logged-period cell the violet dot needs a light core to stay visible. */
+.cycle__cell--logged .cycle__cell-logdot { background: #fff; }
+
+.cycle__cal-hint {
+  margin: var(--tech-space-3, 12px) 0 0;
+  font-size: var(--tech-fs-caption, 0.78rem);
+  color: var(--tech-text-tertiary);
+}
 
 .cycle__cell--fertile {
   background: var(--cyc-fertile-soft);
@@ -134,6 +164,7 @@
 .cycle__dot--logged { background: var(--cyc-period); }
 .cycle__dot--period { background: var(--cyc-period-soft); border: 1px dashed var(--cyc-period); }
 .cycle__dot--fertile { background: var(--cyc-fertile-soft); border: 1px dashed var(--cyc-fertile); }
+.cycle__dot--log { background: var(--cyc-log); border-radius: 50%; width: 9px; height: 9px; align-self: center; }
 
 /* ── Predictions ── */
 .cycle__pred-row {
@@ -197,3 +228,122 @@
   .family__card-title { margin: 0; }
 }
 .cycle__share-sub { margin: 4px 0 0; color: var(--tech-text-tertiary); font-size: var(--tech-fs-caption, 0.82rem); line-height: 1.4; }
+
+/* ── Daily log (PRIVATE, owner-only) ── */
+.cycle__day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tech-space-2, 8px);
+}
+.cycle__day-title { display: flex; align-items: baseline; gap: var(--tech-space-2, 8px); flex-wrap: wrap; }
+.cycle__day-title .family__card-title { margin: 0; }
+.cycle__day-when {
+  font-size: var(--tech-fs-caption, 0.82rem);
+  font-weight: 600;
+  color: var(--tech-text-accent);
+}
+.cycle__day-nav { display: flex; align-items: center; gap: 2px; flex: none; }
+.cycle__day-today { font-size: var(--tech-fs-caption, 0.78rem); min-width: 0; padding: 0 8px; }
+
+.cycle__day-help {
+  margin: var(--tech-space-2, 8px) 0 var(--tech-space-3, 12px);
+  font-size: var(--tech-fs-caption, 0.8rem);
+  color: var(--tech-text-tertiary);
+  line-height: 1.4;
+}
+
+.cycle__field { margin-bottom: var(--tech-space-4, 16px); }
+.cycle__field-l {
+  display: block;
+  margin-bottom: var(--tech-space-2, 8px);
+  font-size: var(--tech-fs-caption, 0.82rem);
+  font-weight: 600;
+  color: var(--tech-text-secondary);
+}
+
+/* Chips (mood / symptom / flow / protected) — pill toggles. */
+.cycle__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.cycle__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--tech-border);
+  background: var(--tech-panel-2, transparent);
+  color: var(--tech-text-secondary);
+  font-family: inherit;
+  font-size: var(--tech-fs-caption, 0.82rem);
+  cursor: pointer;
+  text-transform: capitalize;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+
+  &:hover { border-color: color-mix(in srgb, var(--tech-text-accent) 50%, var(--tech-border)); }
+  &:focus-visible { outline: 2px solid var(--tech-text-accent); outline-offset: 1px; }
+}
+.cycle__chip-emoji { font-size: 1.05em; line-height: 1; }
+.cycle__chip mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+/* Selected chip — accent fill; the flow/period family leans rose, others use the accent. */
+.cycle__chip--on {
+  background: color-mix(in srgb, var(--tech-text-accent) 18%, transparent);
+  border-color: var(--tech-text-accent);
+  color: var(--tech-text);
+  font-weight: 600;
+}
+.cycle__chip--flow.cycle__chip--on,
+.cycle__chip--symptom.cycle__chip--on {
+  background: var(--cyc-period-soft);
+  border-color: var(--cyc-period);
+}
+
+/* Energy 1..5 — filled dots up to the selected level. */
+.cycle__energy { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cycle__energy-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--tech-border);
+  background: var(--tech-panel-2, transparent);
+  color: var(--tech-text-tertiary);
+  font-family: inherit;
+  font-size: var(--tech-fs-caption, 0.78rem);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+
+  &:focus-visible { outline: 2px solid var(--tech-text-accent); outline-offset: 1px; }
+}
+.cycle__energy-dot--on {
+  background: var(--tech-text-accent);
+  border-color: var(--tech-text-accent);
+  color: #fff;
+  font-weight: 600;
+}
+.cycle__energy-cap { font-size: var(--tech-fs-caption, 0.72rem); color: var(--tech-text-tertiary); margin-left: 4px; }
+
+/* Intimacy row — the discreet toggle + the optional protected sub-chip. */
+.cycle__intimacy { display: flex; align-items: center; gap: var(--tech-space-3, 12px); flex-wrap: wrap; }
+
+.cycle__notes { width: 100%; }
+
+.cycle__day-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tech-space-2, 8px);
+  margin-top: var(--tech-space-2, 8px);
+  padding-top: var(--tech-space-3, 12px);
+  border-top: 1px solid var(--tech-border);
+}
+.cycle__day-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--tech-fs-caption, 0.8rem);
+  color: var(--tech-text-tertiary);
+  min-height: 20px;
+
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+}
+.cycle__day-clear { color: var(--tech-text-secondary); font-size: var(--tech-fs-caption, 0.82rem); }

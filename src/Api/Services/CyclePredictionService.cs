@@ -31,6 +31,17 @@ public static class CyclePredictionService
         string CurrentPhase);
 
     /// <summary>
+    /// A logged day at or above this flow level can CONFIRM a period start the owner didn't log as a period
+    /// row — but only when no logged period start is already near it (within <see cref="ConfirmGapDays"/>), so
+    /// it adds a missing anchor without double-counting an existing one. Kept conservative + deterministic.
+    /// </summary>
+    public const CycleFlowLevel ConfirmFlowLevel = CycleFlowLevel.Heavy;
+
+    /// <summary>A heavy-flow day only becomes a candidate start when every existing start is more than this many
+    /// days away (otherwise it's just a day WITHIN an already-known period).</summary>
+    public const int ConfirmGapDays = 10;
+
+    /// <summary>
     /// Compute the deterministic prediction as of <paramref name="today"/> from the user's logged
     /// <paramref name="periods"/> (any order) and their profile fallbacks. The average cycle length is the
     /// mean gap between consecutive logged starts (rounded, clamped to a sane [15,60]); with fewer than two
@@ -40,9 +51,10 @@ public static class CyclePredictionService
     /// start, the typical period length, and the predicted fertile window.
     /// </summary>
     public static Prediction Compute(
-        IReadOnlyList<CyclePeriod> periods, int profileAvgCycle, int profileAvgPeriod, DateOnly today)
+        IReadOnlyList<CyclePeriod> periods, int profileAvgCycle, int profileAvgPeriod, DateOnly today,
+        IReadOnlyList<CycleDayLog>? dayLogs = null)
     {
-        var starts = periods.Select(p => p.StartDate).OrderBy(d => d).ToList();
+        var starts = DeriveStarts(periods, dayLogs);
         if (starts.Count == 0)
         {
             // No history at all — nothing to anchor a projection from. Report the fallback average only.
@@ -141,6 +153,40 @@ public static class CyclePredictionService
         var clippedStart = start < from ? from : start;
         var clippedEnd = end > to ? to : end;
         spans.Add((kind, clippedStart, clippedEnd));
+    }
+
+    /// <summary>
+    /// The sorted, de-duplicated set of period START dates the prediction anchors on. Logged
+    /// <paramref name="periods"/> are the authoritative starts; a heavy-flow day-log can CONFIRM an ADDITIONAL
+    /// start the owner forgot to log as a period, but ONLY when it is the first heavy day of a run AND no
+    /// existing start is within <see cref="ConfirmGapDays"/> of it (so it never double-counts a known period or
+    /// adds noise mid-period). Stays fully deterministic — same inputs, same starts. The day-log's intimate
+    /// fields are never consulted; only the flow level + date.
+    /// </summary>
+    private static List<DateOnly> DeriveStarts(
+        IReadOnlyList<CyclePeriod> periods, IReadOnlyList<CycleDayLog>? dayLogs)
+    {
+        var starts = periods.Select(p => p.StartDate).ToList();
+
+        if (dayLogs is { Count: > 0 })
+        {
+            // Heavy-flow days, sorted; the set of all heavy dates lets us keep only a RUN's first day.
+            var heavyDates = dayLogs
+                .Where(d => d.FlowLevel >= ConfirmFlowLevel)
+                .Select(d => d.LocalDate)
+                .ToHashSet();
+
+            foreach (var date in heavyDates.OrderBy(d => d))
+            {
+                // Only the FIRST heavy day of a contiguous run is a candidate start (skip if yesterday was heavy).
+                if (heavyDates.Contains(date.AddDays(-1))) continue;
+                // Skip if any already-known start (logged or already-confirmed) is within the gap window.
+                if (starts.Any(s => Math.Abs(s.DayNumber - date.DayNumber) <= ConfirmGapDays)) continue;
+                starts.Add(date);
+            }
+        }
+
+        return starts.Distinct().OrderBy(d => d).ToList();
     }
 
     private static int Clamp(int v, int lo, int hi) => v < lo ? lo : v > hi ? hi : v;

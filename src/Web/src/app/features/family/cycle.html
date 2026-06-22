@@ -54,20 +54,25 @@
           </div>
           <div class="cycle__cells" role="rowgroup">
             @for (c of cells(); track c.iso) {
-              <div class="cycle__cell"
+              <button type="button" class="cycle__cell"
                    [class.cycle__cell--out]="!c.inMonth"
                    [class.cycle__cell--today]="c.isToday"
+                   [class.cycle__cell--selected]="c.iso === logDate()"
                    [class.cycle__cell--logged]="c.phase === 'logged'"
                    [class.cycle__cell--period]="c.phase === 'period'"
                    [class.cycle__cell--fertile]="c.phase === 'fertile'"
                    [class.cycle__cell--predicted]="c.predicted"
                    role="gridcell"
+                   (click)="pickCalendarDay(c.iso)"
                    [attr.aria-label]="friendlyDate(c.iso)
                      + (c.phase === 'logged' ? ', logged period' : '')
                      + (c.phase === 'period' ? ', predicted period' : '')
-                     + (c.phase === 'fertile' ? ', predicted fertile window' : '')">
+                     + (c.phase === 'fertile' ? ', predicted fertile window' : '')
+                     + (c.hasLog ? ', has a daily log' : '')
+                     + ', open daily log'">
                 <span class="cycle__cell-num">{{ c.dayNum }}</span>
-              </div>
+                @if (c.hasLog) { <span class="cycle__cell-logdot" aria-hidden="true"></span> }
+              </button>
             }
           </div>
         </div>
@@ -76,7 +81,9 @@
           <li><span class="cycle__dot cycle__dot--logged" aria-hidden="true"></span> Logged period</li>
           <li><span class="cycle__dot cycle__dot--period" aria-hidden="true"></span> Predicted period</li>
           <li><span class="cycle__dot cycle__dot--fertile" aria-hidden="true"></span> Fertile window</li>
+          <li><span class="cycle__dot cycle__dot--log" aria-hidden="true"></span> Daily log</li>
         </ul>
+        <p class="cycle__cal-hint">Tap any day to open its private daily log.</p>
       </section>
 
       <!-- Right column: predictions, note, log form, history, sharing -->
@@ -118,6 +125,123 @@
               {{ n.note }}
             </p>
           }
+        </section>
+
+        <!-- Daily log (PRIVATE, owner-only) — mood / symptoms / flow / intimacy / energy / notes -->
+        <section class="family__card cycle__day-card" aria-label="Daily log">
+          <div class="cycle__day-head">
+            <div class="cycle__day-title">
+              <h2 class="family__card-title">Daily log</h2>
+              <span class="cycle__day-when">{{ logDateLabel() }}</span>
+            </div>
+            <div class="cycle__day-nav">
+              <button mat-icon-button type="button" (click)="prevDay()" aria-label="Previous day">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              @if (logDate() !== today) {
+                <button mat-button type="button" class="cycle__day-today" (click)="logToday()">Today</button>
+              }
+              <button mat-icon-button type="button" (click)="nextDay()" aria-label="Next day">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <p class="cycle__day-help">Everything here is optional and private to you — it autosaves as you go.</p>
+
+          <!-- Mood -->
+          <div class="cycle__field">
+            <span class="cycle__field-l" id="cyc-mood-l">How are you feeling?</span>
+            <div class="cycle__chips" role="group" aria-labelledby="cyc-mood-l">
+              @for (m of moodChoices; track m.value) {
+                <button type="button" class="cycle__chip cycle__chip--mood"
+                        [class.cycle__chip--on]="editMood() === m.value"
+                        [attr.aria-pressed]="editMood() === m.value"
+                        (click)="toggleMood(m.value)">
+                  <span class="cycle__chip-emoji" aria-hidden="true">{{ m.emoji }}</span>{{ m.label }}
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- Symptoms -->
+          <div class="cycle__field">
+            <span class="cycle__field-l" id="cyc-symp-l">Anything you noticed?</span>
+            <div class="cycle__chips" role="group" aria-labelledby="cyc-symp-l">
+              @for (s of symptomChoices; track s) {
+                <button type="button" class="cycle__chip cycle__chip--symptom"
+                        [class.cycle__chip--on]="isSymptomOn(s)"
+                        [attr.aria-pressed]="isSymptomOn(s)"
+                        (click)="toggleSymptom(s)">{{ s }}</button>
+              }
+            </div>
+          </div>
+
+          <!-- Flow -->
+          <div class="cycle__field">
+            <span class="cycle__field-l" id="cyc-flow-l">Flow</span>
+            <div class="cycle__chips" role="group" aria-labelledby="cyc-flow-l">
+              @for (f of flowChoices; track f.value) {
+                <button type="button" class="cycle__chip cycle__chip--flow"
+                        [class.cycle__chip--on]="editFlow() === f.value"
+                        [attr.aria-pressed]="editFlow() === f.value"
+                        (click)="selectFlow(f.value)">{{ f.label }}</button>
+              }
+            </div>
+          </div>
+
+          <!-- Energy -->
+          <div class="cycle__field">
+            <span class="cycle__field-l" id="cyc-energy-l">Energy</span>
+            <div class="cycle__energy" role="group" aria-labelledby="cyc-energy-l">
+              @for (e of energyLevels; track e) {
+                <button type="button" class="cycle__energy-dot"
+                        [class.cycle__energy-dot--on]="(editEnergy() ?? 0) >= e"
+                        [attr.aria-pressed]="editEnergy() === e"
+                        [attr.aria-label]="'Energy ' + e + ' of 5'"
+                        (click)="selectEnergy(e)">{{ e }}</button>
+              }
+              <span class="cycle__energy-cap">low → high</span>
+            </div>
+          </div>
+
+          <!-- Intimacy (discreet) -->
+          <div class="cycle__field cycle__intimacy">
+            <mat-slide-toggle [checked]="editIntimacy()" (change)="toggleIntimacy()"
+                              aria-label="Log intimacy for this day">Intimacy</mat-slide-toggle>
+            @if (editIntimacy()) {
+              <button type="button" class="cycle__chip cycle__chip--prot"
+                      [class.cycle__chip--on]="editProtected() === true"
+                      [attr.aria-pressed]="editProtected() === true"
+                      (click)="toggleProtected()">
+                <mat-icon aria-hidden="true">shield</mat-icon>Protected
+              </button>
+            }
+          </div>
+
+          <!-- Notes -->
+          <div class="cycle__field">
+            <mat-form-field appearance="outline" class="cycle__notes">
+              <mat-label>Notes (optional)</mat-label>
+              <textarea matInput rows="2" maxlength="500" [ngModel]="editNotes()"
+                        (ngModelChange)="onNotesChange($event)"
+                        placeholder="Anything you'd like to remember about today…"></textarea>
+            </mat-form-field>
+          </div>
+
+          <div class="cycle__day-foot">
+            <span class="cycle__day-status" role="status" aria-live="polite">
+              @if (daySaving()) {
+                <mat-icon aria-hidden="true">sync</mat-icon> Saving…
+              } @else if (daySaved()) {
+                <mat-icon aria-hidden="true">check</mat-icon> Saved
+              } @else if (hasDayLog()) {
+                <mat-icon aria-hidden="true">edit_note</mat-icon> Logged
+              }
+            </span>
+            <button mat-button type="button" class="cycle__day-clear" (click)="clearDay()"
+                    [disabled]="!hasDayLog()">Clear day</button>
+          </div>
         </section>
 
         <!-- Log a period -->

@@ -96,6 +96,37 @@ public class CycleTests(WebAppFactory factory)
         return await db.CyclePeriods.AsNoTracking().CountAsync(p => p.UserEmail == lower);
     }
 
+    private async Task<int> DayLogCountFor(string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var lower = email.ToLowerInvariant();
+        return await db.CycleDayLogs.AsNoTracking().CountAsync(d => d.UserEmail == lower);
+    }
+
+    /// <summary>Seed a heavy-flow + intimacy day-log directly for a user (used to prove the overlay never
+    /// surfaces it).</summary>
+    private async Task SeedHeavyIntimateDay(int userId, string email, string dateIso)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        db.CycleDayLogs.Add(new CycleDayLog
+        {
+            UserEmail = email.ToLowerInvariant(),
+            UserId = userId,
+            LocalDate = DateOnly.Parse(dateIso),
+            FlowLevel = CycleFlowLevel.Heavy,
+            Intimacy = true,
+            Protected = false,
+            Mood = "anxious",
+            Symptoms = new List<string> { "cramps" },
+            Notes = "secret-intimate-note",
+            CreatedUtc = DateTime.UtcNow,
+            UpdatedUtc = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+    }
+
     // =====================================================================================
     // GATING — cycle.track required (403), auth required (401)
     // =====================================================================================
@@ -112,6 +143,10 @@ public class CycleTests(WebAppFactory factory)
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await plain.DeleteAsync("/api/family/cycle/period/1")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await plain.GetAsync("/api/family/cycle/note")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await plain.PutAsJsonAsync("/api/family/cycle/day-log", new { date = "2026-06-01", mood = "calm" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await plain.DeleteAsync("/api/family/cycle/day-log?date=2026-06-01"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -123,6 +158,10 @@ public class CycleTests(WebAppFactory factory)
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await anon.GetAsync("/api/family/cycle/note")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await anon.GetAsync("/api/family/cycle/overlay")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await anon.PutAsJsonAsync("/api/family/cycle/day-log", new { date = "2026-06-01" }))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await anon.DeleteAsync("/api/family/cycle/day-log?date=2026-06-01"))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     // =====================================================================================
@@ -289,6 +328,125 @@ public class CycleTests(WebAppFactory factory)
     }
 
     // =====================================================================================
+    // DAY-LOG — PRIVATE health + intimate data. Partial upsert preserves unspecified fields; owner-scoped;
+    // surfaced only on the owner's own GET; cleared with DELETE ?date=. 400 on a bad date.
+    // =====================================================================================
+
+    [Fact]
+    public async Task Day_log_upsert_preserves_unspecified_fields()
+    {
+        var (ownerEmail, owner, _) = await ProvisionUser("cycle.track");
+
+        // First write: mood + symptoms + intimacy/protected + energy + notes.
+        var first = await owner.PutAsJsonAsync("/api/family/cycle/day-log", new
+        {
+            date = "2026-06-10",
+            mood = "calm",
+            symptoms = new[] { "cramps", "fatigue" },
+            flowLevel = 3, // medium
+            intimacy = true,
+            @protected = true,
+            energy = 4,
+            notes = "ok day",
+        });
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        var b1 = await Json(first);
+        b1.GetProperty("mood").GetString().Should().Be("calm");
+        b1.GetProperty("symptoms").GetArrayLength().Should().Be(2);
+        b1.GetProperty("flowLevel").GetInt32().Should().Be(3);
+        b1.GetProperty("intimacy").GetBoolean().Should().BeTrue();
+        b1.GetProperty("protected").GetBoolean().Should().BeTrue();
+        b1.GetProperty("energy").GetInt32().Should().Be(4);
+        b1.GetProperty("notes").GetString().Should().Be("ok day");
+
+        // PARTIAL update: change ONLY the mood — everything else must be PRESERVED.
+        var second = await owner.PutAsJsonAsync("/api/family/cycle/day-log",
+            new { date = "2026-06-10", mood = "happy" });
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        var b2 = await Json(second);
+        b2.GetProperty("mood").GetString().Should().Be("happy");
+        b2.GetProperty("symptoms").GetArrayLength().Should().Be(2); // preserved
+        b2.GetProperty("flowLevel").GetInt32().Should().Be(3);      // preserved
+        b2.GetProperty("intimacy").GetBoolean().Should().BeTrue();  // preserved
+        b2.GetProperty("protected").GetBoolean().Should().BeTrue(); // preserved
+        b2.GetProperty("energy").GetInt32().Should().Be(4);         // preserved
+        b2.GetProperty("notes").GetString().Should().Be("ok day");  // preserved
+
+        // Only ONE row exists for the day (upsert, not insert).
+        (await DayLogCountFor(ownerEmail)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Day_log_appears_only_in_the_owners_own_get()
+    {
+        var (_, owner, _) = await ProvisionUser("cycle.track");
+        await owner.PutAsJsonAsync("/api/family/cycle/day-log",
+            new { date = "2026-06-12", mood = "happy", intimacy = true, notes = "private" });
+
+        var body = await Json(await owner.GetAsync("/api/family/cycle/"));
+        body.GetProperty("dayLogs").GetArrayLength().Should().Be(1);
+        var log = body.GetProperty("dayLogs")[0];
+        log.GetProperty("date").GetString().Should().StartWith("2026-06-12");
+        log.GetProperty("intimacy").GetBoolean().Should().BeTrue();
+        log.GetProperty("notes").GetString().Should().Be("private");
+    }
+
+    [Fact]
+    public async Task Day_log_rejects_bad_date_with_400()
+    {
+        var (_, owner, _) = await ProvisionUser("cycle.track");
+        // Absurd year (out of the sane range).
+        (await owner.PutAsJsonAsync("/api/family/cycle/day-log", new { date = "1990-01-01", mood = "calm" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // DELETE with no date.
+        (await owner.DeleteAsync("/api/family/cycle/day-log")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Day_log_delete_clears_the_day()
+    {
+        var (email, owner, _) = await ProvisionUser("cycle.track");
+        await owner.PutAsJsonAsync("/api/family/cycle/day-log", new { date = "2026-06-14", mood = "sad" });
+        (await DayLogCountFor(email)).Should().Be(1);
+
+        (await owner.DeleteAsync("/api/family/cycle/day-log?date=2026-06-14"))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await DayLogCountFor(email)).Should().Be(0);
+        // Deleting again is a 404 (already gone).
+        (await owner.DeleteAsync("/api/family/cycle/day-log?date=2026-06-14"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_caller_cannot_read_or_edit_or_clear_another_users_day_log()
+    {
+        var (aliceEmail, alice, _) = await ProvisionUser("cycle.track");
+        var (_, bob, _) = await ProvisionUser("cycle.track");
+
+        // Alice logs an intimate day.
+        await alice.PutAsJsonAsync("/api/family/cycle/day-log",
+            new { date = "2026-06-15", mood = "anxious", intimacy = true, notes = "alice-secret" });
+
+        // Bob's own GET never contains Alice's row (owner-scoped read).
+        var bobBody = await Json(await bob.GetAsync("/api/family/cycle/"));
+        bobBody.GetProperty("dayLogs").GetArrayLength().Should().Be(0);
+        var bobRaw = await (await bob.GetAsync("/api/family/cycle/")).Content.ReadAsStringAsync();
+        bobRaw.Should().NotContain("alice-secret");
+
+        // Bob "upserting" the same date writes only to HIS OWN row — Alice's stays untouched.
+        await bob.PutAsJsonAsync("/api/family/cycle/day-log", new { date = "2026-06-15", mood = "happy" });
+        var aliceBody = await Json(await alice.GetAsync("/api/family/cycle/"));
+        aliceBody.GetProperty("dayLogs").GetArrayLength().Should().Be(1);
+        aliceBody.GetProperty("dayLogs")[0].GetProperty("mood").GetString().Should().Be("anxious"); // unchanged
+        aliceBody.GetProperty("dayLogs")[0].GetProperty("notes").GetString().Should().Be("alice-secret");
+
+        // Bob DELETE for that date clears only HIS row; Alice's remains.
+        (await bob.DeleteAsync("/api/family/cycle/day-log?date=2026-06-15"))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await DayLogCountFor(aliceEmail)).Should().Be(1);
+    }
+
+    // =====================================================================================
     // OVERLAY — requires family.use (NOT cycle.track); only opted-in members' PREDICTED spans; no email
     // =====================================================================================
 
@@ -319,15 +477,24 @@ public class CycleTests(WebAppFactory factory)
         await SetOverlay(sharerId, sharerEmail, true);
         await SetOverlay(nonSharerId, nonSharerEmail, false);
 
+        // The opted-in sharer ALSO logs a private heavy-flow + intimate day with a note — this HEALTH +
+        // INTIMATE data must NEVER appear in the predicted-phase overlay.
+        await SeedHeavyIntimateDay(sharerId, sharerEmail, "2026-02-10");
+
         var res = await viewer.GetAsync(
             "/api/family/cycle/overlay?fromUtc=2026-02-01T00:00:00Z&toUtc=2026-03-01T00:00:00Z");
         res.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // NO email anywhere.
+        // NO email anywhere — and NO leaked day-log/intimate data (mood/notes/intimacy/symptoms).
         var raw = await res.Content.ReadAsStringAsync();
         raw.Should().NotContain("@");
         raw.Should().NotContain(sharerEmail);
         raw.Should().NotContain(nonSharerEmail);
+        raw.Should().NotContain("secret-intimate-note");
+        raw.Should().NotContain("intimacy");
+        raw.Should().NotContain("mood");
+        raw.Should().NotContain("symptoms");
+        raw.Should().NotContain("notes");
 
         var arr = await Json(res);
         arr.ValueKind.Should().Be(JsonValueKind.Array);
@@ -335,12 +502,15 @@ public class CycleTests(WebAppFactory factory)
         ids.Should().Contain(sharerId);        // opted-in member appears
         ids.Should().NotContain(nonSharerId);  // non-opted member excluded
 
-        // Every surfaced span is flagged predicted=true and is one of the two kinds.
+        // Every surfaced span carries ONLY the predicted-phase fields (kind/start/end/predicted) — no
+        // day-log fields ever — and is flagged predicted=true with one of the two kinds.
         foreach (var member in arr.EnumerateArray())
         foreach (var phase in member.GetProperty("phases").EnumerateArray())
         {
             phase.GetProperty("predicted").GetBoolean().Should().BeTrue();
             phase.GetProperty("kind").GetString().Should().BeOneOf("period", "fertile");
+            phase.TryGetProperty("intimacy", out _).Should().BeFalse();
+            phase.TryGetProperty("mood", out _).Should().BeFalse();
         }
     }
 

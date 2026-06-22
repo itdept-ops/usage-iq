@@ -3131,11 +3131,55 @@ export interface CycleSettings {
   overlayToFamily: boolean;
 }
 
-/** The main GET /api/family/cycle payload (mirrors CycleDto): recent periods + predictions + settings. */
+/**
+ * One day's flow level (mirrors CycleFlowLevel; serialised as its int 0..4). Informational only.
+ */
+export type CycleFlowLevel = 0 | 1 | 2 | 3 | 4; // none | spotting | light | medium | heavy
+
+/**
+ * One day's PRIVATE self-log (mirrors DayLogDto) — HEALTH + INTIMATE data, OWNER-ONLY. This is returned
+ * ONLY on the owner's own GET /api/family/cycle; it NEVER appears in the family overlay and is never sent
+ * to the AI as raw content (only an aggregate projection is narrated). `date` is a plain ISO date.
+ */
+export interface CycleDayLog {
+  date: string;
+  mood: string | null;
+  symptoms: string[];
+  flowLevel: CycleFlowLevel;
+  intimacy: boolean;
+  /** Only meaningful when `intimacy` is true; null otherwise. */
+  protected: boolean | null;
+  /** 1..5 self-rated energy, or null. */
+  energy: number | null;
+  notes: string | null;
+  updatedUtc: string;
+}
+
+/**
+ * The main GET /api/family/cycle payload (mirrors CycleDto): recent periods + predictions + settings +
+ * the owner's recent private `dayLogs` (newest-date-first; OWNER-ONLY — never overlaid for anyone else).
+ */
 export interface CycleData {
   periods: CyclePeriod[];
   prediction: CyclePrediction;
   settings: CycleSettings;
+  dayLogs: CycleDayLog[];
+}
+
+/**
+ * A PUT /api/family/cycle/day-log body — a PARTIAL upsert of one private day. `date` is required; every
+ * other field is optional and an OMITTED field is PRESERVED on an existing row (it is not cleared). To
+ * clear an entire day use deleteCycleDayLog(date). `symptoms`, when present, REPLACE the stored set.
+ */
+export interface CycleDayLogPatch {
+  date: string;
+  mood?: string | null;
+  symptoms?: string[];
+  flowLevel?: CycleFlowLevel;
+  intimacy?: boolean;
+  protected?: boolean | null;
+  energy?: number | null;
+  notes?: string | null;
 }
 
 /**

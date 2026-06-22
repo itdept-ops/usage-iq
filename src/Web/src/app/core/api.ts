@@ -12,6 +12,7 @@ import {
   SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
   WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WorkoutXSearchResultDto,
   CycleData, CyclePeriod, CycleNote, CycleSettings, CycleSettingsPatch, CycleOverlayMember,
+  CycleDayLog, CycleDayLogPatch,
   HardChallengeDto, HardSharedPersonDto, StartChallengeRequest, UpsertHardDayRequest, HardDayDto, CheatDaysRequest,
 } from './models';
 
@@ -1499,6 +1500,22 @@ export class Api {
   /** Delete one of the caller's OWN logged periods by id (204; owner-scoped — can't touch another user's). */
   deletePeriod(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/family/cycle/period/${id}`);
+  }
+
+  /**
+   * PARTIAL upsert of one day's PRIVATE self-log (PUT /family/cycle/day-log) — HEALTH + INTIMATE data,
+   * owner-scoped (cycle.track). `date` is required; an OMITTED field is PRESERVED on an existing row
+   * (it is not cleared) and `symptoms`, when present, REPLACE the stored set. Returns the saved day-log.
+   * This data NEVER appears in the family overlay or on the wire for any other viewer.
+   */
+  upsertCycleDayLog(patch: CycleDayLogPatch): Observable<CycleDayLog> {
+    return this.http.put<CycleDayLog>(`${this.base}/family/cycle/day-log`, patch);
+  }
+
+  /** Clear an entire day's private log (DELETE /family/cycle/day-log?date=; 204, or 404 if none; owner-scoped). */
+  deleteCycleDayLog(date: string): Observable<void> {
+    const params = new HttpParams().set('date', date);
+    return this.http.delete<void>(`${this.base}/family/cycle/day-log`, { params });
   }
 
   /** Patch the caller's OWN cycle settings — the two averages + the family-overlay opt-in (clamped

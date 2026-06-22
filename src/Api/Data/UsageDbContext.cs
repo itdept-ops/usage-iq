@@ -63,6 +63,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<FamilyEventAnnouncement> FamilyEventAnnouncements => Set<FamilyEventAnnouncement>();
     public DbSet<CycleProfile> CycleProfiles => Set<CycleProfile>();
     public DbSet<CyclePeriod> CyclePeriods => Set<CyclePeriod>();
+    public DbSet<CycleDayLog> CycleDayLogs => Set<CycleDayLog>();
     public DbSet<HardChallenge> HardChallenges => Set<HardChallenge>();
     public DbSet<HardChallengeDay> HardChallengeDays => Set<HardChallengeDay>();
 
@@ -757,6 +758,21 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             // The own-history read filters by UserEmail and pages newest-start-first; this composite serves it
             // directly and also feeds the gap-based prediction.
             e.HasIndex(x => new { x.UserEmail, x.StartDate }).IsDescending(false, true);
+        });
+
+        b.Entity<CycleDayLog>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Mood).HasMaxLength(32);
+            // Symptoms is a small fixed vocabulary stored as a Postgres text[] (mirrors ShareLink.Models).
+            e.Property(x => x.Symptoms).HasColumnType("text[]");
+            // FlowLevel persists as its int (none=0 .. heavy=4).
+            e.Property(x => x.FlowLevel).HasConversion<int>().HasDefaultValue(CycleFlowLevel.None);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // One day-log per (user, local date); also the per-date upsert/lookup + the recent read.
+            e.HasIndex(x => new { x.UserEmail, x.LocalDate }).IsUnique();
         });
 
         b.Entity<HardChallenge>(e =>

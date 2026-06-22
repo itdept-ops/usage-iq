@@ -15,7 +15,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
-  CycleData, CycleNote, CyclePeriod, CyclePrediction, CycleSettings, PERM,
+  CycleData, CycleDayLog, CycleDayLogPatch, CycleFlowLevel, CycleNote, CyclePeriod, CyclePrediction,
+  CycleSettings, PERM,
 } from '../../core/models';
 import { ConfirmData, FamilyConfirmDialog } from './confirm-dialog';
 
@@ -34,7 +35,14 @@ interface CycleCell {
   phase: DayPhase;
   /** True for a day inside a PREDICTED span (period or fertile) — the UI marks it "predicted". */
   predicted: boolean;
+  /** True when the owner has a PRIVATE daily log on this day — an owner-only dot, distinct from the phases. */
+  hasLog: boolean;
 }
+
+/** A mood choice for the daily-log selector (value matches the server's small mood vocabulary). */
+interface MoodChoice { value: string; label: string; emoji: string; }
+/** A flow-level choice (value matches CycleFlowLevel 0..4). */
+interface FlowChoice { value: CycleFlowLevel; label: string; }
 
 /**
  * Family Hub — the Cycle page (features/family/cycle, a child of /family gated by cycle.track). A warm,
@@ -73,6 +81,10 @@ export class FamilyCycle implements OnDestroy {
   readonly prediction = signal<CyclePrediction | null>(null);
   readonly settings = signal<CycleSettings | null>(null);
 
+  /** The owner's recent PRIVATE day-logs, indexed by ISO date. OWNER-ONLY — never overlaid, never on the
+   *  wire for any other viewer. Used to mark logged days on the calendar and prefill the editor. */
+  readonly dayLogsByDate = signal<Map<string, CycleDayLog>>(new Map());
+
   /** The gentle AI note (best-effort; null when unavailable or the caller lacks family.ai). */
   readonly note = signal<CycleNote | null>(null);
 
@@ -95,8 +107,9 @@ export class FamilyCycle implements OnDestroy {
   /** The first-of-month (local midnight) anchoring the visible mini-calendar grid. */
   readonly monthStart = signal<Date>(this.firstOfMonth(new Date()));
 
-  /** Today as ISO, recomputed once on construction (the page is short-lived). */
-  private readonly today = this.todayIso();
+  /** Today as ISO, recomputed once on construction (the page is short-lived). Public so the template can
+   *  compare the edited day against it ("Today" affordance). */
+  readonly today = this.todayIso();
 
   /** Whether the family-overlay opt-in is on (mirrors settings.overlayToFamily). */
   readonly overlayOn = computed<boolean>(() => this.settings()?.overlayToFamily === true);
@@ -130,6 +143,7 @@ export class FamilyCycle implements OnDestroy {
     const p = this.prediction();
     const predPeriod = this.predictedPeriodDays(p);   // Set<iso>
     const fertile = this.fertileDays(p);              // Set<iso>
+    const logs = this.dayLogsByDate();                // Map<iso, CycleDayLog> (owner-only)
 
     const out: CycleCell[] = [];
     for (let i = 0; i < 42; i++) {
@@ -153,6 +167,7 @@ export class FamilyCycle implements OnDestroy {
         inMonth: date.getMonth() === month,
         phase,
         predicted,
+        hasLog: logs.has(iso),
       });
     }
     return out;
@@ -180,11 +195,71 @@ export class FamilyCycle implements OnDestroy {
         : `${this.friendlyDate(pr.startDate)} (start)`,
     })));
 
+  // ============================================================== daily log (PRIVATE, owner-only)
+
+  /** The mood vocabulary the server accepts (emoji is purely cosmetic). */
+  readonly moodChoices: readonly MoodChoice[] = [
+    { value: 'happy', label: 'Happy', emoji: '🙂' },
+    { value: 'calm', label: 'Calm', emoji: '😌' },
+    { value: 'energized', label: 'Energized', emoji: '⚡' },
+    { value: 'irritable', label: 'Irritable', emoji: '😤' },
+    { value: 'anxious', label: 'Anxious', emoji: '😟' },
+    { value: 'sad', label: 'Sad', emoji: '😔' },
+  ];
+
+  /** The symptom vocabulary the server accepts (a multi-select of chips). */
+  readonly symptomChoices: readonly string[] = [
+    'cramps', 'headache', 'bloating', 'fatigue', 'tender', 'acne', 'nausea', 'backache',
+  ];
+
+  /** The flow-level choices (value matches CycleFlowLevel). */
+  readonly flowChoices: readonly FlowChoice[] = [
+    { value: 0, label: 'None' },
+    { value: 1, label: 'Spotting' },
+    { value: 2, label: 'Light' },
+    { value: 3, label: 'Medium' },
+    { value: 4, label: 'Heavy' },
+  ];
+
+  /** The energy scale (1..5), low → high. */
+  readonly energyLevels: readonly number[] = [1, 2, 3, 4, 5];
+
+  /** The day currently being edited in the daily-log section (ISO; defaults to today). */
+  readonly logDate = signal<string>(this.todayIso());
+
+  // ---- the live editor model (mirrors a CycleDayLog; null where "not recorded") ----
+  readonly editMood = signal<string | null>(null);
+  readonly editSymptoms = signal<Set<string>>(new Set());
+  readonly editFlow = signal<CycleFlowLevel>(0);
+  readonly editIntimacy = signal<boolean>(false);
+  readonly editProtected = signal<boolean | null>(null);
+  readonly editEnergy = signal<number | null>(null);
+  readonly editNotes = signal<string>('');
+
+  /** True while a debounced autosave is in flight (drives a subtle "Saving…/Saved" hint). */
+  readonly daySaving = signal(false);
+  /** Set briefly after a successful autosave so the UI can confirm "Saved". */
+  readonly daySaved = signal(false);
+
+  /** Whether the edited day currently holds any recorded value (drives the clear button + the "logged" hint). */
+  readonly hasDayLog = computed<boolean>(() => this.dayLogsByDate().has(this.logDate()));
+
+  /** A friendly label for the day being edited ("Today" when it is today, else "Sun, Jun 22"). */
+  readonly logDateLabel = computed<string>(() =>
+    this.logDate() === this.today ? 'Today' : this.friendlyDate(this.logDate()));
+
+  /** The debounce timer handle for the autosaving PUT, and the saved-flag clear timer. */
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private savedFlagTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor() {
     void this.load();
   }
 
-  ngOnDestroy(): void { /* no timers to clean up */ }
+  ngOnDestroy(): void {
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    if (this.savedFlagTimer) clearTimeout(this.savedFlagTimer);
+  }
 
   // ============================================================== loading
 
@@ -196,6 +271,8 @@ export class FamilyCycle implements OnDestroy {
       this.periods.set(data.periods);
       this.prediction.set(data.prediction);
       this.settings.set(data.settings);
+      this.setDayLogs(data.dayLogs);
+      this.loadDayIntoEditor(this.logDate());
     } catch {
       this.error.set(true);
     } finally {
@@ -221,6 +298,7 @@ export class FamilyCycle implements OnDestroy {
       this.periods.set(data.periods);
       this.prediction.set(data.prediction);
       this.settings.set(data.settings);
+      this.setDayLogs(data.dayLogs);
     } catch {
       this.snack.open("Couldn't refresh just now. Please try again.", 'OK', { duration: 4000 });
     }
@@ -311,6 +389,188 @@ export class FamilyCycle implements OnDestroy {
         { duration: 4000 });
     } finally {
       this.overlayBusy.set(false);
+    }
+  }
+
+  // ============================================================== daily log handlers
+
+  /** Index the owner's private day-logs by ISO date (newest-first from the server; order doesn't matter here). */
+  private setDayLogs(logs: CycleDayLog[]): void {
+    const map = new Map<string, CycleDayLog>();
+    for (const d of logs) map.set(d.date, d);
+    this.dayLogsByDate.set(map);
+  }
+
+  /** Step the edited day one day back/forward (clamped to the same sane window the server enforces). */
+  prevDay(): void { this.shiftLogDate(-1); }
+  nextDay(): void { this.shiftLogDate(1); }
+  /** Jump the daily-log editor back to today. */
+  logToday(): void { this.selectLogDate(this.today); }
+
+  private shiftLogDate(delta: number): void {
+    const d = this.parseIso(this.logDate());
+    if (!d) return;
+    const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta);
+    this.selectLogDate(this.toLocalDate(next));
+  }
+
+  /** Switch the daily-log editor to a specific ISO day, flushing any pending save for the previous day first. */
+  selectLogDate(iso: string): void {
+    if (iso === this.logDate()) return;
+    this.flushPendingSave();
+    this.logDate.set(iso);
+    this.loadDayIntoEditor(iso);
+  }
+
+  /** Open the daily-log editor on a tapped calendar day (only for in-month days; keeps the grid as the picker). */
+  pickCalendarDay(iso: string): void {
+    this.selectLogDate(iso);
+  }
+
+  /** Prefill the editor from the stored log for `iso`, or reset to "nothing recorded" when there's none. */
+  private loadDayIntoEditor(iso: string): void {
+    const log = this.dayLogsByDate().get(iso);
+    this.editMood.set(log?.mood ?? null);
+    this.editSymptoms.set(new Set(log?.symptoms ?? []));
+    this.editFlow.set(log?.flowLevel ?? 0);
+    this.editIntimacy.set(log?.intimacy ?? false);
+    this.editProtected.set(log?.intimacy ? log.protected ?? null : null);
+    this.editEnergy.set(log?.energy ?? null);
+    this.editNotes.set(log?.notes ?? '');
+  }
+
+  // ---- editor mutations (each schedules a debounced autosave) ----
+
+  /** Toggle a mood chip (re-tapping the selected mood clears it). */
+  toggleMood(value: string): void {
+    this.editMood.update(m => (m === value ? null : value));
+    this.scheduleSave();
+  }
+
+  /** Toggle a symptom chip in/out of the multi-select. */
+  toggleSymptom(value: string): void {
+    this.editSymptoms.update(set => {
+      const next = new Set(set);
+      if (next.has(value)) next.delete(value); else next.add(value);
+      return next;
+    });
+    this.scheduleSave();
+  }
+
+  isSymptomOn(value: string): boolean { return this.editSymptoms().has(value); }
+
+  /** Set the flow level (re-tapping the selected level returns to None). */
+  selectFlow(value: CycleFlowLevel): void {
+    this.editFlow.update(f => (f === value ? 0 : value));
+    this.scheduleSave();
+  }
+
+  /** Toggle the discreet intimacy flag; turning it off also clears the protected sub-toggle. */
+  toggleIntimacy(): void {
+    this.editIntimacy.update(v => !v);
+    if (!this.editIntimacy()) this.editProtected.set(null);
+    this.scheduleSave();
+  }
+
+  /** Toggle the optional "protected" sub-flag (only meaningful while intimacy is on). */
+  toggleProtected(): void {
+    if (!this.editIntimacy()) return;
+    this.editProtected.update(v => (v === true ? false : true));
+    this.scheduleSave();
+  }
+
+  /** Set the 1..5 energy level (re-tapping the selected level clears it). */
+  selectEnergy(value: number): void {
+    this.editEnergy.update(e => (e === value ? null : value));
+    this.scheduleSave();
+  }
+
+  /** Notes changed (bound from the textarea); just schedule the debounced save. */
+  onNotesChange(value: string): void {
+    this.editNotes.set(value);
+    this.scheduleSave();
+  }
+
+  /**
+   * Debounced autosave of the edited day. Everything is OPTIONAL — we PUT the full current editor state as a
+   * partial upsert (the server preserves nothing it doesn't see, but we always send every field so the day
+   * reflects exactly what's on screen). PRIVATE data: this only ever hits the owner-scoped day-log endpoint.
+   */
+  private scheduleSave(): void {
+    this.daySaved.set(false);
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => { void this.saveDay(); }, 700);
+  }
+
+  /** Flush a pending debounced save immediately (e.g. before switching days), if one is queued. */
+  private flushPendingSave(): void {
+    if (!this.saveTimer) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    void this.saveDay();
+  }
+
+  private async saveDay(): Promise<void> {
+    if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
+    const date = this.logDate();
+    const intimacy = this.editIntimacy();
+    const patch: CycleDayLogPatch = {
+      date,
+      mood: this.editMood(),
+      symptoms: [...this.editSymptoms()],
+      flowLevel: this.editFlow(),
+      intimacy,
+      protected: intimacy ? this.editProtected() : null,
+      energy: this.editEnergy(),
+      notes: this.editNotes().trim() || null,
+    };
+    this.daySaving.set(true);
+    try {
+      const saved = await firstValueFrom(this.api.upsertCycleDayLog(patch));
+      // Re-index just this day so the calendar dot + "logged" hint stay accurate without a full reload.
+      this.dayLogsByDate.update(prev => {
+        const next = new Map(prev);
+        next.set(saved.date, saved);
+        return next;
+      });
+      this.daySaved.set(true);
+      if (this.savedFlagTimer) clearTimeout(this.savedFlagTimer);
+      this.savedFlagTimer = setTimeout(() => this.daySaved.set(false), 2200);
+    } catch {
+      this.snack.open("Couldn't save your log just now. Please try again.", 'OK', { duration: 4000 });
+    } finally {
+      this.daySaving.set(false);
+    }
+  }
+
+  /** Clear the whole day's private log (with a gentle confirm) — resets the editor + drops the calendar dot. */
+  async clearDay(): Promise<void> {
+    const date = this.logDate();
+    if (!this.dayLogsByDate().has(date)) {
+      // Nothing saved yet — just reset the on-screen editor.
+      this.loadDayIntoEditor(date);
+      return;
+    }
+    const ok = await this.confirm({
+      title: 'Clear this day?',
+      message: 'This removes everything you logged for this day (mood, symptoms, flow, energy and notes) from '
+        + 'your private cycle log. It only affects this one day.',
+      destructive: true,
+      confirmLabel: 'Clear day',
+    });
+    if (!ok) return;
+    if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
+    try {
+      await firstValueFrom(this.api.deleteCycleDayLog(date));
+      this.dayLogsByDate.update(prev => {
+        const next = new Map(prev);
+        next.delete(date);
+        return next;
+      });
+      this.loadDayIntoEditor(date);
+      this.daySaved.set(false);
+    } catch {
+      this.snack.open("Couldn't clear that day just now. Please try again.", 'OK', { duration: 4000 });
     }
   }
 

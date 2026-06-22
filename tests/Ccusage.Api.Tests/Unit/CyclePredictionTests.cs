@@ -105,4 +105,61 @@ public class CyclePredictionTests
             prediction, 5, new DateOnly(2026, 03, 01), new DateOnly(2026, 03, 31));
         spans.Should().BeEmpty();
     }
+
+    private static CycleDayLog Heavy(string isoDate) => new()
+    {
+        UserEmail = "x@test.local",
+        LocalDate = DateOnly.Parse(isoDate),
+        FlowLevel = CycleFlowLevel.Heavy,
+        CreatedUtc = DateTime.UtcNow,
+        UpdatedUtc = DateTime.UtcNow,
+    };
+
+    [Fact]
+    public void A_heavy_flow_day_confirms_a_period_start_the_owner_didnt_log_as_a_period()
+    {
+        // Only ONE logged period start. A heavy-flow day-log 28 days later (well beyond the confirm gap) adds
+        // a SECOND start, so the average becomes a derived 28-day gap (not the profile fallback of 35).
+        var periods = new[] { Start("2026-01-01") };
+        var dayLogs = new[] { Heavy("2026-01-29") };
+        var today = new DateOnly(2026, 02, 01);
+
+        var p = CyclePredictionService.Compute(periods, profileAvgCycle: 35, profileAvgPeriod: 5, today, dayLogs);
+
+        p.AvgCycleLengthDays.Should().Be(28);                         // derived from the confirmed gap, not 35
+        p.LastStart.Should().Be(new DateOnly(2026, 01, 29));          // the heavy-flow day is the latest start
+        p.NextPredictedStart.Should().Be(new DateOnly(2026, 02, 26)); // 2026-01-29 + 28
+    }
+
+    [Fact]
+    public void A_heavy_flow_day_near_a_logged_start_does_not_double_count()
+    {
+        // A heavy-flow day 2 days after a logged start is WITHIN that period (inside the confirm gap) → it
+        // must NOT become a separate start. With one real start, the average falls back to the profile.
+        var periods = new[] { Start("2026-02-01") };
+        var dayLogs = new[] { Heavy("2026-02-03") };
+        var p = CyclePredictionService.Compute(periods, profileAvgCycle: 30, profileAvgPeriod: 5,
+            new DateOnly(2026, 02, 05), dayLogs);
+
+        p.LastStart.Should().Be(new DateOnly(2026, 02, 01)); // unchanged — the heavy day was not a new anchor
+        p.AvgCycleLengthDays.Should().Be(30);                // profile fallback (no derived second start)
+    }
+
+    [Fact]
+    public void Non_heavy_flow_days_never_confirm_a_start()
+    {
+        // A MEDIUM-flow day (below the confirm threshold) far from any start is ignored — still one start.
+        var periods = new[] { Start("2026-01-01") };
+        var dayLogs = new[]
+        {
+            new CycleDayLog
+            {
+                UserEmail = "x@test.local", LocalDate = new DateOnly(2026, 01, 29),
+                FlowLevel = CycleFlowLevel.Medium, CreatedUtc = DateTime.UtcNow, UpdatedUtc = DateTime.UtcNow,
+            },
+        };
+        var p = CyclePredictionService.Compute(periods, 30, 5, new DateOnly(2026, 02, 01), dayLogs);
+        p.LastStart.Should().Be(new DateOnly(2026, 01, 01)); // medium flow did NOT add a start
+        p.AvgCycleLengthDays.Should().Be(30);
+    }
 }
