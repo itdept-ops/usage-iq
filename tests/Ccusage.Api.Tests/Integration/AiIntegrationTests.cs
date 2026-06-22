@@ -45,6 +45,7 @@ public class AiIntegrationTests(WebAppFactory factory)
     public static IEnumerable<object?[]> AllRoutes()
     {
         yield return new object?[] { HttpMethod.Post, "/api/ai/estimate-macros", new { description = "2 eggs" } };
+        yield return new object?[] { HttpMethod.Post, "/api/ai/supplement-macros", new { name = "whey protein", dose = "1 scoop" } };
         yield return new object?[] { HttpMethod.Post, "/api/ai/suggest-goal", new { } };
         yield return new object?[] { HttpMethod.Post, "/api/ai/estimate-exercise", new { name = "running", durationMin = 30 } };
         yield return new object?[] { HttpMethod.Post, "/api/ai/parse-exercise", new { text = "3x10 squats" } };

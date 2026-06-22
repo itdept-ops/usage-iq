@@ -1020,6 +1020,27 @@ export interface CoffeeEntryDto {
   createdUtc: string;
 }
 
+/** The kind of supplement a row is — the lower-cased enum name. Mirrors SupplementKind. */
+export type SupplementKind = 'supplement' | 'vitamin' | 'protein' | 'medication' | 'preworkout' | 'other';
+
+/**
+ * One logged supplement / vitamin / protein-powder / medication / pre-workout on a tracker day. Most
+ * kinds carry 0 macros; protein powders carry real calories + protein. The macros SUM into the day's
+ * calorie/macro roll-up. `kind` is the lower-cased enum name; `createdUtc` is an ISO-8601 UTC string.
+ * Visible (read-only) to a permitted viewer like food/hydration/coffee. Mirrors SupplementEntryDto.
+ */
+export interface SupplementEntryDto {
+  id: number;
+  name: string;
+  dose?: string;
+  kind: SupplementKind;
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  createdUtc: string;
+}
+
 /** How a day's watch active-calories combine with the logged-exercise sum. Mirrors ActivityCalorieMode. */
 export type ActivityCalorieMode = 'add' | 'override';
 
@@ -1559,6 +1580,42 @@ export interface AddCoffeeRequest {
 }
 
 /**
+ * Log-a-supplement payload (POST /api/tracker/supplement). `name` is required (<=120 chars); `dose` is
+ * optional free text ("1 scoop", "5 g", <=60 chars); `kind` is the lower-cased enum name (default
+ * "supplement"). Macros default to 0 when omitted (most supplements carry none). Mirrors AddSupplementRequest.
+ */
+export interface AddSupplementRequest {
+  date: string;
+  name: string;
+  dose?: string;
+  kind?: SupplementKind;
+  calories?: number;
+  protein?: number;
+  carb?: number;
+  fat?: number;
+}
+
+/** Estimate-supplement-macros request (POST /api/ai/supplement-macros). Mirrors SupplementMacrosRequest. */
+export interface SupplementMacrosRequest {
+  name: string;
+  dose?: string;
+}
+
+/**
+ * An AI supplement estimate (clamped server-side). `kind` is the lower-cased SupplementKind name; most
+ * supplements/vitamins/meds estimate to all-zeros, protein powders carry real macros. `note` is an
+ * optional model assumption. Mirrors SupplementMacrosResponse.
+ */
+export interface SupplementMacrosResponse {
+  kind: SupplementKind;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  note?: string | null;
+}
+
+/**
  * A full tracker day (GET /api/tracker/day). `readOnly` is true when viewing someone else's tracker —
  * the UI then hides all add/delete controls. Totals are server-computed. Mirrors TrackerDayDto.
  */
@@ -1607,6 +1664,16 @@ export interface TrackerDayDto {
   stepGoal?: number;
   /** Raw logged-exercise calorie sum for the day, BEFORE the watch add/override is applied. */
   exerciseCalories: number;
+  /** Total calories the day's supplements contribute (already included in {@link caloriesIn}). */
+  supplementCalories: number;
+  /** Total protein (g) the day's supplements contribute (already included in {@link proteinG}). */
+  supplementProteinG: number;
+  /** Total carbs (g) the day's supplements contribute (already included in {@link carbG}). */
+  supplementCarbG: number;
+  /** Total fat (g) the day's supplements contribute (already included in {@link fatG}). */
+  supplementFatG: number;
+  /** The day's supplement entries, oldest-first (by id). Visible even when read-only (like food). */
+  supplements: SupplementEntryDto[];
 }
 
 /** Someone whose tracker the caller may view read-only (GET /api/tracker/shared). Mirrors SharedUserDto. */

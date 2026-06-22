@@ -325,6 +325,39 @@ public sealed class ParseHydrationResponse
     public IReadOnlyList<HydrationItemDto> Items { get; set; } = Array.Empty<HydrationItemDto>();
 }
 
+// ===================================================================================
+// supplement-macros — estimate macros + kind for a supplement ("whey, 1 scoop")
+// ===================================================================================
+
+/// <summary>
+/// Estimate the kind + macros for a free-text supplement. <see cref="Name"/> is the supplement (e.g.
+/// "whey protein", "creatine", "vitamin D", "lisinopril"); <see cref="Dose"/> is an optional free-text
+/// amount ("1 scoop", "5 g", "1 tablet"). Treated strictly as data in the prompt.
+/// </summary>
+public sealed class SupplementMacrosRequest
+{
+    public string? Name { get; set; }
+    public string? Dose { get; set; }
+}
+
+/// <summary>
+/// An AI supplement estimate. <see cref="Kind"/> is the lower-cased <c>SupplementKind</c> name ("supplement"
+/// | "vitamin" | "protein" | "medication" | "preworkout" | "other"). Numbers are model output CLAMPED to
+/// sane ranges (calories 0..5000, macros 0..500 g) — most supplements/vitamins/meds estimate to all-zeros;
+/// protein powders carry real calories + protein.
+/// </summary>
+public sealed class SupplementMacrosResponse
+{
+    public string Kind { get; set; } = "supplement";
+    public int Calories { get; set; }
+    public double ProteinG { get; set; }
+    public double CarbsG { get; set; }
+    public double FatG { get; set; }
+
+    /// <summary>Optional short model note (e.g. an assumption it made); null when none.</summary>
+    public string? Note { get; set; }
+}
+
 /// <summary>A free-text goal to turn into a concrete plan ("lose 10 lbs in 3 months").</summary>
 public sealed class NaturalGoalRequest
 {

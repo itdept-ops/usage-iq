@@ -571,6 +571,93 @@
       </div>
     </section>
 
+    <!-- ── Supplements card: quick-add tiles + today's supplements + macro subtotal (counts toward the day) ── -->
+    <section class="tracker__supps" aria-label="Supplements">
+      <div class="tracker__meal-head">
+        <h2 class="tracker__meal-title">
+          <mat-icon aria-hidden="true">medication</mat-icon> Supplements
+        </h2>
+        <span class="tracker__meal-cal mono-num">
+          {{ day.supplements.length }} · {{ day.supplementCalories | number }} kcal
+          @if (day.supplementProteinG) { · {{ day.supplementProteinG | number:'1.0-0' }}P }
+        </span>
+      </div>
+
+      <div class="tracker__supps-body">
+        <!-- Quick-add tiles (own tracker only). Only protein powders carry real macros; the rest are 0s. -->
+        @if (!store.readOnly()) {
+          <div class="tracker__suppquick" role="group" aria-label="Quick add a supplement">
+            <button mat-stroked-button type="button" class="tracker__suppbtn"
+                    (click)="quickSupplement('Whey protein', 'protein', '1 scoop', { calories: 120, protein: 24, carb: 3, fat: 2 })"
+                    aria-label="Add whey protein, 1 scoop, about 120 calories and 24 grams protein">
+              <mat-icon>fitness_center</mat-icon> Whey
+              <span class="tracker__suppbtn-amt">24P</span>
+            </button>
+            <button mat-stroked-button type="button" class="tracker__suppbtn"
+                    (click)="quickSupplement('Creatine', 'supplement', '5 g')"
+                    aria-label="Add creatine, 5 grams, no macros">
+              <mat-icon>science</mat-icon> Creatine
+            </button>
+            <button mat-stroked-button type="button" class="tracker__suppbtn"
+                    (click)="quickSupplement('Multivitamin', 'vitamin', '1 tablet')"
+                    aria-label="Add a multivitamin, 1 tablet, no macros">
+              <mat-icon>medication_liquid</mat-icon> Multivitamin
+            </button>
+            <button mat-stroked-button type="button" class="tracker__suppbtn"
+                    (click)="quickSupplement('Fish oil', 'supplement', '1 softgel')"
+                    aria-label="Add fish oil, 1 softgel, no macros">
+              <mat-icon>water_drop</mat-icon> Fish oil
+            </button>
+            <button mat-stroked-button type="button" class="tracker__suppbtn"
+                    (click)="quickSupplement('Pre-workout', 'preworkout', '1 scoop')"
+                    aria-label="Add pre-workout, 1 scoop, no macros">
+              <mat-icon>bolt</mat-icon> Pre-workout
+            </button>
+            <button mat-stroked-button type="button" class="tracker__suppbtn tracker__suppbtn--custom"
+                    (click)="openAddSupplement()" aria-label="Add a custom supplement">
+              <mat-icon>add</mat-icon> Custom
+            </button>
+          </div>
+        }
+
+        <!-- Today's supplements: name · dose · kind · macros, removable. -->
+        <ul class="tracker__entries tracker__suppentries">
+          @for (s of day.supplements; track s.id) {
+            <li class="tracker__entry">
+              <div class="tracker__entry-id">
+                <span class="tracker__entry-name">{{ s.name }}</span>
+                <span class="tracker__entry-meta">
+                  {{ supplementKindLabel(s.kind) }}@if (s.dose) { · {{ s.dose }} }
+                  @if (s.proteinG || s.carbG || s.fatG) {
+                    · <span class="mono-num">{{ s.proteinG | number:'1.0-0' }}P {{ s.carbG | number:'1.0-0' }}C {{ s.fatG | number:'1.0-0' }}F</span>
+                  }
+                </span>
+              </div>
+              <span class="tracker__entry-cal mono-num">{{ s.calories | number }} kcal</span>
+              @if (!store.readOnly()) {
+                <button mat-icon-button type="button" class="tracker__entry-del"
+                        (click)="removeSupplement(s)" [attr.aria-label]="'Remove ' + s.name">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+            </li>
+          } @empty {
+            <li class="tracker__entry tracker__entry--empty">No supplements logged yet.</li>
+          }
+        </ul>
+
+        @if (day.supplementCalories || day.supplementProteinG || day.supplementCarbG || day.supplementFatG) {
+          <p class="tracker__supps-note">
+            <mat-icon aria-hidden="true">info</mat-icon>
+            Included in today's total: <strong class="mono-num">{{ day.supplementCalories | number }} kcal</strong>
+            · {{ day.supplementProteinG | number:'1.0-0' }}P
+            · {{ day.supplementCarbG | number:'1.0-0' }}C
+            · {{ day.supplementFatG | number:'1.0-0' }}F
+          </p>
+        }
+      </div>
+    </section>
+
     <!-- ── Activity card: steps ring vs step goal + distance + active calories add/override toggle ── -->
     <section class="tracker__activity" aria-label="Watch activity">
       <div class="tracker__meal-head">

@@ -116,6 +116,17 @@ public static class AiEndpoints
             return result is null ? Unavailable() : Results.Ok(result);
         });
 
+        // ---- Estimate the kind + macros for a free-text supplement ("whey, 1 scoop") ----
+        // Most supplements/vitamins/meds estimate to all-zeros; protein powders carry real macros. The
+        // frontend falls back to manual entry on the 503 (Gemini off / quota / parse failure).
+        g.MapPost("/supplement-macros", async (
+            SupplementMacrosRequest body, GeminiService gemini, CancellationToken ct) =>
+        {
+            if (!gemini.IsConfigured) return Unconfigured();
+            var result = await gemini.SupplementMacrosAsync(body?.Name, body?.Dose, ct);
+            return result is null ? Unavailable() : Results.Ok(result);
+        });
+
         // ============================ Exercise / workouts ============================
 
         // ---- Estimate calories burned for a free-text exercise ----

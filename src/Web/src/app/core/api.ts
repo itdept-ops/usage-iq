@@ -5,6 +5,7 @@ import {
   AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatMessageDto, ChatRepliesResult, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
   FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChoreSource, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, Allowance, AllowanceMe, AllowanceMoveRequest, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, RecipeBreakdownResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation,
+  AddSupplementRequest, SupplementEntryDto, SupplementMacrosRequest, SupplementMacrosResponse,
   CoffeeEntryDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   AiUsageFilter, AiUsageResponse,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, PermissionPreset, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
@@ -713,6 +714,11 @@ export class Api {
     return this.http.post<EstimateMacrosResponse>(`${this.base}/ai/estimate-macros`, body);
   }
 
+  /** Estimate a supplement's kind + macros from its name (+ optional dose). 503 when Gemini off. */
+  estimateSupplement(body: SupplementMacrosRequest): Observable<SupplementMacrosResponse> {
+    return this.http.post<SupplementMacrosResponse>(`${this.base}/ai/supplement-macros`, body);
+  }
+
   /** Suggest a daily calorie + macro goal from the CALLER's own profile (read server-side; empty body). */
   suggestGoal(): Observable<SuggestGoalResponse> {
     return this.http.post<SuggestGoalResponse>(`${this.base}/ai/suggest-goal`, {});
@@ -855,6 +861,16 @@ export class Api {
   /** Delete a logged coffee entry (owner-only; 404 otherwise). */
   deleteCoffee(id: number): Observable<unknown> {
     return this.http.delete(`${this.base}/tracker/coffee/${id}`);
+  }
+
+  /** Log a supplement onto the day (OWN tracker only; macros default to 0). Returns the created entry. */
+  addSupplement(body: AddSupplementRequest): Observable<SupplementEntryDto> {
+    return this.http.post<SupplementEntryDto>(`${this.base}/tracker/supplement`, body);
+  }
+
+  /** Delete a logged supplement entry (owner-only; 404 otherwise). */
+  deleteSupplement(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/tracker/supplement/${id}`);
   }
 
   /**

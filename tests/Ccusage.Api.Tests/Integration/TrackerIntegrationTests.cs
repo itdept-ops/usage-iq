@@ -1378,6 +1378,138 @@ public class TrackerIntegrationTests(WebAppFactory factory)
         aliceAfter.GetProperty("coffeeCups").GetInt32().Should().Be(2); // unchanged by Bob's write
     }
 
+    // ---- Supplements: add + appears on the day + macros add to the day totals, then delete ----
+
+    [Fact]
+    public async Task Adding_a_supplement_appears_on_the_day_and_its_macros_add_to_the_totals_then_deletes()
+    {
+        // tracker.self ONLY (no tracker.ai) — manual macro entry works without the AI permission.
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        // A protein powder with real macros.
+        var add = await user.PostAsJsonAsync("/api/tracker/supplement", new
+        {
+            date = Today, name = "Whey protein", dose = "1 scoop", kind = "protein",
+            calories = 120, protein = 24.0, carb = 3.0, fat = 1.5,
+        });
+        add.StatusCode.Should().Be(HttpStatusCode.OK);
+        var s = await Json(add);
+        var suppId = s.GetProperty("id").GetInt64();
+        s.GetProperty("name").GetString().Should().Be("Whey protein");
+        s.GetProperty("dose").GetString().Should().Be("1 scoop");
+        s.GetProperty("kind").GetString().Should().Be("protein");
+        s.GetProperty("calories").GetInt32().Should().Be(120);
+        s.GetProperty("proteinG").GetDouble().Should().Be(24.0);
+        s.GetProperty("createdUtc").GetString().Should().NotBeNullOrEmpty();
+
+        // A second supplement with NO macros (a vitamin) — kind defaults stay, macros default to 0.
+        (await user.PostAsJsonAsync("/api/tracker/supplement", new
+        {
+            date = Today, name = "Vitamin D", kind = "vitamin",
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Both appear on the day; the labelled supplement subtotal is the sum AND it rolls into the day net.
+        var day = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        day.GetProperty("supplements").EnumerateArray().Should().HaveCount(2);
+        day.GetProperty("supplementCalories").GetInt32().Should().Be(120);
+        day.GetProperty("supplementProteinG").GetDouble().Should().Be(24.0);
+        // The whey counts toward intake: caloriesIn + macros include the supplement contribution.
+        day.GetProperty("caloriesIn").GetInt32().Should().Be(120);
+        day.GetProperty("proteinG").GetDouble().Should().Be(24.0);
+        day.GetProperty("netCalories").GetInt32().Should().Be(120);
+
+        // Delete the protein → 204, and the day's supplement subtotal + totals drop the contribution.
+        (await user.DeleteAsync($"/api/tracker/supplement/{suppId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var after = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        after.GetProperty("supplements").EnumerateArray().Should().ContainSingle();
+        after.GetProperty("supplementCalories").GetInt32().Should().Be(0);
+        after.GetProperty("caloriesIn").GetInt32().Should().Be(0);
+        after.GetProperty("proteinG").GetDouble().Should().Be(0.0);
+    }
+
+    [Fact]
+    public async Task Supplement_macros_combine_with_food_macros_in_the_day_total()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        // A manual food (200 cal / 10 g protein).
+        await user.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "breakfast", description = "Oats", quantity = 1.0,
+            calories = 200, proteinG = 10.0, carbG = 30.0, fatG = 4.0,
+        });
+        // A protein shake (120 cal / 24 g protein).
+        await user.PostAsJsonAsync("/api/tracker/supplement", new
+        {
+            date = Today, name = "Whey", kind = "protein", calories = 120, protein = 24.0,
+        });
+
+        var day = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        day.GetProperty("caloriesIn").GetInt32().Should().Be(320);   // 200 food + 120 supplement
+        day.GetProperty("proteinG").GetDouble().Should().Be(34.0);   // 10 food + 24 supplement
+        day.GetProperty("supplementCalories").GetInt32().Should().Be(120);
+        day.GetProperty("supplementProteinG").GetDouble().Should().Be(24.0);
+    }
+
+    [Fact]
+    public async Task Supplement_requires_a_name_and_a_valid_date()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+        (await user.PostAsJsonAsync("/api/tracker/supplement", new { date = Today, name = "" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await user.PostAsJsonAsync("/api/tracker/supplement", new { date = "not-a-date", name = "Creatine" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Deleting_a_supplement_you_dont_own_is_404()
+    {
+        var (_, owner) = await ProvisionUser("tracker.self");
+        var (_, other) = await ProvisionUser("tracker.self");
+
+        var add = await owner.PostAsJsonAsync("/api/tracker/supplement", new { date = Today, name = "Creatine" });
+        var suppId = (await Json(add)).GetProperty("id").GetInt64();
+
+        // Another tracker.self user can't delete it (404, not 403 — never reveal the row).
+        (await other.DeleteAsync($"/api/tracker/supplement/{suppId}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // ---- Supplement visibility: a permitted viewer sees the day's supplements read-only ----
+
+    [Fact]
+    public async Task A_shared_users_supplements_are_visible_read_only_but_a_write_targets_only_the_caller()
+    {
+        var (aliceEmail, alice) = await ProvisionUser("tracker.self");
+        var (bobEmail, bob) = await ProvisionUser("tracker.self");
+        await MakeContacts(aliceEmail, bobEmail);
+
+        await alice.PutAsJsonAsync("/api/tracker/profile", new
+        {
+            goal = "Maintain", shareWithContacts = true,
+        });
+        // A prescription name is health-adjacent — visible only via the tracker-sharing Alice controls.
+        await alice.PostAsJsonAsync("/api/tracker/supplement", new
+        {
+            date = Today, name = "Lisinopril", dose = "10 mg", kind = "medication",
+        });
+        await alice.PostAsJsonAsync("/api/tracker/supplement", new
+        {
+            date = Today, name = "Whey", kind = "protein", calories = 120, protein = 24.0,
+        });
+
+        // Bob (a sharing mutual contact) sees Alice's supplement list + subtotal read-only.
+        var aliceId = await UserIdFor(aliceEmail);
+        var viewed = await Json(await bob.GetAsync($"/api/tracker/day?date={Today}&user={aliceId}"));
+        viewed.GetProperty("readOnly").GetBoolean().Should().BeTrue();
+        viewed.GetProperty("supplements").EnumerateArray().Should().HaveCount(2);
+        viewed.GetProperty("supplementCalories").GetInt32().Should().Be(120);
+
+        // There is no ?user= on the write — Bob logging a supplement lands on BOB's own log, never Alice's.
+        await bob.PostAsJsonAsync("/api/tracker/supplement", new { date = Today, name = "Magnesium" });
+        var aliceAfter = await Json(await alice.GetAsync($"/api/tracker/day?date={Today}"));
+        aliceAfter.GetProperty("supplements").EnumerateArray().Should().HaveCount(2); // unchanged by Bob's write
+    }
+
     // ---- Watch activity: upsert appears on the day (steps/distance/active calories/mode) + clear ----
 
     [Fact]

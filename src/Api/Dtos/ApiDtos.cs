@@ -1067,6 +1067,18 @@ public sealed class TrackerDayDto
     /// <summary>The day's coffee entries, oldest-first. Visible to a permitted viewer too.</summary>
     public CoffeeEntryDto[] Coffee { get; set; } = Array.Empty<CoffeeEntryDto>();
 
+    /// <summary>Total calories the day's supplements contribute (sum over <see cref="Supplements"/>); already
+    /// INCLUDED in <see cref="CaloriesIn"/>, surfaced separately so the contribution is not a mystery delta.</summary>
+    public int SupplementCalories { get; set; }
+    /// <summary>Total protein (g) the day's supplements contribute; already included in <see cref="ProteinG"/>.</summary>
+    public double SupplementProteinG { get; set; }
+    /// <summary>Total carbs (g) the day's supplements contribute; already included in <see cref="CarbG"/>.</summary>
+    public double SupplementCarbG { get; set; }
+    /// <summary>Total fat (g) the day's supplements contribute; already included in <see cref="FatG"/>.</summary>
+    public double SupplementFatG { get; set; }
+    /// <summary>The day's supplement entries, oldest-first. Visible to a permitted viewer too (read-only).</summary>
+    public SupplementEntryDto[] Supplements { get; set; } = Array.Empty<SupplementEntryDto>();
+
     /// <summary>The day's recorded watch stats (steps/distance/active calories + mode), or null when none
     /// recorded. Visible to a permitted viewer too (read-only).</summary>
     public WatchActivityDto? Activity { get; set; }
@@ -1108,6 +1120,42 @@ public sealed class CoffeeEntryDto
     public string? Label { get; set; }
     /// <summary>ISO-8601 UTC timestamp of when the coffee was logged.</summary>
     public string CreatedUtc { get; set; } = "";
+}
+
+/// <summary>One logged supplement: its name, optional dose, kind, the macros it contributes to the day, an
+/// optional label, and when it was logged. Most kinds carry 0 macros; protein powders carry real values.
+/// The kind is the lower-cased enum name ("supplement" | "vitamin" | "protein" | "medication" |
+/// "preworkout" | "other").</summary>
+public sealed class SupplementEntryDto
+{
+    public long Id { get; set; }
+    public string Name { get; set; } = "";
+    public string? Dose { get; set; }
+    public string Kind { get; set; } = "supplement";
+    public int Calories { get; set; }
+    public double ProteinG { get; set; }
+    public double CarbG { get; set; }
+    public double FatG { get; set; }
+    /// <summary>ISO-8601 UTC timestamp of when the supplement was logged.</summary>
+    public string CreatedUtc { get; set; } = "";
+}
+
+/// <summary>
+/// Log a supplement/vitamin/protein/medication onto a day. <see cref="Name"/> is required (&lt;= 120 chars);
+/// <see cref="Dose"/> is optional free text (&lt;= 60 chars, e.g. "1 scoop", "5 g"); <see cref="Kind"/> is
+/// the lower-cased enum name (default "supplement" when absent/unknown). Macros default to 0 when omitted
+/// (most supplements carry none). Multiple supplements per day are expected.
+/// </summary>
+public sealed class AddSupplementRequest
+{
+    public string Date { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Dose { get; set; }
+    public string? Kind { get; set; }
+    public int? Calories { get; set; }
+    public double? Protein { get; set; }
+    public double? Carb { get; set; }
+    public double? Fat { get; set; }
 }
 
 /// <summary>A person whose tracker the caller may view (a sharing mutual contact, or anyone when the

@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { Api } from './api';
 import {
-  AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, CoffeeEntryDto, HydrationEntryDto, LogWeightRequest,
+  AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AddSupplementRequest, CoffeeEntryDto, HydrationEntryDto, LogWeightRequest,
   SharedUserDto, TrackerDayDto, TrackerProfileDto, UpsertActivityRequest, WeightPointDto, WeightStatsDto,
 } from './models';
 
@@ -165,6 +165,18 @@ export class TrackerStore {
   /** Delete a logged coffee entry, then refresh the day. */
   async deleteCoffee(id: number): Promise<void> {
     await firstValueFrom(this.api.deleteCoffee(id));
+    await this.load();
+  }
+
+  /** Log a supplement onto the day (macros sum into the day total), then refresh the day. */
+  async addSupplement(body: AddSupplementRequest): Promise<void> {
+    await firstValueFrom(this.api.addSupplement(body));
+    await this.load();
+  }
+
+  /** Delete a logged supplement entry, then refresh the day. */
+  async deleteSupplement(id: number): Promise<void> {
+    await firstValueFrom(this.api.deleteSupplement(id));
     await this.load();
   }
 

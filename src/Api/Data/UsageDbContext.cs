@@ -41,6 +41,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<CustomExercise> CustomExercises => Set<CustomExercise>();
     public DbSet<HydrationEntry> HydrationEntries => Set<HydrationEntry>();
     public DbSet<CoffeeEntry> CoffeeEntries => Set<CoffeeEntry>();
+    public DbSet<SupplementEntry> SupplementEntries => Set<SupplementEntry>();
     public DbSet<DailyActivity> DailyActivities => Set<DailyActivity>();
     public DbSet<Household> Households => Set<Household>();
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
@@ -482,6 +483,17 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.Label).HasMaxLength(64);
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
             // The day view reads one user's coffees for one local date (no unique — many coffees per day).
+            e.HasIndex(x => new { x.UserEmail, x.LocalDate });
+        });
+
+        b.Entity<SupplementEntry>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.Dose).HasMaxLength(60);
+            e.Property(x => x.Kind).HasConversion<int>();
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // The day view reads one user's supplements for one local date (no unique — many per day).
             e.HasIndex(x => new { x.UserEmail, x.LocalDate });
         });
 

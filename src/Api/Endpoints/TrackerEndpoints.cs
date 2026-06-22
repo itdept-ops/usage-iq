@@ -701,6 +701,38 @@ public static class TrackerEndpoints
             return deleted == 0 ? Results.NotFound() : Results.NoContent();
         }).RequirePermission(Permissions.TrackerSelf);
 
+        // ---- Log a supplement onto a day (OWN only; many per day, no upsert) ----
+        // Macros default to 0 when omitted (most supplements/vitamins/meds carry none); protein powders
+        // carry real macros, which then SUM into the day's calorie/macro roll-up (see BuildDayAsync).
+        g.MapPost("/supplement", async (
+            AddSupplementRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+
+            if (!TryParseDate(req.Date, out var localDate))
+                return Results.BadRequest(new { message = "A valid date (yyyy-MM-dd) is required." });
+            var name = req.Name?.Trim();
+            if (string.IsNullOrEmpty(name))
+                return Results.BadRequest(new { message = "A supplement name is required." });
+
+            var entry = BuildSupplementEntry(caller.Email, localDate, req);
+            db.SupplementEntries.Add(entry);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(ToSupplementDto(entry));
+        }).RequirePermission(Permissions.TrackerSelf);
+
+        // ---- Delete a logged supplement (owner only) ----
+        g.MapDelete("/supplement/{id:long}", async (
+            long id, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            // 404 when the entry doesn't exist OR isn't the caller's (never reveal someone else's row).
+            var deleted = await db.SupplementEntries
+                .Where(s => s.Id == id && s.UserEmail == caller.Email)
+                .ExecuteDeleteAsync(ct);
+            return deleted == 0 ? Results.NotFound() : Results.NoContent();
+        }).RequirePermission(Permissions.TrackerSelf);
+
         // ---- Upsert the caller's watch activity stats for a day (OWN only; one row per day) ----
         // Records steps/distance/active calories + the calorie mode (add|override) that controls how the
         // active calories factor into the day's calories out. Upserts the single (caller, date) row.
@@ -1281,6 +1313,35 @@ public static class TrackerEndpoints
         };
     }
 
+    /// <summary>Build a <see cref="SupplementEntry"/> from the request (name trimmed + 120-capped; dose
+    /// trimmed + 60-capped; kind parsed with a Supplement default; calories clamped to [0,5000] and each
+    /// macro to [0,500] g — macros default to 0 when the request omits them).</summary>
+    private static SupplementEntry BuildSupplementEntry(string email, DateOnly localDate, AddSupplementRequest req)
+    {
+        var name = Trunc(req.Name?.Trim(), 120) ?? "";
+        var dose = Trunc(req.Dose?.Trim(), 60);
+        return new SupplementEntry
+        {
+            UserEmail = email,
+            LocalDate = localDate,
+            Name = name,
+            Dose = string.IsNullOrEmpty(dose) ? null : dose,
+            Kind = ParseSupplementKind(req.Kind),
+            Calories = ClampCalories(req.Calories ?? 0),
+            ProteinG = (decimal)ClampMacro(req.Protein ?? 0),
+            CarbG = (decimal)ClampMacro(req.Carb ?? 0),
+            FatG = (decimal)ClampMacro(req.Fat ?? 0),
+            CreatedUtc = DateTime.UtcNow,
+        };
+    }
+
+    /// <summary>Parse the supplement kind (lower-cased enum name, case-insensitive); Supplement on anything
+    /// absent/unknown.</summary>
+    private static SupplementKind ParseSupplementKind(string? value) =>
+        Enum.TryParse<SupplementKind>((value ?? "").Trim(), ignoreCase: true, out var k) && Enum.IsDefined(k)
+            ? k
+            : SupplementKind.Supplement;
+
     /// <summary>Clamp a calorie value to [0, 5000] (mirrors the GeminiService clamp for commit-time safety).</summary>
     private static int ClampCalories(int v) => Math.Clamp(v, 0, 5000);
 
@@ -1362,20 +1423,34 @@ public static class TrackerEndpoints
             .Where(c => c.UserEmail == email && c.LocalDate == date)
             .OrderBy(c => c.Id)
             .ToListAsync(ct);
+        // Supplements are part of the day (like food): their macros SUM into the day's calorie/macro
+        // roll-up (so whey counts toward intake) AND surface as a labelled subtotal + list. A permitted
+        // viewer sees them read-only too. Many per day, so a plain list (no upsert), oldest-first by id.
+        var supplements = await db.SupplementEntries.AsNoTracking()
+            .Where(s => s.UserEmail == email && s.LocalDate == date)
+            .OrderBy(s => s.Id)
+            .ToListAsync(ct);
         // The day's recorded watch stats (at most one per day), part of the day like hydration/exercise:
         // a permitted viewer sees them (and the resolved burn) read-only too — we do NOT null it.
         var activity = await db.DailyActivities.AsNoTracking()
             .FirstOrDefaultAsync(a => a.UserEmail == email && a.LocalDate == date, ct);
 
-        var caloriesIn = foods.Sum(f => f.Calories);
+        // The supplement contribution to the day, surfaced separately so it is not a mystery delta.
+        var supplementCalories = supplements.Sum(s => s.Calories);
+        var supplementProtein = Math.Round(supplements.Sum(s => (double)s.ProteinG), 1);
+        var supplementCarbs = Math.Round(supplements.Sum(s => (double)s.CarbG), 1);
+        var supplementFat = Math.Round(supplements.Sum(s => (double)s.FatG), 1);
+
+        // Calories in / macros = food + supplements (whey etc. count toward intake).
+        var caloriesIn = foods.Sum(f => f.Calories) + supplementCalories;
         // The raw logged-exercise sum, BEFORE the watch add/override.
         var exerciseCalories = exercises.Sum(x => x.CaloriesBurned);
         // Resolve calories out: with a watch active-calories value, ADD on top of exercises or OVERRIDE
         // (replace) the exercise sum; with no watch entry / no active calories, it's the exercise sum.
         var caloriesOut = ResolveCaloriesOut(exerciseCalories, activity);
-        var protein = Math.Round(foods.Sum(f => f.ProteinG), 1);
-        var carbs = Math.Round(foods.Sum(f => f.CarbG), 1);
-        var fat = Math.Round(foods.Sum(f => f.FatG), 1);
+        var protein = Math.Round(foods.Sum(f => f.ProteinG) + supplementProtein, 1);
+        var carbs = Math.Round(foods.Sum(f => f.CarbG) + supplementCarbs, 1);
+        var fat = Math.Round(foods.Sum(f => f.FatG) + supplementFat, 1);
 
         var goal = profile?.DailyCalorieGoal;
         int? remaining = goal is { } g ? g - caloriesIn + caloriesOut : null;
@@ -1422,6 +1497,11 @@ public static class TrackerEndpoints
             CaffeineMg = caffeineMg,
             CoffeeGoalCups = coffeeGoalCups,
             Coffee = coffee.Select(ToCoffeeDto).ToArray(),
+            SupplementCalories = supplementCalories,
+            SupplementProteinG = supplementProtein,
+            SupplementCarbG = supplementCarbs,
+            SupplementFatG = supplementFat,
+            Supplements = supplements.Select(ToSupplementDto).ToArray(),
             Activity = activity is null ? null : ToActivityDto(activity),
             StepGoal = profile?.StepGoal,
         };
@@ -1815,6 +1895,19 @@ public static class TrackerEndpoints
         CaffeineMg = c.CaffeineMg,
         Label = c.Label,
         CreatedUtc = c.CreatedUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+    };
+
+    private static SupplementEntryDto ToSupplementDto(SupplementEntry s) => new()
+    {
+        Id = s.Id,
+        Name = s.Name,
+        Dose = s.Dose,
+        Kind = s.Kind.ToString().ToLowerInvariant(),
+        Calories = s.Calories,
+        ProteinG = (double)s.ProteinG,
+        CarbG = (double)s.CarbG,
+        FatG = (double)s.FatG,
+        CreatedUtc = s.CreatedUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
     };
 
     private static WatchActivityDto ToActivityDto(DailyActivity a) => new()

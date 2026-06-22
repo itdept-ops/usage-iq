@@ -18,7 +18,7 @@ import { TrackerStore } from '../../core/tracker-store';
 import {
   ActivityCalorieMode, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, CoffeeEntryDto, CommitDayResponse, DailyCoachResponse,
   DaySummaryResponse, ExerciseEntryDto, FoodEntryDto,
-  FoodSuggestionDto, HydrationEntryDto, LogWeightRequest, Meal, MoveDayRequest, MoveDayResult, PERM, SharedUserDto, TrackerDayDto, TrackerProfileDto,
+  FoodSuggestionDto, HydrationEntryDto, LogWeightRequest, Meal, MoveDayRequest, MoveDayResult, PERM, SharedUserDto, SupplementEntryDto, SupplementKind, TrackerDayDto, TrackerProfileDto,
   TrackerRecapResult, UpsertActivityRequest, WeeklyReviewResponse, WeightPointDto, WeightStatsDto,
 } from '../../core/models';
 import { CalorieRing } from './calorie-ring';
@@ -29,6 +29,7 @@ import { AddFoodDialog, AddFoodData } from './add-food-dialog';
 import { AddExerciseDialog, AddExerciseData } from './add-exercise-dialog';
 import { AddHydrationDialog, AddHydrationData, AddHydrationResult } from './add-hydration-dialog';
 import { AddCoffeeDialog, AddCoffeeData, AddCoffeeResult } from './add-coffee-dialog';
+import { AddSupplementDialog, AddSupplementData, AddSupplementResult } from './add-supplement-dialog';
 import { AddActivityDialog, AddActivityData } from './add-activity-dialog';
 import { ProfileDialog, ProfileData } from './profile-dialog';
 import { LogWeightDialog, LogWeightData } from './log-weight-dialog';
@@ -688,6 +689,66 @@ export class Tracker {
     if (this.store.readOnly()) return;
     this.store.deleteCoffee(c.id)
       .then(() => this.announceCoffee('Removed coffee'))
+      .catch(() => this.snack.open('Could not remove entry', 'Dismiss', { duration: 4000 }));
+  }
+
+  // ---- supplements (vitamins / protein / medication / pre-workout) ----
+
+  /** Human label for a supplement kind, for the entry list. */
+  supplementKindLabel(kind: SupplementKind): string {
+    switch (kind) {
+      case 'vitamin': return 'Vitamin';
+      case 'protein': return 'Protein';
+      case 'medication': return 'Medication';
+      case 'preworkout': return 'Pre-workout';
+      case 'other': return 'Other';
+      default: return 'Supplement';
+    }
+  }
+
+  /**
+   * Quick-add a common supplement by name (Whey/Creatine/Multivitamin/…). Carries a sensible kind +
+   * macro preset (only protein powders carry real macros; the rest are all-zeros). Own tracker only.
+   */
+  quickSupplement(name: string, kind: SupplementKind, dose?: string,
+                  macros?: { calories?: number; protein?: number; carb?: number; fat?: number }): void {
+    if (this.store.readOnly()) return;
+    this.store.addSupplement({
+      date: this.store.date(), name, kind, dose: dose || undefined,
+      calories: macros?.calories, protein: macros?.protein, carb: macros?.carb, fat: macros?.fat,
+    })
+      .then(() => this.announceSupplement(`Added ${name}`))
+      .catch(() => this.snack.open('Could not log supplement', 'Dismiss', { duration: 4000 }));
+  }
+
+  /**
+   * Announce a supplement change to the single SR live region (statusMsg), suffixed with the running
+   * supplement-calorie contribution so the user hears that it counts toward the day total.
+   */
+  private announceSupplement(prefix: string): void {
+    const day = this.store.day();
+    const count = day?.supplements.length ?? 0;
+    const cals = day?.supplementCalories ?? 0;
+    this.statusMsg.set(`${prefix}. ${count} supplement${count === 1 ? '' : 's'} today, ${cals} calories toward your day total.`);
+  }
+
+  /** Open the add-supplement dialog (Name + Dose + Kind + AI/manual macros), then log the result. */
+  openAddSupplement(presetName?: string): void {
+    if (this.store.readOnly()) return;
+    const data: AddSupplementData = { date: this.store.date(), presetName };
+    this.dialog.open(AddSupplementDialog, { data, width: '440px', maxWidth: '95vw', autoFocus: false })
+      .afterClosed().subscribe((res: AddSupplementResult | undefined) => {
+        if (!res) return;
+        this.store.addSupplement(res.request)
+          .then(() => this.announceSupplement(`Added ${res.request.name}`))
+          .catch(() => this.snack.open('Could not log supplement', 'Dismiss', { duration: 4000 }));
+      });
+  }
+
+  removeSupplement(s: SupplementEntryDto): void {
+    if (this.store.readOnly()) return;
+    this.store.deleteSupplement(s.id)
+      .then(() => this.announceSupplement(`Removed ${s.name}`))
       .catch(() => this.snack.open('Could not remove entry', 'Dismiss', { duration: 4000 }));
   }
 
