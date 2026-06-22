@@ -83,6 +83,8 @@ export class ProfileDialog {
   readonly carbGoalG = signal<number | null>(this.data.profile.carbGoalG ?? null);
   readonly fatGoalG = signal<number | null>(this.data.profile.fatGoalG ?? null);
   readonly stepGoal = signal<number | null>(this.data.profile.stepGoal ?? null);
+  /** Daily coffee cap (cups). null = use the default; the tracker ring warns when the day exceeds it. */
+  readonly coffeeGoalCups = signal<number | null>(this.data.profile.coffeeGoalCups ?? null);
   readonly shareWithContacts = signal<boolean>(this.data.profile.shareWithContacts ?? false);
 
   // ---- body profile ----
@@ -325,6 +327,7 @@ export class ProfileDialog {
       unitSystem: this.unitSystem(),
       hydrationGoalMl: hydrationGoalMl ?? undefined,
       stepGoal: this.num(this.stepGoal()),
+      coffeeGoalCups: this.num(this.coffeeGoalCups()),
     };
     this.ref.close(body);
   }

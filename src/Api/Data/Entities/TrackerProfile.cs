@@ -43,6 +43,9 @@ public class TrackerProfile
     /// <summary>Daily fluid-intake goal in millilitres; null ⇒ the day uses a 2000 ml default.</summary>
     public int? HydrationGoalMl { get; set; }
 
+    /// <summary>Daily coffee CAP in cups; null ⇒ the day uses a 3-cup default. The goal is a limit, not a target.</summary>
+    public int? CoffeeGoalCups { get; set; }
+
     /// <summary>Daily step goal; null ⇒ the UI shows a ~10000 default. Not required.</summary>
     public int? StepGoal { get; set; }
 

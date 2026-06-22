@@ -1,0 +1,42 @@
+:host {
+  display: block;
+  width: 100%;
+  max-width: 168px;
+}
+
+.ring {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ring__track {
+  stroke: var(--tech-border);
+}
+
+.ring__bar {
+  stroke: var(--tech-warn);
+  transition: stroke-dashoffset 600ms cubic-bezier(0.22, 1, 0.36, 1), stroke var(--tech-t-control) ease;
+
+  /* Over the cap → warning colour (the goal is a limit, not a target — NOT a celebratory success). */
+  &--over { stroke: var(--tech-error); }
+}
+
+.ring__value {
+  font-family: var(--tech-font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  fill: var(--tech-text);
+}
+
+.ring__label {
+  font-family: var(--tech-font-ui);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--tech-text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring__bar { transition: none; }
+}

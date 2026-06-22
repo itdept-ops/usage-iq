@@ -1161,6 +1161,131 @@ public class TrackerIntegrationTests(WebAppFactory factory)
         aliceAfter.GetProperty("hydrationMl").GetInt32().Should().Be(750); // unchanged by Bob's write
     }
 
+    // ---- Coffee: add + appears on the day (cups + caffeine + entries), delete own ----
+
+    [Fact]
+    public async Task Adding_coffee_appears_on_the_day_cups_caffeine_and_entries_then_deletes()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        var add1 = await user.PostAsJsonAsync("/api/tracker/coffee", new
+        {
+            date = Today, cups = 1, caffeineMg = 95, label = "Mug",
+        });
+        add1.StatusCode.Should().Be(HttpStatusCode.OK);
+        var drink = await Json(add1);
+        var coffeeId = drink.GetProperty("id").GetInt64();
+        drink.GetProperty("cups").GetInt32().Should().Be(1);
+        drink.GetProperty("caffeineMg").GetInt32().Should().Be(95);
+        drink.GetProperty("label").GetString().Should().Be("Mug");
+        drink.GetProperty("createdUtc").GetString().Should().NotBeNullOrEmpty();
+
+        // A second coffee with no label and no caffeine.
+        (await user.PostAsJsonAsync("/api/tracker/coffee", new { date = Today, cups = 2 }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Both appear on the day; coffeeCups + caffeineMg are the sums.
+        var day = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        day.GetProperty("coffeeCups").GetInt32().Should().Be(3);
+        day.GetProperty("caffeineMg").GetInt32().Should().Be(95);
+        day.GetProperty("coffee").EnumerateArray().Should().HaveCount(2);
+
+        // Delete the first → 204, and the day reflects only the remaining coffee.
+        (await user.DeleteAsync($"/api/tracker/coffee/{coffeeId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var after = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        after.GetProperty("coffeeCups").GetInt32().Should().Be(2);
+        after.GetProperty("caffeineMg").GetInt32().Should().Be(0);
+        after.GetProperty("coffee").EnumerateArray().Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Deleting_coffee_you_dont_own_is_404()
+    {
+        var (_, owner) = await ProvisionUser("tracker.self");
+        var (_, other) = await ProvisionUser("tracker.self");
+
+        var add = await owner.PostAsJsonAsync("/api/tracker/coffee", new { date = Today, cups = 1 });
+        var coffeeId = (await Json(add)).GetProperty("id").GetInt64();
+
+        // Another tracker.self user can't delete it (404, not 403 — never reveal the row).
+        (await other.DeleteAsync($"/api/tracker/coffee/{coffeeId}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Coffee_cups_are_clamped_to_the_1_to_20_range()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        // 0 cups clamps up to 1.
+        var low = await user.PostAsJsonAsync("/api/tracker/coffee", new { date = Today, cups = 0 });
+        (await Json(low)).GetProperty("cups").GetInt32().Should().Be(1);
+
+        // 50 cups clamps down to 20.
+        var high = await user.PostAsJsonAsync("/api/tracker/coffee", new { date = Today, cups = 50 });
+        (await Json(high)).GetProperty("cups").GetInt32().Should().Be(20);
+
+        // A bad date is still rejected.
+        (await user.PostAsJsonAsync("/api/tracker/coffee", new { date = "not-a-date", cups = 1 }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    // ---- Coffee goal: 3-cup default when unset, reflects the profile when set ----
+
+    [Fact]
+    public async Task Coffee_goal_defaults_to_3_and_reflects_the_profile_when_set()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        // No profile goal yet → the day resolves a 3-cup default.
+        var day = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        day.GetProperty("coffeeGoalCups").GetInt32().Should().Be(3);
+        day.GetProperty("coffeeCups").GetInt32().Should().Be(0);
+
+        // Set a profile goal → it round-trips on the profile AND drives the day's resolved goal.
+        var put = await user.PutAsJsonAsync("/api/tracker/profile", new
+        {
+            goal = "Maintain", shareWithContacts = false, coffeeGoalCups = 5,
+        });
+        put.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(put)).GetProperty("coffeeGoalCups").GetInt32().Should().Be(5);
+
+        var saved = await Json(await user.GetAsync("/api/tracker/profile"));
+        saved.GetProperty("coffeeGoalCups").GetInt32().Should().Be(5);
+
+        var day2 = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        day2.GetProperty("coffeeGoalCups").GetInt32().Should().Be(5);
+    }
+
+    // ---- Coffee visibility: a viewer sees totals/entries; writes target only the caller ----
+
+    [Fact]
+    public async Task A_shared_users_coffee_is_visible_but_a_write_targets_only_the_caller()
+    {
+        var (aliceEmail, alice) = await ProvisionUser("tracker.self");
+        var (bobEmail, bob) = await ProvisionUser("tracker.self");
+        await MakeContacts(aliceEmail, bobEmail);
+
+        await alice.PutAsJsonAsync("/api/tracker/profile", new
+        {
+            goal = "Maintain", shareWithContacts = true, coffeeGoalCups = 4,
+        });
+        await alice.PostAsJsonAsync("/api/tracker/coffee", new { date = Today, cups = 2, caffeineMg = 126, label = "Espresso" });
+
+        // Bob (a sharing mutual contact) sees Alice's coffee total + entries + resolved goal read-only.
+        var aliceId = await UserIdFor(aliceEmail);
+        var viewed = await Json(await bob.GetAsync($"/api/tracker/day?date={Today}&user={aliceId}"));
+        viewed.GetProperty("readOnly").GetBoolean().Should().BeTrue();
+        viewed.GetProperty("coffeeCups").GetInt32().Should().Be(2);
+        viewed.GetProperty("caffeineMg").GetInt32().Should().Be(126);
+        viewed.GetProperty("coffeeGoalCups").GetInt32().Should().Be(4);
+        viewed.GetProperty("coffee").EnumerateArray().Should().ContainSingle();
+
+        // There is no ?user= on the write — Bob logging a coffee lands on BOB's own log, never Alice's.
+        await bob.PostAsJsonAsync("/api/tracker/coffee", new { date = Today, cups = 1 });
+        var aliceAfter = await Json(await alice.GetAsync($"/api/tracker/day?date={Today}"));
+        aliceAfter.GetProperty("coffeeCups").GetInt32().Should().Be(2); // unchanged by Bob's write
+    }
+
     // ---- Watch activity: upsert appears on the day (steps/distance/active calories/mode) + clear ----
 
     [Fact]
@@ -1669,6 +1794,7 @@ public class TrackerIntegrationTests(WebAppFactory factory)
             date = MoveFrom, name = "Run", durationMin = 20, caloriesBurned = 200,
         });
         await user.PostAsJsonAsync("/api/tracker/hydration", new { date = MoveFrom, amountMl = 250 });
+        await user.PostAsJsonAsync("/api/tracker/coffee", new { date = MoveFrom, cups = 2, caffeineMg = 190 });
         await user.PostAsJsonAsync("/api/tracker/weight", new { date = MoveFrom, weightKg = 80.0, slot = "Morning" });
         await user.PutAsJsonAsync("/api/tracker/activity", new { date = MoveFrom, steps = 8000, activeCalories = 300, calorieMode = "add" });
 
@@ -1679,6 +1805,7 @@ public class TrackerIntegrationTests(WebAppFactory factory)
         moved.GetProperty("food").GetInt32().Should().Be(1);
         moved.GetProperty("exercise").GetInt32().Should().Be(1);
         moved.GetProperty("hydration").GetInt32().Should().Be(1);
+        moved.GetProperty("coffee").GetInt32().Should().Be(1);
         moved.GetProperty("weight").GetInt32().Should().Be(1);
         moved.GetProperty("activity").GetBoolean().Should().BeTrue();
 
@@ -1687,11 +1814,14 @@ public class TrackerIntegrationTests(WebAppFactory factory)
         from.GetProperty("foods").EnumerateArray().Should().BeEmpty();
         from.GetProperty("exercises").EnumerateArray().Should().BeEmpty();
         from.GetProperty("hydration").EnumerateArray().Should().BeEmpty();
+        from.GetProperty("coffee").EnumerateArray().Should().BeEmpty();
         from.GetProperty("activity").ValueKind.Should().Be(JsonValueKind.Null);
 
         var to = await Json(await user.GetAsync($"/api/tracker/day?date={MoveTo}"));
         to.GetProperty("caloriesIn").GetInt32().Should().Be(200);
         to.GetProperty("hydrationMl").GetInt32().Should().Be(250);
+        to.GetProperty("coffeeCups").GetInt32().Should().Be(2);
+        to.GetProperty("caffeineMg").GetInt32().Should().Be(190);
         to.GetProperty("activity").GetProperty("steps").GetInt32().Should().Be(8000);
 
         // Weight history reflects the moved date.

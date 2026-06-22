@@ -2,10 +2,10 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AccessPolicy, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatMessageDto, ChatRepliesResult, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
+  AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatMessageDto, ChatRepliesResult, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
   FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation,
-  HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
+  CoffeeEntryDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   AiUsageFilter, AiUsageResponse,
   NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, PermissionPreset, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
@@ -836,6 +836,16 @@ export class Api {
   /** Delete a logged hydration entry (owner-only; 404 otherwise). */
   deleteHydration(id: number): Observable<unknown> {
     return this.http.delete(`${this.base}/tracker/hydration/${id}`);
+  }
+
+  /** Log coffee toward the day's coffee cap (OWN tracker only; cups 1..20). Returns the created entry. */
+  addCoffee(body: AddCoffeeRequest): Observable<CoffeeEntryDto> {
+    return this.http.post<CoffeeEntryDto>(`${this.base}/tracker/coffee`, body);
+  }
+
+  /** Delete a logged coffee entry (owner-only; 404 otherwise). */
+  deleteCoffee(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/tracker/coffee/${id}`);
   }
 
   /**

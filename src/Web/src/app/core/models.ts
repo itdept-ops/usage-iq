@@ -966,6 +966,8 @@ export interface TrackerProfileDto {
   unitSystem: UnitSystem;
   /** Daily hydration goal in millilitres (backend always metric ml), or null to use the 2000 ml default. */
   hydrationGoalMl?: number;
+  /** Daily coffee goal/cap in cups, or null to use the 3-cup default. */
+  coffeeGoalCups?: number;
   /** Daily step goal (UI defaults to ~10000 when unset), or null. */
   stepGoal?: number;
 }
@@ -1001,6 +1003,19 @@ export interface WeightPointDto {
 export interface HydrationEntryDto {
   id: number;
   amountMl: number;
+  label?: string;
+  createdUtc: string;
+}
+
+/**
+ * One logged coffee entry on a tracker day. `cups` is a whole number (server-clamped 1..20).
+ * `caffeineMg` is an optional caffeine amount and `label` an optional drink name (Mug/Espresso/…).
+ * `createdUtc` is an ISO-8601 UTC string. Mirrors CoffeeEntryDto.
+ */
+export interface CoffeeEntryDto {
+  id: number;
+  cups: number;
+  caffeineMg?: number;
   label?: string;
   createdUtc: string;
 }
@@ -1532,6 +1547,18 @@ export interface AddHydrationRequest {
 }
 
 /**
+ * Log-a-coffee payload (POST /api/tracker/coffee). `cups` is a whole number (server-clamped 1..20).
+ * `caffeineMg` is an optional caffeine amount; `label` an optional drink name (<=64 chars).
+ * Mirrors AddCoffeeRequest.
+ */
+export interface AddCoffeeRequest {
+  date: string;
+  cups: number;
+  caffeineMg?: number;
+  label?: string;
+}
+
+/**
  * A full tracker day (GET /api/tracker/day). `readOnly` is true when viewing someone else's tracker —
  * the UI then hides all add/delete controls. Totals are server-computed. Mirrors TrackerDayDto.
  */
@@ -1566,6 +1593,14 @@ export interface TrackerDayDto {
   hydrationGoalMl: number;
   /** The day's hydration entries, oldest-first (by id). Visible even when read-only (like food/exercise). */
   hydration: HydrationEntryDto[];
+  /** Total cups of coffee logged for the day (sum of all coffee entries). */
+  coffeeCups: number;
+  /** Total caffeine (mg) logged for the day across coffee entries (0 when none specified). */
+  caffeineMg: number;
+  /** Resolved daily coffee goal/cap in cups: the profile's goal, or the 3-cup server default. */
+  coffeeGoalCups: number;
+  /** The day's coffee entries, oldest-first (by id). Visible even when read-only (like food/exercise). */
+  coffee: CoffeeEntryDto[];
   /** The day's manually-recorded smartwatch stats + calorie mode, or null when no watch row exists. */
   activity?: WatchActivityDto | null;
   /** Resolved daily step goal (the profile's goal), or null when unset. */

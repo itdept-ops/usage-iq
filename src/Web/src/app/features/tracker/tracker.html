@@ -502,6 +502,75 @@
       </div>
     </section>
 
+    <!-- ── Coffee card: progress ring vs daily cap + quick-add + today's drinks ── -->
+    <section class="tracker__coffee" aria-label="Coffee">
+      <div class="tracker__meal-head">
+        <h2 class="tracker__meal-title">
+          <mat-icon aria-hidden="true">local_cafe</mat-icon> Coffee
+        </h2>
+        <span class="tracker__meal-cal mono-num">
+          {{ day.coffeeCups }} / {{ day.coffeeGoalCups }} cups
+        </span>
+      </div>
+
+      <div class="tracker__coffee-body">
+        <div class="tracker__cofring">
+          <app-coffee-ring [cups]="day.coffeeCups" [goalCups]="day.coffeeGoalCups"
+                           [caffeineMg]="day.caffeineMg" />
+        </div>
+
+        <div class="tracker__coffee-main">
+          <!-- Quick-add buttons (own tracker only). -->
+          @if (!store.readOnly()) {
+            <div class="tracker__cofquick" role="group" aria-label="Quick add coffee">
+              <button mat-stroked-button type="button" class="tracker__cofbtn"
+                      (click)="quickCoffee(1, 'Mug', 95)" aria-label="Add a mug, 1 cup, about 95 mg caffeine">
+                <mat-icon>local_cafe</mat-icon> Mug
+                <span class="tracker__cofbtn-amt">~95 mg</span>
+              </button>
+              <button mat-stroked-button type="button" class="tracker__cofbtn"
+                      (click)="quickCoffee(1, 'Espresso', 63)" aria-label="Add an espresso, 1 cup, about 63 mg caffeine">
+                <mat-icon>coffee</mat-icon> Espresso
+                <span class="tracker__cofbtn-amt">~63 mg</span>
+              </button>
+              <button mat-stroked-button type="button" class="tracker__cofbtn"
+                      (click)="quickCoffee(1, 'Cold Brew', 155)" aria-label="Add a cold brew, 1 cup, about 155 mg caffeine">
+                <mat-icon>coffee_maker</mat-icon> Cold Brew
+                <span class="tracker__cofbtn-amt">~155 mg</span>
+              </button>
+              <button mat-stroked-button type="button" class="tracker__cofbtn tracker__cofbtn--custom"
+                      (click)="openAddCoffee()" aria-label="Add a custom coffee">
+                <mat-icon>add</mat-icon> Custom
+              </button>
+            </div>
+          }
+
+          <!-- Today's coffees. -->
+          <ul class="tracker__entries tracker__cofentries">
+            @for (c of day.coffee; track c.id) {
+              <li class="tracker__entry">
+                <div class="tracker__entry-id">
+                  <span class="tracker__entry-name">{{ c.label || 'Coffee' }}</span>
+                  <span class="tracker__entry-meta">
+                    {{ entryTime(c.createdUtc) }}@if (c.caffeineMg) { · {{ c.caffeineMg }} mg }
+                  </span>
+                </div>
+                <span class="tracker__entry-cal mono-num">{{ c.cups }} cup{{ c.cups === 1 ? '' : 's' }}</span>
+                @if (!store.readOnly()) {
+                  <button mat-icon-button type="button" class="tracker__entry-del"
+                          (click)="removeCoffee(c)" [attr.aria-label]="'Remove ' + (c.label || 'coffee')">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                }
+              </li>
+            } @empty {
+              <li class="tracker__entry tracker__entry--empty">No coffee logged yet.</li>
+            }
+          </ul>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Activity card: steps ring vs step goal + distance + active calories add/override toggle ── -->
     <section class="tracker__activity" aria-label="Watch activity">
       <div class="tracker__meal-head">

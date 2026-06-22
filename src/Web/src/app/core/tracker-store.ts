@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { Api } from './api';
 import {
-  AddExerciseRequest, AddFoodRequest, AddHydrationRequest, HydrationEntryDto, LogWeightRequest,
+  AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, CoffeeEntryDto, HydrationEntryDto, LogWeightRequest,
   SharedUserDto, TrackerDayDto, TrackerProfileDto, UpsertActivityRequest, WeightPointDto, WeightStatsDto,
 } from './models';
 
@@ -51,6 +51,9 @@ export class TrackerStore {
 
   /** The day's hydration entries (oldest-first), or empty before the first load. */
   readonly hydration = computed<HydrationEntryDto[]>(() => this.day()?.hydration ?? []);
+
+  /** The day's coffee entries (oldest-first), or empty before the first load. */
+  readonly coffee = computed<CoffeeEntryDto[]>(() => this.day()?.coffee ?? []);
 
   /** Load (or reload) the current day for the current date + view target. */
   async load(): Promise<void> {
@@ -132,6 +135,18 @@ export class TrackerStore {
   /** Delete a logged hydration entry, then refresh the day. */
   async deleteHydration(id: number): Promise<void> {
     await firstValueFrom(this.api.deleteHydration(id));
+    await this.load();
+  }
+
+  /** Log coffee toward the day's coffee cap, then refresh the day. */
+  async addCoffee(body: AddCoffeeRequest): Promise<void> {
+    await firstValueFrom(this.api.addCoffee(body));
+    await this.load();
+  }
+
+  /** Delete a logged coffee entry, then refresh the day. */
+  async deleteCoffee(id: number): Promise<void> {
+    await firstValueFrom(this.api.deleteCoffee(id));
     await this.load();
   }
 

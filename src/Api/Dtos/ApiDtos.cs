@@ -995,6 +995,9 @@ public sealed class TrackerProfileDto
     /// <summary>Daily fluid-intake goal in millilitres, or null (the day then uses a 2000 ml default).</summary>
     public int? HydrationGoalMl { get; set; }
 
+    /// <summary>Daily coffee CAP in cups, or null (the day then uses a 3-cup default). A limit, not a target.</summary>
+    public int? CoffeeGoalCups { get; set; }
+
     /// <summary>Daily step goal, or null (the UI then shows a ~10000 default). Not required.</summary>
     public int? StepGoal { get; set; }
 }
@@ -1055,6 +1058,15 @@ public sealed class TrackerDayDto
     /// <summary>The day's hydration entries (drinks), oldest-first. Visible to a permitted viewer too.</summary>
     public HydrationEntryDto[] Hydration { get; set; } = Array.Empty<HydrationEntryDto>();
 
+    /// <summary>Total cups of coffee for the day (sum of <see cref="Coffee"/>).</summary>
+    public int CoffeeCups { get; set; }
+    /// <summary>Total estimated caffeine for the day in milligrams (sum over entries that set it).</summary>
+    public int CaffeineMg { get; set; }
+    /// <summary>The resolved daily coffee CAP in cups: the profile's goal, else a 3-cup default. A limit.</summary>
+    public int CoffeeGoalCups { get; set; }
+    /// <summary>The day's coffee entries, oldest-first. Visible to a permitted viewer too.</summary>
+    public CoffeeEntryDto[] Coffee { get; set; } = Array.Empty<CoffeeEntryDto>();
+
     /// <summary>The day's recorded watch stats (steps/distance/active calories + mode), or null when none
     /// recorded. Visible to a permitted viewer too (read-only).</summary>
     public WatchActivityDto? Activity { get; set; }
@@ -1083,6 +1095,18 @@ public sealed class HydrationEntryDto
     public int AmountMl { get; set; }
     public string? Label { get; set; }
     /// <summary>ISO-8601 UTC timestamp of when the drink was logged.</summary>
+    public string CreatedUtc { get; set; } = "";
+}
+
+/// <summary>One logged coffee: its cups, an optional caffeine estimate (mg), an optional label, and when
+/// it was logged.</summary>
+public sealed class CoffeeEntryDto
+{
+    public long Id { get; set; }
+    public int Cups { get; set; }
+    public int? CaffeineMg { get; set; }
+    public string? Label { get; set; }
+    /// <summary>ISO-8601 UTC timestamp of when the coffee was logged.</summary>
     public string CreatedUtc { get; set; } = "";
 }
 
@@ -1246,6 +1270,17 @@ public sealed class AddHydrationRequest
     public string? Label { get; set; }
 }
 
+/// <summary>Log a coffee onto a day; <see cref="Cups"/> is 1..20 (server-clamped), with an optional
+/// caffeine estimate (mg) and an optional <see cref="Label"/> (trimmed, &lt;= 64 chars). Multiple coffees
+/// per day are expected.</summary>
+public sealed class AddCoffeeRequest
+{
+    public string Date { get; set; } = "";
+    public int Cups { get; set; }
+    public int? CaffeineMg { get; set; }
+    public string? Label { get; set; }
+}
+
 /// <summary>Upsert the caller's watch activity stats for a day. Distance is always metres (1..1000000),
 /// steps 0..200000, active calories 0..20000; <see cref="CalorieMode"/> is "add" | "override" (how the
 /// active calories factor into the day's calories out). All-null stats keep the row (with nulls).</summary>
@@ -1330,6 +1365,7 @@ public sealed class MoveDayCounts
     public int Food { get; set; }
     public int Exercise { get; set; }
     public int Hydration { get; set; }
+    public int Coffee { get; set; }
     public int Weight { get; set; }
     /// <summary>True when the source date had an activity row that was moved onto the target.</summary>
     public bool Activity { get; set; }

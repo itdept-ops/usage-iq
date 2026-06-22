@@ -457,6 +457,7 @@ public static class TrackerEndpoints
             profile.GoalWeightKg = Positive(req.GoalWeightKg);
             profile.UnitSystem = Enum.TryParse<UnitSystem>(req.UnitSystem, ignoreCase: true, out var unit) ? unit : UnitSystem.Metric;
             profile.HydrationGoalMl = Positive(req.HydrationGoalMl);
+            profile.CoffeeGoalCups = Positive(req.CoffeeGoalCups);
             profile.StepGoal = Positive(req.StepGoal);
             profile.UpdatedUtc = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
@@ -632,6 +633,33 @@ public static class TrackerEndpoints
             // 404 when the entry doesn't exist OR isn't the caller's (never reveal someone else's row).
             var deleted = await db.HydrationEntries
                 .Where(h => h.Id == id && h.UserEmail == caller.Email)
+                .ExecuteDeleteAsync(ct);
+            return deleted == 0 ? Results.NotFound() : Results.NoContent();
+        }).RequirePermission(Permissions.TrackerSelf);
+
+        // ---- Log a coffee onto a day (OWN only; many coffees per day, no upsert) ----
+        g.MapPost("/coffee", async (
+            AddCoffeeRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+
+            if (!TryParseDate(req.Date, out var localDate))
+                return Results.BadRequest(new { message = "A valid date (yyyy-MM-dd) is required." });
+
+            var entry = BuildCoffeeEntry(caller.Email, localDate, req.Cups, req.CaffeineMg, req.Label);
+            db.CoffeeEntries.Add(entry);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(ToCoffeeDto(entry));
+        }).RequirePermission(Permissions.TrackerSelf);
+
+        // ---- Delete a logged coffee (owner only) ----
+        g.MapDelete("/coffee/{id:long}", async (
+            long id, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            // 404 when the entry doesn't exist OR isn't the caller's (never reveal someone else's row).
+            var deleted = await db.CoffeeEntries
+                .Where(c => c.Id == id && c.UserEmail == caller.Email)
                 .ExecuteDeleteAsync(ct);
             return deleted == 0 ? Results.NotFound() : Results.NoContent();
         }).RequirePermission(Permissions.TrackerSelf);
@@ -1034,6 +1062,11 @@ public static class TrackerEndpoints
                     .Where(h => h.UserEmail == email && h.LocalDate == fromDate)
                     .ExecuteUpdateAsync(s => s.SetProperty(h => h.LocalDate, toDate), ct);
 
+            if (Wants("coffee"))
+                moved.Coffee = await db.CoffeeEntries
+                    .Where(c => c.UserEmail == email && c.LocalDate == fromDate)
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.LocalDate, toDate), ct);
+
             // weight (UNIQUE per user+date+slot): the moved value wins per slot. Delete any target rows
             // whose slot also exists on the source, THEN re-date the source rows. Wrapped in the retrying
             // execution strategy's transaction so the delete+re-date is atomic (a naive BeginTransaction
@@ -1187,6 +1220,22 @@ public static class TrackerEndpoints
         };
     }
 
+    /// <summary>Build a <see cref="CoffeeEntry"/> (cups clamped to 1..20; caffeine clamped to [0,2000] when
+    /// set; label trimmed + 64-capped).</summary>
+    private static CoffeeEntry BuildCoffeeEntry(string email, DateOnly localDate, int cups, int? caffeineMg, string? label)
+    {
+        var trimmed = Trunc(label?.Trim(), 64);
+        return new CoffeeEntry
+        {
+            UserEmail = email,
+            LocalDate = localDate,
+            Cups = Math.Clamp(cups, 1, 20),
+            CaffeineMg = caffeineMg is { } mg ? Math.Clamp(mg, 0, 2000) : null,
+            Label = string.IsNullOrEmpty(trimmed) ? null : trimmed,
+            CreatedUtc = DateTime.UtcNow,
+        };
+    }
+
     /// <summary>Clamp a calorie value to [0, 5000] (mirrors the GeminiService clamp for commit-time safety).</summary>
     private static int ClampCalories(int v) => Math.Clamp(v, 0, 5000);
 
@@ -1262,6 +1311,12 @@ public static class TrackerEndpoints
             .Where(h => h.UserEmail == email && h.LocalDate == date)
             .OrderBy(h => h.Id)
             .ToListAsync(ct);
+        // Coffee is part of the day (like hydration): a permitted viewer sees the totals + entries read-only
+        // too. Many coffees per day, so this is a plain list (no upsert), oldest-first by id.
+        var coffee = await db.CoffeeEntries.AsNoTracking()
+            .Where(c => c.UserEmail == email && c.LocalDate == date)
+            .OrderBy(c => c.Id)
+            .ToListAsync(ct);
         // The day's recorded watch stats (at most one per day), part of the day like hydration/exercise:
         // a permitted viewer sees them (and the resolved burn) read-only too — we do NOT null it.
         var activity = await db.DailyActivities.AsNoTracking()
@@ -1283,6 +1338,11 @@ public static class TrackerEndpoints
         var hydrationMl = hydration.Sum(h => h.AmountMl);
         // The resolved goal: the profile's goal when set, else the 2000 ml default.
         var hydrationGoalMl = profile?.HydrationGoalMl ?? DefaultHydrationGoalMl;
+
+        var coffeeCups = coffee.Sum(c => c.Cups);
+        var caffeineMg = coffee.Sum(c => c.CaffeineMg ?? 0);
+        // The resolved coffee CAP: the profile's goal when set, else the 3-cup default.
+        var coffeeGoalCups = profile?.CoffeeGoalCups ?? DefaultCoffeeGoalCups;
 
         // Resolve the day owner's email -> {AppUser.Id, Name}; the raw owner email is NEVER put on the wire
         // (email-privacy). db.Users.Email is stored lower-cased.
@@ -1313,6 +1373,10 @@ public static class TrackerEndpoints
             HydrationMl = hydrationMl,
             HydrationGoalMl = hydrationGoalMl,
             Hydration = hydration.Select(ToHydrationDto).ToArray(),
+            CoffeeCups = coffeeCups,
+            CaffeineMg = caffeineMg,
+            CoffeeGoalCups = coffeeGoalCups,
+            Coffee = coffee.Select(ToCoffeeDto).ToArray(),
             Activity = activity is null ? null : ToActivityDto(activity),
             StepGoal = profile?.StepGoal,
         };
@@ -1334,6 +1398,9 @@ public static class TrackerEndpoints
 
     /// <summary>The fallback daily hydration goal (ml) when a user's profile has none set.</summary>
     private const int DefaultHydrationGoalMl = 2000;
+
+    /// <summary>The fallback daily coffee CAP (cups) when a user's profile has none set. A limit, not a target.</summary>
+    private const int DefaultCoffeeGoalCups = 3;
 
     // ===================================================================================
     // Profile helpers
@@ -1656,6 +1723,7 @@ public static class TrackerEndpoints
         GoalWeightKg = p.GoalWeightKg,
         UnitSystem = p.UnitSystem.ToString(),
         HydrationGoalMl = p.HydrationGoalMl,
+        CoffeeGoalCups = p.CoffeeGoalCups,
         StepGoal = p.StepGoal,
     };
 
@@ -1665,6 +1733,15 @@ public static class TrackerEndpoints
         AmountMl = h.AmountMl,
         Label = h.Label,
         CreatedUtc = h.CreatedUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+    };
+
+    private static CoffeeEntryDto ToCoffeeDto(CoffeeEntry c) => new()
+    {
+        Id = c.Id,
+        Cups = c.Cups,
+        CaffeineMg = c.CaffeineMg,
+        Label = c.Label,
+        CreatedUtc = c.CreatedUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
     };
 
     private static WatchActivityDto ToActivityDto(DailyActivity a) => new()

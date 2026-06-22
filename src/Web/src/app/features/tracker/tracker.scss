@@ -659,6 +659,76 @@
   .tracker__hydration-main { width: 100%; }
 }
 
+.tracker__coffee {
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius);
+  background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
+  overflow: hidden;
+
+  .tracker__meal-title mat-icon { color: var(--tech-warn); }
+}
+
+.tracker__coffee-body {
+  display: grid;
+  grid-template-columns: minmax(160px, 200px) 1fr;
+  gap: var(--tech-space-4);
+  padding: var(--tech-space-4);
+  align-items: start;
+}
+
+.tracker__cofring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tracker__coffee-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-3);
+  min-width: 0;
+}
+
+.tracker__cofquick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tech-space-2);
+}
+
+.tracker__cofbtn {
+  flex: 1 1 auto;
+  min-height: 44px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  color: var(--tech-warn);
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+  &-amt {
+    margin-left: 6px;
+    font-family: var(--tech-font-mono);
+    font-size: var(--tech-fs-micro);
+    color: var(--tech-text-tertiary);
+  }
+
+  &--custom { color: var(--tech-accent); }
+}
+
+.tracker__cofentries {
+  border: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-radius);
+  overflow: hidden;
+
+  .tracker__entry { padding-left: var(--tech-space-3); padding-right: var(--tech-space-3); }
+  .tracker__entry-cal { color: var(--tech-warn); }
+}
+
+@media (max-width: 720px) {
+  .tracker__coffee-body { grid-template-columns: 1fr; justify-items: center; }
+  .tracker__coffee-main { width: 100%; }
+}
+
 /* ── Activity card (steps ring + distance + active calories add/override) ── */
 .tracker__activity {
   border: 1px solid var(--tech-border);

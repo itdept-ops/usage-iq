@@ -204,6 +204,14 @@
     <mat-hint>Defaults to 10,000 when left blank.</mat-hint>
   </mat-form-field>
 
+  <mat-form-field appearance="outline" class="pf-field">
+    <mat-label>Daily coffee limit (optional)</mat-label>
+    <input matInput type="number" min="1" max="20" inputmode="numeric" placeholder="3"
+           [ngModel]="coffeeGoalCups()" (ngModelChange)="coffeeGoalCups.set($event)" />
+    <span matTextSuffix>cups</span>
+    <mat-hint>A soft cap — the coffee ring warns when you go over. Defaults to 3.</mat-hint>
+  </mat-form-field>
+
   <span class="micro-label pf-section">Macro targets (optional)</span>
   <div class="pf-macgrid">
     <mat-form-field appearance="outline">

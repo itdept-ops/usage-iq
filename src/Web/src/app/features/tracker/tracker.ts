@@ -16,17 +16,19 @@ import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { TrackerStore } from '../../core/tracker-store';
 import {
-  ActivityCalorieMode, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, CommitDayResponse, DailyCoachResponse,
+  ActivityCalorieMode, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, CoffeeEntryDto, CommitDayResponse, DailyCoachResponse,
   DaySummaryResponse, ExerciseEntryDto, FoodEntryDto,
   FoodSuggestionDto, HydrationEntryDto, LogWeightRequest, Meal, MoveDayRequest, MoveDayResult, PERM, SharedUserDto, TrackerDayDto, TrackerProfileDto,
   TrackerRecapResult, UpsertActivityRequest, WeeklyReviewResponse, WeightPointDto, WeightStatsDto,
 } from '../../core/models';
 import { CalorieRing } from './calorie-ring';
 import { HydrationRing } from './hydration-ring';
+import { CoffeeRing } from './coffee-ring';
 import { ActivityRing } from './activity-ring';
 import { AddFoodDialog, AddFoodData } from './add-food-dialog';
 import { AddExerciseDialog, AddExerciseData } from './add-exercise-dialog';
 import { AddHydrationDialog, AddHydrationData, AddHydrationResult } from './add-hydration-dialog';
+import { AddCoffeeDialog, AddCoffeeData, AddCoffeeResult } from './add-coffee-dialog';
 import { AddActivityDialog, AddActivityData } from './add-activity-dialog';
 import { ProfileDialog, ProfileData } from './profile-dialog';
 import { LogWeightDialog, LogWeightData } from './log-weight-dialog';
@@ -67,7 +69,7 @@ const MEAL_SECTIONS: MealSection[] = [
   imports: [
     DecimalPipe, FormsModule, MatIconModule, MatButtonModule, MatProgressBarModule, MatMenuModule,
     MatTooltipModule, MatDialogModule, MatSnackBarModule, MatProgressSpinnerModule,
-    CalorieRing, HydrationRing, ActivityRing, WeightTrend, WeightStats, OnboardingCard,
+    CalorieRing, HydrationRing, CoffeeRing, ActivityRing, WeightTrend, WeightStats, OnboardingCard,
   ],
   templateUrl: './tracker.html',
   styleUrl: './tracker.scss',
@@ -619,6 +621,63 @@ export class Tracker {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
     return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // ---- coffee ----
+
+  /** Quick-add a fixed cup count (Mug/Espresso/Cold Brew) to today's coffee, with a label + caffeine estimate. */
+  quickCoffee(cups: number, label?: string, caffeineMg?: number): void {
+    if (this.store.readOnly()) return;
+    this.store.addCoffee({ date: this.store.date(), cups, label: label || undefined, caffeineMg })
+      .then(() => this.announceCoffee(`Added ${label ? label + ', ' : ''}${cups} cup${cups === 1 ? '' : 's'}`))
+      .catch(() => this.snack.open('Could not log coffee', 'Dismiss', { duration: 4000 }));
+  }
+
+  /**
+   * Announce a coffee change to the single existing SR live region (statusMsg), suffixed with the
+   * running cup total vs the daily cap so the user hears their progress (e.g. "Added 1 cup, 2 of 3 cups").
+   */
+  private announceCoffee(prefix: string): void {
+    const day = this.store.day();
+    const total = day?.coffeeCups ?? 0;
+    const goal = day?.coffeeGoalCups ?? 0;
+    this.statusMsg.set(`${prefix}, ${total} of ${goal} cups`);
+  }
+
+  /** Open the custom-coffee dialog (cups + optional label + optional caffeine), then log the result. */
+  openAddCoffee(): void {
+    if (this.store.readOnly()) return;
+    const data: AddCoffeeData = { date: this.store.date() };
+    this.dialog.open(AddCoffeeDialog, { data, width: '400px', maxWidth: '95vw', autoFocus: false })
+      .afterClosed().subscribe((res: AddCoffeeResult | undefined) => {
+        if (!res) return;
+        this.logCoffees(res.requests);
+      });
+  }
+
+  /** Log one or more coffees sequentially (each refreshes the day), with a single summary snackbar. */
+  private async logCoffees(requests: AddCoffeeRequest[]): Promise<void> {
+    let ok = 0;
+    for (const req of requests) {
+      try {
+        await this.store.addCoffee(req);
+        ok++;
+      } catch { /* keep going; report the shortfall at the end */ }
+    }
+    if (ok === 0) {
+      this.snack.open('Could not log coffee', 'Dismiss', { duration: 4000 });
+    } else if (requests.length > 1) {
+      this.snack.open(`Added ${ok} coffee${ok === 1 ? '' : 's'}`, 'OK', { duration: 2000 });
+    } else {
+      this.snack.open(`Added ${requests[0].label || 'coffee'}`, 'OK', { duration: 2000 });
+    }
+  }
+
+  removeCoffee(c: CoffeeEntryDto): void {
+    if (this.store.readOnly()) return;
+    this.store.deleteCoffee(c.id)
+      .then(() => this.announceCoffee('Removed coffee'))
+      .catch(() => this.snack.open('Could not remove entry', 'Dismiss', { duration: 4000 }));
   }
 
   // ---- watch activity (steps / distance / active calories) ----
