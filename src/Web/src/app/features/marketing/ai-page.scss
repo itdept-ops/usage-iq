@@ -83,6 +83,7 @@
   flex-direction: column;
   gap: 14px;
   padding: clamp(20px, 3vw, 26px);
+  min-width: 0; /* grid item: let it shrink below the JSON example's min-content so the code box scrolls, not the card */
   transition: border-color 200ms var(--tech-ease);
   &:hover { border-color: var(--tech-border-strong); }
 }
@@ -155,6 +156,7 @@
 }
 .flow-io {
   padding: 14px 16px;
+  min-width: 0; /* contain the JSON code box so its overflow-x scroll engages instead of stretching the card */
   border-radius: var(--tech-r-control, 12px);
   border: 1px solid var(--tech-border-subtle);
   background: var(--tech-bg-sunken, #05080f);
