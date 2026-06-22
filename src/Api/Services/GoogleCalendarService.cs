@@ -90,6 +90,13 @@ public sealed class GoogleCalendarService(
     /// <summary>Per-member busy blocks (identity by userId + display name; NO email).</summary>
     public sealed record MemberBusy(int UserId, string Name, IReadOnlyList<BusyBlock> Busy);
 
+    /// <summary>A single shared event from a household member's calendar (title + time only; never an
+    /// email/location/description — only what the overlay needs to render a block).</summary>
+    public sealed record SharedEvent(string Title, DateTime? StartUtc, DateTime? EndUtc, bool AllDay);
+
+    /// <summary>Per-member shared events (identity by userId + display name; NO email).</summary>
+    public sealed record MemberEvents(int UserId, string Name, IReadOnlyList<SharedEvent> Events);
+
     public sealed record CalendarResult<T>(CalendarStatus Status, T? Value)
     {
         public bool Ok => Status == CalendarStatus.Ok;
@@ -360,6 +367,37 @@ public sealed class GoogleCalendarService(
                 var blocks = ParseBusy(doc.RootElement);
                 result.Add(new MemberBusy(userId, name, blocks));
             }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Read each given member's PRIMARY-calendar events over [start, end) for the family overlay, using THAT
+    /// member's own minted access token (the same per-member-token pattern as <see cref="FreeBusyAsync"/>,
+    /// but it reads event title+time instead of just busy blocks). Only members who have CONNECTED a calendar
+    /// contribute — an unconnected/revoked member is SKIPPED entirely (never surfaced), and a single member's
+    /// fetch FAILING is swallowed (that member is simply absent) so one bad calendar can't fail the whole
+    /// response. Each member is identified by userId + display name — NEVER an email; only the event title +
+    /// time (and an all-day flag) are returned, not location/description/links.
+    /// </summary>
+    public async Task<IReadOnlyList<MemberEvents>> FamilyEventsAsync(
+        IEnumerable<(int UserId, string Name)> members, DateTime startUtc, DateTime endUtc,
+        CancellationToken ct = default)
+    {
+        var result = new List<MemberEvents>();
+        if (!IsConfigured) return result;
+
+        foreach (var (userId, name) in members)
+        {
+            // Each member uses THEIR OWN token (skip unconnected/errored members — they don't appear).
+            var listed = await ListEventsAsync(userId, startUtc, endUtc, ct);
+            if (!listed.Ok || listed.Value is null) continue;
+
+            var events = listed.Value
+                .Select(e => new SharedEvent(
+                    string.IsNullOrWhiteSpace(e.Title) ? "(busy)" : e.Title, e.StartUtc, e.EndUtc, e.AllDay))
+                .ToList();
+            result.Add(new MemberEvents(userId, name, events));
         }
         return result;
     }

@@ -52,6 +52,14 @@ public class AppUser
     /// </summary>
     public bool LocationShareHousehold { get; set; }
 
+    /// <summary>
+    /// Per-user OPT-IN to share the user's connected primary calendar EVENTS (title + time only, never an
+    /// email) with their household members as a read-only overlay. False by default — mirrors
+    /// <see cref="LocationShareHousehold"/>. Only meaningful once the user has connected a calendar; with no
+    /// connection it has no effect (the family-events read skips unconnected members regardless).
+    /// </summary>
+    public bool CalendarShareHousehold { get; set; }
+
     public DateTime CreatedUtc { get; set; }
     public DateTime? LastLoginUtc { get; set; }
 

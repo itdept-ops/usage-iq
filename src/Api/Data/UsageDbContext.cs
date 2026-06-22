@@ -160,6 +160,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             // Location opt-in + sharing are OFF by default (privacy: capture is opt-in, sharing separate).
             e.Property(x => x.LocationEnabled).HasDefaultValue(false);
             e.Property(x => x.LocationShareHousehold).HasDefaultValue(false);
+            // Calendar event-sharing to the household is OFF by default (privacy: opt-in, like location).
+            e.Property(x => x.CalendarShareHousehold).HasDefaultValue(false);
             e.HasIndex(x => x.Email).IsUnique();
             // One Google account maps to at most one user row (nulls allowed for not-yet-logged-in users).
             e.HasIndex(x => x.GoogleSubject).IsUnique().HasFilter("\"GoogleSubject\" IS NOT NULL");

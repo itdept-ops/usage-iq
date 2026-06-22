@@ -118,6 +118,7 @@ public sealed class GoogleAuthService(
                     Picture = created.Picture,
                     ExpiresAtUtc = newExpires,
                     Permissions = defaultPerms,
+                    HomeRoute = created.HomeRoute,
                 }, email, created.Name);
             }
             // else: race recovered — `user` now holds the row the winning request created; continue below.
@@ -166,6 +167,7 @@ public sealed class GoogleAuthService(
             Picture = user.Picture,
             ExpiresAtUtc = expires,
             Permissions = permissions,
+            HomeRoute = user.HomeRoute,
         }, email, user.Name);
     }
 

@@ -16,8 +16,9 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
-  CalendarEvent, CalendarEventInput, CalendarRecurrence, CalendarStatus, FindTimeAiInterpreted,
-  FindTimeConsideredMember, FindTimeSlot, HouseholdMember, ScheduleAiEvent, ScheduleImageFile,
+  CalendarEvent, CalendarEventInput, CalendarRecurrence, CalendarStatus, FamilyMemberEvents,
+  FindTimeAiInterpreted, FindTimeConsideredMember, FindTimeSlot, HouseholdMember, ScheduleAiEvent,
+  ScheduleImageFile,
 } from '../../core/models';
 import { downscaleToJpeg, readFileAsBase64 } from '../tracker/ai-image';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
@@ -32,6 +33,19 @@ interface DayEvent {
   ev: CalendarEvent;
   /** "h:mm a" local start (timed) or "All day". */
   timeLabel: string;
+  /** True for a READ-ONLY family-overlay event (another member's), false for the caller's own editable event. */
+  overlay: boolean;
+  /** The owning member's display name (overlay only) — for the tooltip + a11y label; never an email. */
+  memberName?: string;
+  /** The overlay member's stable color (overlay only); the caller's own events use the default accent. */
+  color?: string;
+}
+
+/** One sharing household member surfaced in the overlay legend (identity = userId + name; never an email). */
+interface OverlayMember {
+  userId: number;
+  name: string;
+  color: string;
 }
 
 /** One AI-proposed event the family member can confirm/edit before it's created on their calendar. */
@@ -49,13 +63,27 @@ interface ProposedEvent {
 interface DayColumn {
   date: Date;
   iso: string;            // "YYYY-MM-DD" local
-  weekdayLabel: string;   // "Mon"
+  weekdayLabel: string;   // "Sun"
   dayNum: number;         // 1..31
   isToday: boolean;
   events: DayEvent[];
 }
 
-type ViewMode = 'week' | 'agenda';
+/** One cell of the month grid (6×7): a day with its events, truncated with a "+N more" overflow. */
+interface MonthCell {
+  date: Date;
+  iso: string;            // "YYYY-MM-DD" local
+  dayNum: number;         // 1..31
+  isToday: boolean;
+  /** True for days inside the visible month; false for leading/trailing days from adjacent months. */
+  inMonth: boolean;
+  /** The first few events shown in the cell (all-day first, then by start). */
+  events: DayEvent[];
+  /** How many further events are hidden ("+N more"). 0 when nothing overflows. */
+  moreCount: number;
+}
+
+type ViewMode = 'week' | 'agenda' | 'month';
 
 /**
  * Family Hub F6 — the family calendar. Until the caller connects their Google Calendar we show a warm
@@ -102,8 +130,37 @@ export class FamilyCalendar implements OnDestroy {
 
   readonly view = signal<ViewMode>('week');
 
-  /** The Monday (local midnight) that anchors the visible week. */
-  readonly weekStart = signal<Date>(this.mondayOf(new Date()));
+  /** The Sunday (local midnight) that anchors the visible week (week + agenda views). */
+  readonly weekStart = signal<Date>(this.sundayOf(new Date()));
+
+  /** The first-of-month (local midnight) that anchors the visible month grid (month view). */
+  readonly monthStart = signal<Date>(this.firstOfMonth(new Date()));
+
+  // ---- Family overlay (other members' shared events, color-coded + read-only) ----
+  /** Raw per-member shared events for the visible range (only opted-in + connected members appear). */
+  readonly familyEvents = signal<FamilyMemberEvents[]>([]);
+  /** Whether the overlay is shown (the legend toggle). Persisted in-session only. */
+  readonly showOverlay = signal(true);
+  /** True while the caller's "Share my calendar" opt-in PATCH is in flight (disables the toggle). */
+  readonly sharingBusy = signal(false);
+
+  /** A small, stable palette for per-member overlay colors (assigned by sorted-userId order). */
+  private static readonly OVERLAY_PALETTE = [
+    '#f59e0b', '#a855f7', '#ec4899', '#10b981', '#3b82f6', '#ef4444', '#14b8a6', '#f97316',
+  ];
+
+  /** userId → overlay color, stable across renders (derived from the sharing members, sorted by userId). */
+  readonly overlayMembers = computed<OverlayMember[]>(() => {
+    const sorted = [...this.familyEvents()].sort((a, b) => a.userId - b.userId);
+    return sorted.map((m, i) => ({
+      userId: m.userId,
+      name: m.name,
+      color: FamilyCalendar.OVERLAY_PALETTE[i % FamilyCalendar.OVERLAY_PALETTE.length],
+    }));
+  });
+
+  /** The caller's calendar-share opt-in (mirrors status.shareHousehold); drives the share toggle state. */
+  readonly shareHousehold = computed<boolean>(() => this.status()?.shareHousehold === true);
 
   /** Epoch ms of the last successful events fetch (null = never). Drives the "updated Xm ago" hint. */
   readonly lastUpdated = signal<number | null>(null);
@@ -118,6 +175,8 @@ export class FamilyCalendar implements OnDestroy {
   readonly aiStatus = signal('');
   /** The AI-proposed events awaiting the user's confirmation. */
   readonly proposals = signal<ProposedEvent[]>([]);
+  /** True while "Add all" is bulk-creating proposals (disables every per-card button + the AI boxes). */
+  readonly addingAll = signal(false);
 
   // ---- 📄 Upload a schedule (extract events from an image / PDF) ----
   /** True while a chosen image/PDF schedule is being prepared + sent for extraction. */
@@ -172,23 +231,50 @@ export class FamilyCalendar implements OnDestroy {
     return `updated ${hrs}h ago`;
   });
 
-  /** The seven day-columns of the visible week with their events placed. */
+  /**
+   * A "YYYY-MM-DD" → DayEvent[] map of the caller's OWN events plus (when the overlay is on) every sharing
+   * member's read-only events, color-coded per member. Recomputed whenever the events, the family overlay,
+   * the toggle, or the member→color mapping change.
+   */
+  private readonly eventsByDay = computed<Map<string, DayEvent[]>>(() => {
+    const byDay = new Map<string, DayEvent[]>();
+    const push = (iso: string, de: DayEvent) => {
+      const arr = byDay.get(iso) ?? [];
+      arr.push(de);
+      byDay.set(iso, arr);
+    };
+    // The caller's own (editable) events.
+    for (const ev of this.events()) {
+      for (const iso of this.spannedDays(ev)) {
+        push(iso, { ev, timeLabel: this.timeLabel(ev), overlay: false });
+      }
+    }
+    // Other members' shared (read-only) events, color-coded — only when the overlay is shown.
+    if (this.showOverlay()) {
+      const colorOf = new Map(this.overlayMembers().map(m => [m.userId, m.color]));
+      for (const member of this.familyEvents()) {
+        const color = colorOf.get(member.userId);
+        for (const item of member.events) {
+          const ev = this.overlayToEvent(item, member.userId);
+          for (const iso of this.spannedDays(ev)) {
+            push(iso, { ev, timeLabel: this.timeLabel(ev), overlay: true, memberName: member.name, color });
+          }
+        }
+      }
+    }
+    return byDay;
+  });
+
+  /** The seven day-columns of the visible week (Sun→Sat) with their events placed. */
   readonly days = computed<DayColumn[]>(() => {
     const start = this.weekStart();
     const todayIso = this.toLocalDate(new Date());
-    const byDay = new Map<string, DayEvent[]>();
-    for (const ev of this.events()) {
-      for (const iso of this.spannedDays(ev)) {
-        const arr = byDay.get(iso) ?? [];
-        arr.push({ ev, timeLabel: this.timeLabel(ev) });
-        byDay.set(iso, arr);
-      }
-    }
+    const byDay = this.eventsByDay();
     const cols: DayColumn[] = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
       const iso = this.toLocalDate(date);
-      const evs = (byDay.get(iso) ?? []).sort(this.compareDayEvents);
+      const evs = (byDay.get(iso) ?? []).slice().sort(this.compareDayEvents);
       cols.push({
         date, iso,
         weekdayLabel: date.toLocaleDateString(undefined, { weekday: 'short' }),
@@ -202,6 +288,55 @@ export class FamilyCalendar implements OnDestroy {
 
   /** The week's events flattened + sorted for the agenda list, grouped by day. */
   readonly agendaDays = computed<DayColumn[]>(() => this.days().filter(d => d.events.length > 0));
+
+  /** Max events shown in a month cell before the rest collapse into "+N more". */
+  private static readonly MONTH_CELL_MAX = 3;
+
+  /**
+   * The 42 cells (6 rows × 7 columns, Sun→Sat) of the visible month grid. The grid begins on the Sunday on or
+   * before the 1st and runs 42 days so the current month is always fully covered with leading/trailing days
+   * from the adjacent months (flagged `inMonth:false`). Each cell shows up to MONTH_CELL_MAX events; the rest
+   * become a "+N more" count. Overlay events are merged in exactly like the week view.
+   */
+  readonly monthCells = computed<MonthCell[]>(() => {
+    const first = this.monthStart();
+    const month = first.getMonth();
+    const gridStart = this.sundayOf(first);
+    const todayIso = this.toLocalDate(new Date());
+    const byDay = this.eventsByDay();
+    const cells: MonthCell[] = [];
+    for (let i = 0; i < 42; i++) {
+      const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+      const iso = this.toLocalDate(date);
+      const all = (byDay.get(iso) ?? []).slice().sort(this.compareDayEvents);
+      const shown = all.slice(0, FamilyCalendar.MONTH_CELL_MAX);
+      cells.push({
+        date, iso,
+        dayNum: date.getDate(),
+        isToday: iso === todayIso,
+        inMonth: date.getMonth() === month,
+        events: shown,
+        moreCount: Math.max(0, all.length - shown.length),
+      });
+    }
+    return cells;
+  });
+
+  /** Sun..Sat weekday header labels for the week + month grids (in the browser's locale). */
+  readonly weekdayHeaders = computed<string[]>(() => {
+    const labels: string[] = [];
+    // Jan 4 2026 is a Sunday — a stable anchor for locale-aware short weekday names.
+    const sunday = new Date(2026, 0, 4);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + i);
+      labels.push(d.toLocaleDateString(undefined, { weekday: 'short' }));
+    }
+    return labels;
+  });
+
+  /** A friendly "June 2026" label for the visible month. */
+  readonly monthLabel = computed<string>(() =>
+    this.monthStart().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }));
 
   /** A friendly "Jun 16 – 22, 2026" label for the visible week. */
   readonly rangeLabel = computed<string>(() => {
@@ -357,6 +492,7 @@ export class FamilyCalendar implements OnDestroy {
       await firstValueFrom(this.api.disconnectCalendar());
       this.status.set({ configured: true, connected: false });
       this.events.set([]);
+      this.familyEvents.set([]);
       this.proposals.set([]);
       this.clearBest();
       this.lastUpdated.set(null);
@@ -385,16 +521,31 @@ export class FamilyCalendar implements OnDestroy {
   // ---- Events ----
 
   /**
-   * Fetch the visible week's events. A `silent` load (auto-poll / visibility catch-up) skips the toolbar
-   * spinner and leaves the current events on screen if the fetch fails, so a transient blip never blanks the
-   * planner. A manual/navigation load shows the spinner + surfaces an error.
+   * The [start, end) the current view shows: the Sun-anchored 7-day week (week + agenda), or the full 42-cell
+   * month grid (month view). Events + the family overlay are both fetched over this range.
+   */
+  private visibleRange(): { start: Date; end: Date } {
+    if (this.view() === 'month') {
+      const gridStart = this.sundayOf(this.monthStart());
+      const end = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + 42);
+      return { start: gridStart, end };
+    }
+    const start = this.weekStart();
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    return { start, end };
+  }
+
+  /**
+   * Fetch the visible range's events (own + the family overlay). A `silent` load (auto-poll / visibility
+   * catch-up) skips the toolbar spinner and leaves the current events on screen if the fetch fails, so a
+   * transient blip never blanks the planner. A manual/navigation load shows the spinner + surfaces an error.
+   * The family overlay is best-effort: its failure never blocks the caller's own events.
    */
   private async loadEvents(opts: { silent?: boolean } = {}): Promise<void> {
     const silent = opts.silent === true;
     if (!silent) this.loadingEvents.set(true);
     this.eventsError.set(false);
-    const start = this.weekStart();
-    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    const { start, end } = this.visibleRange();
     try {
       const list = await firstValueFrom(this.api.calendarEvents(start.toISOString(), end.toISOString()));
       this.events.set(list);
@@ -411,18 +562,34 @@ export class FamilyCalendar implements OnDestroy {
     } finally {
       if (!silent) this.loadingEvents.set(false);
     }
+    // Best-effort overlay over the same range (never blocks / errors the caller's own events).
+    void this.loadFamilyEvents(start, end);
+  }
+
+  /** Best-effort fetch of the family overlay over a range; a failure just clears it (own events stand). */
+  private async loadFamilyEvents(start: Date, end: Date): Promise<void> {
+    try {
+      const members = await firstValueFrom(this.api.familyEvents(start.toISOString(), end.toISOString()));
+      this.familyEvents.set(members ?? []);
+    } catch {
+      this.familyEvents.set([]);
+    }
   }
 
   prevWeek(): void {
+    if (this.view() === 'month') { this.shiftMonth(-1); return; }
     this.shiftWeek(-7);
   }
 
   nextWeek(): void {
+    if (this.view() === 'month') { this.shiftMonth(1); return; }
     this.shiftWeek(7);
   }
 
   today(): void {
-    this.weekStart.set(this.mondayOf(new Date()));
+    const now = new Date();
+    this.weekStart.set(this.sundayOf(now));
+    this.monthStart.set(this.firstOfMonth(now));
     void this.loadEvents();
   }
 
@@ -432,8 +599,50 @@ export class FamilyCalendar implements OnDestroy {
     void this.loadEvents();
   }
 
+  private shiftMonth(months: number): void {
+    const s = this.monthStart();
+    this.monthStart.set(new Date(s.getFullYear(), s.getMonth() + months, 1));
+    void this.loadEvents();
+  }
+
+  /** Switch view; re-fetch because the month grid covers a wider range than a single week. */
   setView(v: ViewMode): void {
+    if (this.view() === v) return;
+    const from = this.view();
     this.view.set(v);
+    // Carry the visible period across the switch so navigating several months in month view then
+    // switching to week doesn't snap back to a stale week (and vice-versa).
+    if (v === 'month' && from !== 'month') this.monthStart.set(this.firstOfMonth(this.weekStart()));
+    else if (v !== 'month' && from === 'month') this.weekStart.set(this.sundayOf(this.monthStart()));
+    if (this.connected()) void this.loadEvents();
+  }
+
+  /** Show/hide the family overlay (legend toggle). No fetch — the overlay data is already loaded. */
+  toggleOverlay(): void {
+    this.showOverlay.set(!this.showOverlay());
+  }
+
+  /**
+   * Opt the caller in/out of sharing their calendar with the household. Only enabled once connected. Optimistic
+   * status update on success; a friendly snackbar + no state change on failure.
+   */
+  async toggleShare(): Promise<void> {
+    if (this.sharingBusy() || !this.connected()) return;
+    const next = !this.shareHousehold();
+    this.sharingBusy.set(true);
+    try {
+      const res = await firstValueFrom(this.api.setCalendarShare(next));
+      const s = this.status();
+      if (s) this.status.set({ ...s, shareHousehold: res.shareHousehold });
+      this.snack.open(
+        res.shareHousehold ? 'Your calendar is now shared with your household.' : 'Calendar sharing turned off.',
+        undefined, { duration: 2200 });
+    } catch (e) {
+      this.snack.open(this.messageOf(e, "Couldn't update calendar sharing. Please try again."), 'OK',
+        { duration: 4000 });
+    } finally {
+      this.sharingBusy.set(false);
+    }
   }
 
   // ---- Schedule with AI ----
@@ -485,6 +694,40 @@ export class FamilyCalendar implements OnDestroy {
     } catch (e) {
       this.setProposalSaving(p, false);
       this.snack.open(this.messageOf(e, "Couldn't add that event. Please try again."), 'OK', { duration: 4000 });
+    }
+  }
+
+  /**
+   * Bulk-add every proposed event. Loops {@link Api.createEvent} over each, DROPS each card on success and
+   * KEEPS any that fail (so the user can retry just those), refreshes the calendar ONCE at the end, and
+   * snackbars the tally. The per-card buttons + the AI boxes are disabled while this runs (`addingAll`).
+   */
+  async addAll(): Promise<void> {
+    if (this.addingAll()) return;
+    const all = this.proposals();
+    if (all.length === 0) return;
+    this.addingAll.set(true);
+    const failed: ProposedEvent[] = [];
+    let added = 0;
+    try {
+      for (const p of all) {
+        try {
+          await firstValueFrom(this.api.createEvent(this.inputFromProposal(p.ai)));
+          added++;
+        } catch {
+          failed.push(p);
+        }
+      }
+      // Keep only the ones that couldn't be added (cleared of any stale per-card saving flag).
+      this.proposals.set(failed.map(p => ({ ...p, saving: false })));
+      const msg = failed.length === 0
+        ? `Added ${added} ${added === 1 ? 'event' : 'events'} to your calendar.`
+        : `Added ${added} · ${failed.length} couldn't be added.`;
+      this.snack.open(msg, undefined, { duration: 3000 });
+    } finally {
+      this.addingAll.set(false);
+      // Refresh once at the end so a partial success still reflects what landed.
+      if (added > 0) await this.loadEvents();
     }
   }
 
@@ -831,6 +1074,19 @@ export class FamilyCalendar implements OnDestroy {
     }
   }
 
+  /**
+   * Click a day/month/agenda event. The caller's OWN events open the editor; a read-only family-overlay event
+   * (another member's) can't be edited, so we just show a gentle note of whose it is.
+   */
+  openDayEvent(de: DayEvent): void {
+    if (de.overlay) {
+      this.snack.open(`${de.ev.title} — ${de.memberName ?? 'a family member'}'s event (view only).`,
+        undefined, { duration: 2600 });
+      return;
+    }
+    void this.edit(de.ev);
+  }
+
   /** Click an event to edit (or delete from within the editor). */
   async edit(ev: CalendarEvent): Promise<void> {
     const result = await this.openEditor({ event: ev });
@@ -877,10 +1133,35 @@ export class FamilyCalendar implements OnDestroy {
 
   // ---- Date helpers (browser local zone) ----
 
-  /** The Monday (local midnight) of the week containing `d`. */
-  private mondayOf(d: Date): Date {
-    const day = (d.getDay() + 6) % 7; // 0 = Monday
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+  /** The Sunday (local midnight) of the week containing `d` (weeks run Sunday→Saturday). */
+  private sundayOf(d: Date): Date {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
+  }
+
+  /** The first day (local midnight) of the month containing `d`. */
+  private firstOfMonth(d: Date): Date {
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }
+
+  /**
+   * Adapt a read-only overlay event (title + time only) into the CalendarEvent shape so it can reuse
+   * {@link spannedDays}/{@link timeLabel}. The id is synthetic + clearly non-editable; clicking it never opens
+   * the editor (the template guards on `overlay`). No location/notes/links are ever carried for another member.
+   */
+  private overlayToEvent(item: { title: string; startUtc: string | null; endUtc: string | null; allDay: boolean },
+                         userId: number): CalendarEvent {
+    return {
+      id: `overlay:${userId}:${item.startUtc ?? ''}:${item.title}`,
+      title: item.title,
+      startUtc: item.startUtc,
+      endUtc: item.endUtc,
+      allDay: item.allDay,
+      location: null,
+      description: null,
+      htmlLink: null,
+      hangoutLink: null,
+      isRecurring: false,
+    };
   }
 
   private toLocalDate(d: Date): string {
@@ -930,7 +1211,11 @@ export class FamilyCalendar implements OnDestroy {
 
   private compareDayEvents = (a: DayEvent, b: DayEvent): number => {
     if (a.ev.allDay !== b.ev.allDay) return a.ev.allDay ? -1 : 1;
-    return (a.ev.startUtc ?? '').localeCompare(b.ev.startUtc ?? '');
+    const byTime = (a.ev.startUtc ?? '').localeCompare(b.ev.startUtc ?? '');
+    if (byTime !== 0) return byTime;
+    // Tie-break: the caller's own events sort before read-only overlay events at the same time.
+    if (a.overlay !== b.overlay) return a.overlay ? 1 : -1;
+    return 0;
   };
 
   private messageOf(e: unknown, fallback: string): string {

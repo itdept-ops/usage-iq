@@ -1039,6 +1039,23 @@ public class AuthIntegrationTests(WebAppFactory factory)
     }
 
     [Fact]
+    public async Task Login_response_carries_the_saved_home_route()
+    {
+        // Regression: the post-login redirect navigates to auth.homeRoute(), which reads session.homeRoute —
+        // so the LOGIN response (not only /me) must carry it, or login always lands on the default page.
+        var email = $"home-login-{Guid.NewGuid():N}@test.local";
+        (await Client(WebAppFactory.AdminEmail).PostAsJsonAsync("/api/users",
+            new { email, isEnabled = true, permissions = new[] { "dashboard.view", "calendar.view" } }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+        (await PatchHome(Client(email), "/calendar")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var login = await GoogleLogin($"{email}|home-sub");
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await login.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("homeRoute").GetString().Should().Be("/calendar");
+    }
+
+    [Fact]
     public async Task Set_home_to_null_clears_it()
     {
         var c = await ProvisionUser("dashboard.view");

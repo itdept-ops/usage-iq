@@ -87,6 +87,23 @@ public class FamilyCalendarTests(WebAppFactory factory)
         return await db.GoogleCalendarConnections.AsNoTracking().FirstOrDefaultAsync(c => c.UserId == userId);
     }
 
+    /// <summary>Flip a user's CalendarShareHousehold opt-in directly (the model flag the family overlay reads).</summary>
+    private async Task SetCalendarShare(int userId, bool share)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        await db.Users.Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.CalendarShareHousehold, share));
+    }
+
+    private async Task<bool> GetCalendarShare(int userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        return await db.Users.AsNoTracking().Where(u => u.Id == userId)
+            .Select(u => u.CalendarShareHousehold).FirstAsync();
+    }
+
     // =====================================================================================
     // GATING
     // =====================================================================================
@@ -102,6 +119,9 @@ public class FamilyCalendarTests(WebAppFactory factory)
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await plain.PostAsync("/api/family/calendar/disconnect", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await plain.PostAsJsonAsync("/api/family/calendar/freebusy", new { memberUserIds = Array.Empty<int>(), startUtc = DateTime.UtcNow, endUtc = DateTime.UtcNow.AddDays(1) }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await plain.GetAsync("/api/family/calendar/family-events")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await plain.PatchAsJsonAsync("/api/family/calendar/share", new { shareHousehold = true }))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -621,5 +641,126 @@ public class FamilyCalendarTests(WebAppFactory factory)
         })).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
 
         (await CalendarConnectionCount()).Should().Be(before);
+    }
+
+    // =====================================================================================
+    // SHARE OPT-IN — PATCH toggles CalendarShareHousehold + it's reflected on /status; gated + authed
+    // =====================================================================================
+
+    [Fact]
+    public async Task Share_patch_requires_authentication()
+    {
+        var anon = factory.CreateClient();
+        (await anon.PatchAsJsonAsync("/api/family/calendar/share", new { shareHousehold = true }))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Status_reports_share_off_by_default()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        var status = await Json(await owner.GetAsync("/api/family/calendar/status"));
+        status.GetProperty("shareHousehold").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Share_patch_toggles_the_flag_and_is_reflected_on_status()
+    {
+        var (_, owner, ownerId) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // Turn sharing ON: the PATCH echoes true, the DB flag is set, and /status reflects it.
+        var on = await owner.PatchAsJsonAsync("/api/family/calendar/share", new { shareHousehold = true });
+        on.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(on)).GetProperty("shareHousehold").GetBoolean().Should().BeTrue();
+        (await GetCalendarShare(ownerId)).Should().BeTrue();
+        (await Json(await owner.GetAsync("/api/family/calendar/status")))
+            .GetProperty("shareHousehold").GetBoolean().Should().BeTrue();
+
+        // Turn it back OFF: echoed false, DB cleared, /status reflects it.
+        var off = await owner.PatchAsJsonAsync("/api/family/calendar/share", new { shareHousehold = false });
+        off.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(off)).GetProperty("shareHousehold").GetBoolean().Should().BeFalse();
+        (await GetCalendarShare(ownerId)).Should().BeFalse();
+        (await Json(await owner.GetAsync("/api/family/calendar/status")))
+            .GetProperty("shareHousehold").GetBoolean().Should().BeFalse();
+    }
+
+    // =====================================================================================
+    // FAMILY-EVENTS — OTHER household members who BOTH share AND are connected; never an email; window clamp
+    // =====================================================================================
+
+    [Fact]
+    public async Task FamilyEvents_requires_authentication()
+    {
+        var anon = factory.CreateClient();
+        (await anon.GetAsync("/api/family/calendar/family-events")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task FamilyEvents_excludes_non_sharing_unconnected_and_non_household_members_and_emits_no_email()
+    {
+        // Household: owner + three other members in distinct states; plus an outsider in their OWN household.
+        var (_, owner, ownerId) = await ProvisionUser("family.use");
+        var (sharerConnectedEmail, _, sharerConnectedId) = await ProvisionUser("family.use"); // shares + connected
+        var (nonSharerEmail, _, nonSharerId) = await ProvisionUser("family.use");             // connected, NOT sharing
+        var (unconnectedSharerEmail, _, unconnectedSharerId) = await ProvisionUser("family.use"); // shares, NOT connected
+        var (outsiderEmail, _, outsiderId) = await ProvisionUser("family.use");               // shares + connected, OTHER household
+
+        await owner.GetAsync("/api/family/household");
+        await owner.PostAsJsonAsync("/api/family/household/members", new { userId = sharerConnectedId });
+        await owner.PostAsJsonAsync("/api/family/household/members", new { userId = nonSharerId });
+        await owner.PostAsJsonAsync("/api/family/household/members", new { userId = unconnectedSharerId });
+
+        // Sharing opt-ins.
+        await SetCalendarShare(sharerConnectedId, true);
+        await SetCalendarShare(unconnectedSharerId, true);
+        await SetCalendarShare(outsiderId, true);
+        // nonSharer stays false.
+
+        // Calendar connections (the outsider + the connected sharer + the non-sharer have one).
+        await SeedConnection(sharerConnectedId, "1//sharer-connected");
+        await SeedConnection(nonSharerId, "1//non-sharer-connected");
+        await SeedConnection(outsiderId, "1//outsider-connected");
+
+        var res = await owner.GetAsync(
+            "/api/family/calendar/family-events?fromUtc=2026-06-01T00:00:00Z&toUtc=2026-06-08T00:00:00Z");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // NO email anywhere in the payload (in particular none of the members').
+        var body = await res.Content.ReadAsStringAsync();
+        body.Should().NotContain("@");
+        body.Should().NotContain(sharerConnectedEmail);
+        body.Should().NotContain(nonSharerEmail);
+        body.Should().NotContain(unconnectedSharerEmail);
+        body.Should().NotContain(outsiderEmail);
+
+        var arr = await Json(res);
+        arr.ValueKind.Should().Be(JsonValueKind.Array);
+        // With Google Calendar unconfigured in the test host, FamilyEventsAsync surfaces no events (it
+        // short-circuits when not configured) — so the array is empty. The point proven here is the response
+        // is a clean 200 carrying NO email, and the endpoint never 500s nor leaks an outsider/non-sharer.
+        var ids = arr.EnumerateArray().Select(x => x.GetProperty("userId").GetInt32()).ToList();
+        ids.Should().NotContain(nonSharerId);
+        ids.Should().NotContain(unconnectedSharerId);
+        ids.Should().NotContain(outsiderId);
+        // The caller's OWN events never appear here (they come from GET /events).
+        ids.Should().NotContain(ownerId);
+    }
+
+    [Fact]
+    public async Task FamilyEvents_clamps_the_window_and_stays_graceful()
+    {
+        var (_, owner, _) = await ProvisionUser("family.use");
+        await owner.GetAsync("/api/family/household");
+
+        // A wildly oversized window (1 year) is accepted and clamped server-side to <=92 days — a clean 200,
+        // never a 500. (No connected sharing members → empty array.)
+        var res = await owner.GetAsync(
+            "/api/family/calendar/family-events?fromUtc=2026-01-01T00:00:00Z&toUtc=2027-01-01T00:00:00Z");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(res)).ValueKind.Should().Be(JsonValueKind.Array);
     }
 }

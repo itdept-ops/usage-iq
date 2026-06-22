@@ -39,6 +39,10 @@ public static class FamilyCalendarEndpoints
 
     public sealed record FreeBusyRequest(int[]? MemberUserIds, DateTime StartUtc, DateTime EndUtc);
 
+    /// <summary>Body of <c>PATCH /api/family/calendar/share</c>: opt the caller in/out of sharing their
+    /// connected calendar's events with the household. Only meaningful once a calendar is connected.</summary>
+    public sealed record ShareRequest(bool ShareHousehold);
+
     /// <summary>The "Schedule with AI" request: the family member's free-text ("dentist next Friday 9am").
     /// <see cref="ReferenceDateUtc"/> anchors relative dates ("tomorrow"); defaults to the server's now.</summary>
     public sealed record ScheduleAiRequest(string? Text, DateTime? ReferenceDateUtc);
@@ -63,8 +67,20 @@ public static class FamilyCalendarEndpoints
         IReadOnlyList<ScheduleImageFile>? Files, DateTime? ReferenceDateUtc);
 
     // ---- Response DTOs ----
-    public sealed record StatusDto(bool Configured, bool Connected, bool ScopeOk);
+    /// <summary><see cref="ShareHousehold"/> echoes the caller's CalendarShareHousehold opt-in so the UI can
+    /// show the current state (only meaningful when <see cref="Connected"/> is true).</summary>
+    public sealed record StatusDto(bool Configured, bool Connected, bool ScopeOk, bool ShareHousehold);
     public sealed record ConnectedDto(bool Connected);
+
+    /// <summary>Echo of the caller's calendar share opt-in (returned by the share PATCH).</summary>
+    public sealed record ShareDto(bool ShareHousehold);
+
+    /// <summary>One shared event on a household member's calendar (title + time only; NEVER an email).</summary>
+    public sealed record FamilyEventDto(string Title, DateTime? StartUtc, DateTime? EndUtc, bool AllDay);
+
+    /// <summary>One OTHER household member's shared events for the overlay (identity by userId + display NAME
+    /// only; NEVER an email). Only members who BOTH opted in AND connected a calendar appear.</summary>
+    public sealed record FamilyMemberEventsDto(int UserId, string Name, IReadOnlyList<FamilyEventDto> Events);
 
     /// <summary>An event on the caller's calendar (mirrors GoogleCalendarService.CalendarEvent).
     /// <see cref="IsRecurring"/> flags an event that is part of a recurring series (for a UI badge).</summary>
@@ -115,14 +131,34 @@ public static class FamilyCalendarEndpoints
 
         // ---- GET /status : is calendar configured (client secret present) + is the caller connected ----
         g.MapGet("/status", async (
-            CurrentUserAccessor me, GoogleCalendarService cal, CancellationToken ct) =>
+            CurrentUserAccessor me, GoogleCalendarService cal, UsageDbContext db, CancellationToken ct) =>
         {
             var caller = (await me.GetUserAsync(ct))!;
             var connected = cal.IsConfigured && await cal.IsConnectedAsync(caller.Id, ct);
             // scopeOk distinguishes "connected but calendar.events scope was never granted" (reconnect) from
             // a working connection (then a create failure points at the Calendar API being disabled instead).
             var scopeOk = connected && await cal.HasEventScopeAsync(caller.Id, ct);
-            return Results.Ok(new StatusDto(cal.IsConfigured, connected, scopeOk));
+            // Surface the caller's calendar-sharing opt-in so the UI shows the current toggle state (only
+            // meaningful when connected — sharing an unconnected calendar overlays nothing).
+            var share = await db.Users.AsNoTracking()
+                .Where(u => u.Id == caller.Id).Select(u => u.CalendarShareHousehold).FirstOrDefaultAsync(ct);
+            return Results.Ok(new StatusDto(cal.IsConfigured, connected, scopeOk, share));
+        });
+
+        // ---- PATCH /share : opt the caller in/out of sharing their calendar events with the household ----
+        // Gated by family.use (the section gate) like every endpoint here; no NEW permission — the per-user
+        // flag + having a connected calendar are what gate the overlay. Only meaningful once connected, but
+        // we allow toggling the preference regardless so the UI can set intent before/after connecting.
+        g.MapPatch("/share", async (
+            ShareRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var user = await db.Users.FirstOrDefaultAsync(u => u.Id == caller.Id, ct);
+            if (user is null) return Results.Forbid();
+
+            user.CalendarShareHousehold = req.ShareHousehold;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new ShareDto(user.CalendarShareHousehold));
         });
 
         // ---- POST /connect : exchange the auth code for tokens; store the encrypted refresh token ----
@@ -237,6 +273,41 @@ public static class FamilyCalendarEndpoints
             var dtos = busy.Select(mb => new MemberBusyDto(
                 mb.UserId, mb.Name,
                 mb.Busy.Select(b => new BusyBlockDto(b.StartUtc, b.EndUtc)).ToList())).ToList();
+            return Results.Ok(dtos);
+        }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
+
+        // ---- GET /family-events?fromUtc=&toUtc= : OTHER household members' shared calendar events (overlay) ----
+        // Gated by family.use only (NO new permission). For each OTHER member of the caller's household who has
+        // CalendarShareHousehold=true AND a CONNECTED calendar, read that member's primary events over the
+        // window via THEIR OWN minted token (FamilyEventsAsync extends the per-member-token pattern to read
+        // events, not just busy). Identity is userId + display NAME only — NEVER an email. The caller's OWN
+        // events are NOT included here (they come from GET /events). Members who don't share, aren't connected,
+        // or aren't in the household are excluded entirely; a single member's fetch failing is swallowed.
+        g.MapGet("/family-events", async (
+            DateTime? fromUtc, DateTime? toUtc, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsageDbContext db, GoogleCalendarService cal, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+            // A month view can span ~6 weeks; clamp the window at 92 days so the overlay can't enumerate an
+            // unbounded range across multiple members.
+            var (start, end) = FamilyWindow(fromUtc, toUtc);
+
+            // OTHER members of the caller's household (privacy: only the caller's own family) who opted IN.
+            // The connected-calendar gate is enforced naturally by FamilyEventsAsync (it mints each member's
+            // own token and SKIPS anyone unconnected). Identity is userId + name (NEVER email).
+            var sharers = await db.HouseholdMembers.AsNoTracking()
+                .Where(m => m.HouseholdId == household.Id && m.UserId != caller.Id)
+                .Join(db.Users.AsNoTracking(), m => m.UserId, u => u.Id, (m, u) => new { u.Id, u.Name, u.CalendarShareHousehold })
+                .Where(x => x.CalendarShareHousehold)
+                .ToListAsync(ct);
+
+            var memberEvents = await cal.FamilyEventsAsync(
+                sharers.Select(s => (s.Id, string.IsNullOrEmpty(s.Name) ? "Unknown user" : s.Name)), start, end, ct);
+
+            var dtos = memberEvents.Select(mev => new FamilyMemberEventsDto(
+                mev.UserId, mev.Name,
+                mev.Events.Select(e => new FamilyEventDto(e.Title, e.StartUtc, e.EndUtc, e.AllDay)).ToList())).ToList();
             return Results.Ok(dtos);
         }).RequireRateLimiting(AiEndpoints.RateLimitPolicy);
 
@@ -568,6 +639,21 @@ public static class FamilyCalendarEndpoints
         if (end <= start) end = start.AddDays(1);
         // Cap the span at ~1 year so a runaway window can't enumerate the whole calendar.
         if (end - start > TimeSpan.FromDays(366)) end = start.AddDays(366);
+        return (DateTime.SpecifyKind(start, DateTimeKind.Utc), DateTime.SpecifyKind(end, DateTimeKind.Utc));
+    }
+
+    /// <summary>
+    /// Resolve a [start, end) window for the family overlay with a TIGHTER cap than <see cref="Window"/>:
+    /// a month view spans at most ~6 weeks, so the span is clamped to 92 days. This bounds how much each
+    /// shared member's calendar can be enumerated in one overlay request.
+    /// </summary>
+    private static (DateTime Start, DateTime End) FamilyWindow(DateTime? fromUtc, DateTime? toUtc)
+    {
+        var now = DateTime.UtcNow;
+        var start = fromUtc ?? now;
+        var end = toUtc ?? start.AddDays(7);
+        if (end <= start) end = start.AddDays(1);
+        if (end - start > TimeSpan.FromDays(92)) end = start.AddDays(92);
         return (DateTime.SpecifyKind(start, DateTimeKind.Utc), DateTime.SpecifyKind(end, DateTimeKind.Utc));
     }
 

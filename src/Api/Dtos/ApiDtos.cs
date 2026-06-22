@@ -478,6 +478,9 @@ public sealed class AuthResultDto
     public string? Picture { get; set; }
     public DateTime ExpiresAtUtc { get; set; }
     public string[] Permissions { get; set; } = Array.Empty<string>();
+    /// <summary>The caller's saved landing-page preference (null = default first-accessible page). Carried
+    /// on the LOGIN response too — not just /me — so the post-login redirect honours it immediately.</summary>
+    public string? HomeRoute { get; set; }
 }
 
 public sealed class AuthConfigDto

@@ -1,6 +1,8 @@
 /* Family Hub F6 — calendar page. Reuses the family tech tokens (soft surfaces, gentle accents). A clean
-   week grid + an agenda list, plus the connect/disconnect surfaces. Mobile-friendly: the week grid scrolls
-   horizontally on narrow screens; the agenda is a comfortable single column. No email is ever rendered. */
+   week grid (Sun→Sat), a month grid (6×7, Sun→Sat), and an agenda list, plus the connect/disconnect surfaces
+   and the family overlay (other members' color-coded, read-only events) + its legend/share controls.
+   Mobile-friendly: the week + month grids scroll horizontally on narrow screens; the agenda is a comfortable
+   single column. No email is ever rendered. */
 
 /* ── Connect / not-configured panel ─────────────────────────────────── */
 .cal-connect {
@@ -86,6 +88,72 @@
   white-space: nowrap;
 }
 
+/* ── Family overlay controls (share opt-in + legend & show/hide toggle) ── */
+.cal-overlay-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tech-space-2, 8px) var(--tech-space-3, 12px);
+  margin-top: var(--tech-space-3, 12px);
+}
+
+.cal-overlay-bar__share {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  mat-icon { width: 18px; height: 18px; font-size: 18px; }
+  mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+
+  &--on {
+    border-color: var(--tech-accent);
+    color: var(--tech-accent);
+    background: color-mix(in srgb, var(--tech-accent) 10%, transparent);
+  }
+}
+
+.cal-overlay-bar__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tech-text-secondary);
+  font-weight: 600;
+  mat-icon { width: 18px; height: 18px; font-size: 18px; }
+}
+
+.cal-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tech-space-2, 8px) var(--tech-space-3, 12px);
+}
+
+.cal-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+}
+
+.cal-legend__dot {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.cal-legend__name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14rem;
+}
+
 /* ── Schedule with AI ───────────────────────────────────────────────── */
 .cal-ai {
   margin-top: var(--tech-space-3, 12px);
@@ -169,6 +237,31 @@
   display: flex;
   flex-direction: column;
   gap: var(--tech-space-2, 8px);
+}
+
+/* "Add all (N)" header above the proposal cards (shown only when there's more than one). */
+.cal-ai__cards-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--tech-space-2, 8px);
+  margin-top: var(--tech-space-3, 12px);
+}
+
+.cal-ai__cards-count {
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  color: var(--tech-text-secondary);
+}
+
+.cal-ai__addall {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
 }
 
 /* ── ✨ Best time for X (cyan-accented variant of the AI bar) ────────── */
@@ -361,6 +454,9 @@
 }
 
 .cal-event {
+  /* The accent the event paints with: the caller's own events default to --tech-accent; a family-overlay
+     event sets --cal-ev-color to its owning member's palette color via an inline style. */
+  --cal-ev-color: var(--tech-accent);
   appearance: none;
   text-align: left;
   cursor: pointer;
@@ -369,17 +465,29 @@
   gap: 1px;
   padding: 4px 8px;
   border: 0;
-  border-left: 3px solid var(--tech-accent);
+  border-left: 3px solid var(--cal-ev-color);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--tech-accent) 12%, var(--tech-panel));
+  background: color-mix(in srgb, var(--cal-ev-color) 12%, var(--tech-panel));
   color: var(--tech-text);
   transition: filter 0.12s ease;
   &:hover { filter: brightness(1.08); }
 
   &--allday {
-    border-left-color: var(--tech-accent-cyan);
-    background: color-mix(in srgb, var(--tech-accent-cyan) 14%, var(--tech-panel));
+    border-left-color: var(--cal-ev-color, var(--tech-accent-cyan));
+    background: color-mix(in srgb, var(--cal-ev-color, var(--tech-accent-cyan)) 14%, var(--tech-panel));
   }
+
+  /* A read-only family-overlay event: dashed left edge + no edit affordance to signal "view only". */
+  &--overlay {
+    border-left-style: dashed;
+    background: color-mix(in srgb, var(--cal-ev-color) 9%, var(--tech-panel));
+  }
+}
+
+.cal-event__lock {
+  width: 11px; height: 11px; font-size: 11px;
+  vertical-align: middle;
+  color: var(--tech-text-tertiary);
 }
 
 .cal-event__time {
@@ -394,6 +502,132 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Month grid (6 rows × 7 columns, Sun→Sat) ───────────────────────── */
+.cal-month {
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius, 12px);
+  background: var(--tech-panel);
+  padding: var(--tech-space-3, 12px);
+  overflow-x: auto;
+}
+
+.cal-month__head,
+.cal-month__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--tech-space-2, 8px);
+  /* Keep all 7 columns readable on narrow screens by letting the whole grid scroll horizontally. */
+  min-width: 560px;
+}
+
+.cal-month__head { margin-bottom: var(--tech-space-2, 8px); }
+
+.cal-month__weekday {
+  text-align: center;
+  font-size: var(--tech-fs-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tech-text-tertiary);
+}
+
+.cal-mcell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 96px;
+  padding: 4px;
+  border-radius: var(--tech-r-control, 10px);
+  background: var(--tech-bg-sunken);
+  border: 1px solid var(--tech-border-subtle);
+
+  /* Leading/trailing days from the adjacent months read quieter than the current month's days. */
+  &--out {
+    background: transparent;
+    .cal-mcell__num { color: var(--tech-text-tertiary); font-weight: 600; }
+    opacity: 0.7;
+  }
+
+  &--today {
+    border-color: var(--tech-accent);
+    background: color-mix(in srgb, var(--tech-accent) 8%, var(--tech-bg-sunken));
+    .cal-mcell__num { color: var(--tech-accent); }
+  }
+}
+
+.cal-mcell__num {
+  align-self: flex-end;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: var(--tech-fs-label);
+  font-weight: 700;
+  color: var(--tech-text);
+  &:hover { background: color-mix(in srgb, var(--tech-accent) 12%, transparent); }
+}
+
+.cal-mcell__events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cal-mev {
+  --cal-ev-color: var(--tech-accent);
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--cal-ev-color) 12%, var(--tech-panel));
+  color: var(--tech-text);
+  transition: filter 0.12s ease;
+  &:hover { filter: brightness(1.08); }
+
+  &--allday { background: color-mix(in srgb, var(--cal-ev-color) 16%, var(--tech-panel)); }
+
+  /* A read-only overlay event: a hollow dot + softer fill, no edit affordance. */
+  &--overlay {
+    background: color-mix(in srgb, var(--cal-ev-color) 8%, var(--tech-panel));
+    .cal-mev__dot { background: transparent; border: 1.5px solid var(--cal-ev-color); }
+  }
+}
+
+.cal-mev__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cal-ev-color);
+}
+
+.cal-mev__text {
+  min-width: 0;
+  font-size: var(--tech-fs-micro, 11px);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-mev__time { color: var(--tech-text-secondary); margin-right: 2px; }
+
+.cal-mcell__more {
+  font-size: var(--tech-fs-micro, 11px);
+  font-weight: 600;
+  color: var(--tech-text-tertiary);
+  padding: 0 5px;
 }
 
 /* ── Agenda list ────────────────────────────────────────────────────── */
@@ -484,6 +718,26 @@
   mat-icon { width: 14px; height: 14px; font-size: 14px; }
 }
 
+/* A read-only family-overlay agenda item: its owning member's color edge + a "view only" owner line. */
+.cal-agenda__item--overlay {
+  --cal-ev-color: var(--tech-accent);
+  border-left: 3px dashed var(--cal-ev-color);
+  cursor: default;
+  &:hover {
+    border-color: var(--cal-ev-color);
+    background: color-mix(in srgb, var(--cal-ev-color) 6%, var(--tech-panel));
+  }
+}
+
+.cal-agenda__owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--tech-fs-label);
+  color: var(--cal-ev-color, var(--tech-text-tertiary));
+  mat-icon { width: 13px; height: 13px; font-size: 13px; }
+}
+
 .cal-agenda__chev {
   flex: 0 0 auto;
   color: var(--tech-text-tertiary);
@@ -534,6 +788,9 @@
   .cal-week {
     grid-template-columns: repeat(7, minmax(120px, 1fr));
   }
+  /* The month grid keeps all 7 columns and scrolls horizontally (min-width set on the grid itself). */
+  .cal-mcell { min-height: 78px; }
+  .cal-overlay-bar { gap: 8px; }
   .cal-toolbar__nav { flex-wrap: wrap; }
   .cal-toolbar__range { margin-left: 0; }
   .cal-toolbar__updated { flex-basis: 100%; }

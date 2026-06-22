@@ -68,14 +68,16 @@
 
     <div class="cal-toolbar">
       <div class="cal-toolbar__nav">
-        <button mat-icon-button aria-label="Previous week" (click)="prevWeek()">
+        <button mat-icon-button [attr.aria-label]="view() === 'month' ? 'Previous month' : 'Previous week'"
+                (click)="prevWeek()">
           <mat-icon>chevron_left</mat-icon>
         </button>
         <button mat-stroked-button class="cal-toolbar__today" (click)="today()">Today</button>
-        <button mat-icon-button aria-label="Next week" (click)="nextWeek()">
+        <button mat-icon-button [attr.aria-label]="view() === 'month' ? 'Next month' : 'Next week'"
+                (click)="nextWeek()">
           <mat-icon>chevron_right</mat-icon>
         </button>
-        <span class="cal-toolbar__range">{{ rangeLabel() }}</span>
+        <span class="cal-toolbar__range">{{ view() === 'month' ? monthLabel() : rangeLabel() }}</span>
         <button mat-icon-button class="cal-toolbar__refresh" aria-label="Refresh events"
                 matTooltip="Refresh" [disabled]="loadingEvents()" (click)="refresh()">
           @if (loadingEvents()) {
@@ -91,10 +93,16 @@
 
       <div class="cal-toolbar__actions">
         <mat-button-toggle-group class="cal-toolbar__view" [value]="view()" hideSingleSelectionIndicator>
-          <mat-button-toggle value="week" (click)="setView('week')" aria-label="Week view">
+          <mat-button-toggle value="week" (click)="setView('week')" aria-label="Week view"
+                             matTooltip="Week">
             <mat-icon>view_week</mat-icon>
           </mat-button-toggle>
-          <mat-button-toggle value="agenda" (click)="setView('agenda')" aria-label="Agenda view">
+          <mat-button-toggle value="month" (click)="setView('month')" aria-label="Month view"
+                             matTooltip="Month">
+            <mat-icon>calendar_view_month</mat-icon>
+          </mat-button-toggle>
+          <mat-button-toggle value="agenda" (click)="setView('agenda')" aria-label="Agenda view"
+                             matTooltip="Agenda">
             <mat-icon>view_agenda</mat-icon>
           </mat-button-toggle>
         </mat-button-toggle-group>
@@ -112,6 +120,42 @@
       </div>
     </div>
 
+    <!-- Family overlay controls: share-my-calendar opt-in + the per-member legend & show/hide toggle. -->
+    <div class="cal-overlay-bar">
+      <button mat-stroked-button class="cal-overlay-bar__share" type="button"
+              [class.cal-overlay-bar__share--on]="shareHousehold()"
+              [disabled]="sharingBusy()" (click)="toggleShare()"
+              [matTooltip]="shareHousehold()
+                ? 'Your events are visible to your household'
+                : 'Let your household see your events (title + time only)'">
+        @if (sharingBusy()) {
+          <mat-spinner [diameter]="16" />
+        } @else {
+          <mat-icon aria-hidden="true">{{ shareHousehold() ? 'group' : 'group_off' }}</mat-icon>
+        }
+        <span>Share my calendar</span>
+      </button>
+
+      @if (overlayMembers().length) {
+        <button mat-button type="button" class="cal-overlay-bar__toggle" (click)="toggleOverlay()"
+                [attr.aria-pressed]="showOverlay()"
+                [matTooltip]="showOverlay() ? 'Hide family events' : 'Show family events'">
+          <mat-icon aria-hidden="true">{{ showOverlay() ? 'visibility' : 'visibility_off' }}</mat-icon>
+          <span>Family events</span>
+        </button>
+        @if (showOverlay()) {
+          <ul class="cal-legend" aria-label="Family calendar legend">
+            @for (m of overlayMembers(); track m.userId) {
+              <li class="cal-legend__item">
+                <span class="cal-legend__dot" [style.background]="m.color" aria-hidden="true"></span>
+                <span class="cal-legend__name">{{ m.name }}</span>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </div>
+
     <!-- Schedule with AI -->
     <section class="cal-ai" aria-label="Schedule with AI">
       <div class="cal-ai__bar">
@@ -120,15 +164,16 @@
           <mat-label>Schedule with AI</mat-label>
           <input matInput [ngModel]="aiText()" (ngModelChange)="aiText.set($event)"
                  (keydown.enter)="scheduleWithAi()" maxlength="600"
-                 placeholder="e.g. soccer every Tuesday at 4pm" [disabled]="aiBusy()" />
+                 placeholder="e.g. soccer every Tuesday at 4pm" [disabled]="aiBusy() || addingAll()" />
           @if (aiText()) {
-            <button mat-icon-button matSuffix aria-label="Clear" (click)="clearAi()" [disabled]="aiBusy()">
+            <button mat-icon-button matSuffix aria-label="Clear" (click)="clearAi()"
+                    [disabled]="aiBusy() || addingAll()">
               <mat-icon>close</mat-icon>
             </button>
           }
         </mat-form-field>
         <button mat-flat-button color="primary" class="cal-ai__go"
-                [disabled]="aiBusy() || !aiText().trim()" (click)="scheduleWithAi()">
+                [disabled]="aiBusy() || addingAll() || !aiText().trim()" (click)="scheduleWithAi()">
           @if (aiBusy()) {
             <mat-spinner [diameter]="18" />
             <span>Thinking…</span>
@@ -143,7 +188,7 @@
            (dragover)="onUploadDragOver($event)" (dragleave)="onUploadDragLeave($event)"
            (drop)="onUploadDrop($event)">
         <button mat-stroked-button type="button" class="cal-upload__btn"
-                [disabled]="uploadBusy()" (click)="triggerUpload()"
+                [disabled]="uploadBusy() || addingAll()" (click)="triggerUpload()"
                 aria-label="Upload a schedule image or PDF to pull events out of it">
           @if (uploadBusy()) {
             <mat-spinner [diameter]="18" />
@@ -166,6 +211,23 @@
       }
 
       @if (proposals().length) {
+        @if (proposals().length > 1) {
+          <div class="cal-ai__cards-head">
+            <span class="cal-ai__cards-count">{{ proposals().length }} proposed events</span>
+            <button mat-flat-button color="primary" type="button" class="cal-ai__addall"
+                    [disabled]="addingAll()" (click)="addAll()">
+              @if (addingAll()) {
+                <mat-spinner [diameter]="16" />
+                <span>Adding…</span>
+              } @else {
+                <ng-container>
+                  <mat-icon aria-hidden="true">playlist_add_check</mat-icon>
+                  <span>Add all ({{ proposals().length }})</span>
+                </ng-container>
+              }
+            </button>
+          </div>
+        }
         <ul class="cal-ai__cards">
           @for (p of proposals(); track $index) {
             <li class="cal-ai-card">
@@ -188,14 +250,16 @@
                 </div>
               </div>
               <div class="cal-ai-card__actions">
-                <button mat-button type="button" (click)="editProposal(p)" [disabled]="p.saving">
+                <button mat-button type="button" (click)="editProposal(p)"
+                        [disabled]="p.saving || addingAll()">
                   <mat-icon aria-hidden="true">edit</mat-icon> Edit
                 </button>
-                <button mat-button type="button" (click)="dismissProposal(p)" [disabled]="p.saving">
+                <button mat-button type="button" (click)="dismissProposal(p)"
+                        [disabled]="p.saving || addingAll()">
                   Dismiss
                 </button>
                 <button mat-flat-button color="primary" type="button" (click)="addProposal(p)"
-                        [disabled]="p.saving">
+                        [disabled]="p.saving || addingAll()">
                   @if (p.saving) {
                     <mat-spinner [diameter]="16" />
                   } @else {
@@ -218,15 +282,17 @@
           <mat-label>Best time for…</mat-label>
           <input matInput [ngModel]="bestText()" (ngModelChange)="bestText.set($event)"
                  (keydown.enter)="findBestTime()" maxlength="600"
-                 placeholder="e.g. a 45-min slot for the dentist next week, mornings" [disabled]="bestBusy()" />
+                 placeholder="e.g. a 45-min slot for the dentist next week, mornings"
+                 [disabled]="bestBusy() || addingAll()" />
           @if (bestText()) {
-            <button mat-icon-button matSuffix aria-label="Clear" (click)="clearBest()" [disabled]="bestBusy()">
+            <button mat-icon-button matSuffix aria-label="Clear" (click)="clearBest()"
+                    [disabled]="bestBusy() || addingAll()">
               <mat-icon>close</mat-icon>
             </button>
           }
         </mat-form-field>
         <button mat-flat-button color="primary" class="cal-ai__go"
-                [disabled]="bestBusy() || !bestText().trim()" (click)="findBestTime()">
+                [disabled]="bestBusy() || addingAll() || !bestText().trim()" (click)="findBestTime()">
           @if (bestBusy()) {
             <mat-spinner [diameter]="18" />
             <span>Thinking…</span>
@@ -283,7 +349,7 @@
     }
 
     @if (view() === 'week') {
-      <!-- Week grid -->
+      <!-- Week grid (Sun→Sat) -->
       <div class="cal-week" aria-label="Week view">
         @for (col of days(); track col.iso) {
           <div class="cal-day" [class.cal-day--today]="col.isToday">
@@ -294,12 +360,17 @@
             </button>
             <div class="cal-day__events">
               @for (de of col.events; track de.ev.id) {
-                <button class="cal-event" type="button" (click)="edit(de.ev)"
-                        [class.cal-event--allday]="de.ev.allDay" [matTooltip]="de.ev.title">
+                <button class="cal-event" type="button" (click)="openDayEvent(de)"
+                        [class.cal-event--allday]="de.ev.allDay" [class.cal-event--overlay]="de.overlay"
+                        [style.--cal-ev-color]="de.color || null"
+                        [matTooltip]="de.overlay ? de.ev.title + ' · ' + de.memberName : de.ev.title">
                   <span class="cal-event__time">
                     {{ de.timeLabel }}
                     @if (de.ev.isRecurring) {
                       <mat-icon class="cal-event__repeat" aria-label="Repeats" matTooltip="Repeats">repeat</mat-icon>
+                    }
+                    @if (de.overlay) {
+                      <mat-icon class="cal-event__lock" aria-label="View only" matTooltip="View only">lock</mat-icon>
                     }
                   </span>
                   <span class="cal-event__title">{{ de.ev.title }}</span>
@@ -311,6 +382,41 @@
             </div>
           </div>
         }
+      </div>
+    } @else if (view() === 'month') {
+      <!-- Month grid: 6 rows × 7 columns, Sun→Sat -->
+      <div class="cal-month" aria-label="Month view">
+        <div class="cal-month__head" aria-hidden="true">
+          @for (wd of weekdayHeaders(); track $index) {
+            <span class="cal-month__weekday">{{ wd }}</span>
+          }
+        </div>
+        <div class="cal-month__grid">
+          @for (cell of monthCells(); track cell.iso) {
+            <div class="cal-mcell" [class.cal-mcell--today]="cell.isToday"
+                 [class.cal-mcell--out]="!cell.inMonth">
+              <button class="cal-mcell__num" type="button" (click)="create(cell.iso)"
+                      [matTooltip]="'Add an event on ' + cell.iso">{{ cell.dayNum }}</button>
+              <div class="cal-mcell__events">
+                @for (de of cell.events; track de.ev.id) {
+                  <button class="cal-mev" type="button" (click)="openDayEvent(de)"
+                          [class.cal-mev--allday]="de.ev.allDay" [class.cal-mev--overlay]="de.overlay"
+                          [style.--cal-ev-color]="de.color || null"
+                          [matTooltip]="de.overlay ? de.ev.title + ' · ' + de.memberName : de.ev.title">
+                    <span class="cal-mev__dot" aria-hidden="true"></span>
+                    <span class="cal-mev__text">
+                      @if (!de.ev.allDay) { <span class="cal-mev__time">{{ de.timeLabel }}</span> }
+                      {{ de.ev.title }}
+                    </span>
+                  </button>
+                }
+                @if (cell.moreCount > 0) {
+                  <span class="cal-mcell__more">+{{ cell.moreCount }} more</span>
+                }
+              </div>
+            </div>
+          }
+        </div>
       </div>
     } @else {
       <!-- Agenda list -->
@@ -325,7 +431,9 @@
               <ul class="cal-agenda__list">
                 @for (de of col.events; track de.ev.id) {
                   <li>
-                    <button class="cal-agenda__item" type="button" (click)="edit(de.ev)">
+                    <button class="cal-agenda__item" type="button" (click)="openDayEvent(de)"
+                            [class.cal-agenda__item--overlay]="de.overlay"
+                            [style.--cal-ev-color]="de.color || null">
                       <span class="cal-agenda__time">{{ rangeFor(de.ev) }}</span>
                       <span class="cal-agenda__body">
                         <span class="cal-agenda__title">
@@ -334,13 +442,19 @@
                             <mat-icon class="cal-agenda__repeat" aria-label="Repeats" matTooltip="Repeats">repeat</mat-icon>
                           }
                         </span>
-                        @if (de.ev.location) {
+                        @if (de.overlay) {
+                          <span class="cal-agenda__owner">
+                            <mat-icon aria-hidden="true">lock</mat-icon>{{ de.memberName }} · view only
+                          </span>
+                        } @else if (de.ev.location) {
                           <span class="cal-agenda__loc">
                             <mat-icon aria-hidden="true">place</mat-icon>{{ de.ev.location }}
                           </span>
                         }
                       </span>
-                      <mat-icon class="cal-agenda__chev" aria-hidden="true">chevron_right</mat-icon>
+                      @if (!de.overlay) {
+                        <mat-icon class="cal-agenda__chev" aria-hidden="true">chevron_right</mat-icon>
+                      }
                     </button>
                   </li>
                 }

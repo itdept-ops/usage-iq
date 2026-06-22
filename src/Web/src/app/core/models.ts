@@ -2082,6 +2082,33 @@ export interface CalendarStatus {
   /** True when the connection actually granted the calendar.events scope. When connected but this is false,
    *  the calendar permission wasn't allowed at consent — the user should disconnect + reconnect. */
   scopeOk?: boolean;
+  /** The caller's "share my calendar with the household" opt-in (mirrors StatusDto.ShareHousehold). Only
+   *  meaningful when `connected`; when true, the caller's events show in their household's overlay. */
+  shareHousehold?: boolean;
+}
+
+/**
+ * One shared event on a household member's calendar for the family overlay (mirrors FamilyEventDto): title +
+ * time ONLY. Times are ISO UTC instants (null only for malformed source events). Overlay events are
+ * READ-ONLY — never an id, location, notes, or any email/other identifying detail.
+ */
+export interface FamilyEventItem {
+  title: string;
+  startUtc: string | null;
+  endUtc: string | null;
+  allDay: boolean;
+}
+
+/**
+ * One OTHER household member's shared events for the calendar overlay (GET /api/family/calendar/family-events;
+ * mirrors FamilyMemberEventsDto). Identity is `userId` + display `name` ONLY — NEVER an email. Only members
+ * who BOTH opted in (shareHousehold) AND connected a calendar appear. The caller's own events are NOT here
+ * (they come from GET /events). `userId` keys the stable per-member overlay color.
+ */
+export interface FamilyMemberEvents {
+  userId: number;
+  name: string;
+  events: FamilyEventItem[];
 }
 
 /**
