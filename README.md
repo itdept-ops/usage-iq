@@ -1,14 +1,29 @@
 <img src="docs/usage-iq-icon.png" width="72" align="right" alt="Usage IQ" />
 
-# Usage IQ
+# Usage IQ — *the Hub*
 
-A self-hosted **workspace** built around **AI usage intelligence** — and grown into the team app around it. At its core it **filters and visualizes your AI coding-agent token usage** — your "ccusage", across **multiple tools** (Claude Code + OpenAI Codex), with charts, cost, and drill-down. It reads each tool's local `*.jsonl` logs directly, de-duplicates and prices every message, stores it in **PostgreSQL**, and serves a filterable **Angular** dashboard from a **.NET 9** API. Around that anchor it adds **real-time team chat & notifications** and a **food & fitness tracker** — all behind one Google sign-in and one granular permission catalog.
+A self-hosted **personal + family hub** and an end-to-end **showcase of full-stack + agentic-AI engineering**. It began as **AI usage intelligence** — filter and visualize your AI coding-agent token spend across **Claude Code + OpenAI Codex** — and grew into an *agentic-OS-lite* for everyday life: a **Family Hub** (shared calendar, lists, meals, chores, finance, locations, a private cycle tracker), a **food & fitness life tracker**, **real-time team chat**, and **AI woven throughout** — all behind **one Google sign-in**, **one granular permission catalog**, and a per-user **home-page picker** so each person lands where they live.
+
+One Angular 21 SPA, one .NET 9 API, one PostgreSQL database. Live at **[usageiq.online](https://usageiq.online)** (auto-deployed to AWS on push-to-main).
 
 [![CI](https://github.com/itdept-ops/usage-iq/actions/workflows/ci.yml/badge.svg)](https://github.com/itdept-ops/usage-iq/actions/workflows/ci.yml)
 
 <a href="https://www.buymeacoffee.com/itdept"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=itdept&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" alt="Buy me a coffee" /></a>
 
-> Built with Angular 21 · .NET 9 · EF Core · PostgreSQL · SignalR · Docker · ECharts · AWS.
+> Built with Angular 21 (standalone + signals) · .NET 9 minimal API · EF Core · PostgreSQL · SignalR · Google Gemini · Leaflet · ECharts · Docker · AWS.
+
+## What's inside
+
+Usage IQ is several products under one roof — each gated by its own permissions, so you grant exactly what a friend, family member, teammate, or your kids should see:
+
+| Pillar | What it is |
+| --- | --- |
+| 🧠 **AI usage intelligence** | The original core — multi-tool token/cost analytics with dedup, pricing, fleet leaderboards, a usage heatmap, public share links, and a remote reporter/desktop agent. |
+| 🏡 **Family Hub** | A household OS — shared **calendar** (Google-synced), **lists**, **notes**, **reminders**, **meal planner**, **chores**, **polls**, **finance**, **"Where's everyone"** locations, and a private **cycle** calendar. |
+| 💪 **Fitness & life tracker** | A food + exercise log with macros (USDA/FatSecret/barcode), workouts (library + WorkoutX), body stats, **hydration**, watch activity, and a weight trend — shareable read-only with your circle. |
+| 💬 **Team chat** | Real-time SignalR channels + DMs with reactions, typing, unread, and in-app/browser notifications. |
+| 📍 **Locations** | Opt-in GPS — your own private history map, fleet machines by IP-geo, and an admin/family map. |
+| ✨ **AI everywhere** | Google Gemini woven through the Hub — schedule-from-photo, day/meal/finance coaches, a family assistant — strictly **gated** and **off by default** for everyone. |
 
 ![Usage IQ dashboard](docs/screenshots/dashboard.png)
 
@@ -95,6 +110,29 @@ A per-user **food & fitness log** with a daily calorie/macro roll-up against a g
 - **Watch activity** — daily **steps, distance, and active calories** that factor into the day's **net calories** (add-on or override).
 - **Sharing** — flip on *share with contacts* to let your **chat circle** view your log read-only; coaches/admins with `tracker.viewall` can view everyone. **Writes are owner-only** — a viewer can look but never edit — and private body metrics (weight, BMI/BMR/TDEE) are never exposed to a viewer.
 
+## Family Hub
+
+A warm, household-private section (gated by `family.use`) that turns the app into a shared family operating system. Members belong to a **household**; everything below is scoped to it.
+
+- **Calendar** — a Sunday–Saturday week / **month** / agenda calendar backed by each member's **own Google Calendar** (OAuth code flow, encrypted refresh token; the secret never touches the browser). Create/edit/delete events, find a free time across members, **bulk-add** AI-extracted events, and — with each member's opt-in — see a **color-coded family overlay** of everyone's events. Drop in a **photo/PDF/screenshot of a schedule** and AI drafts the events for you to confirm (images are digested, never stored).
+- **Meal planner ↔ macros ↔ grocery ↔ tracker** — plan the week's meals; the planner pulls each meal's **macros**, can push a planned meal straight into your **fitness tracker** as a logged meal, and extrapolates ingredients into the **grocery list** — all from the same data.
+- **Lists · Notes · Reminders · Timer · Polls** — shared grocery/to-do/wish lists, family notes, nudges, shared countdowns, and "pick a time / settle a plan" polls.
+- **Finance** — extra-sensitive, double-gated by `family.finance` on top of `family.use`; budgets, bills, and balances with an "explain my month" + money-coach AI.
+- **"Where's everyone"** — a household finder map of members who've opted into location sharing (see **Locations**).
+- **Cycle** — a **private, non-medical** menstrual-cycle calendar (gated by `cycle.track`, granted deliberately). Owner-only entries; deterministic next-period + fertile-window estimates with an optional gentle AI note; an opt-in to overlay **only predicted phases** onto the family calendar — raw entries are never shared, and no image or email ever leaves.
+
+## Locations
+
+Opt-in location, **private by default** (gated by `location.self`; sharing by `location.share`; admin view-all by `location.view-all`).
+
+- **My locations** — your own history on a **Leaflet/OpenStreetMap** map (no API key); capture is opt-in, from the browser on sign-in + periodically while a tab is open, plus a manual "share current location."
+- **Fleet by IP-geo** — desktops without GPS are placed by reverse-geocoding the reporter's public IP.
+- **Admin & family maps** — `location.view-all` sees a household/fleet map with history; the family "Where's everyone" shows opted-in members by name (never email), at city granularity for presence.
+
+## AI everywhere
+
+Google **Gemini** is woven across the Hub, but every generative feature is **gated by a dedicated AI permission and is OFF for everyone by default** — you grant it deliberately, per area. AI features split two ways: **generative** ones (schedule-from-image, the family assistant, list quick-add, meal plans, photo-meal, chat drafts) require their AI permission and return **403** without it; **floored narratives** (the morning briefing, day/week recaps, finance explainers) stay reachable and simply **fall back to a deterministic plain summary** (skipping the model) when the caller lacks the AI grant. Separate AI permissions cover the tracker, family text AI, the action-taking family assistant, finance, chat, and **vision** (image/PDF intake). An admin **AI usage log** (`ai.usage.view`) records every call's feature / model / outcome / token counts / latency — **metadata only, never prompt content**.
+
 ## External APIs / integrations
 
 Usage IQ talks to a few external providers; each is **optional** and **degrades gracefully** (the feature returns **HTTP 503** "not configured" while the rest of the app keeps working).
@@ -102,12 +140,15 @@ Usage IQ talks to a few external providers; each is **optional** and **degrades 
 | Provider | Used for |
 | --- | --- |
 | **Google Identity** | Sign-in (SSO) — validates the ID token and pins each account to its Google `sub`. |
+| **Google Calendar** | The Family calendar — reads/writes each member's own primary calendar via an OAuth code flow + encrypted refresh token. |
+| **Google Gemini** | All AI features (schedule-from-image, coaches, family assistant, summaries) — `gemini-2.5-flash`, gated + off-by-default; metadata-only logging. |
 | **USDA FoodData Central** | Primary food search + details (text + barcode) for the tracker. |
 | **FatSecret** | Fallback food search/barcode, used only when USDA is unconfigured or returns nothing. |
 | **WorkoutX** | Exercise library, animated demos, and per-minute rates for the calorie estimate; the GIF demo is proxied server-side so the key never reaches the browser. |
+| **OpenStreetMap / Nominatim** | Map tiles (Leaflet) + reverse-geocoding for Locations — no API key required. |
 | **Discord** | Outbound spend/security notifications via an incoming webhook. |
 
-**Data posture.** Prompt/response **content never leaves the machine** — only usage **metadata** (token counts, model, project, timing) is ever stored or sent. Provider keys live in **git-ignored `appsettings.Local.json`** locally and in **AWS SSM Parameter Store** in production (injected at deploy time), never in the repo. Outbound provider hosts are fixed (no user-chosen URLs → no SSRF), and keys are never logged.
+**Data posture.** AI-agent prompt/response **content never leaves the machine** — only usage **metadata** (token counts, model, project, timing) is stored. AI features send only the minimal context a feature needs and the **AI usage log records metadata only, never prompt content**; uploaded schedule/food images are **digested in-memory and never stored**. Provider keys live in **git-ignored `appsettings.Local.json`** locally and in **AWS SSM Parameter Store** in production (injected at deploy time), never in the repo. Outbound provider hosts are fixed (no user-chosen URLs → no SSRF), and keys are never logged.
 
 ## How it handles the data correctly
 
@@ -127,7 +168,7 @@ These are the traps the ingestion pipeline is built around (validated against a 
 
 Sign-in is **Google** (Google Identity Services, with the "Continue as…" One-Tap). The server validates the Google ID token's signature, audience (your client id), issuer, and expiry, requires a **verified email**, and **pins each account to its Google subject id** (`sub`) — bound on first login, so a later login with the same email but a different Google account is rejected (a recycled address can't inherit access). Authorization is a **per-user permission set**, enforced **on every request**: the app JWT only proves *who* you are; the server re-loads your user row from the DB on each call and checks `IsEnabled` + the required permission. Disabling a user or removing a permission takes effect on their **next request** — no waiting for a token to expire.
 
-Authorization is a **granular, per-capability permission catalog** — **25 capabilities across 10 groups** (Dashboard, Calendar, Pricing, Settings, Reporter, Notifications, Chat, Tracker, Shares, Administration), typically a *view* plus *action* permission per page: `dashboard.view`/`dashboard.export`, `sync.run`, `calendar.view`, `pricing.view`/`pricing.manage`, `settings.view`/`settings.manage`, `sources.manage`, `reporter.view`/`reporter.manage`/`reporter.self`, `notifications.view`/`notifications.manage`, `chat.read`/`chat.send`/`chat.moderate`/`chat.contacts.manage`, `tracker.self`/`tracker.viewall`, `shares.view`/`shares.manage`, `users.view`/`users.manage`, `activity.view`. Endpoints that serve more than one page accept *any-of* the relevant permissions. Admins manage everyone from the **Users** page (a user × permission matrix grouped by area, enable toggles, add/remove) — gated by `users.manage`, with last-admin lockout protection.
+Authorization is a **granular, per-capability permission catalog** — **39 capabilities across 7 groups** (Usage, Fitness, Family, Chat, Location, Admin, **AI**), typically a *view* plus *action* permission per page (e.g. `dashboard.view`/`dashboard.export`, `pricing.view`/`pricing.manage`, `chat.read`/`chat.send`/`chat.moderate`, `tracker.self`/`tracker.viewall`, `family.use`/`family.finance`/`cycle.track`, `location.self`/`location.share`/`location.view-all`, `users.view`/`users.manage`, `activity.view`, `ai.usage.view`). **AI permissions are their own group** and are **never granted by default** — `tracker.ai`, `family.ai`, `family.ai.assistant`, `finance.ai`, `chat.ai`, `ai.vision` — so everyone starts AI-off and you opt people in deliberately. Endpoints that serve more than one page accept *any-of* the relevant permissions. **Presets** (administrator, family-member, friend-tracker, viewer) are one-click templates that seed a sensible grant set you then fine-tune. Admins manage everyone from a redesigned **Users** page — a master/detail editor with search, filters, a separated AI section with descriptions, bulk multi-user actions, and per-user login/location history — gated by `users.manage`, with last-admin lockout protection. Each user also picks (or an admin sets) their **home page**, so they land on the area they actually use.
 
 **Real-time force-logout.** From the Users page an admin can sign a user out of their **current** session — without disabling the account — via `POST /api/users/{id}/logout` (`users.manage`). A per-user **session version** is baked into the JWT (`sv` claim); bumping it makes every outstanding token stale, so the next request (or the periodic `/me` poll) is rejected, and a **`SessionRevoked`** event is pushed over SignalR so the SPA logs them out **immediately** rather than waiting for the token to be re-checked. Unlike *Disable*, the user can simply sign in again to get a fresh token.
 
@@ -265,6 +306,11 @@ The reporter de-dupes locally before sending (one billed turn spans several iden
 | `GET`/`POST`/`DELETE` | `/api/chat/contacts/*`, `/api/chat/directory` | View the user directory + curate a user's contacts/circle (`chat.contacts.manage`). |
 | `GET`/`POST`/`DELETE` | `/api/tracker/*` | Tracker day, food/exercise/weight/hydration/activity logging, profile, saved foods/exercises, library, sharing (`tracker.self`; read-others `tracker.viewall`). |
 | `GET` | `/api/foods/search`, `/api/foods/{fdcId}` | Food lookup proxy — USDA primary, FatSecret fallback (text + barcode; `tracker.self`). |
+| `GET`/`POST`/`PUT`/`DELETE` | `/api/family/*` | Family Hub — household, calendar, lists, notes, reminders, timer, meals, chores, polls, finance (`family.use`; finance also `family.finance`). |
+| `GET`/`POST`/`PATCH`/`DELETE` | `/api/family/cycle/*` | Private cycle tracker — periods, deterministic predictions, settings, gentle AI note (`cycle.track`); `/overlay` exposes only predicted phases of opted-in members (`family.use`). |
+| `GET` | `/api/family/locations` | Household finder — opted-in members' latest pins (name only, never email; `family.use`). |
+| `GET`/`POST`/`PATCH` | `/api/location/*` | Own location history + settings (`location.self`/`location.share`); `/admin` map across users (`location.view-all`). |
+| `GET` | `/api/ai-usage` | AI call log — feature/model/outcome/tokens/latency, **metadata only** (`ai.usage.view`). |
 | `GET` | `/api/audit` | Recent user-management audit entries (requires `users.manage`). |
 | `GET` | `/api/logs` | Recent request/response action log; filter by `method`/`status`/`q` (requires `users.manage`). |
 | `GET` | `/api/projects`, `/api/models`, `/api/sources` | Filter options with totals. |
