@@ -1,0 +1,184 @@
+<section class="family cycle">
+  @if (loading()) {
+    <div class="cycle__loading" role="status" aria-live="polite">
+      <mat-progress-spinner mode="indeterminate" diameter="36" aria-hidden="true" />
+      <span>Loading your cycle…</span>
+    </div>
+  }
+
+  <!-- Hero: warm header consistent with the other family sub-pages -->
+  <header class="family__hero">
+    <div class="family__hero-id">
+      <span class="family__crest" aria-hidden="true"><mat-icon>spa</mat-icon></span>
+      <div>
+        <p class="family__eyebrow">Private</p>
+        <h1 class="family__name">Cycle</h1>
+        <p class="family__sub">A private place to log your cycle and see gentle predictions. Only you can see
+          your entries — sharing is off until you turn it on below.</p>
+      </div>
+    </div>
+  </header>
+
+  @if (!loading() && error()) {
+    <div class="family__card cycle__state" role="alert">
+      <span class="family__crest cycle__state-crest" aria-hidden="true"><mat-icon>error_outline</mat-icon></span>
+      <h2 class="cycle__state-title">We couldn't load your cycle</h2>
+      <p class="cycle__state-body">Something went wrong just now. Please try again in a moment.</p>
+    </div>
+  } @else if (!loading() && !error()) {
+    <!-- Non-medical reassurance — set expectations clearly. -->
+    <p class="cycle__disclaimer" role="note">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      Informational only — these predictions are estimates from your logged dates, not medical advice.
+    </p>
+
+    <div class="cycle__layout">
+      <!-- Left: the mini month calendar -->
+      <section class="family__card cycle__cal-card" aria-label="Cycle calendar">
+        <div class="cycle__cal-head">
+          <button mat-icon-button type="button" (click)="prevMonth()" aria-label="Previous month">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <button mat-button type="button" class="cycle__month-btn" (click)="thisMonth()"
+                  matTooltip="Jump to this month">{{ monthLabel() }}</button>
+          <button mat-icon-button type="button" (click)="nextMonth()" aria-label="Next month">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+
+        <div class="cycle__grid" role="grid" aria-label="Cycle month grid">
+          <div class="cycle__dow" role="row">
+            @for (d of weekdayHeaders(); track $index) {
+              <span class="cycle__dow-cell" role="columnheader">{{ d }}</span>
+            }
+          </div>
+          <div class="cycle__cells" role="rowgroup">
+            @for (c of cells(); track c.iso) {
+              <div class="cycle__cell"
+                   [class.cycle__cell--out]="!c.inMonth"
+                   [class.cycle__cell--today]="c.isToday"
+                   [class.cycle__cell--logged]="c.phase === 'logged'"
+                   [class.cycle__cell--period]="c.phase === 'period'"
+                   [class.cycle__cell--fertile]="c.phase === 'fertile'"
+                   [class.cycle__cell--predicted]="c.predicted"
+                   role="gridcell"
+                   [attr.aria-label]="friendlyDate(c.iso)
+                     + (c.phase === 'logged' ? ', logged period' : '')
+                     + (c.phase === 'period' ? ', predicted period' : '')
+                     + (c.phase === 'fertile' ? ', predicted fertile window' : '')">
+                <span class="cycle__cell-num">{{ c.dayNum }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <ul class="cycle__legend" aria-label="Legend">
+          <li><span class="cycle__dot cycle__dot--logged" aria-hidden="true"></span> Logged period</li>
+          <li><span class="cycle__dot cycle__dot--period" aria-hidden="true"></span> Predicted period</li>
+          <li><span class="cycle__dot cycle__dot--fertile" aria-hidden="true"></span> Fertile window</li>
+        </ul>
+      </section>
+
+      <!-- Right column: predictions, note, log form, history, sharing -->
+      <div class="cycle__side">
+        <!-- Predictions -->
+        <section class="family__card cycle__pred-card" aria-label="Predictions">
+          <h2 class="family__card-title">Predictions</h2>
+          @if (prediction(); as p) {
+            @if (nextPeriodLabel()) {
+              <div class="cycle__pred-row">
+                <mat-icon aria-hidden="true">event</mat-icon>
+                <div>
+                  <span class="cycle__pred-l">Next period (estimated)</span>
+                  <span class="cycle__pred-v">{{ nextPeriodLabel() }}</span>
+                </div>
+              </div>
+              <div class="cycle__pred-row">
+                <mat-icon aria-hidden="true">favorite_border</mat-icon>
+                <div>
+                  <span class="cycle__pred-l">Fertile window (estimated)</span>
+                  <span class="cycle__pred-v">{{ fertileLabel() || '—' }}</span>
+                </div>
+              </div>
+            } @else {
+              <p class="cycle__pred-empty">Log a period below and your estimates will appear here.</p>
+            }
+            <div class="cycle__pred-row">
+              <mat-icon aria-hidden="true">repeat</mat-icon>
+              <div>
+                <span class="cycle__pred-l">Average cycle</span>
+                <span class="cycle__pred-v">{{ p.avgCycleLengthDays }} days</span>
+              </div>
+            </div>
+          }
+
+          @if (note(); as n) {
+            <p class="cycle__note">
+              <mat-icon aria-hidden="true">{{ n.fellBackToPlain ? 'insights' : 'auto_awesome' }}</mat-icon>
+              {{ n.note }}
+            </p>
+          }
+        </section>
+
+        <!-- Log a period -->
+        <section class="family__card cycle__log-card" aria-label="Log a period">
+          <h2 class="family__card-title">Log a period</h2>
+          <div class="cycle__log-fields">
+            <mat-form-field appearance="outline" class="cycle__date">
+              <mat-label>Start date</mat-label>
+              <input matInput type="date" [ngModel]="logStart()" (ngModelChange)="logStart.set($event)"
+                     [max]="logEnd() || null" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="cycle__date">
+              <mat-label>End date (optional)</mat-label>
+              <input matInput type="date" [ngModel]="logEnd()" (ngModelChange)="logEnd.set($event)"
+                     [min]="logStart() || null" />
+            </mat-form-field>
+          </div>
+          <button mat-flat-button color="primary" type="button" (click)="logPeriod()" [disabled]="logging()">
+            @if (logging()) {
+              <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+            } @else {
+              <mat-icon aria-hidden="true">add</mat-icon>
+            }
+            Log period
+          </button>
+        </section>
+
+        <!-- Recent history -->
+        @if (recentPeriods().length) {
+          <section class="family__card cycle__hist-card" aria-label="Recent periods">
+            <h2 class="family__card-title">Recent</h2>
+            <ul class="cycle__hist">
+              @for (item of recentPeriods(); track item.raw.id) {
+                <li class="cycle__hist-row">
+                  <span class="cycle__hist-label">{{ item.label }}</span>
+                  <button mat-icon-button type="button" class="cycle__hist-del" (click)="deletePeriod(item.raw)"
+                          [attr.aria-label]="'Remove ' + item.label">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+
+        <!-- Sharing opt-in -->
+        <section class="family__card cycle__share-card" aria-label="Family calendar sharing">
+          <div class="cycle__share-head">
+            <mat-icon aria-hidden="true">{{ overlayOn() ? 'visibility' : 'lock' }}</mat-icon>
+            <div>
+              <h2 class="family__card-title">Share with my family calendar</h2>
+              <p class="cycle__share-sub">When on, only your <strong>predicted</strong> period &amp; fertile
+                days show as a soft layer on the family calendar — never your logged entries.</p>
+            </div>
+          </div>
+          <mat-slide-toggle [checked]="overlayOn()" [disabled]="overlayBusy()" (change)="toggleOverlay()"
+                            aria-label="Share predicted phases with my family calendar">
+            {{ overlayOn() ? 'Sharing predicted phases' : 'Private (not shared)' }}
+          </mat-slide-toggle>
+        </section>
+      </div>
+    </div>
+  }
+</section>

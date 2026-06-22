@@ -54,6 +54,9 @@ public static class Permissions
     // ---- Family ----
     public const string FamilyUse = "family.use";
     public const string FamilyFinance = "family.finance";
+    /// <summary>Cycle tracker (PRIVATE health data). Never default — an admin grants it deliberately to the
+    /// person who tracks; the LOG is private to its owner and the family overlay is a further per-user opt-in.</summary>
+    public const string CycleTrack = "cycle.track";
 
     // ---- Location (GPS feature; never default) ----
     public const string LocationSelf = "location.self";
@@ -109,6 +112,7 @@ public static class Permissions
         // ---- Family ----
         new PermissionInfo(FamilyUse, "Family", "Use Family Hub", "Access the Family Hub: see your household, its members, and shared family data."),
         new PermissionInfo(FamilyFinance, "Family", "Manage family finances", "View and manage the household's shared finances (budgets, bills, balances)."),
+        new PermissionInfo(CycleTrack, "Family", "Track cycle", "Log and view your own private cycle calendar (informational, non-medical), and choose whether to overlay only predicted phases on the family calendar."),
 
         // ---- Chat ----
         new PermissionInfo(ChatRead, "Chat", "View chat", "See channels and direct messages you belong to and read their messages."),
@@ -196,9 +200,10 @@ public static class Permissions
     /// capability that must be granted deliberately, never inherited by every new account. Likewise
     /// excludes <see cref="TrackerViewAll"/>: reading every user's food &amp; fitness log is a
     /// coach/admin capability that must be granted deliberately, never inherited by default.
-    /// Likewise excludes both Family keys (<see cref="FamilyUse"/> and <see cref="FamilyFinance"/>):
-    /// the Family Hub holds private household data and shared finances, so access must be granted
-    /// deliberately per user and never inherited by every new account.
+    /// Likewise excludes the Family keys (<see cref="FamilyUse"/>, <see cref="FamilyFinance"/> and
+    /// <see cref="CycleTrack"/>): the Family Hub holds private household data and shared finances, and the
+    /// cycle tracker is PRIVATE health data, so access must be granted deliberately per user and never
+    /// inherited by every new account.
     /// Likewise excludes <see cref="AiUsageView"/>: the AI usage log is admin oversight of who spends
     /// tokens, so it must be granted deliberately, never inherited by every new account.
     /// Finally excludes ALL AI keys (<see cref="AiKeys"/>) and ALL Location keys (<see cref="LocationKeys"/>):
@@ -207,6 +212,7 @@ public static class Permissions
     /// </summary>
     public static bool IsDefaultable(string key) =>
         IsValid(key) && key != UsersManage && key != ChatModerate && key != ChatContactsManage
-        && key != TrackerViewAll && key != FamilyUse && key != FamilyFinance && key != AiUsageView
+        && key != TrackerViewAll && key != FamilyUse && key != FamilyFinance && key != CycleTrack
+        && key != AiUsageView
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }

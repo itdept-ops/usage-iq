@@ -3021,6 +3021,93 @@ export interface TrackerRecapResult {
   fellBackToPlain: boolean;
 }
 
+// ──────────────────────────────────────────────────────────────────────────────────────────────
+// Cycle calendar (Family Hub) — PRIVACY-FIRST + NON-MEDICAL. The LOG is private to its owner; the
+// family overlay only ever exposes PREDICTED day-spans for members who opted in. Mirrors the
+// /api/family/cycle (CycleEndpoints) + /api/family/cycle/overlay (CycleOverlayEndpoints) contracts.
+// ──────────────────────────────────────────────────────────────────────────────────────────────
+
+/** One logged period (the owner's OWN entry; mirrors PeriodDto). `startDate`/`endDate` are plain
+ *  ISO dates ("YYYY-MM-DD"); `endDate` is null while ongoing / not yet recorded. */
+export interface CyclePeriod {
+  id: number;
+  startDate: string;
+  endDate: string | null;
+  loggedUtc: string;
+}
+
+/** A predicted fertile window as a day-span (mirrors FertileWindowDto); ISO dates ("YYYY-MM-DD"). */
+export interface CycleFertileWindow {
+  start: string;
+  end: string;
+}
+
+/**
+ * The DETERMINISTIC prediction block (no AI; mirrors PredictionDto). `nextPredictedStart` +
+ * `fertileWindow` are null until there's at least one logged period to anchor from. `currentPhase`
+ * is a gentle informational phase label. Informational, NOT medical advice.
+ */
+export interface CyclePrediction {
+  avgCycleLengthDays: number;
+  nextPredictedStart: string | null;
+  fertileWindow: CycleFertileWindow | null;
+  currentPhase: string;
+}
+
+/** The owner's cycle settings (mirrors SettingsDto): the two averages + the family-overlay opt-in. */
+export interface CycleSettings {
+  avgCycleLengthDays: number;
+  avgPeriodLengthDays: number;
+  overlayToFamily: boolean;
+}
+
+/** The main GET /api/family/cycle payload (mirrors CycleDto): recent periods + predictions + settings. */
+export interface CycleData {
+  periods: CyclePeriod[];
+  prediction: CyclePrediction;
+  settings: CycleSettings;
+}
+
+/**
+ * The gentle, NON-MEDICAL one-liner (GET /api/family/cycle/note; mirrors NoteDto). `note` narrates only
+ * the deterministic aggregate facts (never raw entries); `fellBackToPlain` is true when family.ai is
+ * absent or Gemini is off and the deterministic plain floor was returned. ALWAYS 200. Never diagnostic.
+ */
+export interface CycleNote {
+  note: string;
+  fellBackToPlain: boolean;
+}
+
+/** A PATCH /api/family/cycle/settings body (all optional; clamped server-side). */
+export interface CycleSettingsPatch {
+  avgCycleLengthDays?: number;
+  avgPeriodLengthDays?: number;
+  overlayToFamily?: boolean;
+}
+
+/**
+ * One PREDICTED phase span for the family-calendar overlay (mirrors PhaseSpanDto). `kind` is "period"
+ * or "fertile"; `predicted` is always true (these are NEVER raw logged entries) — it exists so the UI
+ * labels the span "Period (predicted)" / "Fertile window (predicted)". ISO dates ("YYYY-MM-DD").
+ */
+export interface CycleOverlaySpan {
+  kind: string;
+  start: string;
+  end: string;
+  predicted: boolean;
+}
+
+/**
+ * One household member's predicted spans for the family-calendar overlay (mirrors MemberOverlayDto).
+ * Identity is userId + display NAME only — NEVER an email. Only opted-in members ever appear, and only
+ * their soft PREDICTED phase layer (no raw logged entries).
+ */
+export interface CycleOverlayMember {
+  userId: number;
+  name: string;
+  phases: CycleOverlaySpan[];
+}
+
 /** Canonical permission keys (mirror of the backend catalog). */
 export const PERM = {
   dashboardView: 'dashboard.view',
@@ -3052,6 +3139,7 @@ export const PERM = {
   trackerViewAll: 'tracker.viewall',
   familyUse: 'family.use',
   familyFinance: 'family.finance',
+  cycleTrack: 'cycle.track',
   // ---- Location (GPS feature; group "Location"; never default) ----
   locationSelf: 'location.self',
   locationShare: 'location.share',
@@ -3098,6 +3186,7 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   // ---- Family ----
   [PERM.familyUse]: 'Family',
   [PERM.familyFinance]: 'Family',
+  [PERM.cycleTrack]: 'Family',
   // ---- Chat ----
   [PERM.chatRead]: 'Chat',
   [PERM.chatSend]: 'Chat',

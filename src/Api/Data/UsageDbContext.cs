@@ -60,6 +60,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<FamilyPlanPollOption> FamilyPlanPollOptions => Set<FamilyPlanPollOption>();
     public DbSet<FamilyPlanPollVote> FamilyPlanPollVotes => Set<FamilyPlanPollVote>();
     public DbSet<FamilyEventAnnouncement> FamilyEventAnnouncements => Set<FamilyEventAnnouncement>();
+    public DbSet<CycleProfile> CycleProfiles => Set<CycleProfile>();
+    public DbSet<CyclePeriod> CyclePeriods => Set<CyclePeriod>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -724,6 +726,25 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.AnnouncedUtc).HasColumnType("timestamp with time zone");
             // Announce-once: at most one row per (household, event). Also the dedup lookup in the tick.
             e.HasIndex(x => new { x.HouseholdId, x.GoogleEventId }).IsUnique();
+        });
+
+        b.Entity<CycleProfile>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.AvgCycleLengthDays).HasDefaultValue(28);
+            e.Property(x => x.AvgPeriodLengthDays).HasDefaultValue(5);
+            e.Property(x => x.OverlayToFamily).HasDefaultValue(false);
+            // One profile row per user; also the lookup for "this caller's cycle profile".
+            e.HasIndex(x => x.UserEmail).IsUnique();
+        });
+
+        b.Entity<CyclePeriod>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.LoggedUtc).HasColumnType("timestamp with time zone");
+            // The own-history read filters by UserEmail and pages newest-start-first; this composite serves it
+            // directly and also feeds the gap-based prediction.
+            e.HasIndex(x => new { x.UserEmail, x.StartDate }).IsDescending(false, true);
         });
     }
 }

@@ -1,0 +1,199 @@
+/* Cycle page — layered on the shared family.scss. Phase palette: logged period (solid rose), predicted
+   period (soft rose, dashed = "predicted"), fertile window (soft teal). Informational, never clinical. */
+
+.cycle {
+  --cyc-period: #e11d48;          /* rose-600 — logged period */
+  --cyc-period-soft: rgba(225, 29, 72, 0.16);
+  --cyc-fertile: #0d9488;         /* teal-600 — fertile window */
+  --cyc-fertile-soft: rgba(13, 148, 136, 0.16);
+}
+
+.cycle__loading {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-4, 16px) 0;
+  color: var(--tech-text-secondary);
+  font-size: var(--tech-fs-body);
+}
+
+.cycle__disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tech-space-2, 8px);
+  margin: 0 0 var(--tech-space-4, 16px);
+  color: var(--tech-text-tertiary);
+  font-size: var(--tech-fs-caption, 0.82rem);
+  line-height: 1.4;
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; flex: none; opacity: 0.8; }
+}
+
+.cycle__state {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tech-space-2, 8px);
+}
+.cycle__state-crest mat-icon { color: var(--tech-warn); }
+.cycle__state-title { margin: var(--tech-space-2, 8px) 0 0; font-size: var(--tech-fs-h3, 1.05rem); }
+.cycle__state-body { margin: 0; color: var(--tech-text-secondary); }
+
+/* Two-column: calendar | side. Stacks under 860px. */
+.cycle__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--tech-space-5, 20px);
+  align-items: start;
+
+  @media (max-width: 860px) { grid-template-columns: 1fr; }
+}
+
+.cycle__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-5, 20px);
+  min-width: 0;
+}
+
+/* ── Calendar ── */
+.cycle__cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tech-space-2, 8px);
+  margin-bottom: var(--tech-space-3, 12px);
+}
+.cycle__month-btn { font-weight: 600; font-size: var(--tech-fs-body); }
+
+.cycle__grid { width: 100%; }
+
+.cycle__dow,
+.cycle__cells {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cycle__dow { margin-bottom: 4px; }
+.cycle__dow-cell {
+  text-align: center;
+  font-size: var(--tech-fs-caption, 0.72rem);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tech-text-tertiary);
+}
+
+.cycle__cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--tech-border);
+  background: var(--tech-panel-2, transparent);
+  color: var(--tech-text);
+  font-size: var(--tech-fs-caption, 0.82rem);
+  font-variant-numeric: tabular-nums;
+}
+.cycle__cell--out { opacity: 0.38; }
+.cycle__cell--today { outline: 2px solid var(--tech-text-accent); outline-offset: -1px; font-weight: 700; }
+
+.cycle__cell--fertile {
+  background: var(--cyc-fertile-soft);
+  border-color: color-mix(in srgb, var(--cyc-fertile) 40%, transparent);
+}
+.cycle__cell--period {
+  background: var(--cyc-period-soft);
+  border-color: color-mix(in srgb, var(--cyc-period) 45%, transparent);
+}
+/* Predicted spans read as estimates: dashed border. Logged is solid + filled. */
+.cycle__cell--predicted { border-style: dashed; }
+.cycle__cell--logged {
+  background: var(--cyc-period);
+  border-color: var(--cyc-period);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ── Legend ── */
+.cycle__legend {
+  list-style: none;
+  margin: var(--tech-space-4, 16px) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tech-space-3, 12px);
+  font-size: var(--tech-fs-caption, 0.78rem);
+  color: var(--tech-text-secondary);
+
+  li { display: inline-flex; align-items: center; gap: 6px; }
+}
+.cycle__dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+.cycle__dot--logged { background: var(--cyc-period); }
+.cycle__dot--period { background: var(--cyc-period-soft); border: 1px dashed var(--cyc-period); }
+.cycle__dot--fertile { background: var(--cyc-fertile-soft); border: 1px dashed var(--cyc-fertile); }
+
+/* ── Predictions ── */
+.cycle__pred-row {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-2, 8px) 0;
+
+  & + .cycle__pred-row { border-top: 1px solid var(--tech-border); }
+  mat-icon { color: var(--tech-text-accent); flex: none; }
+  div { display: flex; flex-direction: column; min-width: 0; }
+}
+.cycle__pred-l { font-size: var(--tech-fs-caption, 0.78rem); color: var(--tech-text-tertiary); }
+.cycle__pred-v { font-size: var(--tech-fs-body); font-weight: 600; color: var(--tech-text); }
+.cycle__pred-empty { margin: var(--tech-space-2, 8px) 0; color: var(--tech-text-secondary); font-size: var(--tech-fs-body); }
+
+.cycle__note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tech-space-2, 8px);
+  margin: var(--tech-space-3, 12px) 0 0;
+  padding-top: var(--tech-space-3, 12px);
+  border-top: 1px solid var(--tech-border);
+  color: var(--tech-text-secondary);
+  font-size: var(--tech-fs-body);
+  line-height: 1.5;
+
+  mat-icon { color: var(--tech-text-accent); font-size: 20px; width: 20px; height: 20px; flex: none; }
+}
+
+/* ── Log form ── */
+.cycle__log-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tech-space-3, 12px);
+  margin-bottom: var(--tech-space-2, 8px);
+}
+.cycle__date { flex: 1 1 150px; }
+
+/* ── History ── */
+.cycle__hist { list-style: none; margin: 0; padding: 0; }
+.cycle__hist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tech-space-2, 8px);
+  padding: var(--tech-space-2, 8px) 0;
+
+  & + .cycle__hist-row { border-top: 1px solid var(--tech-border); }
+}
+.cycle__hist-label { font-size: var(--tech-fs-body); color: var(--tech-text); }
+
+/* ── Share opt-in ── */
+.cycle__share-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tech-space-3, 12px);
+  margin-bottom: var(--tech-space-3, 12px);
+
+  mat-icon { color: var(--tech-text-accent); flex: none; }
+  .family__card-title { margin: 0; }
+}
+.cycle__share-sub { margin: 4px 0 0; color: var(--tech-text-tertiary); font-size: var(--tech-fs-caption, 0.82rem); line-height: 1.4; }

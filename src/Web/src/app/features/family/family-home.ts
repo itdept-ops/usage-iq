@@ -44,6 +44,7 @@ const TILES: FeatureTile[] = [
   { key: 'calendar', label: 'Calendar', icon: 'calendar_month', blurb: 'The family calendar in one place', route: '/family/calendar' },
   { key: 'polls', label: 'Polls', icon: 'how_to_vote', blurb: 'Pick a time or settle a plan together', route: '/family/polls' },
   { key: 'locations', label: "Where's everyone", icon: 'person_pin_circle', blurb: 'See where the family is on a map', route: '/family/locations' },
+  { key: 'cycle', label: 'Cycle', icon: 'spa', blurb: 'Your private cycle calendar', route: '/family/cycle', perm: PERM.cycleTrack },
 ];
 
 /**

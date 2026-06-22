@@ -164,6 +164,15 @@ export const routes: Routes = [
         title: 'Usage IQ · Where is everyone',
       },
       {
+        // Cycle — PRIVATE health data: gated by cycle.track ON TOP OF the group's family.use. Every
+        // /api/family/cycle route is gated by cycle.track server-side; owner-scoped (you only ever see
+        // your own entries). The family-calendar overlay is a separate opt-in (predicted phases only).
+        path: 'cycle',
+        canActivate: [permissionGuard(PERM.cycleTrack)],
+        loadComponent: () => import('./features/family/cycle').then(m => m.FamilyCycle),
+        title: 'Usage IQ · Cycle',
+      },
+      {
         // Finance — extra-sensitive: gated by family.finance ON TOP OF the group's family.use. Every
         // /api/family/finance route is double-gated server-side too (family.use AND family.finance).
         path: 'finance',

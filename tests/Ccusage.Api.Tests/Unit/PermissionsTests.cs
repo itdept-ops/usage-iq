@@ -6,7 +6,7 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 38 keys.
+    // The full catalog of 39 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
@@ -18,7 +18,7 @@ public class PermissionsTests
         "chat.read", "chat.send", "chat.moderate", "chat.contacts.manage",
         "tracker.self", "tracker.viewall",
         "shares.view", "shares.manage",
-        "family.use", "family.finance",
+        "family.use", "family.finance", "cycle.track",
         "location.self", "location.share", "location.view-all",
         "users.view", "users.manage", "activity.view", "ai.usage.view",
         "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision",
@@ -50,6 +50,7 @@ public class PermissionsTests
     [InlineData("shares.manage")]
     [InlineData("family.use")]
     [InlineData("family.finance")]
+    [InlineData("cycle.track")]
     [InlineData("location.self")]
     [InlineData("location.share")]
     [InlineData("location.view-all")]
@@ -106,6 +107,7 @@ public class PermissionsTests
         Permissions.SharesManage.Should().Be("shares.manage");
         Permissions.FamilyUse.Should().Be("family.use");
         Permissions.FamilyFinance.Should().Be("family.finance");
+        Permissions.CycleTrack.Should().Be("cycle.track");
         Permissions.LocationSelf.Should().Be("location.self");
         Permissions.LocationShare.Should().Be("location.share");
         Permissions.LocationViewAll.Should().Be("location.view-all");
@@ -122,9 +124,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_thirty_eight_known_keys()
+    public void All_contains_exactly_the_thirty_nine_known_keys()
     {
-        Permissions.All.Should().HaveCount(38);
+        Permissions.All.Should().HaveCount(39);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -135,9 +137,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_thirty_eight_entries()
+    public void Catalog_has_thirty_nine_entries()
     {
-        Permissions.Catalog.Should().HaveCount(38);
+        Permissions.Catalog.Should().HaveCount(39);
     }
 
     [Fact]
@@ -214,6 +216,25 @@ public class PermissionsTests
         // deliberately per user, never inherited by every new account.
         Permissions.IsDefaultable(Permissions.FamilyUse).Should().BeFalse();
         Permissions.IsDefaultable(Permissions.FamilyFinance).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CycleTrack_is_in_the_Family_group_non_ai_not_defaultable_and_granted_deliberately()
+    {
+        // Private health data: cycle.track lives in the Family group, is NOT an AI key, and is never
+        // defaultable — an admin grants it deliberately to the person who tracks.
+        Permissions.Catalog.Single(p => p.Key == Permissions.CycleTrack).Group.Should().Be("Family");
+        Permissions.Catalog.Single(p => p.Key == Permissions.CycleTrack).IsAi.Should().BeFalse();
+        Permissions.IsAi(Permissions.CycleTrack).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.CycleTrack).Should().BeFalse();
+        // It is part of the administrator preset (the full catalog) but NOT the family-member preset — the
+        // owner grants it on purpose, it is not bundled into a standard household member.
+        Permissions.Presets.Single(p => p.Key == "administrator")
+            .Permissions.Should().Contain(Permissions.CycleTrack);
+        Permissions.Presets.Single(p => p.Key == "family-member")
+            .Permissions.Should().NotContain(Permissions.CycleTrack);
+        // It is not a page-view gate.
+        Permissions.Views.Should().NotContain(Permissions.CycleTrack);
     }
 
     [Fact]

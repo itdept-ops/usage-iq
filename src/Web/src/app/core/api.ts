@@ -11,6 +11,7 @@ import {
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
   SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
   WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WorkoutXSearchResultDto,
+  CycleData, CyclePeriod, CycleNote, CycleSettings, CycleSettingsPatch, CycleOverlayMember,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -1442,6 +1443,57 @@ export class Api {
    */
   financeMoneyCoachAi(_month?: string | null): Observable<FinanceMoneyCoachResult> {
     return this.http.get<FinanceMoneyCoachResult>(`${this.base}/family/finance/ai/money-coach`);
+  }
+
+  // ---- Cycle calendar — PRIVACY-FIRST + NON-MEDICAL ----
+  // The cycle LOG is PRIVATE to its owner: every /family/cycle call is gated by cycle.track server-side
+  // and owner-scoped — a caller only ever reads/edits their OWN periods/profile. Predictions are pure
+  // deterministic math (no AI). The overlay (gated family.use, NOT cycle.track) returns ONLY PREDICTED
+  // day-spans for opted-in members — never raw entries, never another user's email.
+
+  /** The caller's OWN recent periods + the deterministic predictions + their settings (GET /family/cycle). */
+  cycleData(): Observable<CycleData> {
+    return this.http.get<CycleData>(`${this.base}/family/cycle/`);
+  }
+
+  /** Log one of the caller's OWN periods (POST /family/cycle/period). `startDate`/`endDate` are ISO dates
+   *  ("YYYY-MM-DD"); `endDate` is optional (null = ongoing / not yet recorded). Returns the created period. */
+  logPeriod(startDate: string, endDate?: string | null): Observable<CyclePeriod> {
+    return this.http.post<CyclePeriod>(`${this.base}/family/cycle/period`,
+      { startDate, endDate: endDate ?? null });
+  }
+
+  /** Delete one of the caller's OWN logged periods by id (204; owner-scoped — can't touch another user's). */
+  deletePeriod(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/family/cycle/period/${id}`);
+  }
+
+  /** Patch the caller's OWN cycle settings — the two averages + the family-overlay opt-in (clamped
+   *  server-side). Returns the updated settings (PATCH /family/cycle/settings). */
+  patchCycleSettings(patch: CycleSettingsPatch): Observable<CycleSettings> {
+    return this.http.patch<CycleSettings>(`${this.base}/family/cycle/settings`, patch);
+  }
+
+  /**
+   * A gentle, NON-MEDICAL one-liner narrating the deterministic facts (GET /family/cycle/note). Gated by
+   * cycle.track AND family.ai server-side; ALWAYS 200 (when Gemini is off it returns the deterministic
+   * plain floor with `fellBackToPlain` = true — same handling as the briefing). Never diagnostic; cycle
+   * content is never sent to the AI-usage log. A 403 means the caller lacks family.ai — degrade silently.
+   */
+  cycleNote(): Observable<CycleNote> {
+    return this.http.get<CycleNote>(`${this.base}/family/cycle/note`);
+  }
+
+  /**
+   * The family-calendar PREDICTED-phase overlay for [fromUtc, toUtc) (GET /family/cycle/overlay; gated
+   * family.use, NOT cycle.track). Returns ONLY predicted period/fertile day-spans for opted-in household
+   * members (the caller's own only when they hold cycle.track). Identity is userId + display name only —
+   * NEVER an email; raw logged entries are NEVER exposed. The window is clamped to ≤92 days server-side.
+   * Read-only; degrades to an empty list when nobody has opted in.
+   */
+  cycleOverlay(fromUtc: string, toUtc: string): Observable<CycleOverlayMember[]> {
+    const params = new HttpParams().set('fromUtc', fromUtc).set('toUtc', toUtc);
+    return this.http.get<CycleOverlayMember[]>(`${this.base}/family/cycle/overlay`, { params });
   }
 
   // ---- Family Hub F6: Google Calendar (OAuth code flow; the caller's own primary calendar) ----
