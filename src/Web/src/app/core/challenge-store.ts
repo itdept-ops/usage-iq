@@ -3,8 +3,9 @@ import { firstValueFrom } from 'rxjs';
 
 import { Api } from './api';
 import {
-  CheatDaysRequest, HardChallengeDto, HardDayDto, HardSharedPersonDto,
-  StartChallengeRequest, UpsertHardDayRequest,
+  CheatDaysRequest, CreateHardTaskRequest, HardChallengeDto, HardCoachDto, HardDayDto,
+  HardLeaderboardRowDto, HardSharedPersonDto, HardTaskDto, StartChallengeRequest,
+  UpdateHardTaskRequest, UpsertHardDayRequest,
 } from './models';
 import { toLocalDate } from './tracker-store';
 
@@ -37,6 +38,13 @@ export class ChallengeStore {
   /** People whose challenge the caller may view read-only (for the shared-view selector). */
   readonly shared = signal<HardSharedPersonDto[]>([]);
 
+  /** The points leaderboard (the caller + sharing contacts), ranked by totalPoints desc — names only. */
+  readonly leaderboard = signal<HardLeaderboardRowDto[]>([]);
+
+  /** The AI coach recap (always present once loaded; floored to a deterministic plain recap when AI is absent). */
+  readonly coach = signal<HardCoachDto | null>(null);
+  readonly coachLoading = signal(false);
+
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -54,6 +62,9 @@ export class ChallengeStore {
     const iso = this.date();
     return this.days().find(d => d.date === iso) ?? null;
   });
+
+  /** The configurable task set for the loaded challenge (ordered), or empty. */
+  readonly tasks = computed<HardTaskDto[]>(() => this.challenge()?.tasks ?? []);
 
   /** Load (or reload) the active challenge for the current view target. */
   async load(): Promise<void> {
@@ -123,6 +134,52 @@ export class ChallengeStore {
   async setCheatDays(body: CheatDaysRequest): Promise<void> {
     const c = await firstValueFrom(this.api.setChallengeCheatDays(body));
     this.challenge.set(c);
+  }
+
+  // ---- task config (owner) ----
+
+  /** Add a CUSTOM manual task, then reload so day points + the grid re-derive against the new set. */
+  async createTask(body: CreateHardTaskRequest): Promise<void> {
+    await firstValueFrom(this.api.createChallengeTask(body));
+    await this.load();
+  }
+
+  /** Edit a task's target/points/enable/etc, then reload so all day scores re-derive. */
+  async updateTask(id: number, body: UpdateHardTaskRequest): Promise<void> {
+    await firstValueFrom(this.api.updateChallengeTask(id, body));
+    await this.load();
+  }
+
+  /** Delete a CUSTOM task (auto tasks can only be disabled), then reload. */
+  async deleteTask(id: number): Promise<void> {
+    await firstValueFrom(this.api.deleteChallengeTask(id));
+    await this.load();
+  }
+
+  // ---- leaderboard + coach ----
+
+  /** Load the points leaderboard (caller + sharing contacts). Silent on failure (empty). */
+  async loadLeaderboard(): Promise<void> {
+    try {
+      this.leaderboard.set(await firstValueFrom(this.api.challengeLeaderboard()));
+    } catch {
+      this.leaderboard.set([]);
+    }
+  }
+
+  /**
+   * Load the AI coach recap (own challenge only). ALWAYS resolves to a recap — the server floors to a
+   * deterministic plain narrative (fellBackToPlain) when tracker.ai/Gemini is absent. Silent on failure.
+   */
+  async loadCoach(): Promise<void> {
+    this.coachLoading.set(true);
+    try {
+      this.coach.set(await firstValueFrom(this.api.challengeCoach()));
+    } catch {
+      this.coach.set(null);
+    } finally {
+      this.coachLoading.set(false);
+    }
   }
 
   private messageOf(e: unknown): string {

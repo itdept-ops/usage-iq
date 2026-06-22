@@ -3477,9 +3477,10 @@ export interface IdentityRuleInput {
 // ──────────────────────────────────────────────────────────────────────────────────────────────
 // 75 Hard challenge (the Relaxed ruleset) — a six-task daily challenge layered on the food/fitness
 // tracker. Gated by the SAME tracker permissions (tracker.self own use; tracker.viewall coach read).
-// Mirrors the /api/challenge (HardChallengeEndpoints) contract. AUTO scoring (diet/water/workouts)
-// is recomputed LIVE from the tracker server-side; only the MANUAL portion is persisted. There is
-// NEVER an image — the progress photo is a boolean attestation only.
+// Mirrors the /api/challenge (HardChallengeEndpoints) 75 Hard V2 contract. The task set is CONFIGURABLE
+// per challenge (HardTaskDto); AUTO tasks (diet/water/workout) recompute LIVE from the tracker against
+// their OWN custom targets; MANUAL tasks (reading, custom) persist per-day progress. Points (incl.
+// PARTIAL) are computed server-side. There is NO progress-photo concept in v2.
 // ──────────────────────────────────────────────────────────────────────────────────────────────
 
 /** Lifecycle of a challenge (mirrors HardChallengeStatus, by name). */
@@ -3488,74 +3489,109 @@ export type HardChallengeStatus = 'Active' | 'Completed' | 'Abandoned';
 /** The rule set a run follows (mirrors HardRuleset, by name). Only "Relaxed" exists today. */
 export type HardRuleset = 'Relaxed';
 
+/** Where a task's progress comes from (mirrors HardTaskAutoSource, by name). `None` = manual. */
+export type HardTaskAutoSource = 'None' | 'Diet' | 'Water' | 'Workout' | 'NoAlcohol';
+
 /**
- * One day in the 75-Hard grid (mirrors DayDto). The five AUTO task results (diet/water/workout1/
- * workout2) are recomputed LIVE from the tracker; the manual flags (read, photo-boolean, no-alcohol)
- * + the diet override + the workout-2 outdoor attestation are persisted. `dayNumber` is 1..75 within
- * the window, else null. `confession` is NULLED for a viewer (never the owner's private narration).
+ * One CONFIGURABLE task in the daily set (mirrors TaskDto). `key` is a STABLE id within the challenge
+ * (diet/water/workout/reading/no-alcohol or custom-N) — day-progress references the task by this key.
+ * `targetValue` is null for a binary task. `minMinutes` applies to a Workout task only.
+ */
+export interface HardTaskDto {
+  id: number;
+  key: string;
+  label: string;
+  autoSource: HardTaskAutoSource;
+  /** The completion target for a measurable task (water ml / workout count / pages), else null (binary). */
+  targetValue: number | null;
+  /** For a Workout task: the minimum logged-exercise minutes that count toward the target count. */
+  minMinutes: number | null;
+  /** Unit label for a measurable task ("ml" / "workouts" / "pages" / …), else "". */
+  unit: string;
+  /** Points the task is worth at 100% (user-assigned, 0..1000). */
+  pointValue: number;
+  /** When true a measurable task pro-rates points by progress; else all-or-nothing. */
+  partialCredit: boolean;
+  /** Whether the task is in the daily set (a disabled task earns no points and is not required). */
+  enabled: boolean;
+  sortOrder: number;
+}
+
+/** One task's RESULT for a day (mirrors DayTaskDto): its progress, measured value, and points earned. */
+export interface HardDayTaskDto {
+  taskId: number;
+  key: string;
+  label: string;
+  autoSource: HardTaskAutoSource;
+  targetValue: number | null;
+  unit: string;
+  /** The raw measured value (auto: tracker total e.g. hydration ml / workout count; manual: entered), else null. */
+  value: number | null;
+  /** Completion fraction 0..1. */
+  progress: number;
+  /** Points earned this day for this task (may be fractional — partial credit). */
+  points: number;
+  pointValue: number;
+  partialCredit: boolean;
+  /** True when progress >= 100%. */
+  complete: boolean;
+}
+
+/**
+ * One day in the grid (mirrors DayDto): the per-task results + day-level flags + day points + overall
+ * completeness. `dayNumber` is 1..75 within the window, else null. `confession` is NULLED for a viewer.
+ * A day is `complete` when EVERY enabled task is at 100% (partial points still count toward `dayPoints`).
  */
 export interface HardDayDto {
   /** The day, plain ISO ("YYYY-MM-DD"). */
   date: string;
-  /** 1..75 within the challenge window, else null (a date outside the window). */
+  /** 1..75 within the challenge window, else null. */
   dayNumber: number | null;
-  /** AUTO: calories-in within the daily calorie goal AND within every SET macro goal (override wins). */
-  dietOk: boolean;
-  /** Manual override of the diet result: true/false WINS over the auto computation; null = use auto. */
+  /** Manual override of the auto diet task: true/false WINS over the tracker computation; null = use auto. */
   dietOverride: boolean | null;
-  /** AUTO: the day's hydration sum is at least one US gallon (3785 ml). */
-  waterGallonOk: boolean;
-  /** AUTO: at least one logged exercise of >= 45 minutes that day. */
-  workout1Ok: boolean;
-  /** AUTO: at least two logged exercises of >= 45 minutes that day. */
-  workout2Ok: boolean;
-  /** User attestation that the second workout was outdoors. */
-  workout2Outdoor: boolean;
-  /** Manual: the day's reading (10 pages) was done. */
-  readOk: boolean;
-  /** Manual BOOLEAN attestation that a progress photo was taken (NO image is ever stored). */
-  photoTaken: boolean;
-  /** Whether the no-alcohol rule held that day (defaults true). */
+  /** Whether the no-alcohol rule held that day (defaults true; read by the seeded no-alcohol task). */
   noAlcohol: boolean;
-  /** Whether this day was pre-declared a cheat day (keeps the run counted without completing). */
+  /** Whether this day was pre-declared a cheat day. */
   isCheatDay: boolean;
-  /** True when all six tasks pass AND no-alcohol holds. */
+  /** Sum of points earned across enabled tasks this day (may be fractional). */
+  dayPoints: number;
+  /** Sum of pointValue across enabled tasks this day (the day's max). */
+  maxPoints: number;
+  /** True when EVERY enabled task is at 100%. */
   complete: boolean;
   /** Optional Relaxed-ruleset confession (<= 280 chars); NULL for a viewer. */
   confession: string | null;
+  /** The per-task results for the day (enabled tasks only). */
+  tasks: HardDayTaskDto[];
 }
 
 /**
- * The active challenge with its derived current day, streaks, and the full day grid (mirrors
- * ChallengeDto). GET /api/challenge returns this or `null` when there's no active challenge.
- * `readOnly` is true when viewing someone else's (a coach/contact read); identity is userId + display
- * NAME only — NEVER an email (email-privacy).
+ * The active challenge with its derived current day, streaks, total points, task set, and day grid
+ * (mirrors ChallengeDto). GET /api/challenge returns this or `null`. `readOnly` is true when viewing
+ * someone else's; identity is userId + display NAME only — NEVER an email.
  */
 export interface HardChallengeDto {
   id: number;
-  /** The owner's AppUser id (the client opens their challenge via GET /challenge?user={userId}). */
   userId: number;
-  /** The owner's display name (never an email). */
   userName: string;
-  /** True when viewing someone else's challenge (no edit controls; confessions nulled). */
   readOnly: boolean;
-  /** Day 1 = this date, plain ISO ("YYYY-MM-DD"). */
   startDate: string;
   ruleset: HardRuleset;
   status: HardChallengeStatus;
-  /** Derived current day, clamped 1..75. */
   currentDay: number;
-  /** Always 75. */
   totalDays: number;
-  /** Count of days that fully passed all six tasks. */
+  /** Count of days where EVERY enabled task hit 100%. */
   completedDays: number;
-  /** Current Relaxed-streak length. */
   currentStreak: number;
-  /** Longest contiguous kept-run length. */
   longestStreak: number;
-  /** How many confessions (the Relaxed "keep the run going" lever) have been used. */
   confessionsUsed: number;
-  /** The full 75-day grid (oldest-first), each day's six task results recomputed live. */
+  /** Sum of dayPoints over the whole window. */
+  totalPoints: number;
+  /** Today's dayPoints. */
+  todayPoints: number;
+  /** The configurable task set (ordered). */
+  tasks: HardTaskDto[];
+  /** The full 75-day grid (oldest-first). */
   days: HardDayDto[];
 }
 
@@ -3566,24 +3602,75 @@ export interface HardSharedPersonDto {
   picture?: string;
 }
 
+/** One leaderboard row (mirrors LeaderboardRowDto) — userId + display NAME only, NEVER an email. */
+export interface HardLeaderboardRowDto {
+  userId: number;
+  name: string;
+  picture?: string;
+  currentDay: number;
+  currentStreak: number;
+  totalPoints: number;
+  todayPoints: number;
+  /** True for the caller's own row. */
+  isSelf: boolean;
+}
+
+/** The AI coach recap (mirrors CoachDto). `fellBackToPlain` when tracker.ai/Gemini was absent. ALWAYS 200. */
+export interface HardCoachDto {
+  narrative: string;
+  insights: string[];
+  fellBackToPlain: boolean;
+}
+
 /** Start-a-challenge payload (POST /api/challenge). `startDate` defaults to local today when omitted. */
 export interface StartChallengeRequest {
   startDate?: string | null;
 }
 
+/** One manual task's progress for a day (keyed by the stable task `key`). */
+export interface HardDayTaskProgressRequest {
+  key: string;
+  /** Measured value for a measurable manual task (e.g. pages read). */
+  value?: number | null;
+  /** Attestation for a binary manual task. */
+  done?: boolean | null;
+}
+
 /**
- * Upsert the MANUAL portion of a day (PUT /api/challenge/day). Every field is optional; a null/omitted
- * field means "leave as-is" (the auto bits are recomputed live, never written from input). There is NO
- * image field, EVER — `photoTaken` is a boolean attestation only.
+ * Upsert the day-level flags + MANUAL per-task progress (PUT /api/challenge/day). Every field optional
+ * (partial PUT). Auto-task progress sent here is ignored (auto tasks recompute live). No image, EVER.
  */
 export interface UpsertHardDayRequest {
   date: string;
-  readOk?: boolean | null;
-  photoTaken?: boolean | null;
   noAlcohol?: boolean | null;
   confession?: string | null;
-  workout2Outdoor?: boolean | null;
   dietOverride?: boolean | null;
+  /** Manual per-task progress (reading pages, custom tasks). */
+  tasks?: HardDayTaskProgressRequest[];
+}
+
+/** Create a CUSTOM manual task (POST /api/challenge/tasks). Auto tasks are seeded, never user-created. */
+export interface CreateHardTaskRequest {
+  label: string;
+  /** Measurable target, else omit/null for a binary task. */
+  targetValue?: number | null;
+  unit?: string | null;
+  /** Points at 100% (default 10). */
+  pointValue?: number | null;
+  partialCredit?: boolean | null;
+}
+
+/** Edit a task (PUT /api/challenge/tasks/{id}). The auto-source + key are immutable. */
+export interface UpdateHardTaskRequest {
+  label?: string | null;
+  targetValue?: number | null;
+  /** Workout tasks only. */
+  minMinutes?: number | null;
+  unit?: string | null;
+  pointValue?: number | null;
+  partialCredit?: boolean | null;
+  enabled?: boolean | null;
+  sortOrder?: number | null;
 }
 
 /** Pre-declare / clear FUTURE-only cheat dates within the window (POST /api/challenge/cheat-days). */

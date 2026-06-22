@@ -70,6 +70,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<IdentityRule> IdentityRules => Set<IdentityRule>();
     public DbSet<HardChallenge> HardChallenges => Set<HardChallenge>();
     public DbSet<HardChallengeDay> HardChallengeDays => Set<HardChallengeDay>();
+    public DbSet<HardChallengeTask> HardChallengeTasks => Set<HardChallengeTask>();
+    public DbSet<HardChallengeDayTask> HardChallengeDayTasks => Set<HardChallengeDayTask>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -867,6 +869,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.UserEmail).HasMaxLength(256);
             e.Property(x => x.Confession).HasMaxLength(280);
             e.Property(x => x.NoAlcohol).HasDefaultValue(true);
+            e.Property(x => x.DayPoints).HasColumnType("numeric(8,1)");
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
             e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
             // One day row per (user, local date); also the day-grid read.
@@ -874,6 +877,35 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             // Cascade the day rows with their owning challenge.
             e.HasOne(x => x.Challenge).WithMany()
                 .HasForeignKey(x => x.ChallengeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<HardChallengeTask>(e =>
+        {
+            e.Property(x => x.Key).HasMaxLength(64);
+            e.Property(x => x.Label).HasMaxLength(120);
+            e.Property(x => x.Unit).HasMaxLength(32);
+            e.Property(x => x.TargetValue).HasColumnType("numeric(12,2)");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // A task Key is stable + unique within a challenge (day-progress rows reference the task by id).
+            e.HasIndex(x => new { x.ChallengeId, x.Key }).IsUnique();
+            // Cascade the task config with its owning challenge.
+            e.HasOne(x => x.Challenge).WithMany(c => c.Tasks)
+                .HasForeignKey(x => x.ChallengeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<HardChallengeDayTask>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Value).HasColumnType("numeric(12,2)");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // One progress row per (user, local date, task).
+            e.HasIndex(x => new { x.UserEmail, x.LocalDate, x.TaskId }).IsUnique();
+            e.HasIndex(x => x.TaskId);
+            // Cascade with the owning task (and thus the challenge).
+            e.HasOne(x => x.Task).WithMany()
+                .HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

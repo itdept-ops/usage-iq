@@ -61,4 +61,8 @@ public class HardChallenge
 
     public DateTime CreatedUtc { get; set; }
     public DateTime UpdatedUtc { get; set; }
+
+    /// <summary>The CONFIGURABLE daily task set (75 Hard v2): the user edits targets/points, enables/disables,
+    /// and adds custom manual tasks. Seeded with the default set (classic 75 Hard MINUS the photo) on start.</summary>
+    public List<HardChallengeTask> Tasks { get; set; } = new();
 }

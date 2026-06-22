@@ -17,6 +17,7 @@ import {
   IdentityRule, IdentityRuleInput, IdentityCalendarStatus, IdentityImportPreview, IdentityImportCommit,
   IdentityImportResult,
   HardChallengeDto, HardSharedPersonDto, StartChallengeRequest, UpsertHardDayRequest, HardDayDto, CheatDaysRequest,
+  HardTaskDto, CreateHardTaskRequest, UpdateHardTaskRequest, HardLeaderboardRowDto, HardCoachDto,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -1720,6 +1721,37 @@ export class Api {
   /** People whose 75 Hard the caller may view read-only (userId + name only, NEVER email). */
   challengeShared(): Observable<HardSharedPersonDto[]> {
     return this.http.get<HardSharedPersonDto[]>(`${this.base}/challenge/shared`);
+  }
+
+  /** The configurable task set (own, or read-only when `user` is set + permitted). */
+  challengeTasks(user?: number): Observable<HardTaskDto[]> {
+    const params = user != null ? new HttpParams().set('user', String(user)) : undefined;
+    return this.http.get<HardTaskDto[]>(`${this.base}/challenge/tasks`, { params });
+  }
+
+  /** Add a CUSTOM manual task (owner). */
+  createChallengeTask(body: CreateHardTaskRequest): Observable<HardTaskDto> {
+    return this.http.post<HardTaskDto>(`${this.base}/challenge/tasks`, body);
+  }
+
+  /** Edit a task's target/points/enable/etc (owner). */
+  updateChallengeTask(id: number, body: UpdateHardTaskRequest): Observable<HardTaskDto> {
+    return this.http.put<HardTaskDto>(`${this.base}/challenge/tasks/${id}`, body);
+  }
+
+  /** Delete a CUSTOM task (owner). Built-in auto tasks can only be disabled (400). */
+  deleteChallengeTask(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/challenge/tasks/${id}`);
+  }
+
+  /** The caller + each sharing mutual contact, ranked by totalPoints desc (userId + name only, NEVER email). */
+  challengeLeaderboard(): Observable<HardLeaderboardRowDto[]> {
+    return this.http.get<HardLeaderboardRowDto[]>(`${this.base}/challenge/leaderboard`);
+  }
+
+  /** The AI coach recap (gated tracker.ai; ALWAYS 200 with a deterministic plain floor). */
+  challengeCoach(): Observable<HardCoachDto> {
+    return this.http.get<HardCoachDto>(`${this.base}/challenge/coach`);
   }
 
   // ---- Family Hub F6: Google Calendar (OAuth code flow; the caller's own primary calendar) ----
