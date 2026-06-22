@@ -1,0 +1,50 @@
+<article class="cx-loc" [class.cx-loc--ended]="!active()" aria-label="Live location share">
+  <header class="cx-loc__head">
+    <span class="cx-loc__icon" aria-hidden="true">
+      <mat-icon>{{ active() ? 'my_location' : 'location_off' }}</mat-icon>
+    </span>
+    <div class="cx-loc__id">
+      <p class="cx-loc__title">
+        {{ isMine() ? 'You are sharing your live location' : share().sharerName + ' is sharing live location' }}
+      </p>
+      <p class="cx-loc__sub">
+        @if (active()) {
+          <span class="cx-loc__live"><span class="cx-loc__pulse" aria-hidden="true"></span> Live</span>
+          <span class="cx-loc__dot" aria-hidden="true">·</span>
+          <span class="cx-loc__count mono-num" aria-live="off">{{ countdown() }} left</span>
+        } @else {
+          {{ endedReason() }}
+        }
+      </p>
+    </div>
+
+    @if (isMine() && active()) {
+      <div class="cx-loc__controls">
+        <button mat-stroked-button class="cx-loc__extend" [matMenuTriggerFor]="extendMenu"
+                matTooltip="Extend the share" aria-label="Extend live location share">
+          <mat-icon>more_time</mat-icon><span>Extend</span>
+        </button>
+        <mat-menu #extendMenu="matMenu" xPosition="before">
+          <button mat-menu-item (click)="onExtend(15)"><mat-icon>schedule</mat-icon><span>+15 minutes</span></button>
+          <button mat-menu-item (click)="onExtend(60)"><mat-icon>schedule</mat-icon><span>+1 hour</span></button>
+          <button mat-menu-item (click)="onExtend(480)"><mat-icon>schedule</mat-icon><span>+8 hours</span></button>
+        </mat-menu>
+        <button mat-flat-button color="warn" class="cx-loc__stop" (click)="onStop()"
+                aria-label="Stop sharing live location">
+          <mat-icon>stop_circle</mat-icon><span>Stop</span>
+        </button>
+      </div>
+    }
+  </header>
+
+  @if (active()) {
+    <div class="cx-loc__map">
+      <app-location-map [pins]="pins()"></app-location-map>
+    </div>
+  } @else {
+    <div class="cx-loc__ended">
+      <mat-icon aria-hidden="true">location_off</mat-icon>
+      <span>This live location is no longer being shared.</span>
+    </div>
+  }
+</article>

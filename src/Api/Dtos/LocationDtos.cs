@@ -68,6 +68,60 @@ public sealed class FamilyMemberLocationDto
     public DateTime CapturedUtc { get; set; }
 }
 
+/// <summary>Body of <c>POST /api/chat/channels/{id}/location-share</c> — start a live location share scoped to
+/// that conversation. Carries the first GPS fix and the requested duration; the server clamps both.</summary>
+public sealed class StartLocationShareRequest
+{
+    public double Lat { get; set; }
+    public double Lng { get; set; }
+    /// <summary>Reported GPS accuracy radius in metres (optional).</summary>
+    public double? AccuracyM { get; set; }
+    /// <summary>How long the share should run. Null/&lt;=0 ⇒ the 15-minute default; clamped to a sane max.</summary>
+    public int? DurationMinutes { get; set; }
+}
+
+/// <summary>Body of <c>PUT /api/chat/location-share/{id}/position</c> — push the sharer's latest live position.</summary>
+public sealed class UpdateLocationShareRequest
+{
+    public double Lat { get; set; }
+    public double Lng { get; set; }
+    public double? AccuracyM { get; set; }
+}
+
+/// <summary>Body of <c>POST /api/chat/location-share/{id}/extend</c> — push the expiry further by N minutes.</summary>
+public sealed class ExtendLocationShareRequest
+{
+    /// <summary>Minutes to add to the current expiry. Clamped to (0, max] (e.g. +15m / +1h / +8h).</summary>
+    public int AddMinutes { get; set; }
+}
+
+/// <summary>
+/// A live location share as seen by a conversation participant (the <c>locationShareStarted/Updated/Extended/Stopped</c>
+/// hub events and the active-shares read all carry this shape). The sharer is identified by AppUser id + display
+/// NAME only — an email is NEVER on the wire (email-privacy). The precise lat/lng is present because starting the
+/// share is the sharer's consent to show their live location to THIS conversation. <see cref="Active"/> reflects the
+/// server's view at send time (!stopped &amp;&amp; now &lt; expiresUtc); clients also run a local countdown to
+/// <see cref="ExpiresUtc"/> and treat <see cref="Stopped"/> / past-expiry as ended.
+/// </summary>
+public sealed class ChatLocationShareDto
+{
+    public int Id { get; set; }
+    public int ChannelId { get; set; }
+    /// <summary>The sharer's AppUser id (0 if their email has no AppUser row).</summary>
+    public int SharerUserId { get; set; }
+    /// <summary>The sharer's display name — NEVER an email.</summary>
+    public string SharerName { get; set; } = "";
+    public double Lat { get; set; }
+    public double Lng { get; set; }
+    public double? AccuracyM { get; set; }
+    public DateTime StartUtc { get; set; }
+    public DateTime ExpiresUtc { get; set; }
+    public DateTime LastUpdateUtc { get; set; }
+    public bool Stopped { get; set; }
+    /// <summary>True when the share is active right now (server view: !stopped AND now &lt; expiresUtc).</summary>
+    public bool Active { get; set; }
+}
+
 /// <summary>One user's entry on the admin location map (<c>GET /api/location/admin</c>): identity by id+name
 /// (admin page is admin-gated, but we still prefer userId+name over email), the latest pin, and a short
 /// recent history. The precise coordinates are visible here ONLY because the endpoint is admin-gated.</summary>

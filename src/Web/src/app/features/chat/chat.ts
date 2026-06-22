@@ -17,9 +17,10 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { ChatRealtime } from '../../core/chat-realtime';
-import { ChatChannelDto, ChatComposeAction, ChatContactDto, ChatMember, ChatMessageDto, PERM, Presence, ReactionGroupDto } from '../../core/models';
+import { ChatChannelDto, ChatComposeAction, ChatContactDto, ChatLocationShareDto, ChatMember, ChatMessageDto, PERM, Presence, ReactionGroupDto } from '../../core/models';
 import { timeAgo } from '../../shared/format';
 import { ChatCreateData, ChatCreateDialog, ChatPickPerson } from './chat-create-dialog';
+import { LiveLocationCard } from './live-location-card';
 
 /** A run of consecutive messages from the same sender, rendered as one grouped block. */
 interface MessageGroup {
@@ -61,7 +62,7 @@ const REACTION_EMOJIS: readonly string[] = [
   selector: 'app-chat',
   imports: [
     FormsModule, TextFieldModule, MatIconModule, MatButtonModule, MatTooltipModule, MatMenuModule,
-    MatDialogModule, MatSnackBarModule,
+    MatDialogModule, MatSnackBarModule, LiveLocationCard,
   ],
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
@@ -82,6 +83,8 @@ export class Chat implements AfterViewChecked, OnDestroy {
   readonly canModerate = computed(() => this.auth.hasPermission(PERM.chatModerate));
   /** Admins (chat.contacts.manage) pick from the full directory so they're never boxed in by a circle. */
   readonly canManageContacts = computed(() => this.auth.hasPermission(PERM.chatContactsManage));
+  /** Live-location share needs BOTH chat.send (write into the conversation) AND location.self (use my GPS). */
+  readonly canShareLocation = computed(() => this.canSend() && this.auth.hasPermission(PERM.locationSelf));
 
   /** The signed-in user's own AppUser id, for "mine"/self-by-id checks (null until /me populates it). */
   private readonly myUserId = computed(() => this.auth.userId());
@@ -211,6 +214,77 @@ export class Chat implements AfterViewChecked, OnDestroy {
   /** The curated emoji set the react picker offers (no external dependency). */
   readonly reactionEmojis = REACTION_EMOJIS;
 
+  // =========================================================================
+  // Live-location share (temporary, scoped to the active conversation)
+  // =========================================================================
+
+  /** The duration choices the "Share live location" sheet offers (the 15-minute default leads). */
+  readonly shareDurations: readonly { minutes: number; label: string }[] = [
+    { minutes: 15, label: '15 minutes' },
+    { minutes: 60, label: '1 hour' },
+    { minutes: 480, label: '8 hours' },
+  ];
+
+  /** True while the duration sheet is open in the composer. */
+  readonly shareSheetOpen = signal(false);
+  /** True while a start-share request (incl. the geolocation prompt) is in flight. */
+  readonly shareStarting = signal(false);
+  /** A friendly inline notice when the browser blocks/cannot provide geolocation. */
+  readonly shareError = signal<string | null>(null);
+
+  /** Heartbeat that re-evaluates the active-share list as shares cross their expiry (1s). */
+  private readonly shareNow = signal(Date.now());
+
+  /**
+   * The conversation's CURRENTLY-ACTIVE shares (not stopped AND before expiry by the local clock), newest
+   * first. Ended rows linger in the cache (so a just-ended card can show "ended"), but the map list filters
+   * to active; an ended card is shown briefly via {@link recentlyEndedShares}.
+   */
+  readonly activeShares = computed<ChatLocationShareDto[]>(() => {
+    const id = this.selectedId();
+    if (id == null) return [];
+    const now = this.shareNow();
+    return this.chat.locationSharesFor(id)
+      .filter(s => !s.stopped && now < new Date(s.expiresUtc).getTime())
+      .sort((a, b) => new Date(b.startUtc).getTime() - new Date(a.startUtc).getTime());
+  });
+
+  /** The shares to render as cards: active ones, plus any of MINE that ended in the last ~20s (so I see it end). */
+  readonly visibleShares = computed<ChatLocationShareDto[]>(() => {
+    const id = this.selectedId();
+    if (id == null) return [];
+    const now = this.shareNow();
+    const me = this.myUserId();
+    return this.chat.locationSharesFor(id)
+      .filter(s => {
+        const ended = s.stopped || now >= new Date(s.expiresUtc).getTime();
+        if (!ended) return true;
+        // Keep a just-ended card visible briefly so the user sees it wind down (mine, or one already on screen).
+        const since = now - new Date(s.lastUpdateUtc).getTime();
+        return me != null && s.sharerUserId === me && since < 20000;
+      })
+      .sort((a, b) => new Date(b.startUtc).getTime() - new Date(a.startUtc).getTime());
+  });
+
+  /** True when I have an active share in the selected conversation (so the composer offers Stop, not Start). */
+  readonly myActiveShare = computed<ChatLocationShareDto | null>(() => {
+    const me = this.myUserId();
+    if (me == null) return null;
+    return this.activeShares().find(s => s.sharerUserId === me) ?? null;
+  });
+
+  /** True for a share authored by the signed-in user (drives the per-card Extend/Stop controls). */
+  shareIsMine(s: ChatLocationShareDto): boolean {
+    const me = this.myUserId();
+    return me != null && s.sharerUserId === me;
+  }
+
+  /** The id under which the periodic position-update timer was started (so we don't double-run it). */
+  private positionShareId: number | null = null;
+  private positionTimer: ReturnType<typeof setInterval> | null = null;
+  /** How often the sharer's tab re-reads + pushes the position while active + visible. */
+  private static readonly POSITION_PUSH_MS = 20000;
+
   // ---- view refs for scroll handling ----
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
   private readonly composerEl = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
@@ -277,6 +351,18 @@ export class Chat implements AfterViewChecked, OnDestroy {
         this.markReadLatest(id, msgs);
       }
     });
+
+    // A 1s heartbeat so live-location cards count down + cross their expiry without input churn.
+    timer(0, 1000).pipe(takeUntilDestroyed()).subscribe(() => this.shareNow.set(Date.now()));
+
+    // Drive the sharer's periodic position push: while I hold an ACTIVE share in the open conversation,
+    // (re)start a timer that re-reads the browser position + updates it; tear it down when the share ends
+    // or the selection changes. The timer itself respects tab visibility (see startPositionPush).
+    effect(() => {
+      const mine = this.myActiveShare();
+      if (mine && mine.id !== this.positionShareId) this.startPositionPush(mine.id);
+      else if (!mine && this.positionShareId != null) this.stopPositionPush();
+    });
   }
 
   // =========================================================================
@@ -324,6 +410,13 @@ export class Chat implements AfterViewChecked, OnDestroy {
         .finally(() => this.loadingHistory.set(false));
     }
     this.markReadLatest(ch.id, have);
+
+    // A late-joiner / a freshly opened conversation should see any in-progress live-location share — pull
+    // the active set (the SignalR events keep it fresh afterward). Close any open duration sheet on switch.
+    this.shareSheetOpen.set(false);
+    this.shareError.set(null);
+    void this.chat.refreshLocationShares(ch.id);
+
     queueMicrotask(() => this.focusComposer());
   }
 
@@ -398,6 +491,7 @@ export class Chat implements AfterViewChecked, OnDestroy {
   /** Navigating away must flush our own typing state so other clients don't see a stuck "is typing…". */
   ngOnDestroy(): void {
     this.stopTypingNow();
+    this.stopPositionPush();
   }
 
   // =========================================================================
@@ -916,6 +1010,113 @@ export class Chat implements AfterViewChecked, OnDestroy {
         online: this.isOnline(c.userId),
       }))
       .sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
+  }
+
+  // =========================================================================
+  // Live-location share — start (with a duration) / extend / stop, + periodic position push
+  // =========================================================================
+
+  /** Toggle the "Share live location" duration sheet in the composer (a no-op while a start is in flight). */
+  toggleShareSheet(): void {
+    if (this.shareStarting()) return;
+    this.shareError.set(null);
+    this.shareSheetOpen.update(v => !v);
+  }
+
+  /**
+   * Start a live-location share in the open conversation for the chosen duration. Grabs a single browser fix
+   * first; if the browser blocks or can't provide one, surface a friendly notice and DON'T start. The hub
+   * broadcasts the share back to every participant (including us), so the card appears via the realtime cache.
+   */
+  async startShare(minutes: number): Promise<void> {
+    const id = this.selectedId();
+    if (id == null || !this.canShareLocation() || this.shareStarting()) return;
+    if (this.myActiveShare()) { this.shareSheetOpen.set(false); return; } // already sharing here
+    this.shareError.set(null);
+    this.shareStarting.set(true);
+    try {
+      const pos = await this.getBrowserPosition();
+      if (!pos) {
+        this.shareError.set(this.geoBlockedMessage());
+        return;
+      }
+      const { latitude, longitude, accuracy } = pos.coords;
+      await this.chat.startLocationShare(id, {
+        lat: latitude,
+        lng: longitude,
+        accuracyM: Number.isFinite(accuracy) ? accuracy : null,
+        durationMinutes: minutes,
+      });
+      this.shareSheetOpen.set(false);
+    } catch {
+      this.shareError.set("Couldn't start the live share just now. Please try again.");
+    } finally {
+      this.shareStarting.set(false);
+    }
+  }
+
+  /** Extend a share I own by N minutes (e.g. +15 / +60). The card emits this; the hub pushes the new expiry. */
+  async extendShare(share: ChatLocationShareDto, minutes: number): Promise<void> {
+    const res = await this.chat.extendLocationShare(share.id, minutes);
+    if (!res) this.snack.open("Couldn't extend the share — it may have ended.", 'Dismiss', { duration: 4000 });
+  }
+
+  /** Stop a share I own. The card emits this; the hub broadcasts the ended state to viewers. */
+  async stopShare(share: ChatLocationShareDto): Promise<void> {
+    if (share.id === this.positionShareId) this.stopPositionPush();
+    const res = await this.chat.stopLocationShare(share.id);
+    if (!res) this.snack.open("Couldn't stop the share just now.", 'Dismiss', { duration: 4000 });
+  }
+
+  /**
+   * While I own an active share AND my tab is visible, re-read the browser position every ~20s and push it
+   * so viewers' pins move in real time. Visibility is checked each tick (a backgrounded tab pauses pushing,
+   * resuming when it returns). A geolocation failure mid-share is swallowed — the next tick retries.
+   */
+  private startPositionPush(shareId: number): void {
+    this.stopPositionPush();
+    this.positionShareId = shareId;
+    this.positionTimer = setInterval(() => void this.pushPositionTick(shareId), Chat.POSITION_PUSH_MS);
+  }
+
+  private async pushPositionTick(shareId: number): Promise<void> {
+    if (this.positionShareId !== shareId) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return; // tab hidden: skip
+    const pos = await this.getBrowserPosition();
+    if (!pos || this.positionShareId !== shareId) return;
+    const { latitude, longitude, accuracy } = pos.coords;
+    const res = await this.chat.updateLocationShare(shareId, {
+      lat: latitude,
+      lng: longitude,
+      accuracyM: Number.isFinite(accuracy) ? accuracy : null,
+    });
+    // A null result means the share ended server-side (expired/stopped) — stop pushing.
+    if (!res) this.stopPositionPush();
+  }
+
+  private stopPositionPush(): void {
+    if (this.positionTimer) { clearInterval(this.positionTimer); this.positionTimer = null; }
+    this.positionShareId = null;
+  }
+
+  /** One-shot browser position; resolves null on any error (blocked, timeout, unsupported). */
+  private getBrowserPosition(): Promise<GeolocationPosition | null> {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return Promise.resolve(null);
+    return new Promise(resolve => {
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve(pos),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+      );
+    });
+  }
+
+  /** A friendly notice when the browser won't give us a position (blocked permission or unsupported). */
+  private geoBlockedMessage(): string {
+    if (typeof navigator !== 'undefined' && !navigator.geolocation) {
+      return "This browser can't share location. Try a different browser.";
+    }
+    return 'Location is blocked. Allow location access in your browser to share, then try again.';
   }
 
   // =========================================================================

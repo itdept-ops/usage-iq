@@ -2,7 +2,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatMessageDto, ChatRepliesResult, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
+  AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatLocationShareDto, ChatMessageDto, ChatRepliesResult, StartLocationShareRequest, UpdateLocationShareRequest, ExtendLocationShareRequest, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
   FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChoreSource, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, Allowance, AllowanceMe, AllowanceMoveRequest, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, RecipeBreakdownResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation,
   AddSupplementRequest, SupplementEntryDto, SupplementMacrosRequest, SupplementMacrosResponse,
@@ -459,6 +459,36 @@ export class Api {
     return this.http.post<ChatComposeResult>(`${this.base}/chat/ai/compose`, {
       action, prompt: opts.prompt ?? '', currentDraft: opts.currentDraft ?? '',
     });
+  }
+
+  // ---- Chat live-location share (temporary, scoped to ONE conversation) -----------------------------
+  // start/update/extend/stop require chat.send + location.self + membership/ownership; the active read
+  // requires chat.read + membership (non-member 404). The realtime hub broadcasts the result to every
+  // participant; these REST calls return the same ChatLocationShareDto. Identity is userId+name, never email.
+
+  /** Active (not stopped, not expired) live-location shares in a conversation, so a late-joiner sees one in progress. */
+  activeLocationShares(channelId: number): Observable<ChatLocationShareDto[]> {
+    return this.http.get<ChatLocationShareDto[]>(`${this.base}/chat/channels/${channelId}/location-shares`);
+  }
+
+  /** Start a live-location share in a conversation the caller belongs to (carries the first fix + duration). */
+  startLocationShare(channelId: number, body: StartLocationShareRequest): Observable<ChatLocationShareDto> {
+    return this.http.post<ChatLocationShareDto>(`${this.base}/chat/channels/${channelId}/location-share`, body);
+  }
+
+  /** Push the sharer's latest live position on an active share they own (404 when absent/not owned/ended). */
+  updateLocationShare(shareId: number, body: UpdateLocationShareRequest): Observable<ChatLocationShareDto> {
+    return this.http.put<ChatLocationShareDto>(`${this.base}/chat/location-share/${shareId}/position`, body);
+  }
+
+  /** Extend an active share the caller owns by N minutes (e.g. +15/+60), clamped server-side (404 when ended). */
+  extendLocationShare(shareId: number, body: ExtendLocationShareRequest): Observable<ChatLocationShareDto> {
+    return this.http.post<ChatLocationShareDto>(`${this.base}/chat/location-share/${shareId}/extend`, body);
+  }
+
+  /** Stop a share the caller owns (idempotent; 404 only when absent/not owned). */
+  stopLocationShare(shareId: number): Observable<ChatLocationShareDto> {
+    return this.http.post<ChatLocationShareDto>(`${this.base}/chat/location-share/${shareId}/stop`, {});
   }
 
   // ---- Chat contacts / circles (admin-managed; the picker draws from these) ----

@@ -170,6 +170,7 @@ builder.Services.AddScoped<GoogleCalendarService>();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, EmailUserIdProvider>();
 builder.Services.AddScoped<ChatNotificationService>();
+builder.Services.AddScoped<ChatLocationShareService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -477,6 +478,7 @@ app.MapShareEndpoints();
 app.MapIngestEndpoints();
 app.MapFleetEndpoints();
 app.MapChatEndpoints();
+app.MapChatLocationShareEndpoints();
 app.MapContactsEndpoints();
 app.MapInboxEndpoints();
 app.MapTrackerEndpoints();

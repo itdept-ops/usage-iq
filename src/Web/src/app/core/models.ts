@@ -834,6 +834,64 @@ export interface ChatComposeResult {
   body: string;
 }
 
+// ---- Chat live-location share (temporary, scoped to ONE conversation; gated chat.send + location.self) ----
+
+/**
+ * A temporary LIVE location share as seen by a conversation participant. The four hub events
+ * (`locationShareStarted` / `Updated` / `Extended` / `Stopped`) and the GET active-shares read all carry
+ * this shape. The sharer is identified by AppUser id + display NAME only — an email is NEVER on the wire
+ * (email-privacy). The precise lat/lng is present because starting the share is the sharer's consent to show
+ * their live location to THIS conversation. `active` is the server's view at send time (!stopped && now <
+ * expiresUtc); the client ALSO runs a local countdown to `expiresUtc` and treats `stopped`/past-expiry as
+ * ended. Mirrors ChatLocationShareDto.
+ */
+export interface ChatLocationShareDto {
+  id: number;
+  channelId: number;
+  /** The sharer's AppUser id (0 if their email has no AppUser row). Used for "mine" checks. */
+  sharerUserId: number;
+  /** The sharer's display name — NEVER an email. */
+  sharerName: string;
+  lat: number;
+  lng: number;
+  /** Reported GPS accuracy radius in metres, when supplied. */
+  accuracyM?: number | null;
+  /** ISO-8601 UTC start time. */
+  startUtc: string;
+  /** ISO-8601 UTC expiry — the client counts down to this and ends the card when reached. */
+  expiresUtc: string;
+  /** ISO-8601 UTC time of the latest position. */
+  lastUpdateUtc: string;
+  /** True once the sharer explicitly stopped the share. */
+  stopped: boolean;
+  /** Server view: true when active right now (!stopped && now < expiresUtc). */
+  active: boolean;
+}
+
+/**
+ * Body of POST /api/chat/channels/{id}/location-share — start a live share scoped to that conversation.
+ * Carries the first GPS fix + the requested duration; the server clamps both (null/<=0 ⇒ 15-minute default).
+ */
+export interface StartLocationShareRequest {
+  lat: number;
+  lng: number;
+  accuracyM?: number | null;
+  /** How long the share should run; null/<=0 ⇒ the 15-minute default. */
+  durationMinutes?: number | null;
+}
+
+/** Body of PUT /api/chat/location-share/{id}/position — push the sharer's latest live position. */
+export interface UpdateLocationShareRequest {
+  lat: number;
+  lng: number;
+  accuracyM?: number | null;
+}
+
+/** Body of POST /api/chat/location-share/{id}/extend — push the expiry further by N minutes (e.g. +15/+60). */
+export interface ExtendLocationShareRequest {
+  addMinutes: number;
+}
+
 // ---- Food & fitness tracker (Phase 2) ----
 
 /** Tracker macro/exercise goal preset (mirrors the backend goal enum names). */

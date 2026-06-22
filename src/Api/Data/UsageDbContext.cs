@@ -30,6 +30,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<ChatMessageReaction> ChatMessageReactions => Set<ChatMessageReaction>();
     public DbSet<ChatContact> ChatContacts => Set<ChatContact>();
+    public DbSet<ChatLocationShare> ChatLocationShares => Set<ChatLocationShare>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<TrackerProfile> TrackerProfiles => Set<TrackerProfile>();
@@ -392,6 +393,18 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
             // One directed edge per (owner, contact); also the lookup for "is X in Y's circle".
             e.HasIndex(x => new { x.OwnerEmail, x.ContactEmail }).IsUnique();
+        });
+
+        b.Entity<ChatLocationShare>(e =>
+        {
+            e.Property(x => x.SharerEmail).HasMaxLength(256);
+            e.Property(x => x.StartUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.ExpiresUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.LastUpdateUtc).HasColumnType("timestamp with time zone");
+            // The active-shares-per-conversation read filters by ChannelId and expiry; this composite serves it.
+            e.HasIndex(x => new { x.ChannelId, x.ExpiresUtc });
+            e.HasOne(x => x.Channel).WithMany()
+                .HasForeignKey(x => x.ChannelId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<Notification>(e =>

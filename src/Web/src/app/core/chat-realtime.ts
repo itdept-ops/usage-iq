@@ -9,7 +9,7 @@ import {
 
 import { Api } from './api';
 import { AuthService } from './auth';
-import { ChatChannelDto, ChatMessageDto, NotificationDto, NotificationPreferenceDto, ReactionGroupDto } from './models';
+import { ChatChannelDto, ChatLocationShareDto, ChatMessageDto, NotificationDto, NotificationPreferenceDto, ReactionGroupDto, StartLocationShareRequest, UpdateLocationShareRequest } from './models';
 import { firstValueFrom } from 'rxjs';
 
 /** Sensible defaults until the real preferences are loaded from the server (everything on). */
@@ -89,6 +89,17 @@ export class ChatRealtime {
   readonly typing = this._typing.asReadonly();
   typingFor(channelId: number): TypingUser[] {
     return this._typing()[channelId] ?? [];
+  }
+
+  // ---- per-channel live-location shares (keyed by channelId), mirroring the locationShare* hub events ----
+  // A share lives here while !stopped; the chat page derives an ACTIVE list (also respecting expiresUtc via a
+  // local countdown). A stopped/ended share is kept (flagged) just long enough for the card to render "ended",
+  // then pruned when a fresh active set replaces it.
+  private readonly _locationShares = signal<Record<number, ChatLocationShareDto[]>>({});
+  /** Reactive read of the live-location shares, keyed by channelId. */
+  readonly locationShares = this._locationShares.asReadonly();
+  locationSharesFor(channelId: number): ChatLocationShareDto[] {
+    return this._locationShares()[channelId] ?? [];
   }
 
   // ---- per-channel unread MESSAGE counts (mirrors UnreadChanged) ----
@@ -210,6 +221,7 @@ export class ChatRealtime {
     this._channels.set([]);
     this._messages.set({});
     this._typing.set({});
+    this._locationShares.set({});
     this._unread.set({});
     this._notifications.set([]);
     this._inboxUnread.set(0);
@@ -234,6 +246,11 @@ export class ChatRealtime {
     c.on('ChannelAdded', (channel: ChatChannelDto) => this.onChannelAdded(channel));
     c.on('ReactionChanged', (channelId: number, messageId: number, reactions: ReactionGroupDto[]) =>
       this.onReactionChanged(channelId, messageId, reactions));
+    // Live-location share lifecycle (scoped to the conversation group every member's connection joins).
+    c.on('locationShareStarted', (share: ChatLocationShareDto) => this.onLocationShareUpsert(share));
+    c.on('locationShareUpdated', (share: ChatLocationShareDto) => this.onLocationShareUpsert(share));
+    c.on('locationShareExtended', (share: ChatLocationShareDto) => this.onLocationShareUpsert(share));
+    c.on('locationShareStopped', (share: ChatLocationShareDto) => this.onLocationShareUpsert(share));
     c.on('SessionRevoked', () => this._sessionRevoked.update(n => n + 1));
   }
 
@@ -318,6 +335,23 @@ export class ChatRealtime {
         ...map,
         [channelId]: list.map(m => m.id === messageId ? { ...m, reactions: reactions ?? [] } : m),
       };
+    });
+  }
+
+  /**
+   * Fold a live-location share (from any of the started/updated/extended/stopped events, or a REST call)
+   * into the per-channel cache: upsert by share id. We KEEP a stopped/ended share in the list so the card
+   * can render its "ended" state — the chat page filters to currently-active for the map, and a fresh
+   * {@link refreshLocationShares} prunes ended rows when it replaces the channel's set.
+   */
+  private onLocationShareUpsert(share: ChatLocationShareDto): void {
+    if (!share || share.channelId == null) return;
+    this._locationShares.update(map => {
+      const list = map[share.channelId] ?? [];
+      const next = list.some(s => s.id === share.id)
+        ? list.map(s => (s.id === share.id ? share : s))
+        : [...list, share];
+      return { ...map, [share.channelId]: next };
     });
   }
 
@@ -458,6 +492,65 @@ export class ChatRealtime {
       return { ...map, [channelId]: merged };
     });
     return page.length;
+  }
+
+  // =========================================================================
+  // Live-location shares (REST-backed; the hub broadcasts the lifecycle events back to every participant,
+  // INCLUDING the caller, so each call also folds its own result in for immediate feedback / offline use)
+  // =========================================================================
+
+  /**
+   * Replace a channel's known shares with the server's currently-ACTIVE set (so a late-joiner / a freshly
+   * opened conversation sees an in-progress share, and ended rows are pruned). Swallows its own error.
+   */
+  async refreshLocationShares(channelId: number): Promise<ChatLocationShareDto[]> {
+    try {
+      const list = await firstValueFrom(this.api.activeLocationShares(channelId));
+      this._locationShares.update(map => ({ ...map, [channelId]: list }));
+      return list;
+    } catch {
+      return this.locationSharesFor(channelId);
+    }
+  }
+
+  /** Start a live-location share in a conversation (first fix + duration); folds the result in. */
+  async startLocationShare(channelId: number, req: StartLocationShareRequest): Promise<ChatLocationShareDto> {
+    const share = await firstValueFrom(this.api.startLocationShare(channelId, req));
+    this.onLocationShareUpsert(share);
+    return share;
+  }
+
+  /** Push the sharer's latest position on a share they own; folds the result in (null when ended/not owned). */
+  async updateLocationShare(shareId: number, req: UpdateLocationShareRequest): Promise<ChatLocationShareDto | null> {
+    try {
+      const share = await firstValueFrom(this.api.updateLocationShare(shareId, req));
+      this.onLocationShareUpsert(share);
+      return share;
+    } catch {
+      return null; // 404 (ended/not owned) — the caller stops updating; the card ends on its own countdown
+    }
+  }
+
+  /** Extend a share the caller owns by N minutes; folds the result in. */
+  async extendLocationShare(shareId: number, addMinutes: number): Promise<ChatLocationShareDto | null> {
+    try {
+      const share = await firstValueFrom(this.api.extendLocationShare(shareId, { addMinutes }));
+      this.onLocationShareUpsert(share);
+      return share;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Stop a share the caller owns (idempotent); folds the ended state in. */
+  async stopLocationShare(shareId: number): Promise<ChatLocationShareDto | null> {
+    try {
+      const share = await firstValueFrom(this.api.stopLocationShare(shareId));
+      this.onLocationShareUpsert(share);
+      return share;
+    } catch {
+      return null;
+    }
   }
 
   // =========================================================================

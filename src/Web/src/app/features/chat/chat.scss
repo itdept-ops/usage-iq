@@ -795,6 +795,78 @@
   pointer-events: none;
 }
 
+/* The composer's "Share live location" trigger (mirrors the AI trigger; toggles the duration sheet). */
+.cx-loc-trigger.mat-mdc-icon-button {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  align-self: flex-end;
+  mat-icon { color: var(--tech-accent); }
+  .cx-spinner { margin: 0 auto; }
+
+  &.cx-loc-trigger--on mat-icon { color: var(--tech-text-on-accent); }
+  &.cx-loc-trigger--on { background: color-mix(in srgb, var(--tech-accent) 80%, transparent); }
+}
+
+/* The "Share live location for…" duration sheet that the trigger expands above the composer row. */
+.cx-locshare {
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: var(--tech-r-control);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 32%, var(--tech-border));
+  background: color-mix(in srgb, var(--tech-accent) 6%, var(--tech-panel));
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    mat-icon { color: var(--tech-accent); font-size: 20px; width: 20px; height: 20px; }
+  }
+  &__title {
+    flex: 1 1 auto;
+    font-size: var(--tech-fs-body);
+    font-weight: 600;
+    color: var(--tech-text);
+  }
+  &__close.mat-mdc-icon-button { flex: 0 0 auto; width: 34px; height: 34px; }
+
+  &__opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  &__opt {
+    flex: 1 1 auto;
+    min-width: 96px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: var(--tech-r-control);
+    border: 1px solid var(--tech-border);
+    background: var(--tech-panel-raised, var(--tech-panel));
+    color: var(--tech-text);
+    font: inherit;
+    font-size: var(--tech-fs-body);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--tech-t-control) ease, border-color var(--tech-t-control) ease;
+    &:hover:not(:disabled) {
+      border-color: var(--tech-accent);
+      background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    }
+    &:focus-visible { outline: none; box-shadow: var(--tech-focus-ring); }
+    &:disabled { opacity: 0.6; cursor: default; }
+  }
+  &__hint {
+    margin: 10px 0 0;
+    font-size: var(--tech-fs-label);
+    color: var(--tech-text-tertiary);
+  }
+}
+
 /* ───────────────────────── Responsive: single-pane on phones ─────────────────────────
    Below 760px the two panes overlay: the sidebar shows until a conversation is picked,
    then the conversation pane takes over (with a Back button). */

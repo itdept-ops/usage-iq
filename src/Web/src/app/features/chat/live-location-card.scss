@@ -1,0 +1,130 @@
+:host { display: block; }
+
+.cx-loc {
+  margin: var(--tech-space-2) 0;
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-r-control, 10px);
+  background: var(--tech-panel-raised, var(--tech-panel));
+  overflow: hidden;
+
+  &--ended { opacity: 0.92; }
+}
+
+.cx-loc__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tech-space-3);
+  padding: var(--tech-space-3);
+}
+
+.cx-loc__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: var(--tech-text-on-accent, #fff);
+  background: linear-gradient(135deg, #3d8bff 0%, #8b7cff 52%, #3fd8d0 100%);
+
+  mat-icon { font-size: 20px; width: 20px; height: 20px; }
+
+  .cx-loc--ended & {
+    background: var(--tech-panel);
+    color: var(--tech-text-tertiary);
+    box-shadow: inset 0 0 0 1px var(--tech-border-subtle);
+  }
+}
+
+.cx-loc__id { min-width: 0; flex: 1 1 auto; }
+
+.cx-loc__title {
+  margin: 0;
+  font-size: var(--tech-fs-body, 13px);
+  font-weight: 600;
+  color: var(--tech-text);
+  line-height: 1.25;
+}
+
+.cx-loc__sub {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--tech-fs-label, 11px);
+  color: var(--tech-text-secondary);
+}
+
+.cx-loc__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tech-success);
+  font-weight: 600;
+}
+
+.cx-loc__pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tech-success);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--tech-success) 70%, transparent);
+  animation: cx-loc-pulse 1.6s ease-out infinite;
+}
+
+.cx-loc__dot { color: var(--tech-text-tertiary); }
+
+.cx-loc__count {
+  font-family: var(--tech-font-mono);
+  color: var(--tech-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-loc__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2);
+  flex: 0 0 auto;
+
+  button {
+    border-radius: var(--tech-r-control, 8px);
+    font-weight: 600;
+    mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  }
+}
+
+.cx-loc__map {
+  height: 220px;
+  border-top: 1px solid var(--tech-border-subtle);
+
+  app-location-map { display: block; width: 100%; height: 100%; }
+}
+
+.cx-loc__ended {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--tech-space-3) var(--tech-space-4) var(--tech-space-4);
+  font-size: var(--tech-fs-label, 11px);
+  color: var(--tech-text-tertiary);
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+}
+
+@keyframes cx-loc-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tech-success) 70%, transparent); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Phones: controls wrap under the title; the map gets a touch more height. */
+@media (max-width: 760px) {
+  .cx-loc__head { flex-wrap: wrap; }
+  .cx-loc__controls { width: 100%; }
+  .cx-loc__controls button { flex: 1 1 0; justify-content: center; }
+  .cx-loc__map { height: 240px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cx-loc__pulse { animation: none; }
+}

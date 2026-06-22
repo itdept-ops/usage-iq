@@ -183,6 +183,12 @@
           </p>
         }
 
+        <!-- Live-location cards: an inline map + countdown per active share; Extend/Stop for the sharer. -->
+        @for (s of visibleShares(); track s.id) {
+          <app-live-location-card [share]="s" [isMine]="shareIsMine(s)"
+                                  (extend)="extendShare(s, $event)" (stop)="stopShare(s)" />
+        }
+
         @if (loadingHistory()) {
           <div class="cx-loading-older"><span class="cx-spinner"></span> Loading earlier messages…</div>
         }
@@ -355,6 +361,35 @@
             <p class="cx-ai-note" role="alert"><mat-icon aria-hidden="true">cloud_off</mat-icon> {{ err }}</p>
           }
 
+          <!-- Share-live-location duration sheet: pick how long to share (15 min default + quick options). -->
+          @if (shareSheetOpen()) {
+            <div class="cx-locshare" role="group" aria-label="Share live location">
+              <div class="cx-locshare__head">
+                <mat-icon aria-hidden="true">my_location</mat-icon>
+                <span class="cx-locshare__title">Share live location for…</span>
+                <button mat-icon-button class="cx-locshare__close" (click)="toggleShareSheet()"
+                        matTooltip="Cancel" aria-label="Cancel sharing">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div class="cx-locshare__opts">
+                @for (d of shareDurations; track d.minutes) {
+                  <button type="button" class="cx-locshare__opt" [disabled]="shareStarting()"
+                          (click)="startShare(d.minutes)">
+                    @if (shareStarting()) {
+                      <span class="cx-spinner cx-spinner--sm" aria-hidden="true"></span>
+                    }
+                    {{ d.label }}
+                  </button>
+                }
+              </div>
+              <p class="cx-locshare__hint">Only people in this conversation can see it. You can stop anytime.</p>
+            </div>
+          }
+          @if (shareError(); as err) {
+            <p class="cx-ai-note" role="alert"><mat-icon aria-hidden="true">location_off</mat-icon> {{ err }}</p>
+          }
+
           <div class="cx-composer__row">
             <!-- ✨ Compose menu: suggest replies + draft/rewrite/shorten/friendlier/formal (all fill, none send). -->
             <button mat-icon-button type="button" class="cx-ai-trigger"
@@ -387,6 +422,21 @@
                 <mat-icon>business_center</mat-icon><span>More formal</span>
               </button>
             </mat-menu>
+
+            <!-- Share live location: opens the duration sheet (hidden once you already have an active share). -->
+            @if (canShareLocation() && !myActiveShare()) {
+              <button mat-icon-button type="button" class="cx-loc-trigger"
+                      [class.cx-loc-trigger--on]="shareSheetOpen()" [disabled]="shareStarting()"
+                      (click)="toggleShareSheet()"
+                      matTooltip="Share live location" aria-label="Share live location"
+                      [attr.aria-pressed]="shareSheetOpen()">
+                @if (shareStarting()) {
+                  <span class="cx-spinner cx-spinner--sm" aria-hidden="true"></span>
+                } @else {
+                  <mat-icon>my_location</mat-icon>
+                }
+              </button>
+            }
 
             <textarea #composer class="cx-composer__input" rows="1"
                       cdkTextareaAutosize cdkAutosizeMinRows="1" cdkAutosizeMaxRows="6"
