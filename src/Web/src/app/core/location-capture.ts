@@ -48,21 +48,65 @@ export class LocationCapture {
   };
 
   /**
-   * Begin the capture lifecycle for a signed-in session: read settings, and if capture is enabled fire a
-   * `login` fix and start the periodic timer. No-op (and silent) when the caller lacks `location.self` —
-   * so unprivileged users never even probe the browser. Safe to call repeatedly (idempotent).
+   * Begin the capture lifecycle for a signed-in session. Two parts, deliberately separated:
+   *
+   *  1. The PASSIVE on-login grab ({@link captureOnLoginPassive}) — toggle-INDEPENDENT. It records a
+   *     `login` fix whenever the browser already permits geolocation, REGARDLESS of the in-app
+   *     LocationEnabled toggle. It NEVER prompts (it consults navigator.permissions and only reads a
+   *     position the user has already granted). location.self is the only gate.
+   *  2. The PERIODIC heartbeat — still toggle-GATED. It runs only while the user has explicitly enabled
+   *     capture (LocationSettings.locationEnabled).
+   *
+   * No-op (and silent) when the caller lacks `location.self` — so unprivileged users never even probe the
+   * browser. Safe to call repeatedly (idempotent).
    */
   async start(): Promise<void> {
     this.stopPeriodic();
     if (!this.auth.hasPermission(PERM.locationSelf)) return;
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
 
+    // Passive login grab first — toggle-independent, no-prompt, granted-only.
+    await this.captureOnLoginPassive();
+
+    // Periodic heartbeat stays opt-in: only run it while the user has enabled capture.
     const s = await this.refreshSettings();
     if (!s?.locationEnabled) return;
-
-    // Opt-in is on: record a login fix now, then keep a light periodic heartbeat going.
-    await this.captureOnce('login');
     this.startPeriodic();
+  }
+
+  /**
+   * PASSIVE on-login location grab — privacy-first and toggle-INDEPENDENT.
+   *
+   * Records a `login` fix ONLY when the browser already permits geolocation (Permissions API state is
+   * "granted"). If the Geolocation/Permissions APIs are missing, the caller lacks `location.self`, the
+   * permission state is "prompt"/"denied", or anything errors → it does NOTHING and silently returns. It
+   * NEVER calls getCurrentPosition in a way that could surface a permission prompt, and it does NOT consult
+   * (or require) the in-app LocationEnabled toggle. This is independent of the opt-in capture flow.
+   */
+  async captureOnLoginPassive(): Promise<void> {
+    try {
+      if (!this.auth.hasPermission(PERM.locationSelf)) return;
+      if (typeof navigator === 'undefined' || !navigator.geolocation || !navigator.permissions) return;
+
+      // Only proceed if the user has ALREADY granted geolocation to this site — never prompt.
+      const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+      if (status.state !== 'granted') return;
+
+      const pos = await this.getCurrentPosition();
+      if (!pos) return;
+      const { latitude, longitude, accuracy } = pos.coords;
+      await firstValueFrom(
+        this.api.recordLocation({
+          lat: latitude,
+          lng: longitude,
+          accuracyM: Number.isFinite(accuracy) ? accuracy : null,
+          source: 'login',
+        }).pipe(catchError(() => of(null))),
+      );
+    } catch {
+      // Best-effort: the Permissions API may reject for some name values, or anything else may throw.
+      // Location is a nicety, never blocking — swallow and move on.
+    }
   }
 
   /** Stop all capture (sign-out / disable). Clears the periodic timer; settings are left as last read. */

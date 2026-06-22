@@ -14,8 +14,10 @@ namespace Ccusage.Api.Endpoints;
 /// themselves (their own history); household sharing surfaces only a COARSE city via presence.
 ///
 /// <list type="bullet">
-///   <item>POST / — record a fix for the caller. REQUIRES <c>location.self</c> AND the caller's
-///   <see cref="AppUser.LocationEnabled"/> opt-in (else 409). Clamps lat/lng; best-effort city.</item>
+///   <item>POST / — record a fix for the caller. REQUIRES <c>location.self</c>; non-login sources also
+///   require the caller's <see cref="AppUser.LocationEnabled"/> opt-in (else 409). The passive on-login
+///   grab (source "login") is toggle-INDEPENDENT — the SPA fires it only when the browser permission is
+///   already "granted" (never prompts). Clamps lat/lng; best-effort city.</item>
 ///   <item>GET /me — the caller's OWN history (self-scoped, capped 500).</item>
 ///   <item>DELETE /me — clear the caller's OWN history (privacy).</item>
 ///   <item>PATCH /settings — the per-user opt-in toggles (enable capture / share-to-household).</item>
@@ -34,19 +36,30 @@ public static class LocationEndpoints
     {
         var g = app.MapGroup("/api/location").RequireAuthorization();
 
-        // ---- Record one fix for the caller (own only; opt-in REQUIRED) ----
+        // ---- Record one fix for the caller (own only; opt-in REQUIRED except for the passive "login" grab) ----
         g.MapPost("/", async (
             RecordLocationRequest req, CurrentUserAccessor me, UsageDbContext db,
             ReverseGeocodeService geocoder, PresenceTracker presence, CancellationToken ct) =>
         {
             var caller = (await me.GetUserAsync(ct))!; // location.self filter guarantees non-null
 
+            var source = NormalizeSource(req.Source);
+
             // The opt-in gate: even with location.self, nothing is recorded until the user enabled capture.
-            var enabled = await db.Users.AsNoTracking()
-                .Where(u => u.Id == caller.Id).Select(u => u.LocationEnabled).FirstOrDefaultAsync(ct);
-            if (!enabled)
-                return Results.Json(new { message = "Enable location first." },
-                    statusCode: StatusCodes.Status409Conflict);
+            // EXCEPTION: the passive on-login grab (source "login") is toggle-INDEPENDENT — it records for
+            // any location.self holder without the LocationEnabled flag. That grab is privacy-safe because
+            // the SPA only fires it when the browser permission is ALREADY "granted" (it never prompts), so
+            // the user has affirmatively allowed this site to read their position. location.self is the only
+            // gate (already enforced by RequirePermission below); the toggle still governs the periodic /
+            // manual paths.
+            if (source != "login")
+            {
+                var enabled = await db.Users.AsNoTracking()
+                    .Where(u => u.Id == caller.Id).Select(u => u.LocationEnabled).FirstOrDefaultAsync(ct);
+                if (!enabled)
+                    return Results.Json(new { message = "Enable location first." },
+                        statusCode: StatusCodes.Status409Conflict);
+            }
 
             if (double.IsNaN(req.Lat) || double.IsNaN(req.Lng))
                 return Results.BadRequest(new { message = "lat and lng are required." });
@@ -55,7 +68,6 @@ public static class LocationEndpoints
             var lat = Math.Clamp(req.Lat, -90, 90);
             var lng = Math.Clamp(req.Lng, -180, 180);
             var accuracy = req.AccuracyM is double a && a >= 0 && !double.IsNaN(a) ? a : (double?)null;
-            var source = NormalizeSource(req.Source);
 
             // Best-effort reverse-geocode; the service never throws and returns null on any failure.
             var place = await geocoder.CityAsync(lat, lng, ct);

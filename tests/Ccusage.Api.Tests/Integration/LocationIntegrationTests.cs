@@ -110,6 +110,38 @@ public class LocationIntegrationTests(WebAppFactory factory)
         dto.GetProperty("source").GetString().Should().Be("manual");
     }
 
+    [Fact]
+    public async Task Login_source_records_for_location_self_holder_even_with_LocationEnabled_off()
+    {
+        // The passive on-login grab is toggle-INDEPENDENT: a location.self holder records a "login" fix
+        // WITHOUT first flipping LocationEnabled (the SPA only fires it when the browser already granted
+        // geolocation, so it never prompts). location.self remains the only gate.
+        var (_, user) = await ProvisionUser("location.self");
+
+        // Sanity: capture is still OFF by default.
+        var settings = await Json(await user.GetAsync("/api/location/settings"));
+        settings.GetProperty("locationEnabled").GetBoolean().Should().BeFalse();
+
+        // A "login" fix is accepted despite the toggle being off.
+        var ok = await user.PostAsJsonAsync("/api/location", new { lat = 27.9, lng = -82.4, source = "login" });
+        ok.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(ok)).GetProperty("source").GetString().Should().Be("login");
+
+        // ...but a non-login source still requires the opt-in (409) while the toggle is off.
+        var blocked = await user.PostAsJsonAsync("/api/location", new { lat = 27.9, lng = -82.4, source = "periodic" });
+        blocked.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Login_source_still_requires_location_self()
+    {
+        // Toggle-independent does NOT mean ungated: without location.self the passive login grab is 403,
+        // never broadened beyond location.self.
+        var (_, noLoc) = await ProvisionUser("dashboard.view");
+        (await noLoc.PostAsJsonAsync("/api/location", new { lat = 1.0, lng = 2.0, source = "login" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     // ---- Clamping ----
 
     [Fact]
