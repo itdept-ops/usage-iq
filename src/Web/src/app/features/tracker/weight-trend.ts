@@ -58,14 +58,16 @@ import { kgToLb, weightUnit } from './units';
     }
   `,
   styles: `
-    .wt-chart-host { display: block; width: 100%; height: 240px; min-height: 240px; }
+    .wt-chart-host { display: block; width: 100%; height: 240px; min-height: 240px; overflow: hidden; }
     .wt-chart { display: block; width: 100%; height: 100%; min-height: 240px; }
+    /* The shared chart's inner host floors at 300px; override it so the canvas fits the 240px we allot. */
+    .wt-chart ::ng-deep .chart-host { min-height: 0 !important; }
     .wt-empty { display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 2px; min-height: 180px; color: var(--tech-text-tertiary); }
     .wt-empty p { margin: 0; font-size: var(--tech-fs-body); }
     .wt-empty-sub { font-size: var(--tech-fs-label) !important; }
 
-    .wt-ai { margin-top: var(--tech-space-2); }
+    .wt-ai { position: relative; margin-top: var(--tech-space-2); }
     .wt-ai-btn {
       min-height: 44px; border-radius: var(--tech-r-control); font-weight: 600;
       display: inline-flex; align-items: center; gap: 6px;

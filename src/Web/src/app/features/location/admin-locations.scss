@@ -38,6 +38,9 @@
 
   @media (max-width: 900px) {
     grid-template-columns: minmax(0, 1fr);
+
+    // Stacked below the map: let the roster flow with the page instead of trapping a nested scroll.
+    .side { max-height: none; overflow: visible; }
   }
 }
 
@@ -46,6 +49,10 @@
   border-radius: var(--tech-r-panel, 14px);
 
   app-location-map { display: block; height: 540px; }
+
+  @media (max-width: 640px) {
+    app-location-map { height: 360px; }
+  }
 
   .osm-note {
     display: flex;

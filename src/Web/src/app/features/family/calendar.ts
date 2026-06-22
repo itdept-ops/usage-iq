@@ -1209,6 +1209,20 @@ export class FamilyCalendar implements OnDestroy {
     return col.date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
   }
 
+  /** Friendly "Monday, Jun 22" label for a month cell (used in tooltips/labels). */
+  monthCellHeading(cell: MonthCell): string {
+    return cell.date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+
+  /** Jump from a month cell into that day's agenda so overflow ("+N more") events are reachable. */
+  openMonthDay(cell: MonthCell): void {
+    // Set the view signal DIRECTLY (not via setView) so its month→week re-anchor doesn't clobber the
+    // clicked day's week back to the month's first week — then anchor on the clicked day + load once.
+    if (this.view() !== 'agenda') this.view.set('agenda');
+    this.weekStart.set(this.sundayOf(cell.date));
+    if (this.connected()) void this.loadEvents();
+  }
+
   private compareDayEvents = (a: DayEvent, b: DayEvent): number => {
     if (a.ev.allDay !== b.ev.allDay) return a.ev.allDay ? -1 : 1;
     const byTime = (a.ev.startUtc ?? '').localeCompare(b.ev.startUtc ?? '');

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnDestroy, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { MatButtonModule } from '@angular/material/button';
@@ -34,9 +34,14 @@ import { LocationMap, MapPin } from '../location/location-map';
   templateUrl: './family-locations.html',
   styleUrls: ['./family.scss', './family-locations.scss'],
 })
-export class FamilyLocations {
+export class FamilyLocations implements OnDestroy {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
+
+  /** Advances now() while the view is alive so "as of" times and the stale badge don't freeze. */
+  private clockTimer: ReturnType<typeof setInterval> | null = null;
+  /** How often the relative-time clock ticks (60s is plenty for "Xm ago" granularity). */
+  private static readonly CLOCK_MS = 60_000;
 
   readonly members = signal<FamilyMemberLocation[]>([]);
   readonly loading = signal(true);
@@ -71,10 +76,16 @@ export class FamilyLocations {
 
   constructor() {
     this.load();
+    this.clockTimer = setInterval(() => this.now.set(Date.now()), FamilyLocations.CLOCK_MS);
+  }
+
+  ngOnDestroy(): void {
+    if (this.clockTimer) { clearInterval(this.clockTimer); this.clockTimer = null; }
   }
 
   private load(): void {
     this.loading.set(true);
+    this.error.set(false);
     this.now.set(Date.now());
     this.api.familyLocations().subscribe({
       next: rows => { this.members.set(rows); this.loading.set(false); },

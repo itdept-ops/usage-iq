@@ -226,7 +226,7 @@
               <span class="tile__blurb">{{ t.blurb }}</span>
             </a>
           } @else {
-            <div class="tile tile--soon" aria-disabled="true">
+            <div class="tile tile--soon" [attr.aria-label]="t.label + ' — coming soon'">
               <span class="tile__icon" aria-hidden="true"><mat-icon>{{ t.icon }}</mat-icon></span>
               <span class="tile__label">{{ t.label }}</span>
               <span class="tile__blurb">{{ t.blurb }}</span>

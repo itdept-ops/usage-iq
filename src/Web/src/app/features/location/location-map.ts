@@ -65,6 +65,7 @@ export class LocationMap implements AfterViewInit, OnDestroy {
   private map: L.Map | null = null;
   private markerLayer: L.LayerGroup | null = null;
   private trailLayer: L.LayerGroup | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   /** A stable key for the current pin set so we only refit the view when the markers actually change. */
   private readonly pinKey = computed(() =>
@@ -94,9 +95,18 @@ export class LocationMap implements AfterViewInit, OnDestroy {
     this.trailLayer = Lm.layerGroup().addTo(this.map);
     this.ready.set(true);
     this.render();
+
+    // Leaflet caches the container's pixel size at init; it doesn't observe later layout changes. Refresh
+    // once after first paint (fonts/grid settle) and on any container resize so tiles never stay gray/
+    // mis-centred after a responsive collapse.
+    requestAnimationFrame(() => this.map?.invalidateSize());
+    this.resizeObserver = new ResizeObserver(() => this.map?.invalidateSize());
+    this.resizeObserver.observe(this.host().nativeElement);
   }
 
   ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.map?.remove();
     this.map = null;
   }

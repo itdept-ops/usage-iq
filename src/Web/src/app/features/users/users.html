@@ -162,13 +162,12 @@
     </div>
 
     <!-- The user rows / cards (one markup, styled responsively) -->
-    <ul class="user-list" role="listbox" aria-label="Users">
+    <ul class="user-list" aria-label="Users">
       @for (u of filteredUsers(); track u.id) {
-        <li class="user-row" role="option"
+        <li class="user-row"
             [class.active]="selectedId() === u.id"
             [class.disabled]="!u.isEnabled"
-            [class.checked]="isSelected(u.id)"
-            [attr.aria-selected]="selectedId() === u.id">
+            [class.checked]="isSelected(u.id)">
           <mat-checkbox class="row-check" [checked]="isSelected(u.id)" [disabled]="bulkRunning()"
                         (change)="toggleSelect(u.id, $event.checked)" (click)="$event.stopPropagation()"
                         [attr.aria-label]="'Select ' + (u.name || u.email || ('user ' + u.id))"></mat-checkbox>
@@ -265,7 +264,7 @@
       <!-- Lands on (home page) — only routes the SAVED grants can reach -->
       <div class="detail-block lands-on">
         <mat-form-field appearance="outline" class="lands-select" subscriptSizing="dynamic">
-          <mat-icon matPrefix>home</mat-icon>
+          <mat-icon matPrefix aria-hidden="true">home</mat-icon>
           <mat-label>Lands on</mat-label>
           <mat-select [ngModel]="u.homeRoute ?? ''" (ngModelChange)="setHomeRoute($event)"
                       [disabled]="homeSavingId() === u.id">
@@ -280,7 +279,7 @@
       <!-- Role picker — the primary spine; applying SEEDS the grants -->
       <div class="detail-block role-block">
         <div class="block-head">
-          <mat-icon class="block-head-icon">badge</mat-icon>
+          <mat-icon class="block-head-icon" aria-hidden="true">badge</mat-icon>
           <span class="block-head-title">Role</span>
           <span class="block-head-sub micro-label">applying a role seeds the capabilities below</span>
         </div>
@@ -312,7 +311,7 @@
       <!-- Plain-language access summary (mandatory) -->
       <div class="detail-block summary-block">
         <div class="block-head">
-          <mat-icon class="block-head-icon">verified_user</mat-icon>
+          <mat-icon class="block-head-icon" aria-hidden="true">verified_user</mat-icon>
           <span class="block-head-title">Can do</span>
         </div>
         <p class="access-sentence">{{ summaryFor(draftPerms()) }}</p>
@@ -335,7 +334,7 @@
       <!-- Capability accordions (feature groups) -->
       <div class="detail-block">
         <div class="block-head">
-          <mat-icon class="block-head-icon">tune</mat-icon>
+          <mat-icon class="block-head-icon" aria-hidden="true">tune</mat-icon>
           <span class="block-head-title">Capabilities</span>
           <span class="block-head-sub micro-label">fine-tune the exact access</span>
         </div>
@@ -368,7 +367,7 @@
       @for (g of aiGroups(); track g.name) {
         <div class="detail-block ai-panel">
           <div class="block-head ai-head">
-            <mat-icon class="shield ai-head-icon">shield</mat-icon>
+            <mat-icon class="shield ai-head-icon" aria-hidden="true">shield</mat-icon>
             <span class="block-head-title">AI &amp; token-spending</span>
             <span class="block-head-sub micro-label">off by default · each grant spends tokens</span>
           </div>
@@ -398,7 +397,7 @@
 
       <!-- Disclosure: sign-in history -->
       <details class="detail-disclosure">
-        <summary><mat-icon>login</mat-icon> Sign-in history <span class="micro-label">most recent first · up to 200</span></summary>
+        <summary><mat-icon aria-hidden="true">login</mat-icon> Sign-in history <span class="micro-label">most recent first · up to 200</span></summary>
         @if (loginHistory(u.id); as h) {
           @if (h.loading) {
             <div class="block-state"><mat-progress-bar mode="indeterminate" /></div>
@@ -443,7 +442,7 @@
       <!-- Disclosure: chat contacts (chat.contacts.manage only) -->
       @if (canEditContacts()) {
         <details class="detail-disclosure" [attr.aria-busy]="contactsState(u.id)?.busyUserId != null ? true : null">
-          <summary><mat-icon>group</mat-icon> Chat contacts <span class="micro-label">their circle · the chat picker draws from this</span></summary>
+          <summary><mat-icon aria-hidden="true">group</mat-icon> Chat contacts <span class="micro-label">their circle · the chat picker draws from this</span></summary>
           @if (contactsState(u.id); as cs) {
             @if (cs.loading) {
               <div class="block-state"><mat-progress-bar mode="indeterminate" /></div>

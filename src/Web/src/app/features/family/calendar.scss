@@ -624,10 +624,24 @@
 .cal-mev__time { color: var(--tech-text-secondary); margin-right: 2px; }
 
 .cal-mcell__more {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
   font-size: var(--tech-fs-micro, 11px);
   font-weight: 600;
   color: var(--tech-text-tertiary);
-  padding: 0 5px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  transition: background 0.12s ease, color 0.12s ease;
+  &:hover {
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    color: var(--tech-text-secondary);
+  }
 }
 
 /* ── Agenda list ────────────────────────────────────────────────────── */

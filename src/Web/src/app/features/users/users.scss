@@ -158,6 +158,10 @@ mat-progress-bar {
   min-width: 0;
   position: sticky;
   top: 12px;
+  /* Bound the pane to the space below its sticky top so the list — the only
+     flexing/scrolling child — derives its height from the pane itself rather
+     than a fragile fixed offset for the head/search/filters above it. */
+  max-height: calc(100vh - 24px);
 }
 .list-search { width: 100%; }
 
@@ -198,7 +202,7 @@ mat-progress-bar {
 .user-list {
   list-style: none; margin: 0; padding: 0;
   display: flex; flex-direction: column; gap: 6px;
-  max-height: calc(100vh - 220px);
+  flex: 1 1 auto; min-height: 0;
   overflow-y: auto;
 }
 .user-row {
@@ -277,10 +281,11 @@ mat-progress-bar {
 /* ---- RIGHT: detail pane ---- */
 .md-detail {
   min-width: 0;
+  position: relative;
   border: 1px solid var(--tech-border-subtle);
   border-radius: var(--tech-r-panel, 12px);
   background: color-mix(in srgb, var(--tech-panel-raised) 24%, transparent);
-  padding: 18px;
+  padding: 18px 18px 12px;
   display: flex; flex-direction: column; gap: 16px;
 }
 .detail-empty {
@@ -407,7 +412,7 @@ mat-progress-bar {
   .acc-count { margin-left: auto; color: var(--tech-text-tertiary); }
 }
 .acc-body {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 16px;
   padding: 4px 12px 12px;
   border-top: 1px solid var(--tech-border-subtle);
 }
@@ -431,7 +436,7 @@ mat-progress-bar {
 .ai-head .ai-head-icon { font-size: 16px; width: 16px; height: 16px; }
 .ai-head .block-head-title { color: color-mix(in srgb, #{$ai} 75%, var(--tech-text-secondary)); }
 .ai-note { margin: 0 0 10px; font-size: var(--tech-fs-label, 12px); color: var(--tech-text-secondary); line-height: 1.45; }
-.ai-items { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+.ai-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 16px; }
 .cap--ai {
   --mdc-checkbox-selected-icon-color: #{$ai};
   --mdc-checkbox-selected-focus-icon-color: #{$ai};
@@ -533,8 +538,11 @@ mat-progress-bar {
 }
 
 /* ---- Sticky save (diff) bar ---- */
+/* Anchored inside the detail pane: it sticks within .md-detail's own bounds
+   (position:relative + bottom padding above) so it parks at the pane's lower
+   edge instead of floating over the bulk/policy/audit surfaces below. */
 .save-bar {
-  position: sticky; bottom: 12px;
+  position: sticky; bottom: 0;
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   margin-top: 4px; padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--tech-accent) 55%, var(--tech-border-subtle));

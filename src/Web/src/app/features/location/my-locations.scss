@@ -100,6 +100,10 @@
 
   app-location-map { display: block; height: 440px; }
 
+  @media (max-width: 640px) {
+    app-location-map { height: 340px; }
+  }
+
   .osm-note {
     display: flex;
     align-items: center;

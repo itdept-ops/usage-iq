@@ -27,7 +27,21 @@
     </div>
   </header>
 
-  @if (!loading() && !members().length) {
+  @if (!loading() && error()) {
+    <!-- Load failed: explicit error state with a retry, distinct from the empty state -->
+    <div class="family__card family-locs__empty" role="alert">
+      <span class="family__crest family-locs__empty-crest" aria-hidden="true">
+        <mat-icon>error_outline</mat-icon>
+      </span>
+      <h2 class="family-locs__empty-title">We couldn't load family locations</h2>
+      <p class="family-locs__empty-body">Something went wrong reaching the family map. Please try again in a
+        moment.</p>
+      <button mat-flat-button color="primary" (click)="refresh()">
+        <mat-icon aria-hidden="true">refresh</mat-icon>
+        Try again
+      </button>
+    </div>
+  } @else if (!loading() && !error() && !members().length) {
     <!-- Friendly empty state: nobody is sharing yet -->
     <div class="family__card family-locs__empty" role="status">
       <span class="family__crest family-locs__empty-crest" aria-hidden="true">

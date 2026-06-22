@@ -125,6 +125,9 @@
       <button mat-stroked-button class="cal-overlay-bar__share" type="button"
               [class.cal-overlay-bar__share--on]="shareHousehold()"
               [disabled]="sharingBusy()" (click)="toggleShare()"
+              [attr.aria-label]="shareHousehold()
+                ? 'Stop sharing my calendar with household'
+                : 'Share my calendar with household'"
               [matTooltip]="shareHousehold()
                 ? 'Your events are visible to your household'
                 : 'Let your household see your events (title + time only)'">
@@ -396,7 +399,7 @@
             <div class="cal-mcell" [class.cal-mcell--today]="cell.isToday"
                  [class.cal-mcell--out]="!cell.inMonth">
               <button class="cal-mcell__num" type="button" (click)="create(cell.iso)"
-                      [matTooltip]="'Add an event on ' + cell.iso">{{ cell.dayNum }}</button>
+                      [matTooltip]="'Add an event on ' + monthCellHeading(cell)">{{ cell.dayNum }}</button>
               <div class="cal-mcell__events">
                 @for (de of cell.events; track de.ev.id) {
                   <button class="cal-mev" type="button" (click)="openDayEvent(de)"
@@ -411,7 +414,10 @@
                   </button>
                 }
                 @if (cell.moreCount > 0) {
-                  <span class="cal-mcell__more">+{{ cell.moreCount }} more</span>
+                  <button class="cal-mcell__more" type="button" (click)="openMonthDay(cell)"
+                          [attr.aria-label]="'Show all events on ' + monthCellHeading(cell)">
+                    +{{ cell.moreCount }} more
+                  </button>
                 }
               </div>
             </div>

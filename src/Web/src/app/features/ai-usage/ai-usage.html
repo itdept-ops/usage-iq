@@ -100,7 +100,6 @@
 <mat-card appearance="outlined" class="panel table-card">
   <div class="panel-header">
     <span>AI calls</span>
-    <span class="page-ind mono-num">page {{ page() + 1 }}</span>
   </div>
   <div class="table-scroll">
     <table class="ai-table">
@@ -139,7 +138,20 @@
             <td class="c-latency mono-num" data-label="Latency">{{ r.durationMs }} ms</td>
           </tr>
         }
-        @if (!rows().length && !loading()) {
+        @if (loading() && !rows().length) {
+          @for (i of [1, 2, 3, 4, 5]; track i) {
+            <tr class="skeleton-row"><td colspan="7"><span class="skeleton-bar"></span></td></tr>
+          }
+        }
+        @if (error() && !loading()) {
+          <tr><td colspan="7" class="empty error-cell">
+            Couldn’t load AI usage — the request failed.
+            <button mat-stroked-button class="retry-btn" (click)="reload()">
+              <mat-icon aria-hidden="true">refresh</mat-icon> Retry
+            </button>
+          </td></tr>
+        }
+        @if (!error() && !rows().length && !loading()) {
           <tr><td colspan="7" class="empty">No AI calls in this window — adjust the filters or use an AI feature, then refresh.</td></tr>
         }
       </tbody>

@@ -36,6 +36,8 @@ export class AiUsage {
   readonly rows = signal<AiUsageRow[]>([]);
   readonly summary = signal<AiUsageSummary | null>(null);
   readonly loading = signal(true);
+  /** Whether the last load failed (so the table shows an error block, not the empty copy). */
+  readonly error = signal(false);
   /** Whether the last page came back full (so an older page may exist). */
   readonly hasMore = signal(false);
   /** The current page index (0-based) for the "page N" label and keyset cursor stack. */
@@ -92,6 +94,7 @@ export class AiUsage {
 
   private load(): void {
     this.loading.set(true);
+    this.error.set(false);
     const before = this.cursors[this.page()];
     this.api.getAiUsage({
       before,
@@ -110,6 +113,7 @@ export class AiUsage {
       },
       error: () => {
         this.loading.set(false);
+        this.error.set(true);
         this.snack.open('Failed to load AI usage', 'Dismiss', { duration: 4000 });
       },
     });
