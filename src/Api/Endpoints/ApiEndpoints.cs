@@ -87,6 +87,20 @@ public static class ApiEndpoints
             await q.WriteRecordsCsvAsync(filter, http.Response.Body, ct);
         }).RequirePermission(Permissions.DashboardExport);
 
+        // ---- Personal data export (My Data): a streamed ZIP of EVERYTHING the caller owns across domains.
+        // Authenticated + gated by the existing export perm; every query inside is scoped to caller.Email, so
+        // even an admin only ever downloads their OWN data. No secret/token/webhook/other-email ever leaves.
+        api.MapGet("/me/export", async (
+            CurrentUserAccessor me, MyDataExportService export, HttpContext http, CancellationToken ct) =>
+        {
+            // The permission filter already proved auth + dashboard.export; the caller is always present here.
+            var caller = (await me.GetUserAsync(ct))!;
+            var fileName = MyDataExportService.FileName(DateTime.UtcNow);
+            http.Response.ContentType = "application/zip";
+            http.Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
+            await export.WriteExportAsync(caller, http.Response.Body, ct);
+        }).RequirePermission(Permissions.DashboardExport);
+
         // ---- Fleet (per-machine + per-user attribution) ----
         api.MapGet("/fleet", async (
             [AsParameters] UsageFilterQuery filter, UsageQueries q, CancellationToken ct) =>

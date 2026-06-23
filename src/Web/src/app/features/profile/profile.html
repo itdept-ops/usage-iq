@@ -125,6 +125,23 @@
     </div>
   </mat-card>
 
+  <!-- Your data — download a personal export of everything you own across every domain. -->
+  @if (canExport()) {
+    <mat-card appearance="outlined" class="panel">
+      <div class="panel-head"><span class="panel-title">Your data</span></div>
+      <p class="hint">Download a ZIP of everything you've logged across the app — your usage, food &amp;
+        fitness, hydration, coffee, weight, sleep, supplements, 75-Hard, your own bills, your tracker
+        profile, and your contacts. It contains only your own data; no passwords, tokens, or other people's
+        email addresses are included.</p>
+      <div class="actions">
+        <button mat-stroked-button [disabled]="exporting()" (click)="exportMyData()">
+          <mat-icon aria-hidden="true">download</mat-icon>
+          {{ exporting() ? 'Preparing…' : 'Download my data' }}
+        </button>
+      </div>
+    </mat-card>
+  }
+
   <div class="actions">
     <button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">
       <mat-icon aria-hidden="true">save</mat-icon> {{ saving() ? 'Saving…' : 'Save profile' }}

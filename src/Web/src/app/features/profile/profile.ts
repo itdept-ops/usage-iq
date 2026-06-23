@@ -45,6 +45,10 @@ export class Profile {
   readonly loading = signal(true);
   readonly loadError = signal(false);
   readonly saving = signal(false);
+  readonly exporting = signal(false);
+
+  /** Whether to show the "Download my data" button (the export endpoint is gated by dashboard.export). */
+  readonly canExport = computed(() => this.auth.hasPermission('dashboard.export'));
 
   // Editable form state (seeded from /me).
   readonly mode = signal<DisplayNameMode>('firstInitial');
@@ -154,6 +158,30 @@ export class Profile {
       error: (e: HttpErrorResponse) => {
         this.saving.set(false);
         this.snack.open(e.error?.message ?? 'Could not save your profile.', 'Dismiss', { duration: 5000 });
+      },
+    });
+  }
+
+  /**
+   * Download EVERYTHING this user owns across every domain as a ZIP (one CSV/JSON per domain). The server
+   * scopes every query to the caller and strips all secrets/other-people's-emails; this just saves the blob.
+   */
+  exportMyData(): void {
+    this.exporting.set(true);
+    this.api.exportMyData().subscribe({
+      next: blob => {
+        this.exporting.set(false);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `usage-iq-export-${new Date().toISOString().slice(0, 10)}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.snack.open('Your data is downloading.', 'OK', { duration: 3000 });
+      },
+      error: () => {
+        this.exporting.set(false);
+        this.snack.open('Could not export your data.', 'Dismiss', { duration: 5000 });
       },
     });
   }

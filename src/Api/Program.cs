@@ -44,6 +44,7 @@ builder.Services.AddScoped<JsonlIngestionService>();
 builder.Services.AddScoped<IngestWriteService>();
 builder.Services.AddScoped<CostRecomputeService>();
 builder.Services.AddScoped<UsageQueries>();
+builder.Services.AddScoped<MyDataExportService>();
 builder.Services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
 builder.Services.AddSingleton<TokenProtector>();
 

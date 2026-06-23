@@ -213,6 +213,11 @@ export class Api {
     return this.http.get(`${this.base}/usage/records.csv`, { params: this.filterParams(f), responseType: 'blob' });
   }
 
+  /** Download the caller's full personal data export as a ZIP (all their own data across every domain). */
+  exportMyData(): Observable<Blob> {
+    return this.http.get(`${this.base}/me/export`, { responseType: 'blob' });
+  }
+
   /**
    * The user-management audit log. Pass `revealKey` to send the X-Email-Reveal-Key header so the server
    * returns real actor/target emails; omit it and other users' emails come back masked (null). The key
