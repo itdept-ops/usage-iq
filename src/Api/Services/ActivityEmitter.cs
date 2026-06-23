@@ -77,6 +77,13 @@ public sealed class ActivityEmitter(IServiceScopeFactory scopeFactory, ILogger<A
                 CreatedUtc = DateTime.UtcNow,
             });
             await db.SaveChangesAsync(ct);
+
+            // TAIL: run the actor's OWN automation rules for this event, reusing this same (still-open) scope.
+            // The actor is already confirmed sharing + enabled and the event is persisted. RuleEvaluator is
+            // internally defensive (never throws) and self-scoped (acts only on the actor's own channels); the
+            // outer try/catch is a second backstop so a rule failure can never fail the user-facing action.
+            var evaluator = scope.ServiceProvider.GetRequiredService<RuleEvaluator>();
+            await evaluator.EvaluateAsync(actor, kind.Trim(), intValue, clean, ct);
         }
         catch (Exception ex)
         {

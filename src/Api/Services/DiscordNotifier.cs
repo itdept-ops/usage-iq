@@ -141,6 +141,7 @@ public sealed class DiscordNotifier(IHttpClientFactory httpFactory, UsageDbConte
         "familyTimer" => "⏲️ Timer finished",
         "familyBriefing" => "🌅 Daily briefing",
         "familyHeadsUp" => "📣 Heads up",
+        "systemAutomation" => "⚡ Automation",
         _ => "🔔 Notification",
     };
 

@@ -78,6 +78,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<HardChallengeTask> HardChallengeTasks => Set<HardChallengeTask>();
     public DbSet<HardChallengeDayTask> HardChallengeDayTasks => Set<HardChallengeDayTask>();
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
+    public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -475,6 +476,21 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
             // The inbox reads a recipient's unread/all notifications newest-first.
             e.HasIndex(x => new { x.RecipientEmail, x.IsRead, x.CreatedUtc });
+        });
+
+        b.Entity<AutomationRule>(e =>
+        {
+            e.Property(x => x.OwnerEmail).HasMaxLength(256);
+            e.Property(x => x.Name).HasMaxLength(80);
+            e.Property(x => x.TriggerKind).HasMaxLength(64);
+            e.Property(x => x.MessageTemplate).HasMaxLength(200);
+            e.Property(x => x.Enabled).HasDefaultValue(true);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // The evaluator's hot read: an owner's enabled rules for one trigger kind.
+            e.HasIndex(x => new { x.OwnerEmail, x.TriggerKind });
+            // The CRUD list: an owner's own rules.
+            e.HasIndex(x => x.OwnerEmail);
         });
 
         b.Entity<NotificationPreference>(e =>

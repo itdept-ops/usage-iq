@@ -440,6 +440,39 @@ export interface FeedPage {
   nextBefore: number | null;
 }
 
+/** The numeric comparison a rule's optional condition applies to the event's intValue. */
+export type RuleConditionOp = 0 | 1 | 2 | 3; // None | Gte | Lte | Eq
+
+/** The fixed, safe action a rule runs (own channels only). */
+export type RuleAction = 0 | 1 | 2; // InAppNotify | DiscordDm | NotifyAndDiscord
+
+/** One of the caller's OWN automation rules (mirrors RulesEndpoints.RuleDto). No owner/webhook/secret. */
+export interface AutomationRule {
+  id: number;
+  name: string;
+  /** One of {@link ActivityKind}. */
+  triggerKind: string;
+  conditionOp: RuleConditionOp;
+  conditionValue: number | null;
+  action: RuleAction;
+  /** Optional capped, sanitized message (no @everyone/@here); {value} is substituted server-side. */
+  messageTemplate: string | null;
+  enabled: boolean;
+  createdUtc: string;
+  updatedUtc: string;
+}
+
+/** Create/update body for an automation rule. Owner is always the caller (never sent). */
+export interface AutomationRuleInput {
+  name?: string | null;
+  triggerKind: string;
+  conditionOp: RuleConditionOp;
+  conditionValue?: number | null;
+  action: RuleAction;
+  messageTemplate?: string | null;
+  enabled: boolean;
+}
+
 // ---- Location / GPS (privacy-sensitive: PRIVATE by default, capture is OPT-IN) ----------------------
 // Mirrors the API's LocationDtos.cs. The precise lat/lng is only ever returned to the SHARER (their own
 // history, GET /api/location/me) or to an admin holding location.view-all (GET /api/location/admin);

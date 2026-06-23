@@ -23,6 +23,7 @@ import {
   PublicBillDto, ReceiptBreakdownDto, UpdateBillRequest,
   ProfilePrefs,
   FeedPage,
+  AutomationRule, AutomationRuleInput,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -720,6 +721,20 @@ export class Api {
     if (opts.before != null) p = p.set('before', opts.before);
     if (opts.limit != null) p = p.set('limit', opts.limit);
     return this.http.get<FeedPage>(`${this.base}/feed`, { params: p });
+  }
+
+  // ---- Automations (the caller's OWN rules; strictly owner-scoped server-side) ----
+  automations(): Observable<AutomationRule[]> {
+    return this.http.get<AutomationRule[]>(`${this.base}/automations`);
+  }
+  createAutomation(body: AutomationRuleInput): Observable<AutomationRule> {
+    return this.http.post<AutomationRule>(`${this.base}/automations`, body);
+  }
+  updateAutomation(id: number, body: AutomationRuleInput): Observable<AutomationRule> {
+    return this.http.put<AutomationRule>(`${this.base}/automations/${id}`, body);
+  }
+  deleteAutomation(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/automations/${id}`);
   }
 
   // ---- Access policy (open sign-up + default permissions; requires users.manage to edit) ----

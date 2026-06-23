@@ -1,0 +1,136 @@
+<header class="head">
+  <span class="head-eyebrow mono-num">~/automations</span>
+  <h2>Automations</h2>
+  <p class="sub">React to your own activity automatically. When you log a workout, complete a 75-Hard day,
+    start the challenge, or hit your water goal, an automation can ping you in-app or on your own Discord —
+    optionally only when a number you choose is met. Automations only ever watch your own activity and only
+    ever notify you.</p>
+</header>
+
+@if (loading()) {
+  <div class="state" role="status" aria-live="polite">
+    <mat-progress-spinner mode="indeterminate" diameter="36" />
+    <p>Loading your automations…</p>
+  </div>
+} @else if (error()) {
+  <div class="state state--error" role="alert">
+    <mat-icon aria-hidden="true">cloud_off</mat-icon>
+    <p>We couldn't load your automations just now.</p>
+    <button mat-stroked-button type="button" (click)="load()">
+      <mat-icon aria-hidden="true">refresh</mat-icon> Try again
+    </button>
+  </div>
+} @else {
+  <div class="toolbar">
+    <button mat-flat-button color="primary" type="button" (click)="newRule()" [disabled]="formOpen()">
+      <mat-icon aria-hidden="true">add</mat-icon> New automation
+    </button>
+  </div>
+
+  <!-- Create / edit form -->
+  @if (formOpen()) {
+    <form class="card form" [formGroup]="form" (ngSubmit)="save()">
+      <h3 class="form__title">{{ editingId() == null ? 'New automation' : 'Edit automation' }}</h3>
+
+      <label class="field">
+        <span class="field__label">Name (optional)</span>
+        <input class="input" type="text" formControlName="name" maxlength="80"
+               placeholder="e.g. Long run cheer" />
+      </label>
+
+      <label class="field">
+        <span class="field__label">When…</span>
+        <select class="input" formControlName="triggerKind">
+          @for (t of triggers; track t.kind) {
+            <option [value]="t.kind">{{ t.label }}</option>
+          }
+        </select>
+      </label>
+
+      @if (selectedTrigger().unit) {
+        <div class="field field--row">
+          <label class="field">
+            <span class="field__label">Only if {{ selectedTrigger().unit }} is…</span>
+            <select class="input" formControlName="conditionOp">
+              <option [value]="0">Any value</option>
+              <option [value]="1">At least (≥)</option>
+              <option [value]="2">At most (≤)</option>
+              <option [value]="3">Exactly (=)</option>
+            </select>
+          </label>
+          @if (form.controls.conditionOp.value !== 0) {
+            <label class="field field--narrow">
+              <span class="field__label">Value</span>
+              <input class="input" type="number" min="0" formControlName="conditionValue" />
+            </label>
+          }
+        </div>
+      }
+
+      <label class="field">
+        <span class="field__label">Then…</span>
+        <select class="input" formControlName="action">
+          <option [value]="0">Notify me in-app</option>
+          <option [value]="1">Send to my Discord</option>
+          <option [value]="2">Notify me in-app + Discord</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Message (optional)</span>
+        <input class="input" type="text" formControlName="messageTemplate" maxlength="200"
+               placeholder="Use {value} to include the number. Leave blank for a default." />
+        <span class="field__hint">No @ mentions — they're stripped automatically.</span>
+      </label>
+
+      <mat-slide-toggle formControlName="enabled">Enabled</mat-slide-toggle>
+
+      @if (saveError()) {
+        <p class="form__error" role="alert">{{ saveError() }}</p>
+      }
+
+      <div class="form__actions">
+        <button mat-stroked-button type="button" (click)="cancel()" [disabled]="saving()">Cancel</button>
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving() || form.invalid">
+          @if (saving()) { Saving… } @else { Save }
+        </button>
+      </div>
+    </form>
+  }
+
+  <!-- The rules list -->
+  @if (isEmpty()) {
+    <div class="state state--empty">
+      <mat-icon aria-hidden="true">bolt</mat-icon>
+      <p>No automations yet. Create one to get a nudge when you hit a milestone.</p>
+    </div>
+  } @else {
+    <ul class="rules">
+      @for (r of rules(); track trackRule($index, r)) {
+        <li class="card rule" [class.rule--off]="!r.enabled">
+          <div class="rule__body">
+            <p class="rule__name">{{ r.name }}</p>
+            <p class="rule__detail">
+              <span class="chip">{{ triggerLabel(r.triggerKind) }}</span>
+              <span class="chip chip--cond">{{ conditionLabel(r) }}</span>
+              <span class="chip chip--action">{{ actionLabel(r.action) }}</span>
+            </p>
+            @if (r.messageTemplate) {
+              <p class="rule__msg">“{{ r.messageTemplate }}”</p>
+            }
+          </div>
+          <div class="rule__actions">
+            <mat-slide-toggle [checked]="r.enabled" (change)="toggleEnabled(r)"
+                              [attr.aria-label]="'Toggle ' + r.name" />
+            <button mat-icon-button type="button" (click)="edit(r)" aria-label="Edit automation">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button type="button" (click)="remove(r)" aria-label="Delete automation">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+}

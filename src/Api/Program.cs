@@ -188,6 +188,7 @@ builder.Services.AddScoped<ChatNotificationService>();
 builder.Services.AddScoped<ChatLocationShareService>();
 // Social activity feed: the fire-and-forget emitter for the event spine (no-op when the actor isn't sharing).
 builder.Services.AddScoped<ActivityEmitter>();
+builder.Services.AddScoped<RuleEvaluator>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -503,6 +504,7 @@ app.MapInboxEndpoints();
 app.MapTrackerEndpoints();
 app.MapHardChallengeEndpoints();
 app.MapFeedEndpoints();
+app.MapRulesEndpoints();
 app.MapAiEndpoints();
 app.MapFamilyEndpoints();
 app.MapFamilyLocationsEndpoints();

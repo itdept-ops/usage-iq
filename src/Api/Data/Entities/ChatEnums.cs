@@ -28,4 +28,7 @@ public enum NotificationType
 
     /// <summary>A Family Hub calendar event is starting soon (pings every household member's bell).</summary>
     FamilyHeadsUp = 9,
+
+    /// <summary>One of the owner's own automation rules fired — a self-notification to themselves only.</summary>
+    SystemAutomation = 10,
 }

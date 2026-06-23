@@ -83,6 +83,7 @@
         <a mat-button class="nav__item" routerLink="/tracker" routerLinkActive="active">Tracker</a>
         <a mat-button class="nav__item" routerLink="/challenge" routerLinkActive="active">75 Hard</a>
         <a mat-button class="nav__item" routerLink="/feed" routerLinkActive="active">Activity</a>
+        <a mat-button class="nav__item" routerLink="/automations" routerLinkActive="active">Automations</a>
       }
       @if (auth.hasPermission('tracker.beta')) {
         <a mat-button class="nav__item" routerLink="/tracker-beta" routerLinkActive="active">Tracker Beta</a>
@@ -391,6 +392,8 @@
            (click)="closeMobileNav()">75 Hard</a>
         <a class="mobile-nav__item" routerLink="/feed" routerLinkActive="active"
            (click)="closeMobileNav()">Activity</a>
+        <a class="mobile-nav__item" routerLink="/automations" routerLinkActive="active"
+           (click)="closeMobileNav()">Automations</a>
       }
       @if (auth.hasPermission('tracker.beta')) {
         <a class="mobile-nav__item" routerLink="/tracker-beta" routerLinkActive="active"

@@ -122,6 +122,14 @@ export const routes: Routes = [
     title: 'Usage IQ · Activity feed',
   },
   {
+    // Automations — the caller's own rules (own events -> own channels). Gated by the SAME tracker
+    // permission (tracker.self) the backend /api/automations group reuses; rules are strictly self-scoped.
+    path: 'automations',
+    canActivate: [permissionGuard(PERM.trackerSelf)],
+    loadComponent: () => import('./features/automations/automations').then(m => m.Automations),
+    title: 'Usage IQ · Automations',
+  },
+  {
     // Tracker Beta — the redesigned, mobile-first "Strata" dashboard over the SAME tracker data
     // (reuses the root TrackerStore). The lazy children file keeps echarts AND the OptimisticTracker
     // route provider out of the initial bundle; the tracker.beta guard lives inside it, so the beta
