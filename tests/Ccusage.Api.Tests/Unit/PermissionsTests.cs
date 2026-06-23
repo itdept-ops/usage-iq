@@ -6,7 +6,7 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 44 keys.
+    // The full catalog of 45 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
@@ -21,6 +21,7 @@ public class PermissionsTests
         "bills.use",
         "family.use", "family.finance", "cycle.track", "chore.claim", "allowance.manage", "identity.map",
         "location.self", "location.share", "location.view-all",
+        "beta.access",
         "users.view", "users.manage", "activity.view", "ai.usage.view",
         "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision",
     };
@@ -60,6 +61,7 @@ public class PermissionsTests
     [InlineData("location.self")]
     [InlineData("location.share")]
     [InlineData("location.view-all")]
+    [InlineData("beta.access")]
     [InlineData("users.view")]
     [InlineData("users.manage")]
     [InlineData("activity.view")]
@@ -122,6 +124,7 @@ public class PermissionsTests
         Permissions.LocationSelf.Should().Be("location.self");
         Permissions.LocationShare.Should().Be("location.share");
         Permissions.LocationViewAll.Should().Be("location.view-all");
+        Permissions.BetaAccess.Should().Be("beta.access");
         Permissions.UsersView.Should().Be("users.view");
         Permissions.UsersManage.Should().Be("users.manage");
         Permissions.ActivityView.Should().Be("activity.view");
@@ -135,9 +138,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_forty_four_known_keys()
+    public void All_contains_exactly_the_forty_five_known_keys()
     {
-        Permissions.All.Should().HaveCount(44);
+        Permissions.All.Should().HaveCount(45);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -148,9 +151,23 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_forty_four_entries()
+    public void Catalog_has_forty_five_entries()
     {
-        Permissions.Catalog.Should().HaveCount(44);
+        Permissions.Catalog.Should().HaveCount(45);
+    }
+
+    [Fact]
+    public void BetaAccess_is_in_the_Beta_group_non_ai_a_page_gate_and_in_the_administrator_preset()
+    {
+        // beta.access gates the experimental Beta section. It lives in its own "Beta" group, is NOT an AI
+        // key, and is a PAGE gate (not a *.view), so it is absent from Views — mirroring tracker.beta.
+        Permissions.Catalog.Single(p => p.Key == Permissions.BetaAccess).Group.Should().Be("Beta");
+        Permissions.Catalog.Single(p => p.Key == Permissions.BetaAccess).IsAi.Should().BeFalse();
+        Permissions.IsAi(Permissions.BetaAccess).Should().BeFalse();
+        Permissions.Views.Should().NotContain(Permissions.BetaAccess);
+        // It is part of the administrator preset (the full catalog).
+        Permissions.Presets.Single(p => p.Key == "administrator")
+            .Permissions.Should().Contain(Permissions.BetaAccess);
     }
 
     [Fact]
@@ -162,6 +179,7 @@ public class PermissionsTests
         Permissions.Catalog.Single(p => p.Key == Permissions.BillsUse).IsAi.Should().BeFalse();
         Permissions.IsAi(Permissions.BillsUse).Should().BeFalse();
         Permissions.IsDefaultable(Permissions.BillsUse).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.BetaAccess).Should().BeFalse();
         // It is part of the administrator preset (the full catalog) and is not a page-view gate.
         Permissions.Presets.Single(p => p.Key == "administrator")
             .Permissions.Should().Contain(Permissions.BillsUse);

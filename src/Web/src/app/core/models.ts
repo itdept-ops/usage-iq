@@ -4034,6 +4034,8 @@ export const PERM = {
   locationSelf: 'location.self',
   locationShare: 'location.share',
   locationViewAll: 'location.view-all',
+  // ---- Beta (group "Beta"; page-gate for the experimental Beta section) ----
+  betaAccess: 'beta.access',
   // ---- AI (group "AI"; token-spending; never default) ----
   trackerAi: 'tracker.ai',
   familyAi: 'family.ai',
@@ -4050,7 +4052,7 @@ export const PERM = {
  * fallback/ordering hint. Any catalog group not listed here is appended after, so nothing is ever dropped.
  */
 export const PERM_GROUP_ORDER: readonly string[] = [
-  'Usage', 'Fitness', 'Bills', 'Family', 'Chat', 'Location', 'Admin', 'AI',
+  'Usage', 'Fitness', 'Bills', 'Family', 'Chat', 'Location', 'Beta', 'Admin', 'AI',
 ];
 
 /** Maps each permission key to its UI group (mirror of the backend catalog grouping). */
@@ -4092,6 +4094,8 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   [PERM.locationSelf]: 'Location',
   [PERM.locationShare]: 'Location',
   [PERM.locationViewAll]: 'Location',
+  // ---- Beta ----
+  [PERM.betaAccess]: 'Beta',
   // ---- Admin ----
   [PERM.usersView]: 'Admin',
   [PERM.usersManage]: 'Admin',

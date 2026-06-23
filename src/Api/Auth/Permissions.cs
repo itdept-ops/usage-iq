@@ -93,6 +93,12 @@ public static class Permissions
     public const string ChatAi = "chat.ai";
     public const string AiVision = "ai.vision";
 
+    // ---- Beta ----
+    /// <summary>Page-gate for the experimental Beta section and its hub. Not a *.view (a page gate, like
+    /// <see cref="TrackerSelf"/>); auto-included in the administrator preset (preset = the full catalog).
+    /// Never default — granted deliberately to opted-in users.</summary>
+    public const string BetaAccess = "beta.access";
+
     // ---- Administration ----
     public const string UsersView = "users.view";
     public const string UsersManage = "users.manage";
@@ -152,6 +158,9 @@ public static class Permissions
         new PermissionInfo(LocationSelf, "Location", "Track own location", "Record and view your own location and location history."),
         new PermissionInfo(LocationShare, "Location", "Share location", "Share your live location with your household and contacts."),
         new PermissionInfo(LocationViewAll, "Location", "View all locations", "Admin oversight: view every user’s location history and the live location map."),
+
+        // ---- Beta ----
+        new PermissionInfo(BetaAccess, "Beta", "Beta access", "Access the experimental Beta section and its pages."),
 
         // ---- Administration ----
         new PermissionInfo(UsersView, "Admin", "View users", "View the user list, permission catalog, and audit log."),
@@ -266,6 +275,6 @@ public static class Permissions
         IsValid(key) && key != UsersManage && key != ChatModerate && key != ChatContactsManage
         && key != TrackerViewAll && key != FamilyUse && key != FamilyFinance && key != CycleTrack
         && key != ChoreClaim && key != AllowanceManage && key != IdentityMap
-        && key != AiUsageView && key != BillsUse
+        && key != AiUsageView && key != BillsUse && key != BetaAccess
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }

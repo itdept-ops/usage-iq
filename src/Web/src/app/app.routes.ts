@@ -105,6 +105,14 @@ export const routes: Routes = [
     loadChildren: () => import('./features/tracker-beta/tracker-beta.routes').then(m => m.TRACKER_BETA_ROUTES),
   },
   {
+    // Beta hub — a permission-gated index of experimental surfaces. Purely additive: lives in the normal
+    // app shell, gated by beta.access; each experiment card inside is further gated by its own feature perm.
+    path: 'beta',
+    canActivate: [permissionGuard(PERM.betaAccess)],
+    loadComponent: () => import('./features/beta/beta-hub.page').then(m => m.BetaHubPage),
+    title: 'Usage IQ · Beta',
+  },
+  {
     // Bill Splitter — its own permission-gated page. Owner-scoped CRUD + AI receipt breakdown + a public
     // anonymous claim link (the bare /bill/:token route below).
     path: 'bills',
