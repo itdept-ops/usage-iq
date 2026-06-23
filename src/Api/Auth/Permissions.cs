@@ -142,10 +142,10 @@ public static class Permissions
         // ---- Fitness ----
         new PermissionInfo(TrackerSelf, "Fitness", "Track food & fitness", "Log and view your own food intake and exercises."),
         new PermissionInfo(TrackerViewAll, "Fitness", "View all trackers", "View every user’s food & fitness log (coach/admin)."),
-        new PermissionInfo(TrackerBeta, "Fitness", "Tracker Beta", "Access the new mobile-first \"Strata\" tracker experience (beta)."),
+        new PermissionInfo(TrackerBeta, "Beta", "Tracker Beta", "Access the new mobile-first \"Strata\" tracker experience (beta)."),
 
-        // ---- Bills ----
-        new PermissionInfo(BillsUse, "Bills", "Use Bill Splitter", "Create bills, break a receipt photo down with AI, assign items to your contacts, and share a public claim link so people can claim what they owe."),
+        // ---- Tools ----
+        new PermissionInfo(BillsUse, "Tools", "Use Bill Splitter", "Create bills, break a receipt photo down with AI, assign items to your contacts, and share a public claim link so people can claim what they owe."),
 
         // ---- Family ----
         new PermissionInfo(FamilyUse, "Family", "Use Family Hub", "Access the Family Hub: see your household, its members, and shared family data."),
@@ -155,19 +155,19 @@ public static class Permissions
         new PermissionInfo(AllowanceManage, "Family", "Manage allowance", "A parent capability: approve or reject submitted chores, record cash payouts, spends, and adjustments, and view every household child's allowance balance."),
         new PermissionInfo(IdentityMap, "Family", "Identity Map", "Log time against the roles you play (parent, coder, athlete…) and see your time split as a radial web. Optionally import from your connected calendar — only your own data, never anyone else's."),
 
-        // ---- Chat ----
-        new PermissionInfo(ChatRead, "Chat", "View chat", "See channels and direct messages you belong to and read their messages."),
-        new PermissionInfo(ChatSend, "Chat", "Send messages", "Post messages, create channels, and start direct messages."),
-        new PermissionInfo(ChatModerate, "Chat", "Moderate chat", "Edit or delete other people’s messages, and archive or delete channels."),
-        new PermissionInfo(ChatContactsManage, "Chat", "Manage contacts", "Add or remove the people in any user’s chat contacts (their circle)."),
+        // ---- Social ----
+        new PermissionInfo(ChatRead, "Social", "View chat", "See channels and direct messages you belong to and read their messages."),
+        new PermissionInfo(ChatSend, "Social", "Send messages", "Post messages, create channels, and start direct messages."),
+        new PermissionInfo(ChatModerate, "Social", "Moderate chat", "Edit or delete other people’s messages, and archive or delete channels."),
+        new PermissionInfo(ChatContactsManage, "Social", "Manage contacts", "Add or remove the people in any user’s chat contacts (their circle)."),
 
         // ---- Location (GPS feature; never default) ----
         new PermissionInfo(LocationSelf, "Location", "Track own location", "Record and view your own location and location history."),
         new PermissionInfo(LocationShare, "Location", "Share location", "Share your live location with your household and contacts."),
         new PermissionInfo(LocationViewAll, "Location", "View all locations", "Admin oversight: view every user’s location history and the live location map."),
 
-        // ---- Automations ----
-        new PermissionInfo(AutomationsUse, "Automations", "Use Automations", "Create rules that react to your own activity and notify you in-app or to your own Discord webhook."),
+        // ---- Tools (continued) ----
+        new PermissionInfo(AutomationsUse, "Tools", "Use Automations", "Create rules that react to your own activity and notify you in-app or to your own Discord webhook."),
 
         // ---- Beta ----
         new PermissionInfo(BetaAccess, "Beta", "Beta access", "Access the experimental Beta section and its pages."),

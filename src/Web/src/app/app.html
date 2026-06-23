@@ -27,10 +27,11 @@
       <span class="navburger__box" aria-hidden="true"><span></span><span></span><span></span></span>
     </button>
 
-    <!-- Grouped nav: "Usage ▾" + "Admin ▾" dropdowns (mat-menu) bracket the standalone Tracker / Family /
-         Chat buttons. Each child link is gated by its OWN route permission; each dropdown trigger renders
-         only when >=1 of its children is permitted. The trigger flags itself active when any child route
-         is active via the hidden routerLinkActive probes (#usageRla / #adminRla). -->
+    <!-- Grouped nav: Usage ▾ · Fitness ▾ · Tools ▾ · Social ▾ · Family (link) · Beta ▾ · Admin ▾.
+         Each dropdown reuses the same nav__group button + mat-menu + expand_more chev pattern; each child
+         link keeps its OWN route permission, and a dropdown trigger renders only when >=1 of its children
+         is permitted. A trigger flags itself active via its xGroupActive() computed (it isn't a link, so
+         it can't use routerLinkActive). Family is a single link — it has its own internal nav. -->
     <nav class="nav" aria-label="Primary">
       <!-- Usage ▾ : Dashboard, Calendar, Pricing, Reporter, Fleet. The trigger isn't a link, so it can't
            use routerLinkActive — usageGroupActive() flags it active when any child route is current. -->
@@ -78,35 +79,121 @@
         </mat-menu>
       }
 
-      <!-- Standalone: Tracker, 75 Hard, Family, Chat -->
+      <!-- Fitness ▾ : Tracker, 75 Hard, Trophies, Activity (all tracker.self) -->
       @if (auth.hasPermission('tracker.self')) {
-        <a mat-button class="nav__item" routerLink="/tracker" routerLinkActive="active">Tracker</a>
-        <a mat-button class="nav__item" routerLink="/challenge" routerLinkActive="active">75 Hard</a>
-        <a mat-button class="nav__item" routerLink="/trophies" routerLinkActive="active">Trophies</a>
-        <a mat-button class="nav__item" routerLink="/feed" routerLinkActive="active">Activity</a>
+        <button type="button" mat-button class="nav__item nav__group"
+                [matMenuTriggerFor]="fitnessMenu" #fitnessTrigger="matMenuTrigger"
+                [class.nav__group--open]="fitnessTrigger.menuOpen"
+                [class.active]="fitnessGroupActive()"
+                aria-haspopup="menu">
+          Fitness<mat-icon class="nav__group-chev" aria-hidden="true">expand_more</mat-icon>
+        </button>
+        <mat-menu #fitnessMenu="matMenu" class="nav-menu" overlapTrigger="false">
+          <a mat-menu-item class="nav-menu__item" routerLink="/tracker" routerLinkActive="active">
+            <mat-icon class="nav-menu__icon" aria-hidden="true">monitoring</mat-icon>
+            <span>Tracker</span>
+          </a>
+          <a mat-menu-item class="nav-menu__item" routerLink="/challenge" routerLinkActive="active">
+            <mat-icon class="nav-menu__icon" aria-hidden="true">military_tech</mat-icon>
+            <span>75 Hard</span>
+          </a>
+          <a mat-menu-item class="nav-menu__item" routerLink="/trophies" routerLinkActive="active">
+            <mat-icon class="nav-menu__icon" aria-hidden="true">emoji_events</mat-icon>
+            <span>Trophies</span>
+          </a>
+          <a mat-menu-item class="nav-menu__item" routerLink="/feed" routerLinkActive="active">
+            <mat-icon class="nav-menu__icon" aria-hidden="true">dynamic_feed</mat-icon>
+            <span>Activity</span>
+          </a>
+        </mat-menu>
       }
-      @if (auth.hasPermission('automations.use')) {
-        <a mat-button class="nav__item" routerLink="/automations" routerLinkActive="active">Automations</a>
+
+      <!-- Tools ▾ : Ask (tracker.ai), Automations (automations.use), Bills (bills.use) -->
+      @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use')) {
+        <button type="button" mat-button class="nav__item nav__group"
+                [matMenuTriggerFor]="toolsMenu" #toolsTrigger="matMenuTrigger"
+                [class.nav__group--open]="toolsTrigger.menuOpen"
+                [class.active]="toolsGroupActive()"
+                aria-haspopup="menu">
+          Tools<mat-icon class="nav__group-chev" aria-hidden="true">expand_more</mat-icon>
+        </button>
+        <mat-menu #toolsMenu="matMenu" class="nav-menu" overlapTrigger="false">
+          @if (auth.hasPermission('tracker.ai')) {
+            <a mat-menu-item class="nav-menu__item" routerLink="/ask" routerLinkActive="active">
+              <mat-icon class="nav-menu__icon" aria-hidden="true">auto_awesome</mat-icon>
+              <span>Ask</span>
+            </a>
+          }
+          @if (auth.hasPermission('automations.use')) {
+            <a mat-menu-item class="nav-menu__item" routerLink="/automations" routerLinkActive="active">
+              <mat-icon class="nav-menu__icon" aria-hidden="true">bolt</mat-icon>
+              <span>Automations</span>
+            </a>
+          }
+          @if (auth.hasPermission('bills.use')) {
+            <a mat-menu-item class="nav-menu__item" routerLink="/bills" routerLinkActive="active">
+              <mat-icon class="nav-menu__icon" aria-hidden="true">receipt_long</mat-icon>
+              <span>Bills</span>
+            </a>
+          }
+        </mat-menu>
       }
-      @if (auth.hasPermission('tracker.beta')) {
-        <a mat-button class="nav__item" routerLink="/tracker-beta" routerLinkActive="active">Tracker Beta</a>
+
+      <!-- Social ▾ : Chat (chat.read), People (any-of chat.read/family.use) -->
+      @if (auth.hasAnyPermission('chat.read', 'family.use')) {
+        <button type="button" mat-button class="nav__item nav__group"
+                [matMenuTriggerFor]="socialMenu" #socialTrigger="matMenuTrigger"
+                [class.nav__group--open]="socialTrigger.menuOpen"
+                [class.active]="socialGroupActive()"
+                aria-haspopup="menu">
+          Social<mat-icon class="nav__group-chev" aria-hidden="true">expand_more</mat-icon>
+        </button>
+        <mat-menu #socialMenu="matMenu" class="nav-menu" overlapTrigger="false">
+          @if (auth.hasPermission('chat.read')) {
+            <a mat-menu-item class="nav-menu__item" routerLink="/chat" routerLinkActive="active">
+              <mat-icon class="nav-menu__icon" aria-hidden="true">forum</mat-icon>
+              <span>Chat</span>
+            </a>
+          }
+          <a mat-menu-item class="nav-menu__item" routerLink="/people" routerLinkActive="active">
+            <mat-icon class="nav-menu__icon" aria-hidden="true">groups</mat-icon>
+            <span>People</span>
+          </a>
+        </mat-menu>
       }
-      @if (auth.hasPermission('beta.access')) {
-        <a mat-button class="nav__item" routerLink="/beta" routerLinkActive="active">Beta</a>
-      }
-      @if (auth.hasPermission('bills.use')) {
-        <a mat-button class="nav__item" routerLink="/bills" routerLinkActive="active">Bills</a>
-      }
+
+      <!-- Family : a single link (it has its own internal nav), keeping its cottage icon. -->
       @if (auth.hasPermission('family.use')) {
         <a mat-button class="nav__item nav__item--family" routerLink="/family" routerLinkActive="active">
           <mat-icon class="nav__item-icon" aria-hidden="true">cottage</mat-icon>Family
         </a>
       }
-      @if (auth.hasPermission('chat.read')) {
-        <a mat-button class="nav__item" routerLink="/chat" routerLinkActive="active">Chat</a>
-      }
-      @if (auth.hasAnyPermission('chat.read', 'family.use')) {
-        <a mat-button class="nav__item" routerLink="/people" routerLinkActive="active">People</a>
+
+      <!-- Beta ▾ : "Beta home" (/beta) then the shared BETA_EXPERIMENTS list (each may add its own perm
+           on top of beta.access). Replaces the old standalone /tracker-beta link. -->
+      @if (auth.hasPermission('beta.access')) {
+        <button type="button" mat-button class="nav__item nav__group"
+                [matMenuTriggerFor]="betaMenu" #betaTrigger="matMenuTrigger"
+                [class.nav__group--open]="betaTrigger.menuOpen"
+                [class.active]="betaGroupActive()"
+                aria-haspopup="menu">
+          Beta<mat-icon class="nav__group-chev" aria-hidden="true">expand_more</mat-icon>
+        </button>
+        <mat-menu #betaMenu="matMenu" class="nav-menu" overlapTrigger="false">
+          <a mat-menu-item class="nav-menu__item" routerLink="/beta" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }">
+            <mat-icon class="nav-menu__icon" aria-hidden="true">science</mat-icon>
+            <span>Beta home</span>
+          </a>
+          @for (x of betaExperiments; track x.route) {
+            @if (!x.perm || auth.hasPermission(x.perm)) {
+              <a mat-menu-item class="nav-menu__item" [routerLink]="x.route" routerLinkActive="active">
+                <mat-icon class="nav-menu__icon" aria-hidden="true">{{ x.icon }}</mat-icon>
+                <span>{{ x.title }}</span>
+              </a>
+            }
+          }
+        </mat-menu>
       }
 
       <!-- Admin ▾ : Users, Locations, Activity, AI usage, Settings -->
@@ -357,9 +444,9 @@
        markup is inert on desktop. Links mirror the inline nav and its permission gates. -->
   <div class="mobile-nav-scrim" [class.open]="mobileNavOpen()" (click)="closeMobileNav()"
        aria-hidden="true"></div>
-  <!-- Mobile drawer mirrors the desktop grouping, but with section headers (Usage / Tracker / Family /
-       Chat / Admin) instead of dropdowns. Each row is gated by the SAME permission as its desktop
-       counterpart; a section header renders only when >=1 of its rows is permitted. -->
+  <!-- Mobile drawer mirrors the desktop grouping, but with flat section headers (Usage / Fitness / Tools /
+       Social / Family / Beta / Admin) instead of dropdowns. Each row is gated by the SAME permission as its
+       desktop counterpart; a section header renders only when >=1 of its rows is permitted. -->
   <nav id="mobile-nav" class="mobile-nav" [class.open]="mobileNavOpen()" aria-label="Primary">
     @if (auth.hasAnyPermission('dashboard.view', 'calendar.view', 'pricing.view',
                                'reporter.view', 'reporter.manage', 'reporter.self', 'fleet.view')) {
@@ -386,42 +473,36 @@
       }
     }
 
-    @if (auth.hasPermission('tracker.self') || auth.hasPermission('tracker.beta')) {
+    @if (auth.hasPermission('tracker.self')) {
       <div class="mobile-nav__head" role="presentation">Fitness</div>
-      @if (auth.hasPermission('tracker.self')) {
-        <a class="mobile-nav__item" routerLink="/tracker" routerLinkActive="active"
-           (click)="closeMobileNav()">Tracker</a>
-        <a class="mobile-nav__item" routerLink="/challenge" routerLinkActive="active"
-           (click)="closeMobileNav()">75 Hard</a>
-        <a class="mobile-nav__item" routerLink="/trophies" routerLinkActive="active"
-           (click)="closeMobileNav()">Trophies</a>
-        <a class="mobile-nav__item" routerLink="/feed" routerLinkActive="active"
-           (click)="closeMobileNav()">Activity</a>
+      <a class="mobile-nav__item" routerLink="/tracker" routerLinkActive="active"
+         (click)="closeMobileNav()">Tracker</a>
+      <a class="mobile-nav__item" routerLink="/challenge" routerLinkActive="active"
+         (click)="closeMobileNav()">75 Hard</a>
+      <a class="mobile-nav__item" routerLink="/trophies" routerLinkActive="active"
+         (click)="closeMobileNav()">Trophies</a>
+      <a class="mobile-nav__item" routerLink="/feed" routerLinkActive="active"
+         (click)="closeMobileNav()">Activity</a>
+    }
+
+    @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use')) {
+      <div class="mobile-nav__head" role="presentation">Tools</div>
+      @if (auth.hasPermission('tracker.ai')) {
+        <a class="mobile-nav__item" routerLink="/ask" routerLinkActive="active"
+           (click)="closeMobileNav()">Ask</a>
       }
       @if (auth.hasPermission('automations.use')) {
         <a class="mobile-nav__item" routerLink="/automations" routerLinkActive="active"
            (click)="closeMobileNav()">Automations</a>
       }
-      @if (auth.hasPermission('tracker.beta')) {
-        <a class="mobile-nav__item" routerLink="/tracker-beta" routerLinkActive="active"
-           (click)="closeMobileNav()">Tracker Beta</a>
+      @if (auth.hasPermission('bills.use')) {
+        <a class="mobile-nav__item" routerLink="/bills" routerLinkActive="active"
+           (click)="closeMobileNav()">Bills</a>
       }
     }
 
-    @if (auth.hasPermission('bills.use')) {
-      <div class="mobile-nav__head" role="presentation">Bills</div>
-      <a class="mobile-nav__item" routerLink="/bills" routerLinkActive="active"
-         (click)="closeMobileNav()">Bill Splitter</a>
-    }
-
-    @if (auth.hasPermission('family.use')) {
-      <div class="mobile-nav__head" role="presentation">Family</div>
-      <a class="mobile-nav__item" routerLink="/family" routerLinkActive="active"
-         (click)="closeMobileNav()">Family</a>
-    }
-
     @if (auth.hasAnyPermission('chat.read', 'family.use')) {
-      <div class="mobile-nav__head" role="presentation">People</div>
+      <div class="mobile-nav__head" role="presentation">Social</div>
       @if (auth.hasPermission('chat.read')) {
         <a class="mobile-nav__item" routerLink="/chat" routerLinkActive="active"
            (click)="closeMobileNav()">Chat</a>
@@ -430,10 +511,22 @@
          (click)="closeMobileNav()">People</a>
     }
 
+    @if (auth.hasPermission('family.use')) {
+      <div class="mobile-nav__head" role="presentation">Family</div>
+      <a class="mobile-nav__item" routerLink="/family" routerLinkActive="active"
+         (click)="closeMobileNav()">Family</a>
+    }
+
     @if (auth.hasPermission('beta.access')) {
       <div class="mobile-nav__head" role="presentation">Beta</div>
       <a class="mobile-nav__item" routerLink="/beta" routerLinkActive="active"
-         (click)="closeMobileNav()">Beta</a>
+         [routerLinkActiveOptions]="{ exact: true }" (click)="closeMobileNav()">Beta home</a>
+      @for (x of betaExperiments; track x.route) {
+        @if (!x.perm || auth.hasPermission(x.perm)) {
+          <a class="mobile-nav__item" [routerLink]="x.route" routerLinkActive="active"
+             (click)="closeMobileNav()">{{ x.title }}</a>
+        }
+      }
     }
 
     @if (auth.hasAnyPermission('users.view', 'location.view-all', 'activity.view', 'ai.usage.view', 'settings.view')) {

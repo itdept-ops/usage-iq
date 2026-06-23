@@ -160,12 +160,12 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void AutomationsUse_is_in_the_Automations_group_non_ai_not_defaultable_a_page_gate_and_in_the_administrator_preset()
+    public void AutomationsUse_is_in_the_Tools_group_non_ai_not_defaultable_a_page_gate_and_in_the_administrator_preset()
     {
         // automations.use gates the Automations builder + /api/automations. A rule may carry the owner's OWN
-        // Discord webhook, so it is a DELIBERATE grant: its own "Automations" group, NOT an AI key, never
+        // Discord webhook, so it is a DELIBERATE grant: the "Tools" group, NOT an AI key, never
         // defaultable, and a PAGE gate (not a *.view) so it is absent from Views — mirroring beta.access.
-        Permissions.Catalog.Single(p => p.Key == Permissions.AutomationsUse).Group.Should().Be("Automations");
+        Permissions.Catalog.Single(p => p.Key == Permissions.AutomationsUse).Group.Should().Be("Tools");
         Permissions.Catalog.Single(p => p.Key == Permissions.AutomationsUse).IsAi.Should().BeFalse();
         Permissions.IsAi(Permissions.AutomationsUse).Should().BeFalse();
         Permissions.IsDefaultable(Permissions.AutomationsUse).Should().BeFalse();
@@ -190,11 +190,11 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void BillsUse_is_in_the_Bills_group_non_ai_not_defaultable_and_in_the_administrator_preset()
+    public void BillsUse_is_in_the_Tools_group_non_ai_not_defaultable_and_in_the_administrator_preset()
     {
         // The Bill Splitter mints PUBLIC anonymous claim links + reads receipt photos via vision AI; bills.use
-        // lives in its own "Bills" group, is NOT an AI key, and is never defaultable — granted deliberately.
-        Permissions.Catalog.Single(p => p.Key == Permissions.BillsUse).Group.Should().Be("Bills");
+        // lives in the "Tools" group, is NOT an AI key, and is never defaultable — granted deliberately.
+        Permissions.Catalog.Single(p => p.Key == Permissions.BillsUse).Group.Should().Be("Tools");
         Permissions.Catalog.Single(p => p.Key == Permissions.BillsUse).IsAi.Should().BeFalse();
         Permissions.IsAi(Permissions.BillsUse).Should().BeFalse();
         Permissions.IsDefaultable(Permissions.BillsUse).Should().BeFalse();

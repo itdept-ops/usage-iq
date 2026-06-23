@@ -50,6 +50,7 @@ export const COMMAND_DEFS: readonly CommandDef[] = [
   { id: 'nav-challenge', label: '75 Hard', group: 'Go to', icon: 'fitness_center', route: '/challenge', perm: [PERM.trackerSelf], keywords: ['challenge'] },
   { id: 'nav-trophies', label: 'Trophies', group: 'Go to', icon: 'emoji_events', route: '/trophies', perm: [PERM.trackerSelf], keywords: ['trophy', 'trophies', 'badges', 'achievements', 'milestones'] },
   { id: 'nav-feed', label: 'Activity feed', group: 'Go to', icon: 'dynamic_feed', route: '/feed', perm: [PERM.trackerSelf], keywords: ['social', 'feed'] },
+  { id: 'nav-automations', label: 'Automations', group: 'Go to', icon: 'bolt', route: '/automations', perm: [PERM.automationsUse], keywords: ['rules', 'triggers', 'webhook', 'discord', 'notify'] },
   { id: 'nav-bills', label: 'Bill Splitter', group: 'Go to', icon: 'receipt_long', route: '/bills', perm: [PERM.billsUse], keywords: ['bill', 'split', 'receipt', 'expense'] },
   { id: 'nav-beta', label: 'Beta', group: 'Go to', icon: 'science', route: '/beta', perm: [PERM.betaAccess], keywords: ['experimental'] },
   { id: 'nav-family', label: 'Family', group: 'Go to', icon: 'cottage', route: '/family', perm: [PERM.familyUse], keywords: ['hub', 'household'] },

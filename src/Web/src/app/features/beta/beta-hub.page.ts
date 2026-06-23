@@ -3,20 +3,7 @@ import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 
 import { AuthService } from '../../core/auth';
-
-/**
- * A single experiment in the Beta hub. `perm`, when set, gates the card to users who hold that
- * permission (via {@link AuthService.hasPermission}); cards without a `perm` always show. Add a new
- * beta page by appending ONE entry to {@link BetaHubPage.experimentDefs}.
- */
-interface BetaExperiment {
-  readonly title: string;
-  readonly blurb: string;
-  readonly route: string;
-  readonly icon: string;
-  /** Optional permission gate — the card only renders if the user holds this key. */
-  readonly perm?: string;
-}
+import { BETA_EXPERIMENTS, BetaExperiment } from './beta-experiments';
 
 /**
  * Beta hub — a clean, mobile-friendly index of experimental surfaces. Lives in the normal app shell
@@ -94,63 +81,9 @@ interface BetaExperiment {
 export class BetaHubPage {
   private readonly auth = inject(AuthService);
 
-  /**
-   * The seed catalog of beta experiments. To add a future beta page, append ONE entry here (title,
-   * blurb, route, icon, and an optional `perm` gate) — the grid and its permission filtering pick it
-   * up automatically.
-   */
-  private static readonly experimentDefs: readonly BetaExperiment[] = [
-    {
-      title: 'Tracker Beta',
-      blurb: 'Mobile-first clean-sheet fitness tracker (Strata)',
-      route: '/tracker-beta',
-      icon: 'fitness_center',
-      perm: 'tracker.beta',
-    },
-    {
-      title: 'Bills',
-      blurb: 'Snap a receipt, split it, share a claim link — mobile-first',
-      route: '/beta/bills',
-      icon: 'receipt_long',
-      perm: 'bills.use',
-    },
-    {
-      title: 'Home',
-      blurb: 'Your cross-domain glance surface — rings, events, who\'s online',
-      route: '/beta/home',
-      icon: 'space_dashboard',
-      // No `perm` → always visible to anyone who can reach the hub (holds beta.access). The page's own
-      // widgets self-gate on their domain perms, and the route guard re-checks beta.access on direct nav.
-    },
-    {
-      title: 'Dashboard',
-      blurb: 'Your token + cost analytics, glanceable on mobile',
-      route: '/beta/dashboard',
-      icon: 'insights',
-      // No `perm` → the route guard re-checks beta.access; same data as the live dashboard.
-    },
-    {
-      title: 'Family',
-      blurb: 'Your household at a glance — mobile-first',
-      route: '/beta/family',
-      icon: 'cottage',
-      // Gated on `family.use` (the feature); the route additionally STACKS beta.access + family.use, so a
-      // direct nav re-checks both. Mirrors the live family glance — never surfaces cycle/finance data.
-      perm: 'family.use',
-    },
-    {
-      title: 'Wrapped',
-      blurb: 'Your Hub, the highlight reel',
-      route: '/beta/wrapped',
-      icon: 'auto_awesome',
-      // No `perm` → the route guard re-checks beta.access; the page itself is gated server-side by
-      // tracker.self (the /api/wrapped endpoint), and only ever shows the caller's OWN data.
-    },
-  ];
-
   /** Experiments visible to the current session (cards without a `perm` always show). */
   readonly experiments = computed<BetaExperiment[]>(() => {
     this.auth.permissions(); // re-run when permissions change
-    return BetaHubPage.experimentDefs.filter(x => !x.perm || this.auth.hasPermission(x.perm));
+    return BETA_EXPERIMENTS.filter(x => !x.perm || this.auth.hasPermission(x.perm));
   });
 }

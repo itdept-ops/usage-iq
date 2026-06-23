@@ -21,6 +21,7 @@ import { LocationCapture } from './core/location-capture';
 import { Presence, SyncStatus, PERM, QuickAddResult } from './core/models';
 import { timeAgo, humanizeInterval } from './shared/format';
 import { NotificationBell } from './features/notifications/notification-bell';
+import { BETA_EXPERIMENTS } from './features/beta/beta-experiments';
 
 /** A teammate online, enriched with the initials + "you" flag the indicator needs to render. */
 interface OnlineUser extends Presence {
@@ -152,6 +153,21 @@ export class App implements AfterViewInit {
   }
   readonly usageGroupActive = computed(() =>
     this.pathInGroup(['/', '/calendar', '/pricing', '/reporter', '/fleet']));
+  readonly fitnessGroupActive = computed(() =>
+    this.pathInGroup(['/tracker', '/challenge', '/trophies', '/feed']));
+  readonly toolsGroupActive = computed(() =>
+    this.pathInGroup(['/ask', '/automations', '/bills']));
+  readonly socialGroupActive = computed(() =>
+    this.pathInGroup(['/chat', '/people']));
+  readonly betaGroupActive = computed(() =>
+    this.pathInGroup(['/beta', '/tracker-beta']));
+
+  /**
+   * The Beta dropdown's page list (the SAME registry the Beta hub grid uses, so nav + hub never drift).
+   * The template prepends a "Beta home" (/beta) link, then iterates these; each entry's optional `perm`
+   * is an ADDITIONAL gate layered on the beta.access trigger gate. Exposed for the nav template.
+   */
+  readonly betaExperiments = BETA_EXPERIMENTS;
   readonly adminGroupActive = computed(() =>
     this.pathInGroup(['/users', '/admin/locations', '/activity', '/ai-usage', '/settings']));
 

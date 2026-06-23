@@ -665,7 +665,7 @@ export interface ManagedUser {
 
 export interface PermissionItem {
   key: string;
-  /** The UI group this permission belongs to (server-defined: Usage/Fitness/Family/Chat/Location/Admin/AI). */
+  /** The UI group this permission belongs to (server-defined: Usage/Fitness/Tools/Social/Family/Beta/Admin/Location/AI). */
   group: string;
   label: string;
   description: string;
@@ -4543,7 +4543,7 @@ export const PERM = {
   locationSelf: 'location.self',
   locationShare: 'location.share',
   locationViewAll: 'location.view-all',
-  // ---- Automations (group "Automations"; page-gate; deliberate grant — a rule may carry a Discord webhook) ----
+  // ---- Automations (group "Tools"; page-gate; deliberate grant — a rule may carry a Discord webhook) ----
   automationsUse: 'automations.use',
   // ---- Beta (group "Beta"; page-gate for the experimental Beta section) ----
   betaAccess: 'beta.access',
@@ -4563,7 +4563,7 @@ export const PERM = {
  * fallback/ordering hint. Any catalog group not listed here is appended after, so nothing is ever dropped.
  */
 export const PERM_GROUP_ORDER: readonly string[] = [
-  'Usage', 'Fitness', 'Bills', 'Family', 'Chat', 'Location', 'Beta', 'Admin', 'AI',
+  'Usage', 'Fitness', 'Tools', 'Social', 'Family', 'Beta', 'Admin', 'Location', 'AI',
 ];
 
 /** Maps each permission key to its UI group (mirror of the backend catalog grouping). */
@@ -4586,9 +4586,12 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   // ---- Fitness ----
   [PERM.trackerSelf]: 'Fitness',
   [PERM.trackerViewAll]: 'Fitness',
-  [PERM.trackerBeta]: 'Fitness',
-  // ---- Bills ----
-  [PERM.billsUse]: 'Bills',
+  // ---- Tools ----
+  [PERM.billsUse]: 'Tools',
+  [PERM.automationsUse]: 'Tools',
+  // ---- Beta ----
+  [PERM.trackerBeta]: 'Beta',
+  [PERM.betaAccess]: 'Beta',
   // ---- Family ----
   [PERM.familyUse]: 'Family',
   [PERM.familyFinance]: 'Family',
@@ -4596,19 +4599,15 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   [PERM.identityMap]: 'Family',
   [PERM.choreClaim]: 'Family',
   [PERM.allowanceManage]: 'Family',
-  // ---- Chat ----
-  [PERM.chatRead]: 'Chat',
-  [PERM.chatSend]: 'Chat',
-  [PERM.chatModerate]: 'Chat',
-  [PERM.chatContactsManage]: 'Chat',
+  // ---- Social ----
+  [PERM.chatRead]: 'Social',
+  [PERM.chatSend]: 'Social',
+  [PERM.chatModerate]: 'Social',
+  [PERM.chatContactsManage]: 'Social',
   // ---- Location ----
   [PERM.locationSelf]: 'Location',
   [PERM.locationShare]: 'Location',
   [PERM.locationViewAll]: 'Location',
-  // ---- Automations ----
-  [PERM.automationsUse]: 'Automations',
-  // ---- Beta ----
-  [PERM.betaAccess]: 'Beta',
   // ---- Admin ----
   [PERM.usersView]: 'Admin',
   [PERM.usersManage]: 'Admin',
