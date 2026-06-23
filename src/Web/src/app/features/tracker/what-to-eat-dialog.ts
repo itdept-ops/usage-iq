@@ -123,7 +123,9 @@ export class WhatToEatDialog {
       this.fallback.set(res.aiUsed === false);
       if (options.length === 0) {
         this.phase.set('empty');
-        this.announce.set("I couldn't find an option that fits right now. Try a refine, or add food manually.");
+        this.announce.set(res.aiUsed === false
+          ? "AI suggestions are off and I have nothing to suggest from yet. Add food manually, or try again later."
+          : "I couldn't find an option that fits right now. Try a refine, or add food manually.");
       } else {
         this.phase.set('options');
         const n = options.length;
@@ -271,4 +273,16 @@ export class WhatToEatDialog {
   close(): void {
     this.ref.close();
   }
+
+  /**
+   * "Add food manually": always-available escape hatch from the empty/error states so the dialog is never a
+   * dead-end. Closes with the `'manual'` result so a caller MAY open its manual add-food flow; callers that
+   * just reload (the current tracker + meals pages) are unaffected since the result is optional.
+   */
+  addManual(): void {
+    this.ref.close('manual');
+  }
 }
+
+/** Optional result the dialog can resolve with. `'manual'` = the user chose to add food manually. */
+export type WhatToEatDialogResult = 'manual' | undefined;

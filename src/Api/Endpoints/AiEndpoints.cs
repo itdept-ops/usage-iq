@@ -1116,7 +1116,7 @@ public static class AiEndpoints
         var constraints = Snip(body?.Constraints, 400);
 
         return new EatContext(sb.ToString(), remCal, remP, remC, remF, onHand,
-            await PlannedMealTitlesAsync(db, household, today, ct), craving, constraints);
+            await PlannedMealTitlesAsync(db, household, today, ct), recent, craving, constraints);
     }
 
     /// <summary>The next week's planned meal titles for the caller's household (deterministic-fallback source).</summary>
@@ -1141,29 +1141,36 @@ public static class AiEndpoints
     private static IReadOnlyList<EatOptionDto> FallbackOptions(EatContext ctx)
     {
         var options = new List<EatOptionDto>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var title in ctx.PlannedMeals.Take(MaxFallbackOptions))
+        void Add(string title, string why, IReadOnlyList<string>? have = null)
+        {
+            if (options.Count >= MaxFallbackOptions) return;
+            var t = title?.Trim();
+            if (string.IsNullOrEmpty(t) || !seen.Add(t)) return; // skip blanks + de-dupe across all sources
             options.Add(new EatOptionDto
             {
-                Title = title,
-                Why = "From your planned meals.",
-                Macros = new MacroSet(),
-                Have = Array.Empty<string>(),
+                Title = t,
+                Why = why,
+                Macros = new MacroSet(), // deterministic floor — no AI, so no estimated macros
+                Have = have ?? Array.Empty<string>(),
                 Missing = Array.Empty<string>(),
                 Steps = Array.Empty<string>(),
             });
+        }
 
-        // No planned meals? Offer a single "use what's on hand" prompt seeded with the groceries.
+        // 1) The caller's planned meals (most intentful).
+        foreach (var title in ctx.PlannedMeals)
+            Add(title, "From your planned meals.");
+
+        // 2) Recently eaten foods the caller already likes (caller-scoped history; names only).
+        foreach (var title in ctx.RecentFoods)
+            Add(title, "Something you've had recently.");
+
+        // 3) Failing all else, a single "use what's on hand" idea seeded with the on-hand groceries.
         if (options.Count == 0 && ctx.OnHand.Count > 0)
-            options.Add(new EatOptionDto
-            {
-                Title = "Make something with what you have",
-                Why = "Built from your on-hand groceries.",
-                Macros = new MacroSet(),
-                Have = ctx.OnHand.Take(MaxFallbackHave).ToList(),
-                Missing = Array.Empty<string>(),
-                Steps = Array.Empty<string>(),
-            });
+            Add("Make something with what you have", "Built from your on-hand groceries.",
+                ctx.OnHand.Take(MaxFallbackHave).ToList());
 
         return options;
     }
@@ -1187,7 +1194,8 @@ public static class AiEndpoints
     /// raw lists used to build the deterministic fallback. Carries NO identity.</summary>
     private sealed record EatContext(
         string Snapshot, int RemCal, double RemP, double RemC, double RemF,
-        IReadOnlyList<string> OnHand, IReadOnlyList<string> PlannedMeals, string Craving, string Constraints);
+        IReadOnlyList<string> OnHand, IReadOnlyList<string> PlannedMeals, IReadOnlyList<string> RecentFoods,
+        string Craving, string Constraints);
 
     /// <summary>A compact, model-friendly summary of the caller's day so far (goal, intake, burn, foods).</summary>
     private static async Task<string> BuildDaySummaryAsync(

@@ -121,6 +121,27 @@ public class WhatToEatTests(WebAppFactory factory)
         first.GetProperty("steps").ValueKind.Should().Be(JsonValueKind.Array);
     }
 
+    [Fact]
+    public async Task Fallback_uses_recent_eaten_foods_when_there_are_no_planned_meals()
+    {
+        // No household / planned meals at all — only the caller's own recently-logged foods. The broadened
+        // fallback must still floor to a useful option built from that history (previously it returned empty).
+        var (_, user) = await ProvisionUser("tracker.ai", "tracker.self");
+        var recentFood = $"Recent-{Guid.NewGuid():N}";
+        (await user.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "lunch", description = recentFood, quantity = 1.0,
+            calories = 400, proteinG = 30.0, carbG = 40.0, fatG = 12.0,
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await Json(await user.PostAsJsonAsync("/api/ai/what-to-eat", new { }));
+        body.GetProperty("aiUsed").GetBoolean().Should().BeFalse();
+
+        var options = body.GetProperty("options").EnumerateArray().ToList();
+        options.Should().NotBeEmpty();
+        options.Select(o => o.GetProperty("title").GetString()).Should().Contain(recentFood);
+    }
+
     // =====================================================================================
     // SCOPING (security): the response reflects ONLY the caller's own household — never user B's
     // planned meals, and never an email anywhere on the wire.

@@ -3765,6 +3765,23 @@ public sealed class GeminiService(
     // ===================================================================================
 
     /// <summary>
+    /// The shared <c>generationConfig</c> for every structured-JSON generate call. Beyond the JSON mime type
+    /// and a low temperature it now sets:
+    ///   • <c>maxOutputTokens</c> = 4096 — generous, so a multi-option answer is never silently truncated
+    ///     (a truncated reply yields invalid JSON → parse-failed → the empty "No options" state); and
+    ///   • a <c>thinkingConfig.thinkingBudget</c> = 1024 — keeps SOME 2.5-flash reasoning (answer quality) but
+    ///     NEVER lets thinking starve the answer of output tokens (budget 0 would disable thinking entirely;
+    ///     an unbounded budget could eat the whole output cap and leave no answer text).
+    /// </summary>
+    private static object GenerationConfig() => new
+    {
+        temperature = 0.2,
+        responseMimeType = "application/json",
+        maxOutputTokens = 4096,
+        thinkingConfig = new { thinkingBudget = 1024 },
+    };
+
+    /// <summary>
     /// POST a prompt to <c>:generateContent</c> with structured-JSON output, and return the parsed JSON
     /// object the model produced. Returns null on any non-200 (esp. 429/503), timeout, network error, or a
     /// non-JSON/non-object reply. Identical prompts are cached briefly. Never throws; never logs the key.
@@ -3788,7 +3805,7 @@ public sealed class GeminiService(
             var body = new
             {
                 contents = new[] { new { parts = new[] { new { text = prompt } } } },
-                generationConfig = new { temperature = 0.2, responseMimeType = "application/json" },
+                generationConfig = GenerationConfig(),
             };
 
             var client = httpFactory.CreateClient(HttpClientName);
@@ -3865,7 +3882,7 @@ public sealed class GeminiService(
                         },
                     },
                 },
-                generationConfig = new { temperature = 0.2, responseMimeType = "application/json" },
+                generationConfig = GenerationConfig(),
             };
 
             var client = httpFactory.CreateClient(HttpClientName);
@@ -3953,7 +3970,7 @@ public sealed class GeminiService(
             var body = new
             {
                 contents = new[] { new { parts = parts.ToArray() } },
-                generationConfig = new { temperature = 0.2, responseMimeType = "application/json" },
+                generationConfig = GenerationConfig(),
             };
 
             var client = httpFactory.CreateClient(HttpClientName);
@@ -4109,25 +4126,85 @@ public sealed class GeminiService(
         }
     }
 
-    /// <summary>Pull <c>candidates[0].content.parts[0].text</c> from a generateContent response.</summary>
+    /// <summary>
+    /// Pull the model's JSON answer text from a generateContent response. gemini-2.5-flash can split a single
+    /// <c>responseMimeType=application/json</c> answer across MULTIPLE <c>parts[].text</c> fragments, and can
+    /// emit a thinking/preamble part FIRST. Returning only the first text part (as the old code did) therefore
+    /// dropped valid answers intermittently — the "No options" bug. So, for each candidate we:
+    ///   1) try each text part on its own, returning the first one that PARSES as a JSON object (a fenced
+    ///      ```json … ``` block is unfenced first) — so a thinking part can't shadow a complete JSON answer; then
+    ///   2) failing that, CONCATENATE all the candidate's text parts and return the (unfenced) join — so an
+    ///      answer chunked across N fragments is reassembled.
+    /// Returns the best whole-response join as a last resort, or null when there is no text at all.
+    /// </summary>
     private static string? ExtractText(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object) return null;
         if (!root.TryGetProperty("candidates", out var cands) || cands.ValueKind != JsonValueKind.Array)
             return null;
+
+        string? firstNonEmptyJoin = null;
         foreach (var cand in cands.EnumerateArray())
         {
             if (!cand.TryGetProperty("content", out var content)) continue;
             if (!content.TryGetProperty("parts", out var parts) || parts.ValueKind != JsonValueKind.Array)
                 continue;
+
+            var sb = new System.Text.StringBuilder();
             foreach (var part in parts.EnumerateArray())
-                if (part.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String)
-                {
-                    var s = t.GetString();
-                    if (!string.IsNullOrWhiteSpace(s)) return s;
-                }
+            {
+                if (!part.TryGetProperty("text", out var t) || t.ValueKind != JsonValueKind.String) continue;
+                var s = t.GetString();
+                if (string.IsNullOrWhiteSpace(s)) continue;
+
+                // 1) A single part that is already a complete JSON object wins outright — this skips any
+                //    thinking/preamble part that came before it.
+                var unfenced = StripJsonFence(s);
+                if (LooksLikeJsonObject(unfenced)) return unfenced;
+                sb.Append(s);
+            }
+
+            // 2) No single part was a complete object: reassemble a possibly-chunked answer from this candidate.
+            if (sb.Length > 0)
+            {
+                var joined = StripJsonFence(sb.ToString());
+                if (LooksLikeJsonObject(joined)) return joined;
+                firstNonEmptyJoin ??= joined; // keep a fallback so a non-object reply still surfaces (parse-failed)
+            }
         }
-        return null;
+        return firstNonEmptyJoin;
+    }
+
+    /// <summary>Strip a leading/trailing Markdown code fence (```json … ``` or ``` … ```) the model sometimes
+    /// wraps JSON in despite <c>responseMimeType=application/json</c>, so <see cref="JsonDocument.Parse"/> sees
+    /// raw JSON. Returns the input trimmed when there is no fence.</summary>
+    private static string StripJsonFence(string s)
+    {
+        var t = s.Trim();
+        if (!t.StartsWith("```", StringComparison.Ordinal)) return t;
+        // Drop the opening fence line (``` or ```json) and an optional trailing fence.
+        var nl = t.IndexOf('\n');
+        if (nl < 0) return t;
+        t = t[(nl + 1)..];
+        if (t.EndsWith("```", StringComparison.Ordinal)) t = t[..^3];
+        return t.Trim();
+    }
+
+    /// <summary>Cheap check that a string is a JSON object literal (starts '{' ends '}') AND actually parses to
+    /// one — used to pick the real answer part over a thinking/preamble fragment without throwing.</summary>
+    private static bool LooksLikeJsonObject(string s)
+    {
+        var t = s.AsSpan().Trim();
+        if (t.Length < 2 || t[0] != '{' || t[^1] != '}') return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(s);
+            return doc.RootElement.ValueKind == JsonValueKind.Object;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     // ===================================================================================

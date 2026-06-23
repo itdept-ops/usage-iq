@@ -221,6 +221,7 @@
 }
 .wte-state-title { margin: 0; font-weight: 600; color: var(--tech-text); font-size: var(--tech-fs-body); }
 .wte-state-sub { margin: 0; font-size: var(--tech-fs-label); }
+.wte-state-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
 
 // On narrow viewports stack the actions full-width.
 @media (max-width: 480px) {

@@ -46,11 +46,42 @@ public class GeminiWhatToEatTests
         }
     }
 
+    /// <summary>
+    /// Like <see cref="StubHandler"/> but returns the candidate as MULTIPLE <c>parts[].text</c> fragments —
+    /// reproducing how gemini-2.5-flash sometimes splits a single JSON answer across N parts (and can prepend a
+    /// thinking/preamble part). This is the exact shape that broke "what-to-eat": the old <c>ExtractText</c>
+    /// returned only the first part, dropping the answer.
+    /// </summary>
+    private sealed class MultiPartStubHandler(params string[] textParts) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var envelope = new
+            {
+                candidates = new[]
+                {
+                    new { content = new { parts = textParts.Select(t => new { text = t }).ToArray() } },
+                },
+            };
+            var body = JsonSerializer.Serialize(envelope);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json"),
+            });
+        }
+    }
+
     private sealed class StubFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) =>
             new(handler, disposeHandler: false) { BaseAddress = new Uri("https://generativelanguage.googleapis.com") };
     }
+
+    private static GeminiService ServiceWith(HttpMessageHandler handler) =>
+        new(new StubFactory(handler),
+            Options.Create(new GeminiOptions { ApiKey = "test-key", Model = "gemini-2.5-flash" }),
+            new MemoryCache(new MemoryCacheOptions()),
+            NullLogger<GeminiService>.Instance);
 
     private static GeminiService ServiceReturning(string modelJson, bool configured = true) =>
         new(new StubFactory(new StubHandler(modelJson)),
@@ -151,6 +182,65 @@ public class GeminiWhatToEatTests
 
         result!.Options.Should().ContainSingle();
         result.Options[0].Title.Should().Be("Normal salad"); // the stubbed reply wins; injection is inert data
+    }
+
+    // ── Regression: the "No options" bug — a valid options[] must survive Gemini chunking/fences/thinking ──
+
+    [Fact]
+    public async Task WhatToEat_reassembles_options_split_across_multiple_text_parts()
+    {
+        // gemini-2.5-flash split the JSON answer across THREE parts. The old ExtractText returned only the
+        // first fragment ('{"options": [') → JsonDocument.Parse threw → parse-failed → empty "No options".
+        var full = Reply(new
+        {
+            title = "Chicken & rice", why = "Lean protein.",
+            calories = 500, protein_g = 45.0, carbs_g = 50.0, fat_g = 10.0,
+            have = new[] { "chicken", "rice" }, missing = new[] { "broccoli" }, steps = new[] { "Cook", "Plate" },
+        });
+        var third = full.Length / 3;
+        var handler = new MultiPartStubHandler(full[..third], full[third..(2 * third)], full[(2 * third)..]);
+
+        var result = await ServiceWith(handler).WhatToEatAsync("ctx", null, null, 1500, 90, 150, 50);
+
+        result.Should().NotBeNull();
+        result!.Options.Should().ContainSingle();
+        var o = result.Options[0];
+        o.Title.Should().Be("Chicken & rice");
+        o.Macros.Calories.Should().Be(500);
+        o.Macros.ProteinG.Should().Be(45.0);
+        o.Macros.CarbsG.Should().Be(50.0);
+        o.Macros.FatG.Should().Be(10.0);
+    }
+
+    [Fact]
+    public async Task WhatToEat_ignores_a_leading_thinking_part_and_reads_the_json_part()
+    {
+        // A reasoning/preamble text part precedes the real JSON answer part. ExtractText must skip the thinking
+        // part (not a JSON object) and return the JSON part — not the first text part blindly.
+        var full = Reply(new { title = "Omelette", calories = 300, protein_g = 24.0, carbs_g = 3.0, fat_g = 22.0 });
+        var handler = new MultiPartStubHandler(
+            "Let me think about the remaining macros and what fits best...", full);
+
+        var result = await ServiceWith(handler).WhatToEatAsync("ctx", null, null, 1000, 60, 80, 40);
+
+        result!.Options.Should().ContainSingle();
+        result.Options[0].Title.Should().Be("Omelette");
+        result.Options[0].Macros.ProteinG.Should().Be(24.0);
+    }
+
+    [Fact]
+    public async Task WhatToEat_strips_a_markdown_json_code_fence()
+    {
+        // Despite responseMimeType=application/json the model occasionally wraps the answer in a ```json fence.
+        var full = Reply(new { title = "Tuna salad", calories = 250, protein_g = 30.0, carbs_g = 5.0, fat_g = 12.0 });
+        var fenced = "```json\n" + full + "\n```";
+        var handler = new MultiPartStubHandler(fenced);
+
+        var result = await ServiceWith(handler).WhatToEatAsync("ctx", null, null, 900, 50, 70, 35);
+
+        result!.Options.Should().ContainSingle();
+        result.Options[0].Title.Should().Be("Tuna salad");
+        result.Options[0].Macros.Calories.Should().Be(250);
     }
 
     [Fact]

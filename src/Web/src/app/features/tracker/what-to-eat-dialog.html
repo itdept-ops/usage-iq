@@ -163,9 +163,23 @@
   <!-- ─────────────────────────── EMPTY ─────────────────────────── -->
   @if (phase() === 'empty') {
     <div class="wte-state">
-      <mat-icon class="wte-state-glyph" aria-hidden="true">no_meals</mat-icon>
-      <p class="wte-state-title">No options just now</p>
-      <p class="wte-state-sub">Try a refine above (like “quick” or “high protein”), or add food manually.</p>
+      @if (fallback()) {
+        <!-- AI is OFF/unavailable and the deterministic floor had nothing to suggest either. -->
+        <mat-icon class="wte-state-glyph" aria-hidden="true">cloud_off</mat-icon>
+        <p class="wte-state-title">AI suggestions are off right now</p>
+        <p class="wte-state-sub">
+          And I don't have planned meals, recent foods or on-hand groceries to suggest from yet.
+          Add food manually, or try again later.
+        </p>
+      } @else {
+        <!-- AI ran but couldn't find an option that fits the remaining macros. -->
+        <mat-icon class="wte-state-glyph" aria-hidden="true">no_meals</mat-icon>
+        <p class="wte-state-title">No ideas that fit just now</p>
+        <p class="wte-state-sub">Try a refine above (like “quick” or “high protein”), or add food manually.</p>
+      }
+      <button mat-stroked-button type="button" (click)="addManual()">
+        <mat-icon aria-hidden="true">edit</mat-icon> Add food manually
+      </button>
     </div>
   }
 
@@ -175,9 +189,14 @@
       <mat-icon class="wte-state-glyph" aria-hidden="true">cloud_off</mat-icon>
       <p class="wte-state-title">Suggestions are unavailable</p>
       <p class="wte-state-sub">I couldn't reach the AI just now — add food manually, or try again.</p>
-      <button mat-stroked-button type="button" (click)="refine()">
-        <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-      </button>
+      <div class="wte-state-actions">
+        <button mat-stroked-button type="button" (click)="refine()">
+          <mat-icon aria-hidden="true">refresh</mat-icon> Try again
+        </button>
+        <button mat-stroked-button type="button" (click)="addManual()">
+          <mat-icon aria-hidden="true">edit</mat-icon> Add food manually
+        </button>
+      </div>
     </div>
   }
 
