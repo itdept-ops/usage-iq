@@ -9,9 +9,9 @@ import {
   CoffeeEntryDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   AiUsageFilter, AiUsageResponse,
   NotificationUpdate, DiscordRoute, DiscordRouteUpdate, MyDiscord, MyDiscordUpdate, RecapPreview, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, PermissionPreset, Presence, PersonDto, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
-  SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
+  SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
   SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
-  WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WorkoutXSearchResultDto,
+  WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WhatToEatRequest, WhatToEatResult, WorkoutXSearchResultDto,
   CycleData, CyclePeriod, CycleNote, CycleSettings, CycleSettingsPatch, CycleOverlayMember,
   CycleDayLog, CycleDayLogPatch,
   IdentityMapData, IdentityRole, IdentityRoleInput, IdentityRolePatch, IdentityTimeEntry, IdentityTimeInput,
@@ -959,9 +959,20 @@ export class Api {
     return this.http.post<ReadLabelResponse>(`${this.base}/ai/read-label`, body);
   }
 
-  /** Suggest foods from the CALLER's own remaining calories/macros today (read server-side; empty body). */
-  suggestFoods(): Observable<SuggestFoodsResponse> {
-    return this.http.post<SuggestFoodsResponse>(`${this.base}/ai/suggest-foods`, {});
+  /**
+   * "✨ What should I eat?": ask Gemini for 3-5 meal/snack OPTIONS that fit the caller's REMAINING macros
+   * today. Reads the caller's OWN context server-side (today's logged foods + goal, recent foods, on-hand
+   * groceries, planned meals) — NO identity is sent. Pass an empty body on open; `craving`/`constraints`
+   * refine ("high protein", "quick", a craving) and `meal` is the slot hint. Each option carries its own
+   * macros so it's addable to the tracker in one call. AI-off returns 200 with `aiUsed:false` and a friendly
+   * deterministic list from planned meals/grocery (never a 503). Gated tracker.ai; rate-limited "ai".
+   */
+  whatToEat(body: WhatToEatRequest = {}): Observable<WhatToEatResult> {
+    return this.http.post<WhatToEatResult>(`${this.base}/ai/what-to-eat`, {
+      craving: body.craving ?? null,
+      constraints: body.constraints ?? null,
+      meal: body.meal ?? null,
+    });
   }
 
   /** Quick verdict + healthier swaps on a free-text meal. */

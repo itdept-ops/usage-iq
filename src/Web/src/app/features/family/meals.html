@@ -30,6 +30,13 @@
           Recipe idea
         </button>
       }
+      @if (canTrackerAi()) {
+        <button mat-stroked-button class="family__settings-btn meals__plan-btn" (click)="openWhatToEat()"
+                aria-label="What should I eat — meal options that fit my remaining macros today">
+          <mat-icon class="meals__spark" aria-hidden="true">auto_awesome</mat-icon>
+          What should I eat?
+        </button>
+      }
       <button mat-stroked-button class="family__settings-btn meals__grocery-btn"
               [disabled]="addingWeek() || mealCount() === 0" (click)="addWeekToGrocery()">
         @if (addingWeek()) {

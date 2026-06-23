@@ -222,6 +222,52 @@ public sealed class SuggestFoodsResponse
 }
 
 // ===================================================================================
+// what-to-eat — macro-aware "what should I eat?" options (read server-side)
+// ===================================================================================
+
+/// <summary>
+/// "✨ What should I eat?" request. Everything is OPTIONAL — on open the frontend sends an empty body and the
+/// server reads the caller's OWN context (today's logged foods + goal, recent foods, on-hand groceries, planned
+/// meals). NO identity is sent: the caller is resolved from the JWT (email-keyed tracker + household meals).
+/// <see cref="Craving"/>/<see cref="Constraints"/> are a free-text refine ("high protein", "quick", a craving),
+/// both treated strictly as DATA; <see cref="Meal"/> is the slot hint ("breakfast"|"lunch"|"dinner"|"snack").
+/// </summary>
+public sealed class WhatToEatRequest
+{
+    public string? Craving { get; set; }
+    public string? Constraints { get; set; }
+    public string? Meal { get; set; }
+}
+
+/// <summary>
+/// One option from "✨ What should I eat?" (mirrors the frontend EatOption). <see cref="Macros"/> is the
+/// per-option total (kcal + grams, CLAMPED) so it's addable to the tracker in one call. <see cref="Why"/> is a
+/// one-line "fits your remaining" rationale. <see cref="Have"/> are ingredients the caller already has on hand;
+/// <see cref="Missing"/> are the few items still needed (add to grocery). <see cref="Steps"/> are optional quick
+/// prep steps.
+/// </summary>
+public sealed class EatOptionDto
+{
+    public string Title { get; set; } = "";
+    public string Why { get; set; } = "";
+    public MacroSet Macros { get; set; } = new();
+    public IReadOnlyList<string> Have { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> Missing { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> Steps { get; set; } = Array.Empty<string>();
+}
+
+/// <summary>
+/// The "✨ What should I eat?" result: 0+ macro-aware options. <see cref="AiUsed"/> is false on the friendly
+/// NON-AI fallback (Gemini off/unavailable) — a small deterministic list built from planned meals + on-hand
+/// groceries — so the dialog labels it plainly instead of showing a 503. The endpoint always returns 200.
+/// </summary>
+public sealed class WhatToEatDto
+{
+    public bool AiUsed { get; set; }
+    public IReadOnlyList<EatOptionDto> Options { get; set; } = Array.Empty<EatOptionDto>();
+}
+
+// ===================================================================================
 // meal-feedback
 // ===================================================================================
 

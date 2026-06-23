@@ -1516,22 +1516,6 @@ export interface ReadLabelResponse {
   servingSize?: string | null;
 }
 
-/** A suggested food to round out the day (clamped server-side). Mirrors FoodSuggestionDto. */
-export interface FoodSuggestionDto {
-  food: string;
-  why?: string | null;
-  calories: number;
-  proteinG: number;
-}
-
-/**
- * Food suggestions to hit the caller's remaining targets (POST /api/ai/suggest-foods; reads the caller's
- * OWN remaining calories/macros today server-side — empty body). Mirrors SuggestFoodsResponse.
- */
-export interface SuggestFoodsResponse {
-  suggestions: FoodSuggestionDto[];
-}
-
 /** Meal-feedback request (POST /api/ai/meal-feedback): a free-text meal to get a verdict + swaps for. Mirrors MealFeedbackRequest. */
 export interface MealFeedbackRequest {
   description: string;
@@ -3142,6 +3126,46 @@ export interface MealIdea {
  */
 export interface WhatCanIMakeAiResult {
   ideas: MealIdea[];
+}
+
+/**
+ * One option from "✨ What should I eat?" (POST /api/ai/what-to-eat; mirrors EatOptionDto). The model
+ * proposes a meal/snack that fits the caller's REMAINING macros today, reading their own day + goal,
+ * recent foods, on-hand groceries and planned meals server-side. `macros` is the per-option total
+ * (kcal + grams) so it's addable to the tracker in one call. `why` is a one-line "fits your remaining"
+ * rationale. `have` are ingredients the caller already has on hand; `missing` are the few items still
+ * needed (add to grocery). `steps` are optional quick prep steps.
+ */
+export interface EatOption {
+  title: string;
+  why: string;
+  macros: MacroSet;
+  have: string[];
+  missing: string[];
+  steps: string[];
+}
+
+/**
+ * "✨ What should I eat?" response (POST /api/ai/what-to-eat; mirrors WhatToEatDto). 0+ `options` that
+ * fit the remaining macros. `aiUsed` is false on the friendly NON-AI fallback (Gemini off / unavailable),
+ * where options are built deterministically from the next planned meals + on-hand groceries (macros may be
+ * zero) — the UI labels that case so the user knows it isn't a tailored AI suggestion.
+ */
+export interface WhatToEatResult {
+  aiUsed: boolean;
+  options: EatOption[];
+}
+
+/**
+ * "✨ What should I eat?" request (POST /api/ai/what-to-eat). Everything optional — on open we send an
+ * empty body and the server reads the caller's own context. `craving`/`constraints` are a free-text refine
+ * ("high protein", "quick", a pasted craving); `meal` is the slot hint carried back into the add-to-tracker
+ * action. No identity is sent — the server resolves the caller (email-keyed tracker + household meals).
+ */
+export interface WhatToEatRequest {
+  craving?: string | null;
+  constraints?: string | null;
+  meal?: Meal | null;
 }
 
 /**

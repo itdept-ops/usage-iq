@@ -1,0 +1,230 @@
+:host {
+  display: block;
+}
+
+// ── header (outside the scroll region — already pinned) ───────────────────────────────────────
+.wte-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tech-space-2);
+  padding: var(--tech-space-3) var(--tech-space-4) var(--tech-space-2);
+  background: var(--tech-panel);
+  border-bottom: 1px solid var(--tech-border-subtle);
+}
+.wte-head-id { display: flex; align-items: flex-start; gap: 10px; }
+.wte-spark {
+  color: var(--tech-accent);
+  font-size: 26px; width: 26px; height: 26px;
+  margin-top: 2px;
+}
+.wte-title {
+  margin: 0;
+  font-family: var(--tech-font-ui);
+  font-weight: 700;
+  font-size: var(--tech-fs-panel-hd);
+  color: var(--tech-text);
+}
+.wte-sub {
+  margin: 1px 0 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+  text-transform: capitalize;
+}
+.wte-close { flex: 0 0 auto; color: var(--tech-text-secondary); }
+
+.wte-sr-status {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+// ── body (the single scroll region) ───────────────────────────────────────────────────────────
+.wte-body {
+  min-width: min(560px, 90vw);
+  padding-top: var(--tech-space-3) !important;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-3);
+}
+
+// ── refine box ─────────────────────────────────────────────────────────────────────────────────
+.wte-refine {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2);
+}
+.wte-refine-field { flex: 1 1 auto; }
+.wte-refine-btn {
+  flex: 0 0 auto;
+  min-height: 40px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  mat-icon { color: var(--tech-accent); }
+  mat-progress-spinner { display: inline-block; margin-right: 6px; }
+}
+
+// ── fallback banner ──────────────────────────────────────────────────────────────────────────
+.wte-fallback {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0;
+  padding: var(--tech-space-2) var(--tech-space-3);
+  border-radius: var(--tech-r-control);
+  background: var(--tech-warn-tint);
+  border: 1px solid var(--tech-warn);
+  color: var(--tech-text-secondary);
+  font-size: var(--tech-fs-label);
+  mat-icon { color: var(--tech-warn); font-size: 18px; width: 18px; height: 18px; flex: 0 0 auto; }
+}
+
+// ── option cards ─────────────────────────────────────────────────────────────────────────────
+.wte-list { display: flex; flex-direction: column; gap: var(--tech-space-3); }
+.wte-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-2);
+  padding: var(--tech-space-3);
+  border-radius: var(--tech-radius);
+  background: var(--tech-panel-raised);
+  border: 1px solid var(--tech-border);
+}
+.wte-card-title {
+  margin: 0;
+  font-family: var(--tech-font-ui);
+  font-weight: 700;
+  font-size: var(--tech-fs-h1);
+  color: var(--tech-text);
+}
+.wte-card-why {
+  margin: 0;
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text-secondary);
+}
+
+// macros row
+.wte-macros {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.wte-macro {
+  display: inline-flex; align-items: baseline; gap: 2px;
+  padding: 3px 8px;
+  border-radius: var(--tech-r-pill);
+  background: var(--tech-panel);
+  border: 1px solid var(--tech-border-subtle);
+  color: var(--tech-text);
+  font-size: var(--tech-fs-num);
+  font-weight: 600;
+  small { color: var(--tech-text-tertiary); font-size: var(--tech-fs-micro); font-weight: 600; }
+}
+.wte-macro--cal { border-color: var(--tech-accent); color: var(--tech-text-accent); }
+
+.wte-fits {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-success);
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+}
+
+// ── ingredients (HAVE vs MISSING) ──────────────────────────────────────────────────────────────
+.wte-ings { display: flex; flex-direction: column; gap: var(--tech-space-2); }
+.wte-ing-group { display: flex; flex-direction: column; gap: 4px; }
+.wte-ing-label {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  mat-icon { font-size: 15px; width: 15px; height: 15px; }
+}
+.wte-ing-label--have { color: var(--tech-success); }
+.wte-ing-label--missing { color: var(--tech-warn); }
+
+.wte-chips {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.wte-chip {
+  padding: 3px 9px;
+  border-radius: var(--tech-r-chip);
+  font-size: var(--tech-fs-label);
+  border: 1px solid var(--tech-border-subtle);
+}
+.wte-chip--have {
+  background: var(--tech-success-tint);
+  border-color: rgba(61, 214, 140, 0.4);
+  color: var(--tech-text);
+}
+// MISSING is visually distinct: warm tint + dashed border + leading marker.
+.wte-chip--missing {
+  background: var(--tech-warn-tint);
+  border: 1px dashed var(--tech-warn);
+  color: var(--tech-text);
+  font-weight: 600;
+  &::before { content: '+ '; color: var(--tech-warn); }
+}
+
+// ── steps ───────────────────────────────────────────────────────────────────────────────────────
+.wte-steps {
+  margin: 0; padding-left: 18px;
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text-secondary);
+}
+
+// ── actions ───────────────────────────────────────────────────────────────────────────────────
+.wte-actions {
+  display: flex; flex-wrap: wrap; gap: var(--tech-space-2);
+  margin-top: 2px;
+}
+.wte-action {
+  flex: 1 1 auto;
+  min-height: 40px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  mat-progress-spinner { display: inline-block; margin-right: 6px; }
+}
+
+// ── skeleton ─────────────────────────────────────────────────────────────────────────────────
+.wte-card--skeleton { gap: 10px; }
+.wte-skel {
+  border-radius: var(--tech-r-chip);
+  background: linear-gradient(90deg,
+    var(--tech-panel) 0%, var(--tech-border-subtle) 50%, var(--tech-panel) 100%);
+  background-size: 200% 100%;
+  animation: wte-shimmer 1.4s ease-in-out infinite;
+}
+.wte-skel--title { height: 18px; width: 55%; }
+.wte-skel--line { height: 12px; width: 85%; }
+.wte-skel--macros { height: 22px; width: 60%; }
+.wte-skel--chips { height: 22px; width: 70%; }
+.wte-skel--actions { height: 36px; width: 100%; }
+
+@keyframes wte-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wte-skel { animation: none; }
+}
+
+// ── empty / error states ───────────────────────────────────────────────────────────────────────
+.wte-state {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 6px;
+  padding: var(--tech-space-4) var(--tech-space-3);
+  color: var(--tech-text-secondary);
+}
+.wte-state-glyph {
+  font-size: 40px; width: 40px; height: 40px;
+  color: var(--tech-text-tertiary);
+}
+.wte-state-title { margin: 0; font-weight: 600; color: var(--tech-text); font-size: var(--tech-fs-body); }
+.wte-state-sub { margin: 0; font-size: var(--tech-fs-label); }
+
+// On narrow viewports stack the actions full-width.
+@media (max-width: 480px) {
+  .wte-action { flex-basis: 100%; }
+  .wte-refine { flex-wrap: wrap; }
+  .wte-refine-btn { flex-basis: 100%; }
+}

@@ -969,8 +969,7 @@
 
 /* Shared ✨ button (used by "What should I eat?" + panel Refresh/Get actions). */
 .tracker__ai-btn,
-.tracker__ai-refresh,
-.tracker__ai-suggestion-add {
+.tracker__ai-refresh {
   min-height: 44px;
   border-radius: var(--tech-r-control);
   font-weight: 600;
@@ -1120,52 +1119,6 @@
   mat-icon { font-size: 18px; width: 18px; height: 18px; flex: 0 0 auto; }
 }
 .tracker__ai-suggest .tracker__ai-unavailable { margin: 0; }
-
-/* Suggestion list (under "What should I eat?"). */
-.tracker__ai-suggestlist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.tracker__ai-suggestion {
-  display: flex;
-  align-items: center;
-  gap: var(--tech-space-3);
-  padding: var(--tech-space-2) 0;
-  border-top: 1px solid var(--tech-border-subtle);
-
-  &:first-child { border-top: none; }
-}
-
-.tracker__ai-suggestion-id {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.tracker__ai-suggestion-name {
-  font-size: var(--tech-fs-body);
-  font-weight: 600;
-  color: var(--tech-text);
-}
-
-.tracker__ai-suggestion-why {
-  font-size: var(--tech-fs-label);
-  color: var(--tech-text-tertiary);
-}
-
-.tracker__ai-suggestion-macros {
-  font-size: var(--tech-fs-label);
-  color: var(--tech-text-secondary);
-}
-
-.tracker__ai-suggestion-add { flex: 0 0 auto; }
 
 .tracker__ai-hint {
   margin: 2px 0 0;

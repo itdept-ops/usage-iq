@@ -1,0 +1,184 @@
+<!-- Sticky-feel header (sits outside the single scroll region): title + close. -->
+<div class="wte-head">
+  <div class="wte-head-id">
+    <mat-icon class="wte-spark" aria-hidden="true">auto_awesome</mat-icon>
+    <div>
+      <h2 mat-dialog-title class="wte-title">What should I eat?</h2>
+      <p class="wte-sub">Options that fit your remaining macros for {{ slotLabel() }}</p>
+    </div>
+  </div>
+  <button mat-icon-button type="button" class="wte-close" (click)="close()" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<!-- Polite sr-only status: announces fetch state + results. -->
+<span class="wte-sr-status" role="status" aria-live="polite">{{ announce() }}</span>
+
+<mat-dialog-content class="wte-body">
+
+  <!-- Refine box: one free-text re-query ("high protein", "quick", a craving). Enter or the button re-runs. -->
+  <div class="wte-refine">
+    <mat-form-field appearance="outline" class="wte-refine-field" subscriptSizing="dynamic">
+      <mat-label>Refine (optional)</mat-label>
+      <input matInput maxlength="200" placeholder="high protein · quick · craving pizza"
+             [ngModel]="refineText()" (ngModelChange)="refineText.set($event)"
+             (keydown.enter)="refine()" [disabled]="phase() === 'loading'" />
+    </mat-form-field>
+    <button mat-stroked-button type="button" class="wte-refine-btn"
+            [disabled]="phase() === 'loading'" (click)="refine()"
+            aria-label="Re-run with the refine text">
+      @if (phase() === 'loading') {
+        <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+      } @else {
+        <mat-icon aria-hidden="true">refresh</mat-icon>
+      }
+      Refine
+    </button>
+  </div>
+
+  <!-- Friendly NON-AI fallback banner (Gemini off/unavailable): the options came from planned meals + grocery. -->
+  @if (fallback() && phase() === 'options') {
+    <p class="wte-fallback" role="status">
+      <mat-icon aria-hidden="true">tips_and_updates</mat-icon>
+      AI is unavailable right now — here are ideas from your planned meals and on-hand groceries.
+    </p>
+  }
+
+  <!-- ─────────────────────────── LOADING (skeleton) ─────────────────────────── -->
+  @if (phase() === 'loading') {
+    <div class="wte-list" aria-hidden="true">
+      @for (s of skeletons; track s) {
+        <div class="wte-card wte-card--skeleton">
+          <div class="wte-skel wte-skel--title"></div>
+          <div class="wte-skel wte-skel--line"></div>
+          <div class="wte-skel wte-skel--macros"></div>
+          <div class="wte-skel wte-skel--chips"></div>
+          <div class="wte-skel wte-skel--actions"></div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ─────────────────────────── OPTIONS ─────────────────────────── -->
+  @if (phase() === 'options') {
+    <div class="wte-list">
+      @for (o of options(); track $index) {
+        <article class="wte-card" [attr.aria-label]="o.title">
+          <h3 class="wte-card-title">{{ o.title }}</h3>
+          @if (o.why) { <p class="wte-card-why">{{ o.why }}</p> }
+
+          <!-- Macros row + the per-option "fits your remaining" hint. -->
+          <div class="wte-macros">
+            <span class="wte-macro wte-macro--cal mono-num">{{ o.macros.calories | number }} <small>kcal</small></span>
+            <span class="wte-macro mono-num">{{ o.macros.proteinG | number:'1.0-0' }}<small>P</small></span>
+            <span class="wte-macro mono-num">{{ o.macros.carbsG | number:'1.0-0' }}<small>C</small></span>
+            <span class="wte-macro mono-num">{{ o.macros.fatG | number:'1.0-0' }}<small>F</small></span>
+          </div>
+          @if (fitsHint(o); as hint) {
+            <p class="wte-fits"><mat-icon aria-hidden="true">check_circle</mat-icon> Fits your remaining: {{ hint }}</p>
+          }
+
+          <!-- Ingredients: HAVE vs MISSING (missing visually distinct). -->
+          @if (o.have.length || o.missing.length) {
+            <div class="wte-ings">
+              @if (o.have.length) {
+                <div class="wte-ing-group">
+                  <span class="wte-ing-label wte-ing-label--have">
+                    <mat-icon aria-hidden="true">check</mat-icon> You have
+                  </span>
+                  <ul class="wte-chips">
+                    @for (h of o.have; track $index) {
+                      <li class="wte-chip wte-chip--have">{{ h }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+              @if (o.missing.length) {
+                <div class="wte-ing-group">
+                  <span class="wte-ing-label wte-ing-label--missing">
+                    <mat-icon aria-hidden="true">add_shopping_cart</mat-icon> Missing
+                  </span>
+                  <ul class="wte-chips">
+                    @for (m of o.missing; track $index) {
+                      <li class="wte-chip wte-chip--missing">{{ m }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Optional quick steps. -->
+          @if (o.steps.length) {
+            <ol class="wte-steps">
+              @for (step of o.steps; track $index) { <li>{{ step }}</li> }
+            </ol>
+          }
+
+          <!-- Three actions — each with a spinner + disabled while in flight. -->
+          <div class="wte-actions">
+            <button mat-flat-button color="primary" type="button" class="wte-action"
+                    [disabled]="cardBusy($index)" (click)="addToTracker($index, o)"
+                    [attr.aria-label]="'Add ' + o.title + ' to your tracker'">
+              @if (isBusy($index, 'tracker')) {
+                <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+              } @else {
+                <mat-icon aria-hidden="true">restaurant</mat-icon>
+              }
+              Add to tracker
+            </button>
+
+            <!-- Family-scoped actions: only when the caller has family.use (else they'd 403 server-side). -->
+            @if (canFamily()) {
+              <button mat-stroked-button type="button" class="wte-action"
+                      [disabled]="cardBusy($index)" (click)="addToPlan($index, o)"
+                      [attr.aria-label]="'Add ' + o.title + ' to your meal plan'">
+                @if (isBusy($index, 'plan')) {
+                  <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+                } @else {
+                  <mat-icon aria-hidden="true">event</mat-icon>
+                }
+                Add to meal plan
+              </button>
+
+              <button mat-stroked-button type="button" class="wte-action"
+                      [disabled]="cardBusy($index) || o.missing.length === 0" (click)="addMissingToGrocery($index, o)"
+                      [matTooltip]="o.missing.length === 0 ? 'Nothing missing' : ''"
+                      [attr.aria-label]="'Add the missing ingredients of ' + o.title + ' to your grocery list'">
+                @if (isBusy($index, 'grocery')) {
+                  <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+                } @else {
+                  <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
+                }
+                Add missing to grocery
+              </button>
+            }
+          </div>
+        </article>
+      }
+    </div>
+  }
+
+  <!-- ─────────────────────────── EMPTY ─────────────────────────── -->
+  @if (phase() === 'empty') {
+    <div class="wte-state">
+      <mat-icon class="wte-state-glyph" aria-hidden="true">no_meals</mat-icon>
+      <p class="wte-state-title">No options just now</p>
+      <p class="wte-state-sub">Try a refine above (like “quick” or “high protein”), or add food manually.</p>
+    </div>
+  }
+
+  <!-- ─────────────────────────── ERROR ─────────────────────────── -->
+  @if (phase() === 'error') {
+    <div class="wte-state">
+      <mat-icon class="wte-state-glyph" aria-hidden="true">cloud_off</mat-icon>
+      <p class="wte-state-title">Suggestions are unavailable</p>
+      <p class="wte-state-sub">I couldn't reach the AI just now — add food manually, or try again.</p>
+      <button mat-stroked-button type="button" (click)="refine()">
+        <mat-icon aria-hidden="true">refresh</mat-icon> Try again
+      </button>
+    </div>
+  }
+
+</mat-dialog-content>

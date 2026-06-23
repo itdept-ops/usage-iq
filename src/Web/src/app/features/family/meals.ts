@@ -22,6 +22,7 @@ import {
 } from '../../core/models';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { MealEditorDialog, MealEditorData, MealEditorResult } from './meal-editor-dialog';
+import { WhatToEatDialog, WhatToEatData } from '../tracker/what-to-eat-dialog';
 
 /** A day's planned-macro rollup (sum of each meal's per-serving macros), with optional goal comparisons. */
 interface DayRollup {
@@ -113,6 +114,13 @@ export class FamilyMeals {
    * recomputes when permissions load.
    */
   readonly canFamilyAi = computed(() => { this.auth.permissions(); return this.auth.hasPermission(PERM.familyAi); });
+
+  /**
+   * "What should I eat?" is tracker-AI (macro/goal-aware), gated by tracker.ai — a SEPARATE permission from
+   * the family-AI buttons. Show it here too since the meal planner is a natural home for it. Read
+   * auth.permissions() so this recomputes when permissions load.
+   */
+  readonly canTrackerAi = computed(() => { this.auth.permissions(); return this.auth.hasPermission(PERM.trackerAi); });
 
   // ---- Tracker tie-in (Slice 2): "✨ Add to my tracker" + the goal-aware planner rollups ----
   /** True when the caller holds tracker.self (gates the "Add to my tracker" button + goal comparisons). */
@@ -546,6 +554,27 @@ export class FamilyMeals {
   /** Edit a proposal's ingredients inline (bound from the row textarea). */
   setProposalIngredients(p: ProposedMeal, ingredients: string): void {
     this.proposals.set(this.proposals().map(x => x.key === p.key ? { ...x, ingredients } : x));
+  }
+
+  // ---- ✨ What should I eat? (tracker-AI: macro/goal-aware options → add to tracker/plan/grocery) ----
+
+  /**
+   * Open the "What should I eat?" modal (tracker-AI; gated tracker.ai). It auto-fetches meal/snack options
+   * that fit the caller's remaining macros today (read server-side) and offers add-to-tracker / meal-plan /
+   * grocery right from each card. We target today (the dinner slot as the planner default) and pass null
+   * remaining — the meals page doesn't hold the day's consumed totals, so the per-card "fits" hint hides;
+   * the server still tailors options to the real remaining macros.
+   */
+  openWhatToEat(): void {
+    if (!this.canTrackerAi()) return;
+    const data: WhatToEatData = {
+      date: this.toIso(new Date()), meal: 'dinner', remaining: null,
+      // This is the family meals page, so the caller has family.use — the plan/grocery actions are valid.
+      canFamily: this.auth.hasPermission(PERM.familyUse),
+    };
+    this.dialog.open(WhatToEatDialog, {
+      data, width: '640px', maxWidth: '95vw', maxHeight: '92dvh', panelClass: 'tracker-dialog', autoFocus: false,
+    }).afterClosed().subscribe(() => this.reload());
   }
 
   // ---- ✨ What can I make? (AI proposes dinners from on-hand ingredients → prefill the editor) ----

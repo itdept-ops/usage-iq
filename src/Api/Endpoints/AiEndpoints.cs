@@ -116,6 +116,31 @@ public static class AiEndpoints
             return result is null ? Unavailable() : Results.Ok(result);
         });
 
+        // ---- "What should I eat?": macro-aware options from the caller's OWN context (read server-side) ----
+        // Reads the caller's remaining macros + goal, today's foods, recent foods, the household's on-hand
+        // groceries, and planned meals — NO identity from the body. Unlike the rest of /api/ai, this NEVER 503s:
+        // when Gemini is off/unavailable it returns 200 with a friendly NON-AI fallback (aiUsed:false) built from
+        // planned meals + groceries, so the dialog degrades gracefully (per the frontend contract).
+        g.MapPost("/what-to-eat", async (
+            WhatToEatRequest body, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            GeminiService gemini, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var ctx = await BuildEatContextAsync(db, households, caller, body, ct);
+
+            if (gemini.IsConfigured)
+            {
+                var result = await gemini.WhatToEatAsync(
+                    ctx.Snapshot, body?.Craving, body?.Constraints,
+                    ctx.RemCal, ctx.RemP, ctx.RemC, ctx.RemF, ct);
+                if (result is { Options.Count: > 0 })
+                    return Results.Ok(new WhatToEatDto { AiUsed = true, Options = ToEatOptionDtos(result.Options) });
+            }
+
+            // Gemini off, unavailable, or returned nothing usable -> friendly deterministic fallback (200).
+            return Results.Ok(new WhatToEatDto { AiUsed = false, Options = FallbackOptions(ctx) });
+        });
+
         // ---- Estimate the kind + macros for a free-text supplement ("whey, 1 scoop") ----
         // Most supplements/vitamins/meds estimate to all-zeros; protein powders carry real macros. The
         // frontend falls back to manual entry on the 503 (Gemini off / quota / parse failure).
@@ -660,6 +685,164 @@ public static class AiEndpoints
         var remF = Math.Max(0, (profile?.FatGoalG ?? 0) - fat);
         return (remCal, Math.Round(remP, 1), Math.Round(remC, 1), Math.Round(remF, 1));
     }
+
+    /// <summary>
+    /// The caller-scoped context for "What should I eat?": the REMAINING macro budget plus a compact, model-
+    /// friendly snapshot of the caller's OWN day (goal + what's logged), recent eaten foods, the household's
+    /// on-hand groceries, and the next week's planned meals — plus the optional typed craving/constraint.
+    ///
+    /// SCOPING INVARIANT: the ONLY identity used is the resolved <paramref name="caller"/> — email-keyed for the
+    /// tracker reads (foods/profile), household-membership-keyed for the family reads (groceries/meals). NOTHING
+    /// is taken from the request body except the free-text craving/constraints. Emails NEVER enter the snapshot
+    /// (names are not even read here). The household is read-only (GetForCaller, never auto-create on this read).
+    /// </summary>
+    private static async Task<EatContext> BuildEatContextAsync(
+        UsageDbContext db, CurrentHouseholdAccessor households,
+        CurrentUserAccessor.CurrentUser caller, WhatToEatRequest? body, CancellationToken ct)
+    {
+        var today = await TodayAsync(db, ct);
+        var (remCal, remP, remC, remF) = await RemainingTodayAsync(db, caller.Email, ct);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append(await BuildDaySummaryAsync(db, caller.Email, today, ct));
+
+        // Recent eaten foods (names only) — caller's own history, deduped by description+brand.
+        var recentRows = await db.FoodEntries.AsNoTracking()
+            .Where(f => f.UserEmail == caller.Email)
+            .OrderByDescending(f => f.CreatedUtc)
+            .Select(f => new { f.Description, f.Brand })
+            .Take(120)
+            .ToListAsync(ct);
+        var recent = new List<string>();
+        var seenRecent = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in recentRows)
+        {
+            var name = Snip(r.Description, 60);
+            if (name.Length == 0) continue;
+            var key = name + "|" + (r.Brand ?? "");
+            if (!seenRecent.Add(key)) continue;
+            recent.Add(name);
+            if (recent.Count >= 30) break;
+        }
+        if (recent.Count > 0)
+        {
+            sb.Append("recent_foods:\n");
+            foreach (var n in recent) sb.Append("- ").Append(n).Append('\n');
+        }
+
+        // Household-scoped reads (groceries on hand + planned meals). Read-only: absent household => empty.
+        var onHand = new List<string>();
+        var household = await households.GetForCallerAsync(caller, ct);
+        if (household is not null)
+        {
+            var groceryItems = await db.FamilyLists.AsNoTracking()
+                .Where(l => l.HouseholdId == household.Id && l.Kind == "shopping"
+                    && l.Name.ToLower() == "groceries")
+                .SelectMany(l => l.Items.Where(i => !i.Done).Select(i => i.Text))
+                .Take(60)
+                .ToListAsync(ct);
+            foreach (var t in groceryItems)
+            {
+                var s = Snip(t, 80);
+                if (s.Length > 0) onHand.Add(s);
+            }
+            if (onHand.Count > 0)
+            {
+                sb.Append("on_hand_groceries:\n");
+                foreach (var s in onHand) sb.Append("- ").Append(s).Append('\n');
+            }
+
+            var meals = await db.FamilyMeals.AsNoTracking()
+                .Where(m => m.HouseholdId == household.Id && m.LocalDate >= today && m.LocalDate < today.AddDays(7))
+                .OrderBy(m => m.LocalDate).ThenBy(m => m.Id)
+                .Select(m => new { m.LocalDate, m.Slot, m.Title })
+                .Take(40)
+                .ToListAsync(ct);
+            if (meals.Count > 0)
+            {
+                sb.Append("planned_meals:\n");
+                foreach (var m in meals)
+                    sb.Append("- ").Append(m.LocalDate.ToString("yyyy-MM-dd")).Append(' ').Append(m.Slot)
+                      .Append(": ").Append(Snip(m.Title, 80)).Append('\n');
+            }
+        }
+
+        var craving = Snip(body?.Craving, 400);
+        var constraints = Snip(body?.Constraints, 400);
+
+        return new EatContext(sb.ToString(), remCal, remP, remC, remF, onHand,
+            await PlannedMealTitlesAsync(db, household, today, ct), craving, constraints);
+    }
+
+    /// <summary>The next week's planned meal titles for the caller's household (deterministic-fallback source).</summary>
+    private static async Task<IReadOnlyList<string>> PlannedMealTitlesAsync(
+        UsageDbContext db, Household? household, DateOnly today, CancellationToken ct)
+    {
+        if (household is null) return Array.Empty<string>();
+        var titles = await db.FamilyMeals.AsNoTracking()
+            .Where(m => m.HouseholdId == household.Id && m.LocalDate >= today && m.LocalDate < today.AddDays(7))
+            .OrderBy(m => m.LocalDate).ThenBy(m => m.Id)
+            .Select(m => m.Title)
+            .Take(40)
+            .ToListAsync(ct);
+        return titles.Select(t => Snip(t, 80)).Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    /// The friendly NON-AI fallback used when Gemini is off/unavailable: a small deterministic option list built
+    /// from the caller's next planned meals (and, failing that, on-hand groceries). Macros are zero (we have no
+    /// AI estimate); each option carries a plain "from your plan" rationale so the dialog labels it honestly.
+    /// </summary>
+    private static IReadOnlyList<EatOptionDto> FallbackOptions(EatContext ctx)
+    {
+        var options = new List<EatOptionDto>();
+
+        foreach (var title in ctx.PlannedMeals.Take(MaxFallbackOptions))
+            options.Add(new EatOptionDto
+            {
+                Title = title,
+                Why = "From your planned meals.",
+                Macros = new MacroSet(),
+                Have = Array.Empty<string>(),
+                Missing = Array.Empty<string>(),
+                Steps = Array.Empty<string>(),
+            });
+
+        // No planned meals? Offer a single "use what's on hand" prompt seeded with the groceries.
+        if (options.Count == 0 && ctx.OnHand.Count > 0)
+            options.Add(new EatOptionDto
+            {
+                Title = "Make something with what you have",
+                Why = "Built from your on-hand groceries.",
+                Macros = new MacroSet(),
+                Have = ctx.OnHand.Take(MaxFallbackHave).ToList(),
+                Missing = Array.Empty<string>(),
+                Steps = Array.Empty<string>(),
+            });
+
+        return options;
+    }
+
+    /// <summary>Map the parsed Gemini options to the wire DTO (field-for-field; macros already CLAMPED).</summary>
+    private static IReadOnlyList<EatOptionDto> ToEatOptionDtos(IReadOnlyList<EatOption> options) =>
+        options.Select(o => new EatOptionDto
+        {
+            Title = o.Title,
+            Why = o.Why,
+            Macros = o.Macros,
+            Have = o.Have,
+            Missing = o.Missing,
+            Steps = o.Steps,
+        }).ToList();
+
+    private const int MaxFallbackOptions = 5;
+    private const int MaxFallbackHave = 12;
+
+    /// <summary>The caller-scoped "what should I eat?" context: the model snapshot + the remaining budget + the
+    /// raw lists used to build the deterministic fallback. Carries NO identity.</summary>
+    private sealed record EatContext(
+        string Snapshot, int RemCal, double RemP, double RemC, double RemF,
+        IReadOnlyList<string> OnHand, IReadOnlyList<string> PlannedMeals, string Craving, string Constraints);
 
     /// <summary>A compact, model-friendly summary of the caller's day so far (goal, intake, burn, foods).</summary>
     private static async Task<string> BuildDaySummaryAsync(

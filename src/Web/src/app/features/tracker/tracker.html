@@ -204,62 +204,12 @@
         @if (aiEnabled()) {
           <div class="tracker__ai-suggest">
             <button mat-stroked-button type="button" class="tracker__ai-btn"
-                    [disabled]="suggestLoading()" (click)="suggestFoods()"
-                    aria-label="Suggest foods for my remaining calories and macros, using AI">
-              @if (suggestLoading()) {
-                <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
-                Finding ideas…
-              } @else {
-                <span class="tracker__ai-btn-label">
-                  <mat-icon aria-hidden="true">auto_awesome</mat-icon> What should I eat?
-                </span>
-              }
+                    (click)="openWhatToEat()"
+                    aria-label="Open What should I eat — meal options that fit my remaining calories and macros, using AI">
+              <span class="tracker__ai-btn-label">
+                <mat-icon aria-hidden="true">auto_awesome</mat-icon> What should I eat?
+              </span>
             </button>
-
-            <!-- Polite sr-only announcement of the suggestions / their unavailability. -->
-            <span class="tracker__sr-status" role="status" aria-live="polite">{{ suggestAnnounce() }}</span>
-
-            @if (suggestUnavailable()) {
-              <p class="tracker__ai-unavailable" role="status">
-                <mat-icon aria-hidden="true">cloud_off</mat-icon>
-                Suggestions are unavailable right now — add food manually below.
-              </p>
-            }
-
-            @if (suggestions(); as list) {
-              <div class="tracker__ai-card tracker__ai-card--suggest">
-                <div class="tracker__ai-cardhead">
-                  <span class="tracker__ai-chip"><mat-icon aria-hidden="true">auto_awesome</mat-icon> Food ideas</span>
-                  <button mat-icon-button type="button" class="tracker__ai-dismiss" (click)="clearSuggestions()"
-                          aria-label="Dismiss food suggestions">
-                    <mat-icon>close</mat-icon>
-                  </button>
-                </div>
-                @if (list.length > 0) {
-                  <ul class="tracker__ai-suggestlist">
-                    @for (s of list; track s.food) {
-                      <li class="tracker__ai-suggestion">
-                        <div class="tracker__ai-suggestion-id">
-                          <span class="tracker__ai-suggestion-name">{{ s.food }}</span>
-                          @if (s.why) { <span class="tracker__ai-suggestion-why">{{ s.why }}</span> }
-                          <span class="tracker__ai-suggestion-macros mono-num">
-                            {{ s.calories | number }} kcal · {{ s.proteinG | number:'1.0-0' }}P
-                          </span>
-                        </div>
-                        <button mat-stroked-button type="button" class="tracker__ai-suggestion-add"
-                                (click)="addSuggestedFood(s)"
-                                [attr.aria-label]="'Add ' + s.food + ' — opens the add-food form prefilled'">
-                          <mat-icon>add</mat-icon> Add
-                        </button>
-                      </li>
-                    }
-                  </ul>
-                  <p class="tracker__ai-hint">Pick one to open the add-food form, prefilled — review and confirm before it logs.</p>
-                } @else {
-                  <p class="tracker__ai-empty">No suggestions right now — you may already be near your targets.</p>
-                }
-              </div>
-            }
           </div>
         }
       </div>

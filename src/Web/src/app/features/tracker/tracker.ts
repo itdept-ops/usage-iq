@@ -18,7 +18,7 @@ import { TrackerStore } from '../../core/tracker-store';
 import {
   ActivityCalorieMode, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, CoffeeEntryDto, CommitDayResponse, CustomFoodDto, DailyCoachResponse,
   DaySummaryResponse, ExerciseEntryDto, FoodEntryDto,
-  FoodSuggestionDto, HydrationEntryDto, LogWeightRequest, Meal, MoveDayRequest, MoveDayResult, PERM, QuickFoodTile, SharedUserDto, SupplementEntryDto, SupplementKind, TrackerDayDto, TrackerProfileDto,
+  HydrationEntryDto, LogWeightRequest, Meal, MoveDayRequest, MoveDayResult, PERM, QuickFoodTile, SharedUserDto, SupplementEntryDto, SupplementKind, TrackerDayDto, TrackerProfileDto,
   TrackerRecapResult, UpsertActivityRequest, WeeklyReviewResponse, WeightPointDto, WeightStatsDto,
 } from '../../core/models';
 import { CalorieRing } from './calorie-ring';
@@ -36,6 +36,7 @@ import { LogWeightDialog, LogWeightData } from './log-weight-dialog';
 import { OnboardingCard, OnboardingResult } from './onboarding-card';
 import { MoveDayDialog, MoveDayData } from './move-day-dialog';
 import { AiDayBuilderDialog, AiDayBuilderData, AiDayBuilderResult } from './ai-day-builder-dialog';
+import { WhatToEatDialog, WhatToEatData } from './what-to-eat-dialog';
 import { WeightTrend } from './weight-trend';
 import { WeightStats } from './weight-stats';
 import { formatDistance, formatVolume, formatWeight, kgToLb } from './units';
@@ -154,12 +155,6 @@ export class Tracker {
   readonly weekly = signal<WeeklyReviewResponse | null>(null);
   readonly weeklyUnavailable = signal(false);
   readonly weeklyAnnounce = signal('');
-
-  // "What should I eat?" — suggest foods for the remaining macros (POST suggest-foods; on-demand only).
-  readonly suggestLoading = signal(false);
-  readonly suggestions = signal<FoodSuggestionDto[] | null>(null);
-  readonly suggestUnavailable = signal(false);
-  readonly suggestAnnounce = signal('');
 
   // AI Day Builder hero hint dismissal (per-day localStorage flag, like the photo notice).
   readonly dayBuilderHintDismissed = signal(this.readHintDismissed());
@@ -984,63 +979,32 @@ export class Tracker {
   }
 
   /**
-   * Ask the AI what to eat for the remaining calories/macros today (reads the caller's own day
-   * server-side). On-demand only. Each suggestion is a prompt the user acts on through the normal,
-   * editable Add Food flow — nothing is auto-logged. A 503/error degrades gracefully.
+   * Open the "What should I eat?" modal. It auto-fetches meal/snack OPTIONS that fit the caller's remaining
+   * macros today (server reads the caller's own context), and lets the user add an option to the tracker /
+   * meal plan / grocery list right from a card. We pass today's date, a time-of-day default meal slot, and
+   * the locally-computed remaining macros (goal − consumed, floored) so each card can show a "fits" hint.
+   * After it closes we reload the day so any foods added from a card show up immediately. Gated like every
+   * AI affordance (trackerAi + own tracker).
    */
-  async suggestFoods(): Promise<void> {
-    if (!this.aiEnabled() || this.suggestLoading()) return;
-    this.suggestLoading.set(true);
-    this.suggestUnavailable.set(false);
-    this.suggestAnnounce.set('Finding foods for your remaining macros…');
-    try {
-      const res = await firstValueFrom(this.api.suggestFoods());
-      this.suggestions.set(res.suggestions);
-      this.suggestAnnounce.set(res.suggestions.length
-        ? `${res.suggestions.length} food ${res.suggestions.length === 1 ? 'idea' : 'ideas'} for your remaining macros.`
-        : 'No suggestions right now.');
-    } catch {
-      this.suggestions.set(null);
-      this.suggestUnavailable.set(true);
-      this.suggestAnnounce.set('Food suggestions are unavailable right now — add food manually.');
-    } finally {
-      this.suggestLoading.set(false);
-    }
-  }
-
-  /** Dismiss the food-suggestions list (clears the panel; the button can re-fetch). */
-  clearSuggestions(): void {
-    this.suggestions.set(null);
-    this.suggestUnavailable.set(false);
-  }
-
-  /**
-   * Act on an AI food suggestion: open the standard Add Food dialog with the name pre-seeded into the
-   * search box. It's an editable prefill — the user searches/confirms and sets quantity; nothing logs
-   * automatically. Defaults to the snack meal as a neutral target.
-   */
-  addSuggestedFood(s: FoodSuggestionDto): void {
-    if (this.store.readOnly()) return;
-    const data: AddFoodData = { date: this.store.date(), meal: 'snack', prefillQuery: s.food };
-    this.dialog.open(AddFoodDialog, { data, width: '500px', maxWidth: '95vw', panelClass: 'tracker-dialog', autoFocus: false })
-      .afterClosed().subscribe((req: AddFoodRequest | AddFoodRequest[] | undefined) => {
-        if (!req) return;
-        const reqs = Array.isArray(req) ? req : [req];
-        if (reqs.length === 0) return;
-        if (reqs.length === 1) {
-          this.store.addFood(reqs[0])
-            .then(() => this.snack.open(`Added ${reqs[0].description}`, 'OK', { duration: 2500 }))
-            .catch(() => this.snack.open('Could not add food', 'Dismiss', { duration: 4000 }));
-          return;
+  openWhatToEat(): void {
+    if (!this.aiEnabled() || this.store.readOnly()) return;
+    const day = this.store.day();
+    const p = this.store.profile();
+    const rem = (p && day && p.dailyCalorieGoal != null)
+      ? {
+          calories: Math.max(0, Math.round((p.dailyCalorieGoal ?? 0) - day.caloriesIn)),
+          proteinG: Math.max(0, Math.round((p.proteinGoalG ?? 0) - day.proteinG)),
+          carbG: Math.max(0, Math.round((p.carbGoalG ?? 0) - day.carbG)),
+          fatG: Math.max(0, Math.round((p.fatGoalG ?? 0) - day.fatG)),
         }
-        this.store.addFoods(reqs)
-          .then(({ added, failed }) => {
-            if (failed === 0) this.snack.open(`Added ${added} foods`, 'OK', { duration: 2500 });
-            else if (added === 0) this.snack.open('Could not add foods', 'Dismiss', { duration: 4000 });
-            else this.snack.open(`Added ${added} of ${added + failed} foods — ${failed} failed`, 'Dismiss', { duration: 5000 });
-          })
-          .catch(() => this.snack.open('Could not add food', 'Dismiss', { duration: 4000 }));
-      });
+      : null;
+    const data: WhatToEatData = {
+      date: this.store.date(), meal: this.defaultMeal(), remaining: rem,
+      // The meal-plan / grocery actions are family.use-gated server-side; hide them for tracker-only users.
+      canFamily: this.auth.hasPermission(PERM.familyUse),
+    };
+    this.dialog.open(WhatToEatDialog, { data, width: '640px', maxWidth: '95vw', maxHeight: '92dvh', panelClass: 'tracker-dialog', autoFocus: false })
+      .afterClosed().subscribe(() => { void this.store.load(); });
   }
 
   // ---- AI Day Builder (describe the whole day → reviewable draft → atomic commit) ----
