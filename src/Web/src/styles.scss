@@ -459,7 +459,10 @@ code, pre, kbd, samp {
 .content--bare:has(app-marketing-footer) {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  /* svh, not dvh: the *small* viewport height is STABLE — it doesn't grow/shrink as the mobile URL bar
+     shows/hides during scroll, so the bottom-pinned footer can't jump/"ride up" mid-scroll. (dvh tracks
+     the dynamic chrome and made the footer shift on every scroll.) On desktop svh == vh, so no change. */
+  min-height: 100svh;
 }
 .content--bare:has(app-marketing-footer) > *:not(router-outlet) {
   flex: 1 0 auto;
