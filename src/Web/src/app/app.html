@@ -100,6 +100,9 @@
       @if (auth.hasPermission('chat.read')) {
         <a mat-button class="nav__item" routerLink="/chat" routerLinkActive="active">Chat</a>
       }
+      @if (auth.hasAnyPermission('chat.read', 'family.use')) {
+        <a mat-button class="nav__item" routerLink="/people" routerLinkActive="active">People</a>
+      }
 
       <!-- Admin ▾ : Users, Locations, Activity, AI usage, Settings -->
       @if (auth.hasAnyPermission('users.view', 'location.view-all', 'activity.view', 'ai.usage.view', 'settings.view')) {
@@ -396,10 +399,14 @@
          (click)="closeMobileNav()">Family</a>
     }
 
-    @if (auth.hasPermission('chat.read')) {
-      <div class="mobile-nav__head" role="presentation">Chat</div>
-      <a class="mobile-nav__item" routerLink="/chat" routerLinkActive="active"
-         (click)="closeMobileNav()">Chat</a>
+    @if (auth.hasAnyPermission('chat.read', 'family.use')) {
+      <div class="mobile-nav__head" role="presentation">People</div>
+      @if (auth.hasPermission('chat.read')) {
+        <a class="mobile-nav__item" routerLink="/chat" routerLinkActive="active"
+           (click)="closeMobileNav()">Chat</a>
+      }
+      <a class="mobile-nav__item" routerLink="/people" routerLinkActive="active"
+         (click)="closeMobileNav()">People</a>
     }
 
     @if (auth.hasPermission('beta.access')) {

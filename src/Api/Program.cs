@@ -492,6 +492,7 @@ app.MapFleetEndpoints();
 app.MapChatEndpoints();
 app.MapChatLocationShareEndpoints();
 app.MapContactsEndpoints();
+app.MapPeopleEndpoints();
 app.MapInboxEndpoints();
 app.MapTrackerEndpoints();
 app.MapHardChallengeEndpoints();

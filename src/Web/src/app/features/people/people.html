@@ -1,0 +1,166 @@
+<header class="head">
+  <span class="head-eyebrow mono-num">~/people</span>
+  <h2>People</h2>
+  <p class="sub">Everyone in your circle — your contacts and your household, in one place. See who's around,
+    send a message, or jump to a profile.</p>
+</header>
+
+<!-- Segmented filter: All / Contacts / Family (with live counts). -->
+<div class="toolbar">
+  <mat-button-toggle-group class="seg" [value]="filter()" hideSingleSelectionIndicator
+                           aria-label="Filter people">
+    <mat-button-toggle value="all" (click)="setFilter('all')">
+      All <span class="seg__count mono-num">{{ counts().all }}</span>
+    </mat-button-toggle>
+    <mat-button-toggle value="contacts" (click)="setFilter('contacts')">
+      Contacts <span class="seg__count mono-num">{{ counts().contacts }}</span>
+    </mat-button-toggle>
+    <mat-button-toggle value="family" (click)="setFilter('family')">
+      Family <span class="seg__count mono-num">{{ counts().family }}</span>
+    </mat-button-toggle>
+  </mat-button-toggle-group>
+</div>
+
+@if (loading()) {
+  <!-- Loading -->
+  <div class="state" role="status" aria-live="polite">
+    <mat-progress-spinner mode="indeterminate" diameter="36" />
+    <p>Loading your people…</p>
+  </div>
+} @else if (error()) {
+  <!-- Load error -->
+  <div class="state state--error" role="alert">
+    <mat-icon aria-hidden="true">cloud_off</mat-icon>
+    <p>We couldn't load your people just now.</p>
+    <button mat-stroked-button type="button" (click)="setFilter(filter())">Try again</button>
+  </div>
+} @else if (isEmpty()) {
+  <!-- Empty (context-aware to the active filter) -->
+  <div class="state state--empty">
+    <mat-icon aria-hidden="true">groups</mat-icon>
+    @switch (filter()) {
+      @case ('contacts') {
+        <p>No contacts yet. Contacts are managed by an administrator — once you're connected with someone,
+          they'll show up here.</p>
+      }
+      @case ('family') {
+        <p>No household members yet. Set up your household in the Family hub to see everyone here.</p>
+      }
+      @default {
+        <p>No people yet. Once you have contacts or a household, they'll appear here.</p>
+      }
+    }
+  </div>
+} @else {
+  <!-- People grid -->
+  <ul class="grid" aria-label="People">
+    @for (p of view(); track trackPerson($index, p)) {
+      <li class="card" [class.card--self]="p.isSelf" [attr.data-presence]="presence(p)">
+        <div class="card__top">
+          <span class="avatar-wrap">
+            @if (p.picture) {
+              <img class="avatar" [src]="p.picture" alt="" referrerpolicy="no-referrer" />
+            } @else {
+              <span class="avatar avatar--init" aria-hidden="true">{{ p.initials }}</span>
+            }
+            <span class="presence-dot" [attr.data-presence]="presence(p)"
+                  [matTooltip]="presence(p) === 'online' ? 'Online' : presence(p) === 'away' ? 'Away' : 'Offline'"
+                  aria-hidden="true"></span>
+          </span>
+
+          <div class="id">
+            <div class="id__name">
+              {{ p.name }}
+              @if (p.isSelf) { <span class="badge badge--you">you</span> }
+            </div>
+
+            <!-- Relationship chips -->
+            <div class="chips">
+              @if (p.isContact) {
+                <span class="chip chip--contact"><mat-icon aria-hidden="true">person</mat-icon>Contact</span>
+              }
+              @if (p.isHousehold) {
+                <span class="chip chip--family">
+                  <mat-icon aria-hidden="true">cottage</mat-icon>{{ p.role ? roleLabel(p.role) : 'Family' }}
+                </span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Status / presence line -->
+        <div class="meta">
+          @if (p.status) {
+            <span class="meta__status" [title]="p.status">{{ p.status }}</span>
+          }
+          <span class="meta__presence">
+            @switch (presence(p)) {
+              @case ('online') { Active now }
+              @case ('away') { Active {{ timeAgo(p.lastSeenUtc, now()) }} }
+              @default { Offline }
+            }
+          </span>
+          @if (p.city) {
+            <span class="meta__city"><mat-icon aria-hidden="true">place</mat-icon>{{ p.city }}</span>
+          }
+        </div>
+
+        <!-- Quick actions -->
+        <div class="actions">
+          @if (p.canDm && canMessage()) {
+            <button mat-stroked-button type="button" class="act act--msg"
+                    [disabled]="opening() === p.userId" (click)="message(p)">
+              <mat-icon aria-hidden="true">{{ opening() === p.userId ? 'hourglass_empty' : 'chat_bubble' }}</mat-icon>
+              Message
+            </button>
+          }
+          @if (p.sharesLocation) {
+            <button mat-stroked-button type="button" class="act act--map" (click)="viewOnMap()"
+                    matTooltip="See where they are on the family map">
+              <mat-icon aria-hidden="true">map</mat-icon>
+              View on map
+            </button>
+          }
+
+          <!-- Profile peek: a lightweight in-card summary of the relationship facts we already hold (there is
+               no separate per-user profile page — names/identity are intentionally minimal app-wide). -->
+          <button mat-icon-button type="button" class="act act--more"
+                  [matMenuTriggerFor]="profileMenu" aria-label="View profile"
+                  matTooltip="View profile">
+            <mat-icon aria-hidden="true">badge</mat-icon>
+          </button>
+          <mat-menu #profileMenu="matMenu" class="people-profile-menu" xPosition="before" overlapTrigger="false">
+            <div class="pp" role="presentation" (click)="$event.stopPropagation()">
+              <div class="pp__head">
+                @if (p.picture) {
+                  <img class="pp__avatar" [src]="p.picture" alt="" referrerpolicy="no-referrer" />
+                } @else {
+                  <span class="pp__avatar pp__avatar--init" aria-hidden="true">{{ p.initials }}</span>
+                }
+                <div class="pp__id">
+                  <div class="pp__name">{{ p.name }}@if (p.isSelf) { <span class="badge badge--you">you</span> }</div>
+                  <div class="pp__presence" [attr.data-presence]="presence(p)">
+                    <span class="presence-dot" [attr.data-presence]="presence(p)" aria-hidden="true"></span>
+                    @switch (presence(p)) {
+                      @case ('online') { Online }
+                      @case ('away') { Away · active {{ timeAgo(p.lastSeenUtc, now()) }} }
+                      @default { Offline }
+                    }
+                  </div>
+                </div>
+              </div>
+              @if (p.status) { <div class="pp__row"><mat-icon aria-hidden="true">format_quote</mat-icon>{{ p.status }}</div> }
+              <div class="pp__row">
+                <mat-icon aria-hidden="true">hub</mat-icon>
+                @if (p.isContact && p.isHousehold) { Contact · {{ p.role ? roleLabel(p.role) : 'Household' }} }
+                @else if (p.isContact) { In your contacts }
+                @else if (p.isHousehold) { {{ p.role ? roleLabel(p.role) : 'Household member' }} }
+              </div>
+              @if (p.city) { <div class="pp__row"><mat-icon aria-hidden="true">place</mat-icon>{{ p.city }}</div> }
+            </div>
+          </mat-menu>
+        </div>
+      </li>
+    }
+  </ul>
+}

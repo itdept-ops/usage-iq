@@ -98,6 +98,15 @@ export const routes: Routes = [
     title: 'Usage IQ · Chat',
   },
   {
+    // People hub — the caller's contacts ∪ household members in one screen (read-only aggregation over the
+    // single AppUser spine). Any-of chat.read | family.use (mirrors GET /api/people): a chat-only caller
+    // sees just contacts, a family-only caller sees just their household. Purely additive.
+    path: 'people',
+    canActivate: [anyPermissionGuard(PERM.chatRead, PERM.familyUse)],
+    loadComponent: () => import('./features/people/people').then(m => m.People),
+    title: 'Usage IQ · People',
+  },
+  {
     path: 'tracker',
     canActivate: [permissionGuard(PERM.trackerSelf)],
     loadComponent: () => import('./features/tracker/tracker').then(m => m.Tracker),

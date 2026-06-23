@@ -293,6 +293,7 @@ export class App {
     { route: '/beta', label: 'Beta', perms: [PERM.betaAccess] },
     { route: '/family', label: 'Family', perms: [PERM.familyUse] },
     { route: '/chat', label: 'Chat', perms: [PERM.chatRead] },
+    { route: '/people', label: 'People', perms: [PERM.chatRead, PERM.familyUse] },
     { route: '/locations', label: 'My locations', perms: [PERM.locationSelf] },
     { route: '/users', label: 'Users', perms: [PERM.usersView] },
     { route: '/activity', label: 'Activity', perms: [PERM.activityView] },

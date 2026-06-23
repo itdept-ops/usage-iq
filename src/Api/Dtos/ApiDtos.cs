@@ -943,6 +943,58 @@ public sealed class AddContactRequest
     public int ContactUserId { get; set; }
 }
 
+/// <summary>
+/// One person in the caller's "People" hub — the de-duplicated union of their chat contacts and their
+/// household members, projected over the single AppUser spine. Carries PUBLIC identity only: the raw
+/// email is NEVER on the wire (email-privacy) and the <see cref="Name"/> is always the central
+/// <c>DisplayName.Format</c> output (never a raw <c>AppUser.Name</c>).
+/// </summary>
+public sealed class PersonDto
+{
+    /// <summary>The AppUser id — the stable identity used for DM-open ("/api/chat/direct") and dedup.</summary>
+    public int UserId { get; set; }
+
+    /// <summary>The wire-facing display name (target user's own DisplayNameMode/nickname). Never an email.</summary>
+    public string Name { get; set; } = "";
+
+    public string? Picture { get; set; }
+
+    /// <summary>True when this person is in the caller's mutual chat contact circle.</summary>
+    public bool IsContact { get; set; }
+
+    /// <summary>True when this person is a member of the caller's household.</summary>
+    public bool IsHousehold { get; set; }
+
+    /// <summary>The household role ("owner" | "adult" | "child") when <see cref="IsHousehold"/>; else null.</summary>
+    public string? Role { get; set; }
+
+    /// <summary>True for the caller's own row (they appear in their own household).</summary>
+    public bool IsSelf { get; set; }
+
+    /// <summary>True when this person is active within the presence window (honoring appear-offline:
+    /// a person hiding their presence reads as offline to everyone but themselves).</summary>
+    public bool Online { get; set; }
+
+    /// <summary>The person's opt-in presence status (sanitized at write time), or null. Never an email.</summary>
+    public string? Status { get; set; }
+
+    /// <summary>Last-seen time when online (so the SPA can derive an "away" nuance exactly as the chat page
+    /// does); null when offline.</summary>
+    public DateTime? LastSeenUtc { get; set; }
+
+    /// <summary>The person's latest COARSE city, shown ONLY when they share-to-household AND are a fellow
+    /// household member of the caller (or it's the caller's own row). Null otherwise — never precise.</summary>
+    public string? City { get; set; }
+
+    /// <summary>Whether the caller may open a DM with this person (mirrors the server DM gate so the UI
+    /// never offers a button that 403s): a contact, or a chat.contacts.manage holder. Never self.</summary>
+    public bool CanDm { get; set; }
+
+    /// <summary>Whether this person shares their coarse location with the caller (a fellow household member
+    /// who shares-to-household). Drives the "view on map" affordance (→ /family/locations). Never self.</summary>
+    public bool SharesLocation { get; set; }
+}
+
 // ---------------------------------------------------------------------------
 // Food & fitness tracker
 // ---------------------------------------------------------------------------

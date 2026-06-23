@@ -370,6 +370,40 @@ export interface Presence {
   autoContext?: string | null;
 }
 
+/**
+ * One person in the People hub (GET /api/people): the caller's mutual contacts ∪ their household members,
+ * de-duplicated over the single AppUser spine and decorated with live presence. Identity is the
+ * server-resolved `userId` + DisplayName-formatted `name` — the raw email is NEVER on the wire. Mirrors
+ * PersonDto. Returned ordered: self first, then online, then by name.
+ */
+export interface PersonDto {
+  /** AppUser id — the dedup key; pass to POST /api/chat/direct to open a DM. */
+  userId: number;
+  /** DisplayName-formatted name (never raw name, never email). */
+  name: string;
+  picture: string | null;
+  /** In the caller's mutual contact circle. */
+  isContact: boolean;
+  /** A member of the caller's household. */
+  isHousehold: boolean;
+  /** "owner" | "adult" | "child" when household, else null. */
+  role: string | null;
+  /** The caller's own row. */
+  isSelf: boolean;
+  /** Active within the presence window (appear-offline users read offline to others). */
+  online: boolean;
+  /** Opt-in presence status, or null. Always safe to show. */
+  status: string | null;
+  /** Set when online, so the SPA can derive an "away" nuance from staleness (as the chat page does); null when offline. */
+  lastSeenUtc: string | null;
+  /** Coarse city — only for self or a shared-household member; null otherwise. Never precise. */
+  city: string | null;
+  /** Whether the UI may offer a DM button (mirrors the chat DM gate; never self) so it never 403s. */
+  canDm: boolean;
+  /** Fellow household member who shares-to-household; drives the "view on map" link to /family/locations. */
+  sharesLocation: boolean;
+}
+
 // ---- Location / GPS (privacy-sensitive: PRIVATE by default, capture is OPT-IN) ----------------------
 // Mirrors the API's LocationDtos.cs. The precise lat/lng is only ever returned to the SHARER (their own
 // history, GET /api/location/me) or to an admin holding location.view-all (GET /api/location/admin);

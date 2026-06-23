@@ -1,0 +1,342 @@
+:host {
+  display: block;
+  max-width: var(--tech-max-width);
+  margin: 0 auto;
+}
+
+/* ───────────────────────── Header ───────────────────────── */
+.head {
+  margin-bottom: var(--tech-space-4);
+
+  .head-eyebrow { display: block; color: var(--tech-text-accent); margin-bottom: 6px; }
+  h2 {
+    margin: 0 0 var(--tech-space-1);
+    font-family: var(--tech-font-ui);
+    font-size: clamp(20px, 5vw, var(--tech-fs-display));
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--tech-text);
+  }
+  .sub {
+    margin: 0;
+    max-width: 640px;
+    font-size: var(--tech-fs-body);
+    color: var(--tech-text-secondary);
+    line-height: 1.5;
+  }
+}
+
+/* ───────────────────────── Filter toolbar ───────────────────────── */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: var(--tech-space-4);
+
+  .seg {
+    border-radius: var(--tech-r-pill);
+    overflow: hidden;
+
+    .seg__count {
+      margin-left: 6px;
+      padding: 0 6px;
+      border-radius: var(--tech-r-pill);
+      font-size: 11px;
+      color: var(--tech-text-tertiary);
+      background: color-mix(in srgb, var(--tech-text) 8%, transparent);
+    }
+  }
+}
+
+/* ───────────────────────── States (loading / error / empty) ───────────────────────── */
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: clamp(32px, 8vw, 64px) 16px;
+  text-align: center;
+  color: var(--tech-text-secondary);
+
+  mat-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    color: var(--tech-text-tertiary);
+  }
+  p { margin: 0; max-width: 460px; line-height: 1.5; }
+
+  &--error mat-icon { color: var(--tech-warn, #f5a623); }
+  &--empty { color: var(--tech-text-tertiary); }
+}
+
+/* ───────────────────────── People grid ───────────────────────── */
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--tech-space-3);
+
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+    gap: var(--tech-space-2);
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--tech-space-3) var(--tech-space-4);
+  border-radius: var(--tech-radius);
+  border: 1px solid var(--tech-border-subtle, #1c2533);
+  background: var(--tech-panel, #111722);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+
+  &:hover {
+    border-color: var(--tech-border-strong, #2a3548);
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-1, 0 4px 16px rgba(0, 0, 0, 0.25));
+  }
+
+  /* The caller's own card is gently accented. */
+  &--self {
+    border-color: color-mix(in srgb, var(--tech-accent) 45%, var(--tech-border-subtle, #1c2533));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--tech-accent) 7%, transparent), transparent 60%),
+      var(--tech-panel, #111722);
+  }
+}
+
+.card__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* Avatar + presence dot (mirrors the toolbar roster styling). */
+.avatar-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--tech-border-subtle, #1c2533);
+}
+.avatar--init {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--tech-font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tech-text-on-accent, #06090e);
+  background: linear-gradient(135deg, var(--tech-accent), var(--tech-accent-cyan, #3FD8D0));
+}
+
+.presence-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--tech-text-tertiary, #6b7688); /* offline default */
+  box-shadow: 0 0 0 2px var(--tech-panel, #111722);
+
+  &[data-presence='online'] { background: var(--tech-success, #36d399); }
+  &[data-presence='away'] { background: var(--tech-warn, #f5a623); }
+}
+
+.id {
+  min-width: 0;
+  flex: 1 1 auto;
+
+  &__name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: var(--tech-text);
+    font-size: var(--tech-fs-body);
+    word-break: break-word;
+  }
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: var(--tech-r-pill);
+
+  &--you {
+    color: var(--tech-accent);
+    background: color-mix(in srgb, var(--tech-accent) 16%, transparent);
+  }
+}
+
+/* Relationship chips */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  border-radius: var(--tech-r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+
+  mat-icon {
+    font-size: 13px;
+    width: 13px;
+    height: 13px;
+  }
+
+  &--contact {
+    color: var(--tech-accent-cyan, #3FD8D0);
+    background: color-mix(in srgb, var(--tech-accent-cyan, #3FD8D0) 12%, transparent);
+    border-color: color-mix(in srgb, var(--tech-accent-cyan, #3FD8D0) 28%, transparent);
+  }
+  &--family {
+    color: var(--tech-accent-magenta, #f472b6);
+    background: color-mix(in srgb, var(--tech-accent-magenta, #f472b6) 12%, transparent);
+    border-color: color-mix(in srgb, var(--tech-accent-magenta, #f472b6) 28%, transparent);
+  }
+}
+
+/* Status / presence meta line */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--tech-fs-micro, 12px);
+  color: var(--tech-text-tertiary);
+  min-height: 16px;
+
+  &__status {
+    color: var(--tech-text-secondary);
+    font-style: italic;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &__city {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    mat-icon { font-size: 13px; width: 13px; height: 13px; }
+  }
+}
+
+/* Quick actions */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+
+  .act {
+    border-radius: var(--tech-r-control);
+    font-weight: 600;
+    font-size: 13px;
+    mat-icon { font-size: 16px; width: 16px; height: 16px; margin-right: 4px; }
+  }
+  .act--msg:hover:not(:disabled) { box-shadow: var(--tech-glow-blue); }
+  .act--more {
+    margin-left: auto;
+    color: var(--tech-text-tertiary);
+    mat-icon { margin-right: 0; }
+  }
+}
+
+/* ───────────────────────── Profile-peek menu ─────────────────────────
+   The menu renders in the CDK overlay (outside this component's DOM), so reach it via ::ng-deep scoped
+   to the .people-profile-menu panelClass. Tokens keep it on-theme. */
+::ng-deep .people-profile-menu.mat-mdc-menu-panel {
+  background: var(--tech-panel-raised, #161d2a);
+  border: 1px solid var(--tech-border-subtle, #1c2533);
+  border-radius: var(--tech-radius);
+
+  .mat-mdc-menu-content { padding: 0; }
+
+  .pp {
+    width: min(280px, 80vw);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    cursor: default;
+  }
+
+  .pp__head { display: flex; align-items: center; gap: 10px; }
+  .pp__avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: 0 0 auto;
+    box-shadow: 0 0 0 1px var(--tech-border-subtle, #1c2533);
+  }
+  .pp__avatar--init {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--tech-font-mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--tech-text-on-accent, #06090e);
+    background: linear-gradient(135deg, var(--tech-accent), var(--tech-accent-cyan, #3FD8D0));
+  }
+  .pp__id { min-width: 0; }
+  .pp__name {
+    display: flex; align-items: center; gap: 6px;
+    font-weight: 600; color: var(--tech-text); word-break: break-word;
+  }
+  .pp__presence {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--tech-text-tertiary);
+
+    .presence-dot {
+      position: static;
+      box-shadow: none;
+      width: 9px;
+      height: 9px;
+    }
+  }
+  .pp__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--tech-text-secondary);
+
+    mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+      color: var(--tech-text-tertiary);
+      flex: 0 0 auto;
+    }
+  }
+}
