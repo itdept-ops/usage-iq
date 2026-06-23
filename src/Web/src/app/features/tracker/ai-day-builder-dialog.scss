@@ -213,7 +213,32 @@
   }
 }
 .db-num--wide input, .db-select { width: 92px; text-align: left; }
-.db-select { font-size: var(--tech-fs-label) !important; }
+// The meal/weight-slot dropdowns are bare native <select>s and (unlike the .db-num selects) sit outside a
+// .db-num wrapper, so without this they render as the browser's light-grey native control on the dark
+// theme. Theme them to match the sibling inputs: dark surface, themed text, a CSS-drawn chevron (no data
+// URI), and a dark option list.
+.db-select {
+  font-size: var(--tech-fs-label) !important;
+  min-height: 36px;
+  padding: 4px 24px 4px 8px;
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-r-control);
+  background-color: var(--tech-bg-sunken);
+  color: var(--tech-text);
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--tech-text-secondary) 50%),
+    linear-gradient(135deg, var(--tech-text-secondary) 50%, transparent 50%);
+  background-position: calc(100% - 13px) center, calc(100% - 9px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+  &:focus { outline: 2px solid var(--tech-focus-ring); outline-offset: 1px; border-color: var(--tech-accent); }
+  option { background: var(--tech-panel); color: var(--tech-text); }
+}
 
 .db-rowdel { flex: 0 0 auto; color: var(--tech-text-tertiary); }
 .db-addrow {
