@@ -122,10 +122,10 @@ export const routes: Routes = [
     title: 'Usage IQ · Activity feed',
   },
   {
-    // Automations — the caller's own rules (own events -> own channels). Gated by the SAME tracker
-    // permission (tracker.self) the backend /api/automations group reuses; rules are strictly self-scoped.
+    // Automations — the caller's own rules (own events -> own channels). Gated by automations.use (a
+    // deliberate grant: a rule may carry the owner's own Discord webhook), matching the backend group.
     path: 'automations',
-    canActivate: [permissionGuard(PERM.trackerSelf)],
+    canActivate: [permissionGuard(PERM.automationsUse)],
     loadComponent: () => import('./features/automations/automations').then(m => m.Automations),
     title: 'Usage IQ · Automations',
   },

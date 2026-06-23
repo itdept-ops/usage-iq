@@ -164,10 +164,13 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
     /// Fan a system event out to the given recipients, gated only by each recipient's
     /// <see cref="NotificationPreference.NotifySystemEvents"/>. Persists one row per recipient and pushes
     /// <c>ReceiveNotification</c> to each. Wiring real system triggers is a later concern.
+    /// <para>When <paramref name="suppressDiscordMirror"/> is true, the per-user Discord mirror is skipped — the
+    /// caller is responsible for the Discord delivery itself (e.g. an automation rule posting to its OWN
+    /// per-rule webhook, where the per-user mirror would otherwise double-post). Defaults to false.</para>
     /// </summary>
     public async Task NotifySystem(
         IEnumerable<string> recipientEmails, NotificationType type, string text, string? link,
-        CancellationToken ct = default)
+        CancellationToken ct = default, bool suppressDiscordMirror = false)
     {
         var emails = (recipientEmails ?? Enumerable.Empty<string>())
             .Select(e => e.Trim().ToLowerInvariant())
@@ -211,7 +214,8 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
             await hub.Clients.User(email)
                 .SendAsync("InboxUnreadChanged", inboxUnreadByEmail.GetValueOrDefault(email, 0), ct);
             // Fire-and-forget Discord mirror for opted-in recipients (no actor on a system event).
-            discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), null, n.Text, n.Link));
+            if (!suppressDiscordMirror)
+                discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), null, n.Text, n.Link));
         }
     }
 

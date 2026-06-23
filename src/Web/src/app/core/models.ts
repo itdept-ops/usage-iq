@@ -476,6 +476,8 @@ export interface AutomationRule {
   /** Optional capped, sanitized message (no @everyone/@here); {value} is substituted server-side. */
   messageTemplate: string | null;
   enabled: boolean;
+  /** Whether a per-rule Discord webhook is configured. The URL itself is NEVER returned. */
+  hasWebhook: boolean;
   createdUtc: string;
   updatedUtc: string;
 }
@@ -489,6 +491,8 @@ export interface AutomationRuleInput {
   action: RuleAction;
   messageTemplate?: string | null;
   enabled: boolean;
+  /** Per-rule Discord webhook: null = leave as-is · "" = clear · a value = set (validated server-side). */
+  webhookUrl?: string | null;
 }
 
 // ---- Location / GPS (privacy-sensitive: PRIVATE by default, capture is OPT-IN) ----------------------
@@ -4376,6 +4380,8 @@ export const PERM = {
   locationSelf: 'location.self',
   locationShare: 'location.share',
   locationViewAll: 'location.view-all',
+  // ---- Automations (group "Automations"; page-gate; deliberate grant — a rule may carry a Discord webhook) ----
+  automationsUse: 'automations.use',
   // ---- Beta (group "Beta"; page-gate for the experimental Beta section) ----
   betaAccess: 'beta.access',
   // ---- AI (group "AI"; token-spending; never default) ----
@@ -4436,6 +4442,8 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   [PERM.locationSelf]: 'Location',
   [PERM.locationShare]: 'Location',
   [PERM.locationViewAll]: 'Location',
+  // ---- Automations ----
+  [PERM.automationsUse]: 'Automations',
   // ---- Beta ----
   [PERM.betaAccess]: 'Beta',
   // ---- Admin ----

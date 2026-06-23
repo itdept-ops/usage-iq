@@ -63,12 +63,25 @@ export class Automations {
     conditionValue: [null as number | null],
     action: [0 as RuleAction],
     messageTemplate: [''],
+    webhookUrl: [''],
     enabled: [true],
   });
 
   /** The selected trigger's metadata (drives whether a numeric condition is offered). */
   readonly selectedTrigger = computed(() =>
     this.triggers.find(t => t.kind === this.form.controls.triggerKind.value) ?? this.triggers[0]);
+
+  /** Whether the rule being edited already has a webhook stored (the URL is never returned). */
+  readonly editingHasWebhook = signal(false);
+
+  /** When true, save sends "" to CLEAR a stored webhook (vs. null = leave as-is). */
+  readonly clearWebhook = signal(false);
+
+  /** Mark the stored webhook for removal on save (a blank field alone leaves it as-is). */
+  requestClearWebhook(): void {
+    this.clearWebhook.set(true);
+    this.editingHasWebhook.set(false);
+  }
 
   constructor() {
     this.load();
@@ -90,10 +103,12 @@ export class Automations {
   /** Open the form to create a fresh rule. */
   newRule(): void {
     this.editingId.set(null);
+    this.editingHasWebhook.set(false);
+    this.clearWebhook.set(false);
     this.saveError.set(null);
     this.form.reset({
       name: '', triggerKind: 'workout.logged', conditionOp: 0, conditionValue: null,
-      action: 0, messageTemplate: '', enabled: true,
+      action: 0, messageTemplate: '', webhookUrl: '', enabled: true,
     });
     this.formOpen.set(true);
   }
@@ -101,6 +116,8 @@ export class Automations {
   /** Open the form pre-filled to edit an existing rule. */
   edit(r: AutomationRule): void {
     this.editingId.set(r.id);
+    this.editingHasWebhook.set(r.hasWebhook);
+    this.clearWebhook.set(false);
     this.saveError.set(null);
     this.form.reset({
       name: r.name,
@@ -109,6 +126,9 @@ export class Automations {
       conditionValue: r.conditionValue,
       action: r.action,
       messageTemplate: r.messageTemplate ?? '',
+      // The URL is NEVER returned — leave the field blank. The stored webhook is preserved on save (blank =
+      // "leave as-is"); the user types a new URL to replace it, or uses the Clear button to remove it.
+      webhookUrl: '',
       enabled: r.enabled,
     });
     this.formOpen.set(true);
@@ -126,6 +146,10 @@ export class Automations {
     const trig = this.triggers.find(t => t.kind === v.triggerKind);
     // A condition only makes sense for kinds with a numeric payload; force "always" otherwise.
     const op: RuleConditionOp = trig?.unit ? v.conditionOp : 0;
+    // Webhook contract (null = leave · "" = clear · value = set). A typed value sets/replaces it; an explicit
+    // Clear sends "" to remove a stored webhook; otherwise (blank, untouched) send null to leave it as-is.
+    const typed = v.webhookUrl?.trim() ?? '';
+    const webhookUrl = typed.length > 0 ? typed : (this.clearWebhook() ? '' : null);
     const body: AutomationRuleInput = {
       name: v.name?.trim() || null,
       triggerKind: v.triggerKind,
@@ -133,6 +157,7 @@ export class Automations {
       conditionValue: op === 0 ? null : (v.conditionValue ?? null),
       action: v.action,
       messageTemplate: v.messageTemplate?.trim() || null,
+      webhookUrl,
       enabled: v.enabled,
     };
 
@@ -156,6 +181,7 @@ export class Automations {
     const body: AutomationRuleInput = {
       name: r.name, triggerKind: r.triggerKind, conditionOp: r.conditionOp,
       conditionValue: r.conditionValue, action: r.action, messageTemplate: r.messageTemplate,
+      // webhookUrl omitted (=> null = leave as-is): a one-field toggle must never touch the stored webhook.
       enabled: !r.enabled,
     };
     this.api.updateAutomation(r.id, body)

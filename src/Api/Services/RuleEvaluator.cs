@@ -59,13 +59,30 @@ public sealed class RuleEvaluator(
                         await chat.NotifySystem(new[] { actor }, NotificationType.SystemAutomation, msg, link: null, ct);
                         break;
                     case RuleAction.DiscordDm:
-                        // Enqueue a self-forward to the owner's OWN webhook (decrypt + rate-limit + never-throw
-                        // all happen inside the forwarder, gated on the owner's SurfaceDiscord toggle).
-                        discord.Enqueue(new DiscordForwardItem(actor, "systemAutomation", "Usage IQ", msg, null));
+                        // Enqueue a self-forward. If the rule carries its OWN webhook, the forwarder decrypts +
+                        // validates + posts THERE (its own opt-in); otherwise it falls back to the owner's
+                        // per-user webhook (gated on SurfaceDiscord). Decrypt + rate-limit + never-throw all
+                        // happen inside the forwarder. The encrypted blob (never plaintext) rides the channel.
+                        discord.Enqueue(new DiscordForwardItem(
+                            actor, "systemAutomation", "Usage IQ", msg, null, rule.WebhookEnc));
                         break;
                     case RuleAction.NotifyAndDiscord:
-                        // NotifySystem persists the in-app row AND mirrors to the owner's Discord when on.
-                        await chat.NotifySystem(new[] { actor }, NotificationType.SystemAutomation, msg, link: null, ct);
+                        if (rule.WebhookEnc is { Length: > 0 })
+                        {
+                            // The rule has its OWN webhook: persist the in-app row WITHOUT NotifySystem's per-user
+                            // Discord mirror (suppressed), then post the Discord half explicitly to the rule's
+                            // webhook — so we never double-post (per-user mirror + rule webhook).
+                            await chat.NotifySystem(new[] { actor }, NotificationType.SystemAutomation, msg,
+                                link: null, ct, suppressDiscordMirror: true);
+                            discord.Enqueue(new DiscordForwardItem(
+                                actor, "systemAutomation", "Usage IQ", msg, null, rule.WebhookEnc));
+                        }
+                        else
+                        {
+                            // No rule webhook: NotifySystem persists the in-app row AND mirrors to the owner's
+                            // per-user Discord when SurfaceDiscord is on (the existing #104 behavior).
+                            await chat.NotifySystem(new[] { actor }, NotificationType.SystemAutomation, msg, link: null, ct);
+                        }
                         break;
                 }
             }

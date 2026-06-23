@@ -101,9 +101,15 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
     {
         private readonly object _gate = new();
         private readonly List<string> _payloads = new();
+        private readonly List<string> _urls = new();
 
-        public void Record(string payload) { lock (_gate) _payloads.Add(payload); }
+        public void Record(string payload, string url)
+        {
+            lock (_gate) { _payloads.Add(payload); _urls.Add(url); }
+        }
         public IReadOnlyList<string> Payloads { get { lock (_gate) return _payloads.ToArray(); } }
+        /// <summary>The request URI each Discord POST was sent to (so a test can assert WHICH webhook was hit).</summary>
+        public IReadOnlyList<string> Urls { get { lock (_gate) return _urls.ToArray(); } }
         public int Count { get { lock (_gate) return _payloads.Count; } }
     }
 
@@ -147,7 +153,7 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             if (request.Content is not null)
-                capture.Record(await request.Content.ReadAsStringAsync(ct));
+                capture.Record(await request.Content.ReadAsStringAsync(ct), request.RequestUri?.ToString() ?? "");
             return new HttpResponseMessage(HttpStatusCode.NoContent) { RequestMessage = request };
         }
     }

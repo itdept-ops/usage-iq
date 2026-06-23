@@ -12,21 +12,28 @@ namespace Ccusage.Api.Endpoints;
 /// so a caller can only ever see/create/edit/delete THEIR OWN rules (another user's rule reads as 404, never
 /// revealing its existence). DTOs carry NO email/webhook/secret — only the rule's own safe configuration.
 ///
-/// VIEW/MANAGE gate: reuses <see cref="Permissions.TrackerSelf"/> (no new permission), exactly mirroring the
-/// activity-feed decision — the only triggers come from tracker/75-Hard actions already gated by tracker.self,
-/// and a rule is self-scoped (own events -> own channels), so no broader capability is exposed.
+/// VIEW/MANAGE gate: <see cref="Permissions.AutomationsUse"/> — a deliberate grant (a rule may carry the
+/// owner's OWN Discord webhook). A rule is self-scoped (own events -> own channels), so no broader capability
+/// is exposed; the triggers come from tracker/75-Hard actions.
 /// </summary>
 public static class RulesEndpoints
 {
-    /// <summary>The wire shape of a rule. No email/webhook/secret — just the safe, owner-visible config.</summary>
+    /// <summary>The wire shape of a rule. No email/webhook/secret — only a <see cref="HasWebhook"/> flag tells
+    /// the client whether a per-rule webhook is configured (the URL itself is NEVER returned).</summary>
     public sealed record RuleDto(
         int Id, string Name, string TriggerKind, RuleConditionOp ConditionOp, int? ConditionValue,
-        RuleAction Action, string? MessageTemplate, bool Enabled, DateTime CreatedUtc, DateTime UpdatedUtc);
+        RuleAction Action, string? MessageTemplate, bool Enabled, bool HasWebhook,
+        DateTime CreatedUtc, DateTime UpdatedUtc);
 
-    /// <summary>Create/update body. OwnerEmail is NEVER accepted from the client — it is the caller.</summary>
+    /// <summary>
+    /// Create/update body. OwnerEmail is NEVER accepted from the client — it is the caller.
+    /// <para><see cref="WebhookUrl"/> follows the same contract as the per-user webhook:
+    /// <c>null</c> = leave as-is (on create: no webhook) · <c>""</c> = clear · a value = validate
+    /// (SSRF-allowlisted to Discord) + encrypt + store. The plaintext URL is never echoed back.</para>
+    /// </summary>
     public sealed record RuleUpsertRequest(
         string? Name, string TriggerKind, RuleConditionOp ConditionOp, int? ConditionValue,
-        RuleAction Action, string? MessageTemplate, bool Enabled);
+        RuleAction Action, string? MessageTemplate, bool Enabled, string? WebhookUrl = null);
 
     private static readonly HashSet<string> ValidKinds = new(StringComparer.Ordinal)
     {
@@ -42,7 +49,7 @@ public static class RulesEndpoints
     {
         var g = app.MapGroup("/api/automations")
             .RequireAuthorization()
-            .RequirePermission(Permissions.TrackerSelf);
+            .RequirePermission(Permissions.AutomationsUse);
 
         // ---- GET /api/automations : the caller's OWN rules, newest-first ----
         g.MapGet("/", async (CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
@@ -57,7 +64,8 @@ public static class RulesEndpoints
 
         // ---- POST /api/automations : create a rule owned by the caller ----
         g.MapPost("/", async (
-            RuleUpsertRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+            RuleUpsertRequest req, CurrentUserAccessor me, UsageDbContext db, TokenProtector protector,
+            CancellationToken ct) =>
         {
             if (Validate(req) is { } err) return Results.BadRequest(new { message = err });
 
@@ -76,6 +84,11 @@ public static class RulesEndpoints
                 CreatedUtc = now,
                 UpdatedUtc = now,
             };
+            // Per-rule webhook: null/"" = none; a value is SSRF-validated to Discord + encrypted (never stored
+            // in plaintext, never echoed). An invalid (non-Discord) URL is a 400 — no arbitrary host.
+            if (ApplyWebhook(req.WebhookUrl, rule, protector) is { } whErr)
+                return Results.BadRequest(new { message = whErr });
+
             db.AutomationRules.Add(rule);
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToDto(rule));
@@ -83,7 +96,8 @@ public static class RulesEndpoints
 
         // ---- PUT /api/automations/{id} : update — only a row the caller owns (else 404) ----
         g.MapPut("/{id:int}", async (
-            int id, RuleUpsertRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+            int id, RuleUpsertRequest req, CurrentUserAccessor me, UsageDbContext db, TokenProtector protector,
+            CancellationToken ct) =>
         {
             if (Validate(req) is { } err) return Results.BadRequest(new { message = err });
 
@@ -100,6 +114,9 @@ public static class RulesEndpoints
             rule.Action = req.Action;
             rule.MessageTemplate = RuleEvaluator.Sanitize(req.MessageTemplate);
             rule.Enabled = req.Enabled;
+            // null = leave the existing webhook · "" = clear · a value = validate (Discord-only) + encrypt.
+            if (ApplyWebhook(req.WebhookUrl, rule, protector) is { } whErr)
+                return Results.BadRequest(new { message = whErr });
             rule.UpdatedUtc = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToDto(rule));
@@ -133,6 +150,26 @@ public static class RulesEndpoints
         return null;
     }
 
+    /// <summary>
+    /// Applies the webhook contract to <paramref name="rule"/>: <c>null</c> = leave as-is, <c>""</c>/whitespace
+    /// = clear, a value = SSRF-validate to a Discord host then AES-GCM encrypt (never stored in plaintext, never
+    /// returned). Returns an error message on an invalid (non-Discord) URL, else null. NEVER logs the URL.
+    /// </summary>
+    private static string? ApplyWebhook(string? webhookUrl, AutomationRule rule, TokenProtector protector)
+    {
+        if (webhookUrl is null) return null; // leave as-is.
+        var url = webhookUrl.Trim();
+        if (url.Length == 0)
+        {
+            rule.WebhookEnc = null; // explicit clear.
+            return null;
+        }
+        if (!DiscordWebhookValidator.IsValid(url))
+            return "Enter a valid Discord webhook URL (https://discord.com/api/webhooks/…).";
+        rule.WebhookEnc = protector.Protect(url); // encrypt at rest; the plaintext never leaves this method.
+        return null;
+    }
+
     private static string CleanName(string? name, string triggerKind)
     {
         var n = (name ?? "").Trim();
@@ -151,5 +188,5 @@ public static class RulesEndpoints
 
     private static RuleDto ToDto(AutomationRule r) => new(
         r.Id, r.Name, r.TriggerKind, r.ConditionOp, r.ConditionValue, r.Action,
-        r.MessageTemplate, r.Enabled, r.CreatedUtc, r.UpdatedUtc);
+        r.MessageTemplate, r.Enabled, r.WebhookEnc is { Length: > 0 }, r.CreatedUtc, r.UpdatedUtc);
 }

@@ -6,7 +6,7 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 45 keys.
+    // The full catalog of 46 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
@@ -21,6 +21,7 @@ public class PermissionsTests
         "bills.use",
         "family.use", "family.finance", "cycle.track", "chore.claim", "allowance.manage", "identity.map",
         "location.self", "location.share", "location.view-all",
+        "automations.use",
         "beta.access",
         "users.view", "users.manage", "activity.view", "ai.usage.view",
         "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision",
@@ -61,6 +62,7 @@ public class PermissionsTests
     [InlineData("location.self")]
     [InlineData("location.share")]
     [InlineData("location.view-all")]
+    [InlineData("automations.use")]
     [InlineData("beta.access")]
     [InlineData("users.view")]
     [InlineData("users.manage")]
@@ -124,6 +126,7 @@ public class PermissionsTests
         Permissions.LocationSelf.Should().Be("location.self");
         Permissions.LocationShare.Should().Be("location.share");
         Permissions.LocationViewAll.Should().Be("location.view-all");
+        Permissions.AutomationsUse.Should().Be("automations.use");
         Permissions.BetaAccess.Should().Be("beta.access");
         Permissions.UsersView.Should().Be("users.view");
         Permissions.UsersManage.Should().Be("users.manage");
@@ -138,9 +141,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_forty_five_known_keys()
+    public void All_contains_exactly_the_forty_six_known_keys()
     {
-        Permissions.All.Should().HaveCount(45);
+        Permissions.All.Should().HaveCount(46);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -151,9 +154,25 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_forty_five_entries()
+    public void Catalog_has_forty_six_entries()
     {
-        Permissions.Catalog.Should().HaveCount(45);
+        Permissions.Catalog.Should().HaveCount(46);
+    }
+
+    [Fact]
+    public void AutomationsUse_is_in_the_Automations_group_non_ai_not_defaultable_a_page_gate_and_in_the_administrator_preset()
+    {
+        // automations.use gates the Automations builder + /api/automations. A rule may carry the owner's OWN
+        // Discord webhook, so it is a DELIBERATE grant: its own "Automations" group, NOT an AI key, never
+        // defaultable, and a PAGE gate (not a *.view) so it is absent from Views — mirroring beta.access.
+        Permissions.Catalog.Single(p => p.Key == Permissions.AutomationsUse).Group.Should().Be("Automations");
+        Permissions.Catalog.Single(p => p.Key == Permissions.AutomationsUse).IsAi.Should().BeFalse();
+        Permissions.IsAi(Permissions.AutomationsUse).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.AutomationsUse).Should().BeFalse();
+        Permissions.Views.Should().NotContain(Permissions.AutomationsUse);
+        // It is part of the administrator preset (the full catalog).
+        Permissions.Presets.Single(p => p.Key == "administrator")
+            .Permissions.Should().Contain(Permissions.AutomationsUse);
     }
 
     [Fact]

@@ -83,6 +83,22 @@
         <span class="field__hint">No @ mentions — they're stripped automatically.</span>
       </label>
 
+      @if (form.controls.action.value !== 0) {
+        <label class="field">
+          <span class="field__label">Discord webhook (optional)</span>
+          <input class="input" type="url" formControlName="webhookUrl"
+                 placeholder="https://discord.com/api/webhooks/…" autocomplete="off" />
+          <span class="field__hint">
+            @if (editingHasWebhook()) {
+              A webhook is configured. Leave blank to keep it, type a new URL to replace it, or
+              <button type="button" class="link-btn" (click)="requestClearWebhook()">remove it</button>.
+            } @else {
+              Send to this rule's own Discord webhook. Leave blank to use your personal Discord webhook instead.
+            }
+          </span>
+        </label>
+      }
+
       <mat-slide-toggle formControlName="enabled">Enabled</mat-slide-toggle>
 
       @if (saveError()) {
@@ -114,6 +130,9 @@
               <span class="chip">{{ triggerLabel(r.triggerKind) }}</span>
               <span class="chip chip--cond">{{ conditionLabel(r) }}</span>
               <span class="chip chip--action">{{ actionLabel(r.action) }}</span>
+              @if (r.hasWebhook) {
+                <span class="chip chip--webhook" title="Posts to this rule's own Discord webhook">Own webhook</span>
+              }
             </p>
             @if (r.messageTemplate) {
               <p class="rule__msg">“{{ r.messageTemplate }}”</p>

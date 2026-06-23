@@ -125,4 +125,19 @@
 
   &--cond { color: var(--tech-text-accent); }
   &--action { color: var(--tech-text); }
+  &--webhook {
+    color: var(--tech-text-accent);
+    border-color: var(--tech-text-accent, rgba(255, 255, 255, 0.2));
+  }
+}
+
+/* An inline text button (e.g. "remove it") inside a hint line. */
+.link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--tech-text-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }

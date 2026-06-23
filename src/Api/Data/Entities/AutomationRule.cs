@@ -65,6 +65,15 @@ public class AutomationRule
     /// </summary>
     public string? MessageTemplate { get; set; }
 
+    /// <summary>
+    /// OPTIONAL per-rule Discord webhook, AES-GCM encrypted at rest via <see cref="Services.TokenProtector"/>
+    /// (mirrors <see cref="NotificationPreference.DiscordWebhookEnc"/>). When set, a Discord action posts to THIS
+    /// webhook instead of the owner's per-user webhook; when null, the action falls back to the per-user webhook.
+    /// SSRF-allowlisted to Discord hosts on write (<see cref="Services.DiscordWebhookValidator.IsValid"/>) and
+    /// re-validated at send time. NEVER returned to the client (the DTO exposes only a hasWebhook flag) or logged.
+    /// </summary>
+    public string? WebhookEnc { get; set; }
+
     /// <summary>Whether the rule is active. Disabled rules are skipped by the evaluator.</summary>
     public bool Enabled { get; set; } = true;
 

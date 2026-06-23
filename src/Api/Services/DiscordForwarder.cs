@@ -7,11 +7,18 @@ namespace Ccusage.Api.Services;
 
 /// <summary>
 /// A request describing ONE per-user Discord forward. Carries only the recipient email + the notification
-/// metadata — never the webhook URL (that is decrypted in-memory at send time, keyed by the recipient) and
-/// never any secret. Enqueued at the fan-out hook; drained off the request path by <see cref="DiscordForwarder"/>.
+/// metadata — never the webhook URL in plaintext (that is decrypted in-memory at send time) and never any
+/// secret. Enqueued at the fan-out hook; drained off the request path by <see cref="DiscordForwarder"/>.
+///
+/// <para><paramref name="WebhookOverrideEnc"/> is an OPTIONAL AES-GCM encrypted webhook blob (an automation
+/// rule's own webhook). When present, the worker decrypts + Discord-allowlist-validates it and posts THERE,
+/// bypassing the recipient's per-user webhook/SurfaceDiscord gate (the rule webhook is its own opt-in). When
+/// null, the worker resolves the recipient's per-user webhook as before. The per-user rate-limit bucket
+/// (keyed on <paramref name="RecipientEmail"/>) applies either way, so a rule can't bypass the spam cap.</para>
 /// </summary>
 public readonly record struct DiscordForwardItem(
-    string RecipientEmail, string Kind, string? ActorName, string Text, string? Link);
+    string RecipientEmail, string Kind, string? ActorName, string Text, string? Link,
+    string? WebhookOverrideEnc = null);
 
 /// <summary>
 /// Off-request-path, fire-and-forget forwarder of per-user in-app notifications to each user's PERSONAL
@@ -82,15 +89,27 @@ public sealed class DiscordForwarder(
         var protector = scope.ServiceProvider.GetRequiredService<TokenProtector>();
         var notifier = scope.ServiceProvider.GetRequiredService<DiscordNotifier>();
 
-        var pref = await db.NotificationPreferences.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.UserEmail == item.RecipientEmail, ct);
-        if (pref is null || !pref.SurfaceDiscord || string.IsNullOrEmpty(pref.DiscordWebhookEnc))
-            return; // toggled off or cleared since enqueue — nothing to do.
+        string? url;
+        if (!string.IsNullOrEmpty(item.WebhookOverrideEnc))
+        {
+            // Per-rule webhook (its OWN opt-in): decrypt the rule's blob and post there, bypassing the
+            // recipient's per-user SurfaceDiscord/webhook gate. Still Discord-allowlist-validated at send time.
+            url = protector.Unprotect(item.WebhookOverrideEnc);
+            if (string.IsNullOrEmpty(url) || !DiscordWebhookValidator.IsValid(url))
+                return; // undecryptable / corrupt / no-longer-valid — drop quietly.
+        }
+        else
+        {
+            var pref = await db.NotificationPreferences.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserEmail == item.RecipientEmail, ct);
+            if (pref is null || !pref.SurfaceDiscord || string.IsNullOrEmpty(pref.DiscordWebhookEnc))
+                return; // toggled off or cleared since enqueue — nothing to do.
 
-        // Decrypt ONLY in memory at send time; never logged, never stored back.
-        var url = protector.Unprotect(pref.DiscordWebhookEnc);
-        if (string.IsNullOrEmpty(url) || !DiscordWebhookValidator.IsValid(url))
-            return; // undecryptable / corrupt / no-longer-valid — drop quietly.
+            // Decrypt ONLY in memory at send time; never logged, never stored back.
+            url = protector.Unprotect(pref.DiscordWebhookEnc);
+            if (string.IsNullOrEmpty(url) || !DiscordWebhookValidator.IsValid(url))
+                return; // undecryptable / corrupt / no-longer-valid — drop quietly.
+        }
 
         // Up to 2 attempts; on a 429 respect the retry-after (capped) once, then drop.
         for (var attempt = 0; attempt < 2; attempt++)

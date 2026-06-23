@@ -93,22 +93,35 @@ public class AutomationsTests(WebAppFactory factory)
             .CountAsync(n => n.RecipientEmail == email && n.Type == type);
     }
 
-    /// <summary>Insert a rule directly (bypassing CRUD) for evaluator-focused tests.</summary>
+    /// <summary>Insert a rule directly (bypassing CRUD) for evaluator-focused tests. When
+    /// <paramref name="webhookToken"/> is set, the rule carries its OWN encrypted Discord webhook.</summary>
     private async Task<int> SeedRule(
         string ownerEmail, string kind, RuleAction action, RuleConditionOp op = RuleConditionOp.None,
-        int? value = null, bool enabled = true, string? template = null)
+        int? value = null, bool enabled = true, string? template = null, string? webhookToken = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var protector = scope.ServiceProvider.GetRequiredService<TokenProtector>();
         var rule = new AutomationRule
         {
             OwnerEmail = ownerEmail, Name = "test rule", TriggerKind = kind,
             ConditionOp = op, ConditionValue = value, Action = action, MessageTemplate = template,
+            WebhookEnc = webhookToken is null
+                ? null
+                : protector.Protect($"https://discord.com/api/webhooks/987654321/{webhookToken}"),
             Enabled = enabled, CreatedUtc = DateTime.UtcNow, UpdatedUtc = DateTime.UtcNow,
         };
         db.AutomationRules.Add(rule);
         await db.SaveChangesAsync();
         return rule.Id;
+    }
+
+    /// <summary>Read a rule row straight from the DB (to assert what's persisted — e.g. the encrypted blob).</summary>
+    private async Task<AutomationRule> GetRule(int id)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        return await db.AutomationRules.AsNoTracking().FirstAsync(r => r.Id == id);
     }
 
     private static async Task<JsonElement> Json(HttpResponseMessage resp) =>
@@ -131,20 +144,29 @@ public class AutomationsTests(WebAppFactory factory)
     // ---- CRUD gating + owner-scoping ----
 
     [Fact]
-    public async Task Automations_requires_authentication_and_tracker_self()
+    public async Task Automations_requires_authentication_and_the_automations_use_permission()
     {
         var anon = factory.CreateClient();
         (await anon.GetAsync("/api/automations")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        var (_, noTracker) = await ProvisionUser("dashboard.view");
-        (await noTracker.GetAsync("/api/automations")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        // A user without automations.use is Forbidden — even one who can otherwise track (tracker.self).
+        var (_, noPerm) = await ProvisionUser("dashboard.view");
+        (await noPerm.GetAsync("/api/automations")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var (_, trackerOnly) = await ProvisionUser("tracker.self");
+        (await trackerOnly.GetAsync("/api/automations")).StatusCode.Should().Be(HttpStatusCode.Forbidden,
+            "tracker.self no longer grants the Automations CRUD — it now needs the deliberate automations.use grant");
+
+        // With automations.use the endpoint is reachable.
+        var (_, withPerm) = await ProvisionUser("automations.use");
+        (await withPerm.GetAsync("/api/automations")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
     public async Task Create_then_list_returns_only_the_callers_own_rules()
     {
-        var (_, alice) = await ProvisionUser("tracker.self");
-        var (_, bob) = await ProvisionUser("tracker.self");
+        var (_, alice) = await ProvisionUser("automations.use");
+        var (_, bob) = await ProvisionUser("automations.use");
 
         var created = await alice.PostAsJsonAsync("/api/automations", new
         {
@@ -167,7 +189,7 @@ public class AutomationsTests(WebAppFactory factory)
     [Fact]
     public async Task Create_rejects_an_unknown_trigger_kind()
     {
-        var (_, alice) = await ProvisionUser("tracker.self");
+        var (_, alice) = await ProvisionUser("automations.use");
         var res = await alice.PostAsJsonAsync("/api/automations", new
         {
             triggerKind = "not.a.kind", conditionOp = 0, action = 0, enabled = true,
@@ -178,8 +200,8 @@ public class AutomationsTests(WebAppFactory factory)
     [Fact]
     public async Task Caller_cannot_update_or_delete_another_users_rule()
     {
-        var (aliceEmail, alice) = await ProvisionUser("tracker.self");
-        var (_, bob) = await ProvisionUser("tracker.self");
+        var (aliceEmail, alice) = await ProvisionUser("automations.use");
+        var (_, bob) = await ProvisionUser("automations.use");
         var ruleId = await SeedRule(aliceEmail, ActivityEmitter.Kinds.WorkoutLogged, RuleAction.InAppNotify);
 
         // Bob tries to read-by-edit and delete Alice's rule — both 404 (no existence leak).
@@ -201,7 +223,7 @@ public class AutomationsTests(WebAppFactory factory)
     [Fact]
     public async Task Create_forces_owner_to_the_caller_even_if_a_body_tries_to_set_it()
     {
-        var (aliceEmail, alice) = await ProvisionUser("tracker.self");
+        var (aliceEmail, alice) = await ProvisionUser("automations.use");
         // The DTO has no ownerEmail field, but send one anyway — it must be ignored; owner = caller.
         var created = await alice.PostAsJsonAsync("/api/automations", new
         {
@@ -310,6 +332,168 @@ public class AutomationsTests(WebAppFactory factory)
         // Privacy: the embed body never carries the owner's email or the raw webhook token.
         payload.Should().NotContain(email);
         payload.Should().NotContain(token);
+    }
+
+    // ---- Per-rule webhook: validation, encryption at rest, routing, no leak ----
+
+    [Fact]
+    public async Task Create_with_a_per_rule_webhook_encrypts_it_at_rest_and_never_returns_or_stores_the_plaintext()
+    {
+        var (_, alice) = await ProvisionUser("automations.use");
+        var token = $"RULEHOOK-{Guid.NewGuid():N}";
+        var url = $"https://discord.com/api/webhooks/123456789/{token}";
+
+        var created = await alice.PostAsJsonAsync("/api/automations", new
+        {
+            triggerKind = ActivityEmitter.Kinds.ChallengeStarted, conditionOp = 0,
+            action = (int)RuleAction.DiscordDm, enabled = true, webhookUrl = url,
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var dto = await Json(created);
+        // The response exposes only a boolean — never the URL, the token, or any "webhookEnc"/"webhookUrl".
+        dto.GetProperty("hasWebhook").GetBoolean().Should().BeTrue();
+        var raw = dto.GetRawText();
+        raw.Should().NotContain(token);
+        raw.Should().NotContain("discord.com/api/webhooks");
+        dto.TryGetProperty("webhookUrl", out _).Should().BeFalse();
+        dto.TryGetProperty("webhookEnc", out _).Should().BeFalse();
+
+        // At rest: the column holds an encrypted blob, never the plaintext URL/token.
+        var id = dto.GetProperty("id").GetInt32();
+        var rule = await GetRule(id);
+        rule.WebhookEnc.Should().NotBeNullOrEmpty();
+        rule.WebhookEnc!.Should().NotContain(token);
+        rule.WebhookEnc!.Should().NotContain("discord.com");
+        // And it decrypts back to exactly the URL we stored.
+        using var scope = factory.Services.CreateScope();
+        var protector = scope.ServiceProvider.GetRequiredService<TokenProtector>();
+        protector.Unprotect(rule.WebhookEnc).Should().Be(url);
+
+        // The list endpoint likewise never leaks it.
+        var listRaw = (await (await alice.GetAsync("/api/automations")).Content.ReadAsStringAsync());
+        listRaw.Should().NotContain(token);
+        listRaw.Should().NotContain("discord.com/api/webhooks");
+    }
+
+    [Fact]
+    public async Task Create_rejects_a_non_Discord_webhook_url_with_400_and_no_arbitrary_ssrf_target()
+    {
+        var (aliceEmail, alice) = await ProvisionUser("automations.use");
+        foreach (var bad in new[]
+        {
+            "https://evil.example.com/api/webhooks/1/abc",   // non-Discord host (SSRF target)
+            "http://discord.com/api/webhooks/1/abc",         // http (not https)
+            "https://discord.com/not/a/webhook",             // wrong path
+            "https://localhost/api/webhooks/1/abc",          // localhost
+        })
+        {
+            var res = await alice.PostAsJsonAsync("/api/automations", new
+            {
+                triggerKind = ActivityEmitter.Kinds.ChallengeStarted, conditionOp = 0,
+                action = (int)RuleAction.DiscordDm, enabled = true, webhookUrl = bad,
+            });
+            res.StatusCode.Should().Be(HttpStatusCode.BadRequest, "'{0}' is not a valid Discord webhook", bad);
+        }
+
+        // No rule was persisted by any of the rejected attempts (scoped to this caller — the DB is shared).
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        (await db.AutomationRules.AsNoTracking().CountAsync(r => r.OwnerEmail == aliceEmail)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Update_can_clear_the_webhook_with_empty_string_and_leave_it_with_null()
+    {
+        var (email, alice) = await ProvisionUser("automations.use");
+        var id = await SeedRule(email, ActivityEmitter.Kinds.ChallengeStarted, RuleAction.DiscordDm,
+            webhookToken: "KEEPME");
+        (await GetRule(id)).WebhookEnc.Should().NotBeNullOrEmpty();
+
+        // null/omitted webhookUrl => leave the stored webhook untouched.
+        var leave = await alice.PutAsJsonAsync($"/api/automations/{id}", new
+        {
+            triggerKind = ActivityEmitter.Kinds.ChallengeStarted, conditionOp = 0,
+            action = (int)RuleAction.DiscordDm, enabled = true,
+        });
+        leave.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(leave)).GetProperty("hasWebhook").GetBoolean().Should().BeTrue();
+        (await GetRule(id)).WebhookEnc.Should().NotBeNullOrEmpty("a null webhookUrl leaves the webhook as-is");
+
+        // "" => clear it.
+        var clear = await alice.PutAsJsonAsync($"/api/automations/{id}", new
+        {
+            triggerKind = ActivityEmitter.Kinds.ChallengeStarted, conditionOp = 0,
+            action = (int)RuleAction.DiscordDm, enabled = true, webhookUrl = "",
+        });
+        clear.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(clear)).GetProperty("hasWebhook").GetBoolean().Should().BeFalse();
+        (await GetRule(id)).WebhookEnc.Should().BeNull("an empty webhookUrl clears the stored webhook");
+    }
+
+    [Fact]
+    public async Task DiscordDm_uses_the_rules_OWN_webhook_when_set_bypassing_the_per_user_gate()
+    {
+        var (email, _) = await ProvisionUser("automations.use");
+        await SetSharing(email, true);
+        // No per-user webhook + SurfaceDiscord OFF — yet the rule has its OWN webhook, which is its own opt-in.
+        var ruleToken = $"RULE-{Guid.NewGuid():N}";
+        await SeedRule(email, ActivityEmitter.Kinds.ChallengeStarted, RuleAction.DiscordDm,
+            template: "Rule-hook ping!", webhookToken: ruleToken);
+
+        var before = factory.Discord.Count;
+        await EmitAsync(email, ActivityEmitter.Kinds.ChallengeStarted);
+
+        (await WaitForDiscord(before)).Should().BeTrue("the rule's own webhook is posted even with the per-user gate off");
+        // The POST went to the RULE's webhook (its distinctive token in the request URI), not a per-user one.
+        factory.Discord.Urls.Last().Should().Contain(ruleToken);
+        // And no secret/email leaks into the embed body.
+        var payload = factory.Discord.Payloads.Last();
+        payload.Should().Contain("Rule-hook ping!");
+        payload.Should().NotContain(email);
+        payload.Should().NotContain(ruleToken);
+    }
+
+    [Fact]
+    public async Task DiscordDm_falls_back_to_the_per_user_webhook_when_the_rule_has_none()
+    {
+        var (email, _) = await ProvisionUser("automations.use");
+        await SetSharing(email, true);
+        var userToken = $"USER-{Guid.NewGuid():N}";
+        await SetOwnWebhook(email, userToken);
+        // Rule with NO own webhook => falls back to the per-user webhook (existing behavior).
+        await SeedRule(email, ActivityEmitter.Kinds.ChallengeStarted, RuleAction.DiscordDm,
+            template: "Fallback ping!");
+
+        var before = factory.Discord.Count;
+        await EmitAsync(email, ActivityEmitter.Kinds.ChallengeStarted);
+
+        (await WaitForDiscord(before)).Should().BeTrue();
+        factory.Discord.Urls.Last().Should().Contain(userToken, "with no rule webhook it uses the per-user one");
+    }
+
+    [Fact]
+    public async Task NotifyAndDiscord_with_a_rule_webhook_writes_one_in_app_row_and_posts_once_to_the_rule_webhook()
+    {
+        var (email, _) = await ProvisionUser("automations.use");
+        await SetSharing(email, true);
+        // The user ALSO has their own webhook + SurfaceDiscord on; the rule webhook must take precedence and
+        // there must be NO double-post (per-user mirror + rule webhook).
+        await SetOwnWebhook(email, $"USER-{Guid.NewGuid():N}");
+        var ruleToken = $"RULE-{Guid.NewGuid():N}";
+        await SeedRule(email, ActivityEmitter.Kinds.ChallengeStarted, RuleAction.NotifyAndDiscord,
+            template: "Both!", webhookToken: ruleToken);
+
+        var before = factory.Discord.Count;
+        await EmitAsync(email, ActivityEmitter.Kinds.ChallengeStarted);
+
+        (await WaitForDiscord(before)).Should().BeTrue();
+        // Exactly ONE Discord post, to the RULE's webhook — not a second mirror to the per-user webhook.
+        await Task.Delay(300); // give any (erroneous) second enqueue a chance to land before asserting "exactly one"
+        (factory.Discord.Count - before).Should().Be(1, "no double-post: only the rule webhook is used");
+        factory.Discord.Urls.Last().Should().Contain(ruleToken);
+        // And the in-app self-notification row was written exactly once.
+        (await CountSelfNotifications(email)).Should().Be(1);
     }
 
     // ---- Never-throws: a failing action never breaks the emit caller ----

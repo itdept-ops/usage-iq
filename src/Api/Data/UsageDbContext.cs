@@ -508,6 +508,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.Name).HasMaxLength(80);
             e.Property(x => x.TriggerKind).HasMaxLength(64);
             e.Property(x => x.MessageTemplate).HasMaxLength(200);
+            // Encrypted (AES-GCM) per-rule Discord webhook blob. No length cap / no index — never queried by value.
+            e.Property(x => x.WebhookEnc);
             e.Property(x => x.Enabled).HasDefaultValue(true);
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
             e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");

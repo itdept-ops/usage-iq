@@ -93,6 +93,13 @@ public static class Permissions
     public const string ChatAi = "chat.ai";
     public const string AiVision = "ai.vision";
 
+    // ---- Automations ----
+    /// <summary>Page-gate for the Automations builder + the <c>/api/automations</c> CRUD. A rule can carry the
+    /// owner's OWN Discord webhook (SSRF-allowlisted + encrypted at rest), so the capability is granted
+    /// deliberately — never default. Auto-included in the administrator preset (preset = the full catalog).
+    /// Not a *.view (a page gate, like <see cref="TrackerSelf"/>).</summary>
+    public const string AutomationsUse = "automations.use";
+
     // ---- Beta ----
     /// <summary>Page-gate for the experimental Beta section and its hub. Not a *.view (a page gate, like
     /// <see cref="TrackerSelf"/>); auto-included in the administrator preset (preset = the full catalog).
@@ -158,6 +165,9 @@ public static class Permissions
         new PermissionInfo(LocationSelf, "Location", "Track own location", "Record and view your own location and location history."),
         new PermissionInfo(LocationShare, "Location", "Share location", "Share your live location with your household and contacts."),
         new PermissionInfo(LocationViewAll, "Location", "View all locations", "Admin oversight: view every user’s location history and the live location map."),
+
+        // ---- Automations ----
+        new PermissionInfo(AutomationsUse, "Automations", "Use Automations", "Create rules that react to your own activity and notify you in-app or to your own Discord webhook."),
 
         // ---- Beta ----
         new PermissionInfo(BetaAccess, "Beta", "Beta access", "Access the experimental Beta section and its pages."),
@@ -267,6 +277,9 @@ public static class Permissions
     /// Likewise excludes <see cref="BillsUse"/>: the Bill Splitter mints PUBLIC anonymous claim links and
     /// reads receipt photos through vision AI, so it must be granted deliberately per user, never inherited
     /// by every new account.
+    /// Likewise excludes <see cref="AutomationsUse"/>: an automation rule can carry the owner's OWN Discord
+    /// webhook (SSRF-allowlisted + encrypted), so the capability is a deliberate grant, never inherited by
+    /// every new account.
     /// Finally excludes ALL AI keys (<see cref="AiKeys"/>) and ALL Location keys (<see cref="LocationKeys"/>):
     /// AI capabilities spend tokens and the Location feature reveals where a user is, so both must be
     /// granted deliberately per user — every new account starts with AI off and location off.
@@ -275,6 +288,6 @@ public static class Permissions
         IsValid(key) && key != UsersManage && key != ChatModerate && key != ChatContactsManage
         && key != TrackerViewAll && key != FamilyUse && key != FamilyFinance && key != CycleTrack
         && key != ChoreClaim && key != AllowanceManage && key != IdentityMap
-        && key != AiUsageView && key != BillsUse && key != BetaAccess
+        && key != AiUsageView && key != BillsUse && key != BetaAccess && key != AutomationsUse
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }
