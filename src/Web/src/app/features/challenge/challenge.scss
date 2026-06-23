@@ -499,6 +499,11 @@
   strong { font-size: 1.05rem; color: var(--tech-text); font-variant-numeric: tabular-nums; }
   small { font-size: var(--tech-fs-caption, 0.72rem); color: var(--tech-text-tertiary); }
 }
+.challenge__board-nudge {
+  flex: none; width: 44px; height: 44px; margin-left: -4px;
+  color: var(--tech-text-tertiary);
+  &:hover:not([disabled]) { color: var(--ch-fire); }
+}
 
 @media (max-width: 560px) {
   .challenge__board-meta { display: none; }

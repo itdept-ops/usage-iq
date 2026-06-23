@@ -16,7 +16,7 @@ public sealed class CurrentUserAccessor(UsageDbContext db, IHttpContextAccessor 
         string? HomeRoute = null, string? Picture = null,
         DisplayNameMode DisplayNameMode = DisplayNameMode.FirstInitial, string? Nickname = null,
         bool AppearOffline = false, string? PresenceStatus = null, bool ShareAutoContext = false,
-        bool ShareActivity = false, bool ViewActivityFeed = false);
+        bool ShareActivity = false, bool ViewActivityFeed = false, bool NudgesOptOut = false);
 
     /// <summary>
     /// HttpContext.Items key under which the JWT <c>OnTokenValidated</c> handler stashes the AppUser it
@@ -53,5 +53,5 @@ public sealed class CurrentUserAccessor(UsageDbContext db, IHttpContextAccessor 
         u.Permissions.Select(p => p.Permission).ToHashSet(StringComparer.Ordinal),
         u.HomeRoute, u.Picture,
         u.DisplayNameMode, u.Nickname, u.AppearOffline, u.PresenceStatus, u.ShareAutoContext,
-        u.ShareActivity, u.ViewActivityFeed);
+        u.ShareActivity, u.ViewActivityFeed, u.NudgesOptOut);
 }

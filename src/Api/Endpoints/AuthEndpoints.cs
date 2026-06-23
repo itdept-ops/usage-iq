@@ -58,6 +58,7 @@ public static class AuthEndpoints
                 ShareAutoContext = u.ShareAutoContext,
                 ShareActivity = u.ShareActivity,
                 ViewActivityFeed = u.ViewActivityFeed,
+                NudgesOptOut = u.NudgesOptOut,
             });
         }).RequireAuthorization();
 
@@ -93,6 +94,7 @@ public static class AuthEndpoints
             if (req.ShareAutoContext is { } share) user.ShareAutoContext = share;
             if (req.ShareActivity is { } shareAct) user.ShareActivity = shareAct;
             if (req.ViewActivityFeed is { } viewFeed) user.ViewActivityFeed = viewFeed;
+            if (req.NudgesOptOut is { } nudgeOut) user.NudgesOptOut = nudgeOut;
 
             await db.SaveChangesAsync(ct);
 
@@ -105,6 +107,7 @@ public static class AuthEndpoints
                 shareAutoContext = user.ShareAutoContext,
                 shareActivity = user.ShareActivity,
                 viewActivityFeed = user.ViewActivityFeed,
+                nudgesOptOut = user.NudgesOptOut,
             });
         }).RequireAuthorization();
 

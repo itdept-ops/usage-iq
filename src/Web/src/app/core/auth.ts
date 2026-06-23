@@ -110,6 +110,7 @@ export class AuthService {
       shareAutoContext: me.shareAutoContext,
       shareActivity: me.shareActivity,
       viewActivityFeed: me.viewActivityFeed,
+      nudgesOptOut: me.nudgesOptOut,
     };
     this._session.set(updated);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
@@ -132,6 +133,7 @@ export class AuthService {
       shareAutoContext: p.shareAutoContext,
       shareActivity: p.shareActivity,
       viewActivityFeed: p.viewActivityFeed,
+      nudgesOptOut: p.nudgesOptOut,
     };
     this._session.set(updated);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch { /* ignore */ }

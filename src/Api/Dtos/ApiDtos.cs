@@ -561,6 +561,9 @@ public sealed class MeDto
     /// <summary>When true the caller opts IN to VIEW the circle activity feed (default false); when false the
     /// feed shows only their own events.</summary>
     public bool ViewActivityFeed { get; set; }
+
+    /// <summary>When true the caller has opted OUT of receiving peer nudges (default false = opted in).</summary>
+    public bool NudgesOptOut { get; set; }
 }
 
 /// <summary>Body for <c>PATCH /api/auth/home</c>: the route to land on, or null to clear (use default).</summary>
@@ -593,6 +596,9 @@ public sealed class SetProfileRequest
 
     /// <summary>Opt in/out of VIEWING the circle activity feed.</summary>
     public bool? ViewActivityFeed { get; set; }
+
+    /// <summary>Opt OUT of receiving peer nudges (the canned "log your day" pings). Default false = opted IN.</summary>
+    public bool? NudgesOptOut { get; set; }
 }
 
 /// <summary>One teammate currently online (active within the presence window). Carries public identity

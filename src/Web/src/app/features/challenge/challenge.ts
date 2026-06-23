@@ -18,10 +18,12 @@ import { RouterLink } from '@angular/router';
 
 import { ChallengeStore } from '../../core/challenge-store';
 import { AuthService } from '../../core/auth';
+import { Api } from '../../core/api';
 import {
-  CreateHardTaskRequest, HardDayDto, HardDayTaskDto, HardSharedPersonDto, HardTaskDto,
-  PERM, UpdateHardTaskRequest, UpsertHardDayRequest,
+  CreateHardTaskRequest, HardDayDto, HardDayTaskDto, HardLeaderboardRowDto, HardSharedPersonDto, HardTaskDto,
+  NudgeKind, PERM, UpdateHardTaskRequest, UpsertHardDayRequest,
 } from '../../core/models';
+import { catchError, of } from 'rxjs';
 
 /** Max future cheat days the backend accepts (kept in sync with HardChallengeEndpoints.MaxCheatDays). */
 const MAX_CHEAT_DAYS = 10;
@@ -77,6 +79,7 @@ function emptyDraft(): NewTaskDraft {
 export class Challenge {
   readonly store = inject(ChallengeStore);
   readonly auth = inject(AuthService);
+  private api = inject(Api);
   private snack = inject(MatSnackBar);
   private destroyRef = inject(DestroyRef);
 
@@ -535,6 +538,49 @@ export class Challenge {
   }
   viewOther(userId: number): void {
     void this.store.viewUserTracker(userId).then(() => void this.store.loadLeaderboard());
+  }
+
+  // ---- nudge (a friendly poke to a circle peer on the leaderboard) ----
+
+  /** Whether the caller can nudge at all (chat.send); the action no-ops without it. */
+  readonly canNudge = computed(() => this.auth.hasPermission(PERM.chatSend));
+
+  /** Whether a Nudge is in-flight for a given user (so the menu can't double-fire). */
+  readonly nudging = signal<number | null>(null);
+
+  /** The fixed, safe nudge templates offered in the menu (label → server-side kind). */
+  readonly nudgeKinds: { kind: NudgeKind; icon: string; label: string }[] = [
+    { kind: 'logYourDay', icon: 'edit_calendar', label: 'Log your day' },
+    { kind: 'closeYourRings', icon: 'track_changes', label: 'Close your rings' },
+    { kind: 'keepTheStreak', icon: 'local_fire_department', label: 'Keep the streak' },
+    { kind: 'checkIn', icon: 'waving_hand', label: 'Just checking in' },
+  ];
+
+  /**
+   * Whether the UI may offer a Nudge for a leaderboard row: a non-self peer. The leaderboard is the caller
+   * plus the contacts who SHARE their tracker with them, so every other row is already in the caller's
+   * circle — mirroring the server's circle gate, so the button never offers something that 404s.
+   */
+  canNudgeRow(row: HardLeaderboardRowDto): boolean {
+    return !row.isSelf;
+  }
+
+  /**
+   * Send a canned NUDGE to a circle peer from their leaderboard row. The button is only rendered for a
+   * non-self row, so the server's circle check should not 404; the server also enforces a per-pair
+   * cooldown + the target's opt-out, surfaced here as a friendly toast (delivered:false ⇒ a no-op
+   * message, never an error).
+   */
+  nudge(row: HardLeaderboardRowDto, kind: NudgeKind): void {
+    if (!this.canNudgeRow(row) || !this.canNudge() || this.nudging() != null) return;
+    this.nudging.set(row.userId);
+    this.api.nudge(row.userId, kind).pipe(catchError(() => of(null))).subscribe(res => {
+      this.nudging.set(null);
+      if (!res) { this.snack.open('Could not send your nudge. Try again.', 'OK', { duration: 4000 }); return; }
+      this.snack.open(
+        res.delivered ? `Nudged ${row.name}!` : `${row.name} was already nudged recently.`,
+        'OK', { duration: 3000 });
+    });
   }
 
   /** Two-letter initials for an avatar fallback (name only; no email — email-privacy). */

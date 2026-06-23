@@ -500,6 +500,7 @@ app.MapChatEndpoints();
 app.MapChatLocationShareEndpoints();
 app.MapContactsEndpoints();
 app.MapPeopleEndpoints();
+app.MapNudgeEndpoints();
 app.MapInboxEndpoints();
 app.MapTrackerEndpoints();
 app.MapHardChallengeEndpoints();

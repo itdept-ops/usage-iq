@@ -311,6 +311,77 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
     }
 
     /// <summary>
+    /// Deliver a peer NUDGE (a canned "log your day" / "close your rings" / "keep the streak" / "check-in"
+    /// ping) to a single target, addressed by their AppUser id (email-privacy: the caller never holds the
+    /// target's email — it's resolved server-side via <see cref="ResolveEmailsByIdAsync"/>). Persists ONE
+    /// inbox <see cref="Notification"/> row carrying the SENDER as the actor (id + DisplayName-formatted name
+    /// — the sender email is NEVER on the wire and NEVER appears in the body) and pushes
+    /// <c>ReceiveNotification</c> + <c>InboxUnreadChanged</c> + a Discord mirror — the SAME delivery path the
+    /// cheer/chat fan-out uses. Like <see cref="NotifyCheerAsync"/> this is a user-initiated peer action, so
+    /// it is NOT gated on a notification PREFERENCE; instead the endpoint gates it on the CIRCLE + cooldown,
+    /// and this method honors the target's own <see cref="AppUser.NudgesOptOut"/> escape hatch.
+    ///
+    /// The body is a FIXED server-side template keyed by <paramref name="kind"/> — there is no client text
+    /// path, which is what kills injection / @-mention abuse. Returns true if a notification was written,
+    /// false if the target opted out or its id didn't resolve to an enabled user (a friendly no-op — the
+    /// caller treats both as a silent success so opt-out is not observable). The caller MUST have already
+    /// authorized the circle + reject self; this method does NOT re-check the circle.
+    /// </summary>
+    public async Task<bool> NotifyNudgeAsync(
+        int targetUserId, string senderEmail, NudgeKind kind, CancellationToken ct = default)
+    {
+        // Resolve the target id -> internal email (enabled users only). Absent ⇒ silent no-op.
+        var emailById = await ResolveEmailsByIdAsync(db, new[] { targetUserId }, ct);
+        if (!emailById.TryGetValue(targetUserId, out var targetEmailRaw)) return false;
+        var targetEmail = targetEmailRaw.ToLowerInvariant();
+
+        // Honor the target's opt-out (their escape hatch). Default false = opted IN.
+        var optedOut = await db.Users.AsNoTracking()
+            .Where(u => u.Email == targetEmail)
+            .Select(u => u.NudgesOptOut)
+            .FirstOrDefaultAsync(ct);
+        if (optedOut) return false;
+
+        // Resolve the sender to id + DisplayName-formatted name — the raw sender email never reaches the
+        // client and never appears in the notification text (email-privacy; DisplayName strips email shapes).
+        var sender = (await ResolveActorsAsync(db, new[] { senderEmail }, ct))
+            .TryGetValue(senderEmail.ToLowerInvariant(), out var si) ? si : (ActorIdentity?)null;
+        var senderName = string.IsNullOrEmpty(sender?.Name) ? DisplayName.Unknown : sender!.Value.Name;
+
+        var text = $"{senderName} {NudgeTemplate(kind)}";
+        var n = new Notification
+        {
+            RecipientEmail = targetEmail,
+            Type = NotificationType.SystemNudge,
+            Text = text.Length > 512 ? text[..512] : text,
+            Link = "/challenge",
+            ActorEmail = senderEmail.ToLowerInvariant(),
+            ActorName = senderName,
+            IsRead = false,
+            CreatedUtc = DateTime.UtcNow,
+        };
+        db.Notifications.Add(n);
+        await db.SaveChangesAsync(ct);
+
+        var inbox = (await UnreadInboxCountsAsync(new[] { targetEmail }, ct)).GetValueOrDefault(targetEmail, 0);
+        await hub.Clients.User(targetEmail).SendAsync("ReceiveNotification", ToDto(n, sender), ct);
+        await hub.Clients.User(targetEmail).SendAsync("InboxUnreadChanged", inbox, ct);
+        discord.Enqueue(new DiscordForwardItem(targetEmail, NotificationTypeName(n.Type), senderName, n.Text, n.Link));
+        return true;
+    }
+
+    /// <summary>The FIXED safe template fragment for a nudge kind (the body is "{senderName} {fragment}").
+    /// No client text ever enters here — this is the only source of nudge body text.</summary>
+    public static string NudgeTemplate(NudgeKind kind) => kind switch
+    {
+        NudgeKind.LogYourDay => "nudged you to log your day",
+        NudgeKind.CloseYourRings => "nudged you to close your rings",
+        NudgeKind.KeepTheStreak => "nudged you to keep your streak alive",
+        NudgeKind.CheckIn => "sent you a check-in",
+        _ => "nudged you",
+    };
+
+    /// <summary>
     /// The single code path that toggles a caller's emoji reaction on a message and broadcasts the
     /// result. Used by BOTH the REST endpoint and the hub so they behave identically. Assumes the
     /// caller has already been authorized (chat.send) and verified as a member of the message's
@@ -554,6 +625,7 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
         NotificationType.FamilyHeadsUp => "familyHeadsUp",
         NotificationType.SystemAutomation => "systemAutomation",
         NotificationType.Cheer => "cheer",
+        NotificationType.SystemNudge => "systemNudge",
         _ => "channelMessage",
     };
 }

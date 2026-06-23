@@ -517,6 +517,21 @@
               <strong>{{ fmt(row.totalPoints) }}</strong>
               <small>+{{ fmt(row.todayPoints) }} today</small>
             </span>
+            @if (canNudgeRow(row) && canNudge()) {
+              <button mat-icon-button type="button" class="challenge__board-nudge"
+                      [disabled]="nudging() === row.userId" [matMenuTriggerFor]="nudgeMenu"
+                      [attr.aria-label]="'Nudge ' + row.name" matTooltip="Send a quick, friendly nudge">
+                <mat-icon aria-hidden="true">{{ nudging() === row.userId ? 'hourglass_empty' : 'campaign' }}</mat-icon>
+              </button>
+              <mat-menu #nudgeMenu="matMenu" xPosition="before" overlapTrigger="false">
+                @for (n of nudgeKinds; track n.kind) {
+                  <button mat-menu-item type="button" (click)="nudge(row, n.kind)">
+                    <mat-icon aria-hidden="true">{{ n.icon }}</mat-icon>
+                    <span>{{ n.label }}</span>
+                  </button>
+                }
+              </mat-menu>
+            }
           </li>
         }
       </ol>

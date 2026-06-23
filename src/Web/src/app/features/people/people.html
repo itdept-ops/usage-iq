@@ -114,6 +114,22 @@
               Message
             </button>
           }
+          @if (canNudgePerson(p) && canNudge()) {
+            <button mat-stroked-button type="button" class="act act--nudge"
+                    [disabled]="nudging() === p.userId" [matMenuTriggerFor]="nudgeMenu"
+                    matTooltip="Send a quick, friendly nudge">
+              <mat-icon aria-hidden="true">{{ nudging() === p.userId ? 'hourglass_empty' : 'campaign' }}</mat-icon>
+              Nudge
+            </button>
+            <mat-menu #nudgeMenu="matMenu" xPosition="before" overlapTrigger="false">
+              @for (n of nudgeKinds; track n.kind) {
+                <button mat-menu-item type="button" (click)="nudge(p, n.kind)">
+                  <mat-icon aria-hidden="true">{{ n.icon }}</mat-icon>
+                  <span>{{ n.label }}</span>
+                </button>
+              }
+            </mat-menu>
+          }
           @if (p.sharesLocation) {
             <button mat-stroked-button type="button" class="act act--map" (click)="viewOnMap()"
                     matTooltip="See where they are on the family map">

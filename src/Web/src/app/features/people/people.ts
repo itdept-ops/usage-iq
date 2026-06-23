@@ -15,7 +15,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
-import { PERM, PersonDto } from '../../core/models';
+import { PERM, PersonDto, NudgeKind } from '../../core/models';
 import { timeAgo } from '../../shared/format';
 
 /** Which slice of the caller's people the grid shows. */
@@ -74,6 +74,20 @@ export class People {
 
   /** Whether the caller can open DMs at all (chat.send) — the Message action no-ops without it. */
   readonly canMessage = computed(() => this.auth.hasPermission(PERM.chatSend));
+
+  /** Whether the caller can nudge at all (chat.send) — the Nudge action no-ops without it. */
+  readonly canNudge = computed(() => this.auth.hasPermission(PERM.chatSend));
+
+  /** Whether a Nudge is in-flight for a given person (so the menu can't double-fire). */
+  readonly nudging = signal<number | null>(null);
+
+  /** The fixed, safe nudge templates offered in the menu (label → server-side kind). */
+  readonly nudgeKinds: { kind: NudgeKind; icon: string; label: string }[] = [
+    { kind: 'logYourDay', icon: 'edit_calendar', label: 'Log your day' },
+    { kind: 'closeYourRings', icon: 'track_changes', label: 'Close your rings' },
+    { kind: 'keepTheStreak', icon: 'local_fire_department', label: 'Keep the streak' },
+    { kind: 'checkIn', icon: 'waving_hand', label: 'Just checking in' },
+  ];
 
   constructor() {
     this.load();
@@ -160,6 +174,29 @@ export class People {
       this.opening.set(null);
       if (ch) this.router.navigate(['/chat'], { queryParams: { c: ch.id } });
       else this.snack.open('Could not open the conversation. Try again.', 'OK', { duration: 4000 });
+    });
+  }
+
+  /** Whether the UI may offer a Nudge for this person: a non-self circle member (contact or household).
+   * Mirrors the server's circle gate exactly, so the button never offers something that 404s. */
+  canNudgePerson(p: PersonDto): boolean {
+    return !p.isSelf && (p.isContact || p.isHousehold);
+  }
+
+  /**
+   * Send a canned NUDGE to a circle peer. The button is only rendered for a non-self circle member, so the
+   * server's circle check should not 404; the server also enforces a per-pair cooldown + the target's
+   * opt-out, surfaced here as a friendly toast (delivered:false ⇒ a no-op message, never an error).
+   */
+  nudge(p: PersonDto, kind: NudgeKind): void {
+    if (!this.canNudgePerson(p) || !this.canNudge() || this.nudging() != null) return;
+    this.nudging.set(p.userId);
+    this.api.nudge(p.userId, kind).pipe(catchError(() => of(null))).subscribe(res => {
+      this.nudging.set(null);
+      if (!res) { this.snack.open('Could not send your nudge. Try again.', 'OK', { duration: 4000 }); return; }
+      this.snack.open(
+        res.delivered ? `Nudge sent to ${p.name}.` : `${p.name} was already nudged recently.`,
+        'OK', { duration: 3000 });
     });
   }
 

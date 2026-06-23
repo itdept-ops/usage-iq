@@ -111,6 +111,14 @@ public class AppUser
     /// </summary>
     public bool ViewActivityFeed { get; set; }
 
+    /// <summary>
+    /// When true, the user receives NO peer nudges (the canned "log your day"/"close your rings"/etc.
+    /// pings). False by default — opt-IN is safe because nudges are circle-gated (only a contact or
+    /// fellow household member can send one) AND cooldowned per (sender, target), so they can't be used
+    /// to spam/harass. This is the user's escape hatch; the nudge service no-ops when it's true.
+    /// </summary>
+    public bool NudgesOptOut { get; set; }
+
     public DateTime CreatedUtc { get; set; }
     public DateTime? LastLoginUtc { get; set; }
 

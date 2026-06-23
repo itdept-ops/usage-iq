@@ -404,6 +404,13 @@ export interface PersonDto {
   sharesLocation: boolean;
 }
 
+/**
+ * The FIXED set of safe nudge templates (POST /api/nudge `kind`). The server maps each to a canned
+ * notification body — there is NO free-text path, so a nudge can never carry injection or @-mentions.
+ * Wire values are camelCase and validated server-side (an unknown value is a 400).
+ */
+export type NudgeKind = 'logYourDay' | 'closeYourRings' | 'keepTheStreak' | 'checkIn';
+
 // ---- Activity feed (the social circle feed; GET /api/feed) ------------------------------------------
 // The READ side of the activity spine. Distinct from the admin audit page (/activity, GET /api/logs).
 // Privacy: an actor is identified by an AppUser id + a DisplayName-formatted name — the raw email is
@@ -584,6 +591,8 @@ export interface AuthSession {
   shareActivity?: boolean;
   /** OPT-IN to VIEW the circle feed (default OFF); mirrored from /me. */
   viewActivityFeed?: boolean;
+  /** OPT-OUT of receiving peer nudges (default false = opted in); mirrored from /me. */
+  nudgesOptOut?: boolean;
 }
 
 /** How the caller's name is shown to OTHERS. "firstInitial" ("First L.") is the default. */
@@ -617,6 +626,12 @@ export interface ProfilePrefs {
    * own events regardless of this flag.
    */
   viewActivityFeed: boolean;
+  /**
+   * OPT-OUT of receiving peer nudges (default false = opted IN): when true, the caller gets none of the
+   * canned "log your day"/"close your rings"/etc. pings. Safe to default on because nudges are circle-gated
+   * (only a contact or household member can send one) and cooldowned, so this is the user's escape hatch.
+   */
+  nudgesOptOut: boolean;
 }
 
 /** The GET /api/auth/me payload: live identity + permissions + the caller's own profile prefs. */

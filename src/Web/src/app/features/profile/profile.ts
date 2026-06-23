@@ -57,6 +57,9 @@ export class Profile {
   // shows your circle (vs only your own events).
   readonly shareActivity = signal<boolean>(false);
   readonly viewActivityFeed = signal<boolean>(false);
+  // Receiving peer nudges (default ON — opted in). This is the escape hatch: nudges are circle-gated +
+  // cooldowned, so default-on is safe; flip it on to STOP receiving them.
+  readonly nudgesOptOut = signal<boolean>(false);
 
   /** The caller's real (full) name, from the session — the formatter's input; never edited here. */
   readonly fullName = computed(() => this.auth.session()?.name?.trim() || this.auth.session()?.email || '');
@@ -106,6 +109,7 @@ export class Profile {
             shareAutoContext: s.shareAutoContext ?? false,
             shareActivity: s.shareActivity ?? false,
             viewActivityFeed: s.viewActivityFeed ?? false,
+            nudgesOptOut: s.nudgesOptOut ?? false,
           });
           this.loading.set(false);
         } else {
@@ -124,6 +128,7 @@ export class Profile {
     this.shareAutoContext.set(p.shareAutoContext);
     this.shareActivity.set(p.shareActivity);
     this.viewActivityFeed.set(p.viewActivityFeed);
+    this.nudgesOptOut.set(p.nudgesOptOut);
   }
 
   save(): void {
@@ -137,6 +142,7 @@ export class Profile {
       shareAutoContext: this.shareAutoContext(),
       shareActivity: this.shareActivity(),
       viewActivityFeed: this.viewActivityFeed(),
+      nudgesOptOut: this.nudgesOptOut(),
     };
     this.api.setProfile(body).subscribe({
       next: saved => {

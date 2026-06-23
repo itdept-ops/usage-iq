@@ -35,4 +35,10 @@ public enum NotificationType
     /// <summary>Someone in the actor's circle cheered (👏) one of their activity-feed events (a peer action,
     /// not gated like a system event — the actor always learns their event was cheered).</summary>
     Cheer = 11,
+
+    /// <summary>Someone in the target's circle (a contact or fellow household member) sent them a canned
+    /// "nudge" (log your day / close your rings / keep the streak / check-in). A peer action like
+    /// <see cref="Cheer"/> — circle-gated + cooldowned at the endpoint, carrying the sender as actor; the
+    /// text is a FIXED server-side template keyed by the nudge kind (never client free-text).</summary>
+    SystemNudge = 12,
 }

@@ -112,6 +112,17 @@
       <mat-slide-toggle [ngModel]="viewActivityFeed()" (ngModelChange)="viewActivityFeed.set($event)"
                         aria-label="Show me my circle's feed" />
     </div>
+
+    <div class="toggle-row">
+      <div class="toggle-row__text">
+        <span class="toggle-row__label">Don't let people nudge me</span>
+        <span class="toggle-row__sub">People in your circle can send you a quick, friendly nudge (a canned
+          "log your day" / "keep the streak" ping). It's limited so it can't be used to pester you. Turn this
+          on to stop receiving them entirely.</span>
+      </div>
+      <mat-slide-toggle [ngModel]="nudgesOptOut()" (ngModelChange)="nudgesOptOut.set($event)"
+                        aria-label="Don't let people nudge me" />
+    </div>
   </mat-card>
 
   <div class="actions">

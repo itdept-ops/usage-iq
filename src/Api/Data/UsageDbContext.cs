@@ -34,6 +34,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<ChatLocationShare> ChatLocationShares => Set<ChatLocationShare>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+    public DbSet<NudgeEvent> NudgeEvents => Set<NudgeEvent>();
     public DbSet<TrackerProfile> TrackerProfiles => Set<TrackerProfile>();
     public DbSet<FoodEntry> FoodEntries => Set<FoodEntry>();
     public DbSet<ExerciseEntry> ExerciseEntries => Set<ExerciseEntry>();
@@ -490,6 +491,15 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
             // The inbox reads a recipient's unread/all notifications newest-first.
             e.HasIndex(x => new { x.RecipientEmail, x.IsRead, x.CreatedUtc });
+        });
+
+        b.Entity<NudgeEvent>(e =>
+        {
+            e.Property(x => x.SenderEmail).HasMaxLength(256);
+            e.Property(x => x.TargetEmail).HasMaxLength(256);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // The cooldown check reads the latest row for a (sender, target) pair within a recent window.
+            e.HasIndex(x => new { x.SenderEmail, x.TargetEmail, x.CreatedUtc });
         });
 
         b.Entity<AutomationRule>(e =>
