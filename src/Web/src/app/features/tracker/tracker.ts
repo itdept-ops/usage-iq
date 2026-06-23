@@ -1057,7 +1057,12 @@ export class Tracker {
       canFamily: this.auth.hasPermission(PERM.familyUse),
     };
     this.dialog.open(WhatToEatDialog, { data, width: '640px', maxWidth: '95vw', maxHeight: '92dvh', panelClass: 'tracker-dialog', autoFocus: false })
-      .afterClosed().subscribe(() => { void this.store.load(); });
+      .afterClosed().subscribe((result?: string) => {
+        // The empty-state "Add food manually" button closes with 'manual' — hand off to the add-food
+        // dialog (which logs + refreshes the day itself) instead of silently returning to the tracker.
+        if (result === 'manual') { this.openAddFood(this.defaultMeal()); return; }
+        void this.store.load();
+      });
   }
 
   // ---- AI Day Builder (describe the whole day → reviewable draft → atomic commit) ----
