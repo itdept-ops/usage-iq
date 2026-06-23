@@ -44,6 +44,20 @@
   --grad-bills:     linear-gradient(135deg, #34d399, #10b981);
   --grad-usage:     linear-gradient(135deg, #c084fc, #7c3aed);
 
+  // ---- PER-ACCENT SOLID (vivid, high-contrast on the dark stage) — the headline number colour ----
+  --sa-primary:   #c084fc;
+  --sa-exercise:  #fb7185;
+  --sa-food:      #4ade80;
+  --sa-activity:  #38bdf8;
+  --sa-hydration: #7dd3fc;
+  --sa-coffee:    #e6b980;
+  --sa-weight:    #5eead4;
+  --sa-sleep:     #a5b4fc;
+  --sa-hard:      #fbbf24;
+  --sa-trophy:    #fcd34d;
+  --sa-bills:     #6ee7b7;
+  --sa-usage:     #c4b5fd;
+
   // ---- RADII ----
   --r-card: 24px;
   --r-pill: 999px;
@@ -276,17 +290,10 @@
   margin: 0;
   font: 800 clamp(46px, 15vw, 88px)/.92 var(--font-num);
   letter-spacing: -.03em;
-  color: var(--ink); // readable fallback so the number never collapses to the card colour
-}
-// Gradient-fill the number for the showcase pop ONLY where background-clip:text is supported;
-// otherwise the solid --ink above shows (was: color:transparent with no fallback → invisible text).
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .wb-card__headline {
-    background: var(--accent, var(--grad-primary));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
+  // Solid vivid per-accent colour (treatment B): high-contrast on the dark card and can never
+  // go invisible (no gradient-clip / transparent fill). --accent-solid is set inline per card;
+  // --ink is the safety fallback if it's somehow unset.
+  color: var(--accent-solid, var(--ink));
 }
 .wb-card__label {
   position: relative;
