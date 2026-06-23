@@ -432,12 +432,23 @@ export interface FeedItem {
   label: string | null;
   /** ISO-8601 UTC timestamp the event was recorded. */
   createdUtc: string;
+  /** Total cheers (👏) on this row. No reactor identity is ever exposed — only the aggregate count. */
+  clapCount: number;
+  /** Whether the CALLER has cheered this row (drives the toggle button's pressed state). */
+  iReacted: boolean;
 }
 
 /** A page of feed items + the keyset cursor for the next (older) page; nextBefore is null at the end. */
 export interface FeedPage {
   items: FeedItem[];
   nextBefore: number | null;
+}
+
+/** The toggle result of POST /api/feed/{id}/react (mirrors FeedEndpoints.ReactResultDto): the row's fresh
+ * cheer count + whether the caller now has a cheer on it. Lets the SPA reconcile after a race. */
+export interface ReactResult {
+  clapCount: number;
+  iReacted: boolean;
 }
 
 /** The numeric comparison a rule's optional condition applies to the event's intValue. */

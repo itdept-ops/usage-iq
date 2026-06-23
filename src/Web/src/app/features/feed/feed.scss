@@ -120,9 +120,70 @@
 
   &__verb { color: var(--tech-text-secondary); }
 
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: var(--tech-space-2, 12px);
+    margin-top: 2px;
+  }
+
   &__time {
     font-size: var(--tech-fs-small, 12px);
     color: var(--tech-text-tertiary, #6b7688);
+  }
+}
+
+/* ---- Cheer (👏) toggle ---- */
+.cheer {
+  position: relative; /* anchors the invisible 44px touch target (::before). */
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--tech-border-subtle, #1c2533);
+  background: transparent;
+  color: var(--tech-text-tertiary, #6b7688);
+  font-family: var(--tech-font-ui);
+  font-size: var(--tech-fs-small, 12px);
+  font-weight: 700;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+
+  /* Expand the tap area to a 44x44 minimum (centered) without inflating the visual pill. */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  &:hover {
+    border-color: var(--tech-border-strong, #2a3548);
+    color: var(--tech-text-secondary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--tech-accent, #3FD8D0);
+    outline-offset: 2px;
+  }
+
+  &__emoji { font-size: 14px; line-height: 1; filter: grayscale(0.4); transition: filter 120ms ease; }
+  &__count { font-variant-numeric: tabular-nums; }
+
+  /* Pressed (the caller has cheered this row). */
+  &--on {
+    border-color: color-mix(in srgb, var(--tech-accent, #3FD8D0) 55%, transparent);
+    background: color-mix(in srgb, var(--tech-accent, #3FD8D0) 14%, transparent);
+    color: var(--tech-text-accent, #3FD8D0);
+
+    .cheer__emoji { filter: none; }
   }
 }
 

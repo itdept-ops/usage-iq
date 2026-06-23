@@ -271,6 +271,46 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
     }
 
     /// <summary>
+    /// Notify a single actor that someone cheered (👏) one of their activity-feed events. Persists ONE
+    /// inbox <see cref="Notification"/> row carrying the reactor as the actor (id + DisplayName-formatted
+    /// name — the reactor email is NEVER on the wire, email-privacy) and pushes <c>ReceiveNotification</c> +
+    /// <c>InboxUnreadChanged</c> + a Discord mirror — the SAME delivery path the chat fan-out uses. Like
+    /// <see cref="NotifyFamily"/> this is a user-initiated peer action, so it is NOT gated on a notification
+    /// preference (the actor always learns their event was cheered). Callers MUST skip this on a self-cheer
+    /// (reactor == actor) and on a toggle-OFF (un-cheer) — it only fires on a fresh cheer of someone else's
+    /// event. <paramref name="actorEmail"/> and <paramref name="reactorEmail"/> must be lower-cased.
+    /// </summary>
+    public async Task NotifyCheerAsync(
+        string actorEmail, string reactorEmail, string thing, CancellationToken ct = default)
+    {
+        // Resolve the reactor to id + DisplayName-formatted name — the raw reactor email never reaches the
+        // client and never appears in the notification text (email-privacy; DisplayName strips email shapes).
+        var reactor = (await ResolveActorsAsync(db, new[] { reactorEmail }, ct))
+            .TryGetValue(reactorEmail.ToLowerInvariant(), out var ri) ? ri : (ActorIdentity?)null;
+        var reactorName = string.IsNullOrEmpty(reactor?.Name) ? DisplayName.Unknown : reactor!.Value.Name;
+
+        var text = $"{reactorName} cheered your {thing}";
+        var n = new Notification
+        {
+            RecipientEmail = actorEmail,
+            Type = NotificationType.Cheer,
+            Text = text.Length > 512 ? text[..512] : text,
+            Link = "/feed",
+            ActorEmail = reactorEmail,
+            ActorName = reactorName,
+            IsRead = false,
+            CreatedUtc = DateTime.UtcNow,
+        };
+        db.Notifications.Add(n);
+        await db.SaveChangesAsync(ct);
+
+        var inbox = (await UnreadInboxCountsAsync(new[] { actorEmail }, ct)).GetValueOrDefault(actorEmail, 0);
+        await hub.Clients.User(actorEmail).SendAsync("ReceiveNotification", ToDto(n, reactor), ct);
+        await hub.Clients.User(actorEmail).SendAsync("InboxUnreadChanged", inbox, ct);
+        discord.Enqueue(new DiscordForwardItem(actorEmail, NotificationTypeName(n.Type), reactorName, n.Text, n.Link));
+    }
+
+    /// <summary>
     /// The single code path that toggles a caller's emoji reaction on a message and broadcasts the
     /// result. Used by BOTH the REST endpoint and the hub so they behave identically. Assumes the
     /// caller has already been authorized (chat.send) and verified as a member of the message's
@@ -513,6 +553,7 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
         NotificationType.FamilyBriefing => "familyBriefing",
         NotificationType.FamilyHeadsUp => "familyHeadsUp",
         NotificationType.SystemAutomation => "systemAutomation",
+        NotificationType.Cheer => "cheer",
         _ => "channelMessage",
     };
 }

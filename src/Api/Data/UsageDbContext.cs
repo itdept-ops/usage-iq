@@ -78,6 +78,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<HardChallengeTask> HardChallengeTasks => Set<HardChallengeTask>();
     public DbSet<HardChallengeDayTask> HardChallengeDayTasks => Set<HardChallengeDayTask>();
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
+    public DbSet<ActivityReaction> ActivityReactions => Set<ActivityReaction>();
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -442,6 +443,18 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => x.MessageId);
             e.HasOne(x => x.Message).WithMany()
                 .HasForeignKey(x => x.MessageId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ActivityReaction>(e =>
+        {
+            e.Property(x => x.ReactorEmail).HasMaxLength(256);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // One cheer per user per event; also the lookup for "has this user cheered this event".
+            e.HasIndex(x => new { x.ReactorEmail, x.ActivityEventId }).IsUnique();
+            // Batch-load all reactions for a page of feed events by event id.
+            e.HasIndex(x => x.ActivityEventId);
+            e.HasOne<ActivityEvent>().WithMany()
+                .HasForeignKey(x => x.ActivityEventId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<ChatContact>(e =>

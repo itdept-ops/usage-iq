@@ -22,7 +22,7 @@ import {
   BillDto, BillItemRequest, BillShareToggleResult, CreateBillRequest, PaymentHandlesDto,
   PublicBillDto, ReceiptBreakdownDto, UpdateBillRequest,
   ProfilePrefs,
-  FeedPage,
+  FeedPage, ReactResult,
   AutomationRule, AutomationRuleInput,
 } from './models';
 
@@ -721,6 +721,16 @@ export class Api {
     if (opts.before != null) p = p.set('before', opts.before);
     if (opts.limit != null) p = p.set('limit', opts.limit);
     return this.http.get<FeedPage>(`${this.base}/feed`, { params: p });
+  }
+
+  /**
+   * Toggle a cheer (👏) on a feed event (POST /api/feed/{id}/react). Adds the caller's cheer if absent,
+   * removes it if present. Returns the row's fresh `clapCount` + `iReacted` so the UI converges after races.
+   * The server enforces that the caller can only cheer an event they can already SEE in the feed. The actor
+   * gets ONE in-app notification on a fresh cheer of someone else's event (none on self-cheer or un-cheer).
+   */
+  reactFeed(eventId: number): Observable<ReactResult> {
+    return this.http.post<ReactResult>(`${this.base}/feed/${eventId}/react`, {});
   }
 
   // ---- Automations (the caller's OWN rules; strictly owner-scoped server-side) ----

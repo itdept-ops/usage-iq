@@ -1,5 +1,6 @@
 using Ccusage.Api.Auth;
 using Ccusage.Api.Data;
+using Ccusage.Api.Data.Entities;
 using Ccusage.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,9 +27,16 @@ namespace Ccusage.Api.Endpoints;
 /// </summary>
 public static class FeedEndpoints
 {
-    /// <summary>One feed row. The actor is an AppUser id + display name — NEVER an email.</summary>
+    /// <summary>One feed row. The actor is an AppUser id + display name — NEVER an email. <paramref name="ClapCount"/>
+    /// is the total cheers (👏) on the row; <paramref name="IReacted"/> is whether the CALLER cheered it (drives the
+    /// toggle button) — no reactor identity beyond the count is ever exposed.</summary>
     public sealed record FeedItemDto(
-        long Id, int ActorUserId, string ActorName, string Kind, int? IntValue, string? Label, DateTime CreatedUtc);
+        long Id, int ActorUserId, string ActorName, string Kind, int? IntValue, string? Label, DateTime CreatedUtc,
+        int ClapCount, bool IReacted);
+
+    /// <summary>The toggle result for <c>POST /api/feed/{id}/react</c>: the row's fresh cheer count and whether the
+    /// caller now has a cheer on it (true after an add, false after a remove). Lets the SPA converge after races.</summary>
+    public sealed record ReactResultDto(int ClapCount, bool IReacted);
 
     /// <summary>A page of feed items + the keyset cursor for the next page (null when no more).</summary>
     public sealed record FeedPageDto(IReadOnlyList<FeedItemDto> Items, long? NextBefore);
@@ -80,6 +88,26 @@ public static class FeedEndpoints
             var actors = await ChatNotificationService.ResolveActorsAsync(
                 db, rows.Select(r => r.ActorEmail).ToArray(), ct);
 
+            // Batch-load the cheer aggregates for this page of events in TWO grouped queries (no N+1): the
+            // total count per event, and the set of events the CALLER has cheered (for iReacted). Reactor
+            // identities are NEVER exposed — only the count + the caller's own flag cross the wire.
+            var eventIds = rows.Select(r => r.Id).ToArray();
+            var clapCounts = eventIds.Length == 0
+                ? new Dictionary<long, int>()
+                : (await db.ActivityReactions.AsNoTracking()
+                    .Where(r => eventIds.Contains(r.ActivityEventId))
+                    .GroupBy(r => r.ActivityEventId)
+                    .Select(g => new { EventId = g.Key, Count = g.Count() })
+                    .ToListAsync(ct))
+                    .ToDictionary(x => x.EventId, x => x.Count);
+            var myReactions = eventIds.Length == 0
+                ? new HashSet<long>()
+                : (await db.ActivityReactions.AsNoTracking()
+                    .Where(r => r.ReactorEmail == callerEmail && eventIds.Contains(r.ActivityEventId))
+                    .Select(r => r.ActivityEventId)
+                    .ToListAsync(ct))
+                    .ToHashSet();
+
             var items = rows.Select(r =>
             {
                 var actor = actors.GetValueOrDefault(r.ActorEmail.ToLowerInvariant());
@@ -87,12 +115,92 @@ public static class FeedEndpoints
                     r.Id,
                     actor.Id,
                     string.IsNullOrEmpty(actor.Name) ? DisplayName.Unknown : actor.Name,
-                    r.Kind, r.IntValue, r.Label, r.CreatedUtc);
+                    r.Kind, r.IntValue, r.Label, r.CreatedUtc,
+                    clapCounts.GetValueOrDefault(r.Id, 0),
+                    myReactions.Contains(r.Id));
             }).ToList();
 
             // Keyset cursor: a full page implies there may be more (oldest id on this page).
             long? nextBefore = items.Count == take ? items[^1].Id : null;
             return Results.Ok(new FeedPageDto(items, nextBefore));
         });
+
+        // ---- POST /api/feed/{id}/react : toggle the caller's cheer (👏) on a feed event ----
+        // Add if absent (→ iReacted:true), remove if present (→ iReacted:false). Returns the fresh count so
+        // the SPA converges after races. Gated by the SAME visibility check the feed read uses: the caller
+        // may only cheer an event they can SEE (own, or a sharing contact's when they've opted to view) — a
+        // 404 otherwise NEVER reveals the event exists. Rate-limited like the chat react endpoint.
+        g.MapPost("/{id:long}/react", async (
+            long id, CurrentUserAccessor me, UsageDbContext db, ChatNotificationService notifier,
+            CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var callerEmail = caller.Email.ToLowerInvariant();
+
+            var ev = await db.ActivityEvents.AsNoTracking()
+                .Where(e => e.Id == id)
+                .Select(e => new { e.Id, e.ActorEmail, e.Kind })
+                .FirstOrDefaultAsync(ct);
+            if (ev is null) return Results.NotFound();
+
+            // The SAME circle/visibility check as GET /api/feed: own event always visible; a circle actor's
+            // event only when the actor shares AND the caller opted to view. 404 (not 403) if not visible —
+            // never reveal that an out-of-circle event exists.
+            var isOwn = string.Equals(ev.ActorEmail, callerEmail, StringComparison.Ordinal);
+            if (!isOwn)
+            {
+                if (!caller.ViewActivityFeed) return Results.NotFound();
+                var inCircle = await db.ChatContacts.AsNoTracking()
+                    .Where(c => c.ContactEmail == callerEmail && c.OwnerEmail == ev.ActorEmail)
+                    .AnyAsync(ct);
+                var actorShares = inCircle && await db.Users.AsNoTracking()
+                    .AnyAsync(u => u.Email == ev.ActorEmail && u.IsEnabled && u.ShareActivity, ct);
+                if (!actorShares) return Results.NotFound();
+            }
+
+            // Toggle the (reactor, event) row, recovering from a concurrent racer's win on either side
+            // (mirrors ToggleReactionAsync): on remove, a concurrent delete leaves the desired end state; on
+            // add, a concurrent add already satisfies it (Postgres 23505).
+            var existing = await db.ActivityReactions
+                .FirstOrDefaultAsync(r => r.ReactorEmail == callerEmail && r.ActivityEventId == id, ct);
+            bool reacted;
+            if (existing is not null)
+            {
+                db.ActivityReactions.Remove(existing);
+                try { await db.SaveChangesAsync(ct); }
+                catch (DbUpdateConcurrencyException) { db.ChangeTracker.Clear(); }
+                reacted = false;
+            }
+            else
+            {
+                db.ActivityReactions.Add(new ActivityReaction
+                {
+                    ReactorEmail = callerEmail, ActivityEventId = id, CreatedUtc = DateTime.UtcNow,
+                });
+                try { await db.SaveChangesAsync(ct); }
+                catch (DbUpdateException ex) when (ChatEndpoints.IsUniqueViolation(ex)) { db.ChangeTracker.Clear(); }
+                reacted = true;
+
+                // ONE in-app notification to the actor on a FRESH cheer of SOMEONE ELSE's event. Never on a
+                // self-cheer (own event) and never on a toggle-OFF (the remove branch). DisplayName only.
+                if (!isOwn)
+                    await notifier.NotifyCheerAsync(ev.ActorEmail, callerEmail, ThingFor(ev.Kind), ct);
+            }
+
+            var clapCount = await db.ActivityReactions.AsNoTracking()
+                .CountAsync(r => r.ActivityEventId == id, ct);
+            return Results.Ok(new ReactResultDto(clapCount, reacted));
+        }).RequireRateLimiting("chat");
     }
+
+    /// <summary>The human noun the cheer notification reads as ("cheered your <thing>"), per event kind —
+    /// non-sensitive labels only, matching the feed's verb vocabulary. Forward-compatible default.</summary>
+    private static string ThingFor(string kind) => kind switch
+    {
+        "workout.logged" => "workout",
+        "challenge.dayComplete" => "75-Hard day",
+        "challenge.started" => "75-Hard start",
+        "hydration.goalHit" => "water goal",
+        _ => "activity",
+    };
 }

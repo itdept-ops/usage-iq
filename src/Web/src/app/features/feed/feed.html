@@ -53,7 +53,21 @@
                   <span class="row__name">{{ item.actorName }}</span>
                   <span class="row__verb">{{ item.verb }}</span>
                 </p>
-                <time class="row__time" [attr.datetime]="item.createdUtc">{{ timeAgo(item.createdUtc) }}</time>
+                <div class="row__meta">
+                  <time class="row__time" [attr.datetime]="item.createdUtc">{{ timeAgo(item.createdUtc) }}</time>
+                  <button
+                    type="button"
+                    class="cheer"
+                    [class.cheer--on]="item.iReacted"
+                    [attr.aria-pressed]="item.iReacted"
+                    [attr.aria-label]="item.iReacted ? 'Cheered' : 'Cheer'"
+                    (click)="cheer(item)">
+                    <span class="cheer__emoji" aria-hidden="true">👏</span>
+                    @if (item.clapCount > 0) {
+                      <span class="cheer__count">{{ item.clapCount }}</span>
+                    }
+                  </button>
+                </div>
               </div>
             </li>
           }

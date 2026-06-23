@@ -31,4 +31,8 @@ public enum NotificationType
 
     /// <summary>One of the owner's own automation rules fired — a self-notification to themselves only.</summary>
     SystemAutomation = 10,
+
+    /// <summary>Someone in the actor's circle cheered (👏) one of their activity-feed events (a peer action,
+    /// not gated like a system event — the actor always learns their event was cheered).</summary>
+    Cheer = 11,
 }

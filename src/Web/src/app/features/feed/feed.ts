@@ -104,6 +104,44 @@ export class Feed {
       });
   }
 
+  /**
+   * Toggle the caller's cheer (👏) on a row. Optimistically flips iReacted + clapCount immediately (the
+   * view/groups computeds re-derive), then reconciles with the server's authoritative count — or rolls back
+   * on error. The server enforces that the caller may only cheer an event they can see; a failure leaves the
+   * row as it was. Guards re-entrancy per row so a double-tap can't desync the count.
+   */
+  cheer(item: FeedItemVm): void {
+    const id = item.id;
+    if (this.cheering.has(id)) return;
+    this.cheering.add(id);
+
+    const before = this.items().find(i => i.id === id);
+    const wasReacted = before?.iReacted ?? false;
+    const prevCount = before?.clapCount ?? 0;
+
+    // Optimistic flip.
+    this.patch(id, { iReacted: !wasReacted, clapCount: prevCount + (wasReacted ? -1 : 1) });
+
+    this.api.reactFeed(id)
+      .pipe(catchError(() => {
+        // Roll back to the pre-tap state on failure.
+        this.patch(id, { iReacted: wasReacted, clapCount: prevCount });
+        return of(null);
+      }))
+      .subscribe(res => {
+        if (res) this.patch(id, { iReacted: res.iReacted, clapCount: res.clapCount });
+        this.cheering.delete(id);
+      });
+  }
+
+  /** Rows whose cheer toggle is in flight (re-entrancy guard; not in a signal — it never affects render). */
+  private readonly cheering = new Set<number>();
+
+  /** Merge a partial update into the row with this id (the view/groups computeds re-derive from items). */
+  private patch(id: number, change: Partial<FeedItem>): void {
+    this.items.update(cur => cur.map(i => (i.id === id ? { ...i, ...change } : i)));
+  }
+
   /** Whether there's another page to load (drives the "load more" affordance). */
   readonly hasMore = computed(() => this.nextBefore() != null);
 
