@@ -82,6 +82,7 @@
       @if (auth.hasPermission('tracker.self')) {
         <a mat-button class="nav__item" routerLink="/tracker" routerLinkActive="active">Tracker</a>
         <a mat-button class="nav__item" routerLink="/challenge" routerLinkActive="active">75 Hard</a>
+        <a mat-button class="nav__item" routerLink="/trophies" routerLinkActive="active">Trophies</a>
         <a mat-button class="nav__item" routerLink="/feed" routerLinkActive="active">Activity</a>
         <a mat-button class="nav__item" routerLink="/automations" routerLinkActive="active">Automations</a>
       }
@@ -390,6 +391,8 @@
            (click)="closeMobileNav()">Tracker</a>
         <a class="mobile-nav__item" routerLink="/challenge" routerLinkActive="active"
            (click)="closeMobileNav()">75 Hard</a>
+        <a class="mobile-nav__item" routerLink="/trophies" routerLinkActive="active"
+           (click)="closeMobileNav()">Trophies</a>
         <a class="mobile-nav__item" routerLink="/feed" routerLinkActive="active"
            (click)="closeMobileNav()">Activity</a>
         <a class="mobile-nav__item" routerLink="/automations" routerLinkActive="active"

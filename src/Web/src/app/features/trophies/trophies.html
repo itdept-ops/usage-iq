@@ -1,0 +1,53 @@
+<section class="trophies">
+  <header class="trophies__head">
+    <div class="trophies__title">
+      <h1>Trophies</h1>
+      <p class="trophies__sub">Milestones earned across your tracker, 75 Hard, and bills. Each badge has a
+        bronze, silver, and gold tier — keep logging to climb the ladder.</p>
+    </div>
+    @if (data(); as d) {
+      <div class="trophies__count" role="status" aria-live="polite">
+        <mat-icon>emoji_events</mat-icon>
+        <span><strong>{{ d.earnedCount }}</strong> / {{ d.totalCount }} earned</span>
+      </div>
+    }
+  </header>
+
+  @if (loading()) {
+    <div class="trophies__state">
+      <mat-spinner diameter="32"></mat-spinner>
+    </div>
+  } @else if (error()) {
+    <div class="trophies__state trophies__state--error" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ error() }}</span>
+    </div>
+  } @else {
+    @for (group of groups(); track group.name) {
+      <div class="trophies__group">
+        <h2 class="trophies__group-title">{{ group.name }}</h2>
+        <div class="trophies__grid">
+          @for (b of group.badges; track b.id) {
+            <article class="badge" [class.badge--earned]="b.earned" [class.badge--locked]="!b.earned"
+                     [attr.data-tier]="b.tier" [matTooltip]="b.description">
+              <div class="badge__medal" [attr.data-tier]="b.tier">
+                <mat-icon>{{ icon(b) }}</mat-icon>
+              </div>
+              <div class="badge__body">
+                <div class="badge__label">{{ b.label }}</div>
+                <div class="badge__caption">{{ caption(b) }}</div>
+                <mat-progress-bar class="badge__bar" mode="determinate" [value]="pct(b)"></mat-progress-bar>
+                <div class="badge__tiers" aria-hidden="true">
+                  @for (t of b.tiers; track t.name) {
+                    <span class="badge__tier" [class.badge__tier--earned]="t.earned"
+                          [attr.data-tier]="t.name" [matTooltip]="t.name + ' · ' + fmt(t.threshold)"></span>
+                  }
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      </div>
+    }
+  }
+</section>

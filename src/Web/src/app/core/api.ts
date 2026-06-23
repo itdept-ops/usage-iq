@@ -19,6 +19,7 @@ import {
   IdentityImportResult,
   HardChallengeDto, HardSharedPersonDto, StartChallengeRequest, UpsertHardDayRequest, HardDayDto, CheatDaysRequest,
   HardTaskDto, CreateHardTaskRequest, UpdateHardTaskRequest, HardLeaderboardRowDto, HardCoachDto,
+  TrophiesResponse,
   BillDto, BillItemRequest, BillShareToggleResult, CreateBillRequest, PaymentHandlesDto,
   PublicBillDto, ReceiptBreakdownDto, UpdateBillRequest,
   ProfilePrefs,
@@ -1972,6 +1973,13 @@ export class Api {
   /** The AI coach recap (gated tracker.ai; ALWAYS 200 with a deterministic plain floor). */
   challengeCoach(): Observable<HardCoachDto> {
     return this.http.get<HardCoachDto>(`${this.base}/challenge/coach`);
+  }
+
+  // ---- Trophy Wall (/api/trophies) — the caller's OWN milestone badges, gated by tracker.self ----
+
+  /** The caller's own trophy wall: badges DERIVED from existing tracker/75-Hard/bills data (no email). */
+  trophies(): Observable<TrophiesResponse> {
+    return this.http.get<TrophiesResponse>(`${this.base}/trophies/`);
   }
 
   // ---- Family Hub F6: Google Calendar (OAuth code flow; the caller's own primary calendar) ----

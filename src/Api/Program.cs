@@ -503,6 +503,7 @@ app.MapPeopleEndpoints();
 app.MapInboxEndpoints();
 app.MapTrackerEndpoints();
 app.MapHardChallengeEndpoints();
+app.MapTrophyEndpoints();
 app.MapFeedEndpoints();
 app.MapRulesEndpoints();
 app.MapAiEndpoints();

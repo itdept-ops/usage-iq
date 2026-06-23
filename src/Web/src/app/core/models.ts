@@ -4018,6 +4018,42 @@ export interface HardCoachDto {
   fellBackToPlain: boolean;
 }
 
+// ---- Trophy Wall (/api/trophies) ----
+// The caller's OWN milestone badges, DERIVED at read time from existing tracker/75-Hard/bills data (no new
+// tracking, no migration). Personal-only in V1. userId + display NAME only — NEVER an email.
+
+/** One tier on a badge's ladder (mirrors TierDto): name + threshold + whether the value reached it. */
+export interface TrophyTierDto {
+  name: string;       // "bronze" | "silver" | "gold" | "complete" (one-shot)
+  threshold: number;
+  earned: boolean;
+}
+
+/** One badge (mirrors BadgeDto): catalog metadata + measured value + earned/locked ladder + progress to next. */
+export interface TrophyBadgeDto {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  group: string;        // "Tracker" | "75 Hard" | "Bills"
+  value: number;        // the current measured metric
+  tier: string;         // highest earned tier: "none" | "bronze" | "silver" | "gold" | "complete"
+  earned: boolean;      // tier !== "none"
+  tiers: TrophyTierDto[];
+  nextTier: TrophyTierDto | null;  // the next unearned tier (null when maxed)
+  progressToNext: number;          // 0..1 toward nextTier.threshold (1.0 when maxed)
+}
+
+/** The caller's own trophy wall (mirrors TrophiesResponse) — userId + display name only, NEVER an email. */
+export interface TrophiesResponse {
+  userId: number;
+  userName: string;
+  generatedUtc: string;
+  earnedCount: number;
+  totalCount: number;
+  badges: TrophyBadgeDto[];
+}
+
 /** Start-a-challenge payload (POST /api/challenge). `startDate` defaults to local today when omitted. */
 export interface StartChallengeRequest {
   startDate?: string | null;

@@ -297,6 +297,7 @@ export class App implements AfterViewInit {
     { route: '/tracker', label: 'Tracker', perms: [PERM.trackerSelf] },
     { route: '/tracker-beta', label: 'Tracker Beta', perms: [PERM.trackerBeta] },
     { route: '/challenge', label: '75 Hard', perms: [PERM.trackerSelf] },
+    { route: '/trophies', label: 'Trophies', perms: [PERM.trackerSelf] },
     { route: '/feed', label: 'Activity feed', perms: [PERM.trackerSelf] },
     { route: '/automations', label: 'Automations', perms: [PERM.trackerSelf] },
     { route: '/bills', label: 'Bill Splitter', perms: [PERM.billsUse] },

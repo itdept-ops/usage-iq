@@ -47,6 +47,7 @@ export const COMMAND_DEFS: readonly CommandDef[] = [
   { id: 'nav-tracker', label: 'Tracker', group: 'Go to', icon: 'monitoring', route: '/tracker', perm: [PERM.trackerSelf], keywords: ['food', 'water', 'hydration', 'coffee', 'weight', 'exercise', 'log', 'fitness', 'calories', 'macros'] },
   { id: 'nav-tracker-beta', label: 'Tracker Beta', group: 'Go to', icon: 'science', route: '/tracker-beta', perm: [PERM.trackerBeta], keywords: ['strata'] },
   { id: 'nav-challenge', label: '75 Hard', group: 'Go to', icon: 'fitness_center', route: '/challenge', perm: [PERM.trackerSelf], keywords: ['challenge'] },
+  { id: 'nav-trophies', label: 'Trophies', group: 'Go to', icon: 'emoji_events', route: '/trophies', perm: [PERM.trackerSelf], keywords: ['trophy', 'trophies', 'badges', 'achievements', 'milestones'] },
   { id: 'nav-feed', label: 'Activity feed', group: 'Go to', icon: 'dynamic_feed', route: '/feed', perm: [PERM.trackerSelf], keywords: ['social', 'feed'] },
   { id: 'nav-bills', label: 'Bill Splitter', group: 'Go to', icon: 'receipt_long', route: '/bills', perm: [PERM.billsUse], keywords: ['bill', 'split', 'receipt', 'expense'] },
   { id: 'nav-beta', label: 'Beta', group: 'Go to', icon: 'science', route: '/beta', perm: [PERM.betaAccess], keywords: ['experimental'] },

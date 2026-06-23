@@ -188,6 +188,14 @@ export const routes: Routes = [
     title: 'Usage IQ · 75 Hard',
   },
   {
+    // Trophy Wall — the caller's own milestone badges, DERIVED from existing tracker/75-Hard/bills data.
+    // Personal-only (no sharing). Gated by the SAME tracker permission (tracker.self).
+    path: 'trophies',
+    canActivate: [permissionGuard(PERM.trackerSelf)],
+    loadComponent: () => import('./features/trophies/trophies').then(m => m.Trophies),
+    title: 'Usage IQ · Trophies',
+  },
+  {
     // Family Hub — a warm, household-private section. The whole group is gated by family.use; the
     // owner-only controls inside (rename, add/remove member) are enforced server-side too.
     path: 'family',
