@@ -753,17 +753,23 @@ public class AuthIntegrationTests(WebAppFactory factory)
     public async Task Security_alerts_and_mention_round_trip()
     {
         var admin = Client(WebAppFactory.AdminEmail);
+        // The global webhook + master-enable + schedule + global mention live on the setting.
         await admin.PutAsJsonAsync("/api/notifications", new
         {
             discordWebhookUrl = "https://discord.com/api/webhooks/55/sometoken",
-            enabled = true, digestHourLocal = 9, dailyDigest = false, weeklyDigest = false,
-            weeklyDay = 1, thresholdEnabled = false, thresholdUsd = 0,
-            securityAlerts = true, mentionOnAlert = "@here",
+            enabled = true, digestHourLocal = 9, weeklyDay = 1, thresholdUsd = 0,
+            mentionOnAlert = "@here",
         });
+        // WHICH events forward now lives in the routing table — enable the security-alerts route.
+        (await admin.PutAsJsonAsync("/api/notifications/routes/security-alerts",
+            new { enabled = true, mention = (string?)null })).EnsureSuccessStatusCode();
 
         var dto = await (await admin.GetAsync("/api/notifications")).Content.ReadFromJsonAsync<JsonElement>();
-        dto.GetProperty("securityAlerts").GetBoolean().Should().BeTrue();
         dto.GetProperty("mentionOnAlert").GetString().Should().Be("@here");
+
+        var routes = await (await admin.GetAsync("/api/notifications/routes")).Content.ReadFromJsonAsync<JsonElement>();
+        var security = routes.EnumerateArray().Single(r => r.GetProperty("eventKey").GetString() == "security-alerts");
+        security.GetProperty("enabled").GetBoolean().Should().BeTrue();
     }
 
     [Fact]

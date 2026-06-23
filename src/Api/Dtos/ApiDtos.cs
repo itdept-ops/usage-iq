@@ -11,19 +11,54 @@ public readonly record struct UsageFilterQuery(
     string[]? machine = null,
     string[]? user = null);
 
+/// <summary>The global Discord config (admin): webhook + master enable + digest SCHEDULE + threshold VALUE +
+/// global mention. WHICH events forward is the routing table (<see cref="DiscordRouteDto"/>), not here.</summary>
 public sealed class NotificationSettingDto
 {
     public bool WebhookConfigured { get; set; }
     public string? WebhookMasked { get; set; }
     public bool Enabled { get; set; }
     public int DigestHourLocal { get; set; }
-    public bool DailyDigest { get; set; }
-    public bool WeeklyDigest { get; set; }
     public int WeeklyDay { get; set; }
-    public bool ThresholdEnabled { get; set; }
     public decimal ThresholdUsd { get; set; }
-    public bool SecurityAlerts { get; set; }
     public string? MentionOnAlert { get; set; }
+}
+
+/// <summary>The caller's OWN per-user Discord forwarding state. NEVER exposes the webhook URL — only
+/// whether one is configured, a non-sensitive masked hint, and the surface toggle.</summary>
+public sealed class MyDiscordDto
+{
+    public bool Configured { get; set; }
+    public string? Hint { get; set; }
+    public bool SurfaceDiscord { get; set; }
+}
+
+/// <summary>Set/clear the caller's OWN per-user Discord webhook + surface toggle.</summary>
+public sealed class MyDiscordUpdateRequest
+{
+    /// <summary>null = leave the stored webhook unchanged · "" = clear it · value = set (must be a valid
+    /// Discord webhook; SSRF-validated, encrypted at rest — the plaintext URL is never stored or returned).</summary>
+    public string? WebhookUrl { get; set; }
+
+    /// <summary>Whether to forward the caller's in-app notifications to their Discord webhook.</summary>
+    public bool SurfaceDiscord { get; set; }
+}
+
+/// <summary>One system Discord routing row (admin view): which event, whether it forwards, its mention.</summary>
+public sealed class DiscordRouteDto
+{
+    public string EventKey { get; set; } = "";
+    public string Label { get; set; } = "";
+    public bool Enabled { get; set; }
+    public string? Mention { get; set; }
+    public int SortOrder { get; set; }
+}
+
+/// <summary>Update a single system route's Enabled and/or Mention (admin).</summary>
+public sealed class DiscordRouteUpdateRequest
+{
+    public bool Enabled { get; set; }
+    public string? Mention { get; set; }
 }
 
 public sealed class NotificationUpdateRequest
@@ -32,12 +67,8 @@ public sealed class NotificationUpdateRequest
     public string? DiscordWebhookUrl { get; set; }
     public bool Enabled { get; set; }
     public int DigestHourLocal { get; set; }
-    public bool DailyDigest { get; set; }
-    public bool WeeklyDigest { get; set; }
     public int WeeklyDay { get; set; }
-    public bool ThresholdEnabled { get; set; }
     public decimal ThresholdUsd { get; set; }
-    public bool SecurityAlerts { get; set; }
     public string? MentionOnAlert { get; set; }
 }
 

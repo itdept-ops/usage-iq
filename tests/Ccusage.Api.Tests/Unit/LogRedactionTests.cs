@@ -84,4 +84,20 @@ public class LogRedactionTests
     public void Clean_query_string_passes_through()
         => LogRedaction.RedactQuery("?groupBy=day&from=2026-01-01", "/api/usage/summary")
             .Should().Be("?groupBy=day&from=2026-01-01");
+
+    [Fact]
+    public void Per_user_discord_route_is_fully_redacted()
+        => LogRedaction.Redact("{\"webhookUrl\":\"https://discord.com/api/webhooks/1/secret\",\"surfaceDiscord\":true}",
+                "/api/notifications/me/discord")
+            .Should().Be("[redacted]");
+
+    [Fact]
+    public void Webhook_url_field_is_redacted_on_non_sensitive_routes_too()
+    {
+        // Defense-in-depth: even if a webhook URL ever appears in a body on some other route, the field name
+        // is in the secret-key set so the value is scrubbed.
+        var r = LogRedaction.Redact("{\"webhookUrl\":\"https://discord.com/api/webhooks/1/secrettok\"}", "/api/x")!;
+        r.Should().NotContain("secrettok");
+        r.Should().Contain("\"webhookUrl\":\"[redacted]\"");
+    }
 }

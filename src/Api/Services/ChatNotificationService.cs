@@ -17,7 +17,7 @@ namespace Ccusage.Api.Services;
 /// Scoped: it depends on the (scoped) <see cref="UsageDbContext"/>. The singleton hub resolves it via a
 /// per-invocation scope (see <see cref="Hubs.ChatHub"/>).
 /// </summary>
-public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatHub> hub)
+public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatHub> hub, DiscordForwarder discord)
 {
     /// <summary>Group name a connection joins for every channel it belongs to.</summary>
     public static string GroupFor(int channelId) => $"channel:{channelId}";
@@ -134,6 +134,9 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
             await hub.Clients.User(email).SendAsync("ReceiveNotification", ToDto(n, actor), ct);
             await hub.Clients.User(email)
                 .SendAsync("InboxUnreadChanged", inboxUnreadByEmail.GetValueOrDefault(email, 0), ct);
+            // Fire-and-forget: mirror this notification to the recipient's personal Discord webhook if they
+            // opted in. Enqueue only — never block/slow/fail the fan-out; the worker gates on their prefs.
+            discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), actor?.Name, n.Text, n.Link));
         }
     }
 
@@ -207,6 +210,8 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
             await hub.Clients.User(email).SendAsync("ReceiveNotification", ToDto(n, (ActorIdentity?)null), ct);
             await hub.Clients.User(email)
                 .SendAsync("InboxUnreadChanged", inboxUnreadByEmail.GetValueOrDefault(email, 0), ct);
+            // Fire-and-forget Discord mirror for opted-in recipients (no actor on a system event).
+            discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), null, n.Text, n.Link));
         }
     }
 
@@ -259,6 +264,8 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
             await hub.Clients.User(email).SendAsync("ReceiveNotification", ToDto(n, (ActorIdentity?)null), ct);
             await hub.Clients.User(email)
                 .SendAsync("InboxUnreadChanged", inboxUnreadByEmail.GetValueOrDefault(email, 0), ct);
+            // Fire-and-forget Discord mirror for opted-in recipients (no actor on a family alert).
+            discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), null, n.Text, n.Link));
         }
         return created.Count;
     }

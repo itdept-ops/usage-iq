@@ -515,31 +515,67 @@ export interface LoginEvent {
   userAgent: string | null;
 }
 
+/**
+ * The global Discord config (admin). After the routing-table overhaul this holds only the webhook,
+ * master enable, digest SCHEDULE (hour/weekly day), threshold VALUE, and the global mention. WHICH
+ * events forward now lives in the routing table ({@link DiscordRoute}), not here. Mirrors NotificationSettingDto.
+ */
 export interface NotificationSettings {
   webhookConfigured: boolean;
   webhookMasked: string | null;
   enabled: boolean;
   digestHourLocal: number;
-  dailyDigest: boolean;
-  weeklyDigest: boolean;
   weeklyDay: number;
-  thresholdEnabled: boolean;
   thresholdUsd: number;
-  securityAlerts: boolean;
   mentionOnAlert: string | null;
 }
 
+/** Update the global Discord config (admin, PUT /api/notifications). Mirrors NotificationUpdateRequest. */
 export interface NotificationUpdate {
+  /** null = leave unchanged · "" = clear · value = set (server validates it is a Discord webhook). */
   discordWebhookUrl?: string | null;
   enabled: boolean;
   digestHourLocal: number;
-  dailyDigest: boolean;
-  weeklyDigest: boolean;
   weeklyDay: number;
-  thresholdEnabled: boolean;
   thresholdUsd: number;
-  securityAlerts: boolean;
   mentionOnAlert: string | null;
+}
+
+/**
+ * One row of the system Discord ROUTING TABLE (admin): which event forwards to Discord, whether it's
+ * enabled, and an optional per-row mention. The 5 rows are seeded server-side (daily-digest, weekly-digest,
+ * spend-threshold, security-alerts, new-user-signup). Mirrors DiscordRouteDto.
+ */
+export interface DiscordRoute {
+  eventKey: string;
+  label: string;
+  enabled: boolean;
+  mention: string | null;
+  sortOrder: number;
+}
+
+/** Update a single routing-table row (admin, PUT /api/notifications/routes/{eventKey}). Mirrors DiscordRouteUpdateRequest. */
+export interface DiscordRouteUpdate {
+  enabled: boolean;
+  mention?: string | null;
+}
+
+/**
+ * The caller's OWN per-user Discord forwarding state (GET /api/notifications/me/discord). NEVER exposes the
+ * webhook URL — only whether one is configured, a non-sensitive masked hint, and the surface toggle.
+ * Mirrors MyDiscordDto.
+ */
+export interface MyDiscord {
+  configured: boolean;
+  hint: string | null;
+  surfaceDiscord: boolean;
+}
+
+/** Set/clear the caller's OWN per-user Discord webhook + surface toggle. Mirrors MyDiscordUpdateRequest. */
+export interface MyDiscordUpdate {
+  /** null = leave unchanged · "" = clear · value = set (server validates it is a Discord webhook). */
+  webhookUrl?: string | null;
+  surfaceDiscord: boolean;
 }
 
 export interface HeatmapCell { day: number; hour: number; count: number; }

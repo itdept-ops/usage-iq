@@ -32,6 +32,12 @@ public sealed class NotificationBackgroundService(
         var s = await db.NotificationSettings.FirstOrDefaultAsync(ct);
         if (s is null || !s.Enabled || !DiscordNotifier.IsValidWebhook(s.DiscordWebhookUrl)) return;
 
+        // The per-event routing table replaces the old DailyDigest/WeeklyDigest/ThresholdEnabled/SecurityAlerts
+        // booleans: a route's Enabled gates whether that event forwards, and its Mention overrides the global one.
+        var routes = await db.DiscordRoutes.AsNoTracking().ToDictionaryAsync(r => r.EventKey, ct);
+        bool Enabled(string key) => routes.TryGetValue(key, out var r) && r.Enabled;
+        string? RouteMention(string key) => routes.TryGetValue(key, out var r) ? r.Mention : null;
+
         var tz = await ResolveTzAsync(db, ct);
         var nowLocal = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, tz);
         var today = DateOnly.FromDateTime(nowLocal.DateTime);
@@ -42,7 +48,7 @@ public sealed class NotificationBackgroundService(
         // The guard only advances on a *successful* send, so a transient Discord/DB failure retries next tick.
 
         // Daily digest → the previous full day, with a trend vs the day before.
-        if (s.DailyDigest && s.LastDailySent != today && nowLocal.Hour >= s.DigestHourLocal)
+        if (Enabled(DiscordRouteKeys.DailyDigest) && s.LastDailySent != today && nowLocal.Hour >= s.DigestHourLocal)
         {
             var day = today.AddDays(-1);
             var d = await notifier.BuildDigestAsync(day, day, day.AddDays(-1), day.AddDays(-1), ct);
@@ -51,7 +57,7 @@ public sealed class NotificationBackgroundService(
         }
 
         // Weekly digest → previous 7 days, with a trend vs the 7 days before that.
-        if (s.WeeklyDigest && (int)nowLocal.DayOfWeek == s.WeeklyDay
+        if (Enabled(DiscordRouteKeys.WeeklyDigest) && (int)nowLocal.DayOfWeek == s.WeeklyDay
             && s.LastWeeklySent != today && nowLocal.Hour >= s.DigestHourLocal)
         {
             var from = today.AddDays(-7);
@@ -62,40 +68,62 @@ public sealed class NotificationBackgroundService(
         }
 
         // Spend threshold → at most one alert per day, when today's running spend crosses it.
-        if (s.ThresholdEnabled && s.ThresholdUsd > 0 && s.LastThresholdSent != today)
+        if (Enabled(DiscordRouteKeys.SpendThreshold) && s.ThresholdUsd > 0 && s.LastThresholdSent != today)
         {
+            var mention = RouteMention(DiscordRouteKeys.SpendThreshold) ?? s.MentionOnAlert;
             var sum = await notifier.SummarizeAsync(today, today, ct);
             if (sum.Cost >= s.ThresholdUsd
-                && await notifier.SendThresholdAsync(url, today, sum.Cost, s.ThresholdUsd, s.MentionOnAlert, ct))
+                && await notifier.SendThresholdAsync(url, today, sum.Cost, s.ThresholdUsd, mention, ct))
             {
                 s.LastThresholdSent = today;
                 await db.SaveChangesAsync(ct);
             }
         }
 
-        // Security alerts → forward audit entries created since the last forwarded id.
-        if (s.SecurityAlerts)
-            await ForwardSecurityAsync(db, notifier, s, url, ct);
+        // Security alerts + new-user-signup → forward audit entries created since the last forwarded id.
+        // Both routes read the same audit stream and advance the same high-water mark; each gates which
+        // entries it cares about (security = everything; signup = the user.created/autoprovisioned actions).
+        var securityOn = Enabled(DiscordRouteKeys.SecurityAlerts);
+        var signupOn = Enabled(DiscordRouteKeys.NewUserSignup);
+        if (securityOn || signupOn)
+            await ForwardSecurityAsync(db, notifier, s, url, securityOn, signupOn,
+                RouteMention(DiscordRouteKeys.SecurityAlerts) ?? s.MentionOnAlert,
+                RouteMention(DiscordRouteKeys.NewUserSignup) ?? s.MentionOnAlert, ct);
     }
 
+    // The audit actions that represent a NEW USER arriving (open-signup auto-provision + admin-create).
+    private static readonly HashSet<string> SignupActions =
+        new(StringComparer.Ordinal) { "user.autoprovisioned", "user.created" };
+
     private static async Task ForwardSecurityAsync(
-        UsageDbContext db, DiscordNotifier notifier, NotificationSetting s, string url, CancellationToken ct)
+        UsageDbContext db, DiscordNotifier notifier, NotificationSetting s, string url,
+        bool securityOn, bool signupOn, string? securityMention, string? signupMention, CancellationToken ct)
     {
-        // The baseline (LastAuditAlertId) is set when security alerts are turned on, so history isn't replayed.
+        // The baseline (LastAuditAlertId) is set when a route is turned on, so history isn't replayed.
         var newEntries = await db.AuditEntries.AsNoTracking()
             .Where(a => a.Id > s.LastAuditAlertId).OrderBy(a => a.Id).Take(20).ToListAsync(ct);
         if (newEntries.Count == 0) return;
 
+        var advanced = false;
         foreach (var e in newEntries)
         {
-            // Never let an auth.* event carry the @everyone/@here mention — those can be triggered by
-            // outside parties; reserve pings for admin-initiated user.* management changes.
-            var mention = e.Action.StartsWith("auth.", StringComparison.Ordinal) ? null : s.MentionOnAlert;
-            if (!await notifier.SendSecurityAsync(url, e.Action, e.ActorEmail, e.TargetEmail, e.Detail, mention, ct))
-                break; // stop on failure; retry from here next tick
+            var isSignup = SignupActions.Contains(e.Action);
+            // This entry forwards if security-alerts is on (all entries), OR it's a signup and that route is on.
+            if (securityOn || (signupOn && isSignup))
+            {
+                // Never let an auth.* event carry the @everyone/@here mention — those can be triggered by
+                // outside parties; reserve pings for admin-initiated user.* management changes.
+                var baseMention = (signupOn && isSignup && !securityOn) ? signupMention : securityMention;
+                var mention = e.Action.StartsWith("auth.", StringComparison.Ordinal) ? null : baseMention;
+                if (!await notifier.SendSecurityAsync(url, e.Action, e.ActorEmail, e.TargetEmail, e.Detail, mention, ct))
+                    break; // stop on failure; retry from here next tick
+            }
+            // Advance the high-water mark even for entries this tick chose to skip (e.g. signup-only mode
+            // skipping a non-signup entry) so a skipped entry isn't reconsidered forever.
             s.LastAuditAlertId = e.Id;
+            advanced = true;
         }
-        await db.SaveChangesAsync(ct);
+        if (advanced) await db.SaveChangesAsync(ct);
     }
 
     private static async Task<TimeZoneInfo> ResolveTzAsync(UsageDbContext db, CancellationToken ct)

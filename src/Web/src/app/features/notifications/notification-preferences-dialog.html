@@ -104,6 +104,67 @@
     }
   </section>
 
+  <div class="np-divider" role="separator" aria-hidden="true"></div>
+
+  <section class="np-group" role="group" aria-labelledby="np-discord-head">
+    <div class="np-group__head">
+      <span class="micro-label" id="np-discord-head">Forward to my Discord</span>
+      <p class="np-group__hint">
+        Mirror your notifications to your own Discord via an
+        <strong>incoming webhook</strong> (Server Settings → Integrations → Webhooks → Copy URL). Muted
+        types above are never forwarded. Your URL is encrypted and never shown again — only a masked hint.
+      </p>
+    </div>
+
+    <div class="np-row">
+      <div class="np-row__text">
+        <mat-icon class="np-row__icon">forum</mat-icon>
+        <div class="np-row__id">
+          <div class="np-row__label">Also send my notifications to my Discord</div>
+          <div class="np-row__desc">{{ (discord()?.configured) ? 'Forwarding uses the webhook saved below.' : 'Save a webhook below first.' }}</div>
+        </div>
+      </div>
+      <mat-slide-toggle class="np-toggle"
+                        [checked]="!!discord()?.surfaceDiscord"
+                        [disabled]="discordBusy() || !discord()?.configured"
+                        (change)="surfaceDiscordChange($event.checked)"
+                        aria-label="Also send my notifications to my Discord" />
+    </div>
+
+    @if (discord()?.configured) {
+      <div class="np-discord-saved" role="status">
+        <mat-icon class="np-discord-saved__icon">check_circle</mat-icon>
+        <span class="np-discord-saved__hint">
+          Webhook saved <code>{{ discord()?.hint }}</code>
+        </span>
+        <span class="np-discord-saved__spacer"></span>
+        <button mat-stroked-button type="button" class="np-discord-test"
+                [disabled]="discordTesting()" (click)="testWebhook()">
+          <mat-icon aria-hidden="true">send</mat-icon> {{ discordTesting() ? 'Sending…' : 'Send test' }}
+        </button>
+        <button mat-button type="button" class="np-discord-clear"
+                [disabled]="discordBusy()" (click)="clearWebhook()">
+          <mat-icon aria-hidden="true">link_off</mat-icon> Clear
+        </button>
+      </div>
+    }
+
+    <div class="np-discord-entry">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="np-discord-field">
+        <mat-label>{{ discord()?.configured ? 'Replace webhook URL' : 'Discord webhook URL' }}</mat-label>
+        <input matInput type="password" autocomplete="off" class="np-mono"
+               placeholder="https://discord.com/api/webhooks/…"
+               [ngModel]="webhookInput()" (ngModelChange)="webhookInput.set($event)"
+               (keydown.enter)="saveWebhook()" />
+        <mat-hint>Must be a Discord webhook URL — the server validates it.</mat-hint>
+      </mat-form-field>
+      <button mat-flat-button type="button" color="primary" class="np-discord-save"
+              [disabled]="discordBusy() || !webhookInput().trim()" (click)="saveWebhook()">
+        <mat-icon aria-hidden="true">save</mat-icon> Save
+      </button>
+    </div>
+  </section>
+
   @if (error()) {
     <p class="np-error" role="alert">
       <mat-icon>error_outline</mat-icon> {{ error() }}

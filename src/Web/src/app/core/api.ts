@@ -8,7 +8,7 @@ import {
   AddSupplementRequest, SupplementEntryDto, SupplementMacrosRequest, SupplementMacrosResponse,
   CoffeeEntryDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   AiUsageFilter, AiUsageResponse,
-  NotificationUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, PermissionPreset, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
+  NotificationUpdate, DiscordRoute, DiscordRouteUpdate, MyDiscord, MyDiscordUpdate, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, PermissionItem, PermissionPreset, Presence, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestFoodsResponse, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
   SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
   WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WorkoutXSearchResultDto,
@@ -295,6 +295,30 @@ export class Api {
 
   sendUsageSnapshot(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.base}/notifications/snapshot`, {});
+  }
+
+  // ---- System Discord routing table (notifications.view to read, notifications.manage to write) ----
+  discordRoutes(): Observable<DiscordRoute[]> {
+    return this.http.get<DiscordRoute[]>(`${this.base}/notifications/routes`);
+  }
+
+  updateDiscordRoute(eventKey: string, body: DiscordRouteUpdate): Observable<DiscordRoute> {
+    return this.http.put<DiscordRoute>(`${this.base}/notifications/routes/${encodeURIComponent(eventKey)}`, body);
+  }
+
+  // ---- Per-user "Forward to my Discord" (any authenticated user; caller's own only) ----
+  // The webhook URL is never returned — only { configured, hint, surfaceDiscord }.
+  myDiscord(): Observable<MyDiscord> {
+    return this.http.get<MyDiscord>(`${this.base}/notifications/me/discord`);
+  }
+
+  saveMyDiscord(body: MyDiscordUpdate): Observable<MyDiscord> {
+    return this.http.put<MyDiscord>(`${this.base}/notifications/me/discord`, body);
+  }
+
+  // 200 { message } · 404 if no webhook saved · 502 if Discord rejects.
+  testMyDiscord(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.base}/notifications/me/discord/test`, {});
   }
 
   // ---- Ingest keys (reporter credentials) ----

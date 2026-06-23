@@ -14,7 +14,7 @@ public static partial class LogRedaction
 
     // Secret keys, matched in JSON ("key":"value") and in urlencoded/query pairs (key=value).
     private const string SecretKeys =
-        "token|id_token|access_token|refresh_token|code|password|secret|clientSecret|client_secret|apiKey|api_key|authorization";
+        "token|id_token|access_token|refresh_token|code|password|secret|clientSecret|client_secret|apiKey|api_key|authorization|webhookUrl|webhook_url|discordWebhookUrl|DiscordWebhookUrl";
 
     [GeneratedRegex("\"(?<k>" + SecretKeys + ")\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*\"", RegexOptions.IgnoreCase)]
     private static partial Regex SecretJsonFieldRegex();

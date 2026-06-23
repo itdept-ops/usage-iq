@@ -355,6 +355,110 @@ mat-slide-toggle {
 .notif-row .mention { width: 220px; max-width: 100%; }
 .notif-row .notif-hint { color: var(--tech-text-tertiary); margin-top: 9px; }
 
+/* ---- Discord routing table ---- */
+.route-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--tech-space-5) 0 var(--tech-space-2);
+  padding-top: var(--tech-space-4);
+  border-top: 1px solid var(--tech-border-subtle);
+
+  &__title { color: var(--tech-text-secondary); font-weight: 600; }
+  &__hint { color: var(--tech-text-tertiary); }
+}
+
+.route-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--tech-space-2);
+  padding: var(--tech-space-3);
+  color: var(--tech-text-tertiary);
+  font-size: var(--tech-fs-label);
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  button { margin-left: auto; }
+}
+
+.route-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-r-control);
+  overflow: hidden;
+}
+
+.route-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px minmax(180px, 240px);
+  align-items: center;
+  gap: var(--tech-space-3);
+  padding: 10px var(--tech-space-3);
+  border-top: 1px solid var(--tech-border-subtle);
+  transition: opacity var(--tech-t-control) ease, background-color var(--tech-t-control) ease;
+
+  &:first-child { border-top: none; }
+  &:not(.route-row--head):hover { background: color-mix(in srgb, var(--tech-panel-raised) 50%, transparent); }
+
+  &--head {
+    background: var(--tech-bg-sunken);
+    .route-cell { color: var(--tech-text-tertiary); }
+  }
+
+  &.disabled { opacity: 0.6; }
+  &.saving { opacity: 0.5; pointer-events: none; }
+}
+
+.route-cell {
+  min-width: 0;
+
+  &--event {
+    display: flex;
+    align-items: center;
+    gap: var(--tech-space-2);
+    min-width: 0;
+  }
+  &--toggle { display: flex; justify-content: flex-start; }
+  &--mention { min-width: 0; }
+}
+
+.route-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tech-text-tertiary);
+  opacity: 0.45;
+
+  &.on {
+    background: var(--tech-accent);
+    opacity: 1;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tech-accent) 22%, transparent);
+  }
+}
+
+.route-label {
+  font-family: var(--tech-font-ui);
+  font-size: var(--tech-fs-body);
+  font-weight: 500;
+  color: var(--tech-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.route-key {
+  font-family: var(--tech-font-mono, monospace);
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-tertiary);
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--tech-bg-sunken);
+  white-space: nowrap;
+}
+
+.route-mention { width: 100%; }
+
 /* ───────────────────────── Responsive (phones / small tablets) ───────────────────────── */
 @media (max-width: 640px) {
   .head h2 { font-size: clamp(20px, 6vw, var(--tech-fs-display)); }
@@ -407,6 +511,21 @@ mat-slide-toggle {
 
     .threshold,
     .mention { width: 100%; }
+  }
+
+  /* Routing table: collapse each row into a stacked card (label, toggle, mention). */
+  .route-table { border: none; }
+  .route-row {
+    grid-template-columns: 1fr;
+    gap: var(--tech-space-2);
+    padding: var(--tech-space-3);
+    border: 1px solid var(--tech-border-subtle);
+    border-radius: var(--tech-r-control);
+    margin-bottom: var(--tech-space-2);
+
+    &--head { display: none; }
+    .route-cell--event { flex-wrap: wrap; }
+    .route-mention { width: 100%; }
   }
 
   /* Every form field in a stacked grid spans the row (digest hour, weekly day, etc.). */

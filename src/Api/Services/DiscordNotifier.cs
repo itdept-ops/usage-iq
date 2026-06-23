@@ -86,9 +86,73 @@ public sealed class DiscordNotifier(IHttpClientFactory httpFactory, UsageDbConte
             content: mention, allowMentions: !string.IsNullOrWhiteSpace(mention));
     }
 
+    /// <summary>
+    /// Forward a single per-user in-app notification to that user's personal Discord webhook as a spruced
+    /// embed (kind-colored, author = the actor, the notification text as the description, a deep-link, and
+    /// the Usage IQ footer). Never pings (per-user forwards carry no @here/@role). Returns the post outcome
+    /// AND the HTTP status / retry-after so the caller's rate-limiter can respect a Discord 429.
+    /// </summary>
+    public Task<DiscordPostResult> ForwardUserNotificationAsync(
+        string url, string kind, string? actorName, string text, string? deepLink, CancellationToken ct)
+    {
+        var color = kind switch
+        {
+            "mention" => Amber,
+            "directMessage" => Blue,
+            "systemSyncFailed" or "systemFleetOffline" => Red,
+            _ when kind.StartsWith("system", StringComparison.Ordinal) => Green,
+            _ when kind.StartsWith("family", StringComparison.Ordinal) => Green,
+            _ => Blue,
+        };
+        var author = string.IsNullOrWhiteSpace(actorName) ? "Usage IQ" : actorName!;
+        var title = KindTitle(kind);
+        var description = Trunc(text, 2000);
+        var fields = string.IsNullOrWhiteSpace(deepLink)
+            ? NoFields
+            : new[] { ("🔗 Open", $"[View in Usage IQ]({PublicLink(deepLink!)})", false) };
+
+        return PostWithResultAsync(url, author, title, description, color, fields, ct);
+    }
+
+    private static string KindTitle(string kind) => kind switch
+    {
+        "mention" => "💬 You were mentioned",
+        "directMessage" => "✉️ New direct message",
+        "channelMessage" => "💬 New message",
+        "systemSyncFailed" => "⚠️ Sync failed",
+        "systemUserJoined" => "👋 New member",
+        "systemFleetOffline" => "🛰️ Fleet offline",
+        "familyReminder" => "⏰ Reminder",
+        "familyTimer" => "⏲️ Timer finished",
+        "familyBriefing" => "🌅 Daily briefing",
+        "familyHeadsUp" => "📣 Heads up",
+        _ => "🔔 Notification",
+    };
+
+    // The deep-link the in-app notification carries is an app-relative path (e.g. "/chat?c=1&m=2").
+    // The forwarder turns it into the public absolute URL for the Discord button.
+    private const string PublicBase = "https://usageiq.online";
+    private static string PublicLink(string relative) =>
+        relative.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            ? relative
+            : PublicBase + (relative.StartsWith('/') ? relative : "/" + relative);
+
     private static readonly (string, string, bool)[] NoFields = Array.Empty<(string, string, bool)>();
 
+    /// <summary>The outcome of a single Discord post: success + the HTTP status and any 429 retry-after,
+    /// so a caller's rate-limiter can back off. <see cref="RetryAfter"/> is null unless Discord 429'd.</summary>
+    public readonly record struct DiscordPostResult(bool Ok, int? Status, TimeSpan? RetryAfter)
+    {
+        public bool IsRateLimited => Status == 429;
+    }
+
     private async Task<bool> PostAsync(
+        string url, string author, string? title, string? description, int color,
+        (string Name, string Value, bool Inline)[] fields, CancellationToken ct,
+        string? content = null, bool allowMentions = false)
+        => (await PostWithResultAsync(url, author, title, description, color, fields, ct, content, allowMentions)).Ok;
+
+    private async Task<DiscordPostResult> PostWithResultAsync(
         string url, string author, string? title, string? description, int color,
         (string Name, string Value, bool Inline)[] fields, CancellationToken ct,
         string? content = null, bool allowMentions = false)
@@ -96,7 +160,7 @@ public sealed class DiscordNotifier(IHttpClientFactory httpFactory, UsageDbConte
         if (!IsValidWebhook(url))
         {
             logger.LogWarning("Refusing to post to a non-Discord webhook URL.");
-            return false;
+            return new DiscordPostResult(false, null, null);
         }
 
         var payload = new
@@ -134,17 +198,22 @@ public sealed class DiscordNotifier(IHttpClientFactory httpFactory, UsageDbConte
             if (finalHost is not null && !AllowedHosts.Contains(finalHost))
             {
                 logger.LogWarning("Discord request ended on an unexpected host; ignoring response.");
-                return false;
+                return new DiscordPostResult(false, null, null);
             }
+
+            TimeSpan? retryAfter = null;
+            if ((int)res.StatusCode == 429)
+                retryAfter = res.Headers.RetryAfter?.Delta
+                    ?? (double.TryParse(res.Headers.RetryAfter?.ToString(), out var secs) ? TimeSpan.FromSeconds(secs) : null);
 
             if (!res.IsSuccessStatusCode)
                 logger.LogWarning("Discord webhook returned {Status}.", (int)res.StatusCode);
-            return res.IsSuccessStatusCode;
+            return new DiscordPostResult(res.IsSuccessStatusCode, (int)res.StatusCode, retryAfter);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to post to Discord webhook.");
-            return false;
+            return new DiscordPostResult(false, null, null);
         }
     }
 

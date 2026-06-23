@@ -25,5 +25,23 @@ public class NotificationPreference
     /// <summary>Surface notifications as native browser notifications.</summary>
     public bool SurfaceBrowser { get; set; } = false;
 
+    /// <summary>
+    /// Forward this user's in-app notifications to their personal Discord webhook. OFF by default; only
+    /// effective when <see cref="DiscordWebhookEnc"/> is also set. The user controls this for themselves.
+    /// </summary>
+    public bool SurfaceDiscord { get; set; } = false;
+
+    /// <summary>
+    /// The user's personal Discord webhook URL, encrypted at rest via <c>TokenProtector</c> (AES-GCM
+    /// base64 blob: nonce|tag|ciphertext). The PLAINTEXT URL is NEVER persisted. Null = not configured.
+    /// </summary>
+    public string? DiscordWebhookEnc { get; set; }
+
+    /// <summary>
+    /// A non-sensitive masked hint for the configured webhook (e.g. <c>discord.com/api/webhooks/12345…/abcd</c>),
+    /// safe to return to the owner so the UI can show "configured as …" without ever exposing the secret URL.
+    /// </summary>
+    public string? DiscordWebhookHint { get; set; }
+
     public DateTime UpdatedUtc { get; set; }
 }

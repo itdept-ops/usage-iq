@@ -19,6 +19,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<RequestLog> RequestLogs => Set<RequestLog>();
     public DbSet<AiUsageLog> AiUsageLogs => Set<AiUsageLog>();
     public DbSet<NotificationSetting> NotificationSettings => Set<NotificationSetting>();
+    public DbSet<DiscordRoute> DiscordRoutes => Set<DiscordRoute>();
     public DbSet<ShareLink> ShareLinks => Set<ShareLink>();
     public DbSet<ShareAccess> ShareAccesses => Set<ShareAccess>();
     public DbSet<IngestKey> IngestKeys => Set<IngestKey>();
@@ -247,6 +248,23 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasData(new NotificationSetting { Id = 1 });
         });
 
+        b.Entity<DiscordRoute>(e =>
+        {
+            e.Property(x => x.EventKey).HasMaxLength(64);
+            e.Property(x => x.Label).HasMaxLength(120);
+            e.Property(x => x.Mention).HasMaxLength(64);
+            // One row per routable event; also the lookup the senders use.
+            e.HasIndex(x => x.EventKey).IsUnique();
+            // Seed the routable events DISABLED; the migration that adds this then copies the existing
+            // NotificationSetting flags into Enabled so live config is preserved (digest/threshold/security).
+            e.HasData(
+                new DiscordRoute { Id = 1, EventKey = DiscordRouteKeys.DailyDigest, Label = "Daily digest", SortOrder = 1 },
+                new DiscordRoute { Id = 2, EventKey = DiscordRouteKeys.WeeklyDigest, Label = "Weekly digest", SortOrder = 2 },
+                new DiscordRoute { Id = 3, EventKey = DiscordRouteKeys.SpendThreshold, Label = "Spend threshold alert", SortOrder = 3 },
+                new DiscordRoute { Id = 4, EventKey = DiscordRouteKeys.SecurityAlerts, Label = "Security alerts", SortOrder = 4 },
+                new DiscordRoute { Id = 5, EventKey = DiscordRouteKeys.NewUserSignup, Label = "New user signup", SortOrder = 5 });
+        });
+
         b.Entity<ShareLink>(e =>
         {
             e.Property(x => x.TokenHash).HasMaxLength(64);
@@ -457,6 +475,11 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.NotifySystemEvents).HasDefaultValue(true);
             e.Property(x => x.SurfaceToasts).HasDefaultValue(true);
             e.Property(x => x.SurfaceBrowser).HasDefaultValue(false);
+            e.Property(x => x.SurfaceDiscord).HasDefaultValue(false);
+            // The encrypted webhook is a base64 AES-GCM blob (nonce|tag|ciphertext) — generous cap (matches
+            // GoogleCalendarConnection.EncryptedRefreshToken). The plaintext URL is NEVER persisted.
+            e.Property(x => x.DiscordWebhookEnc).HasMaxLength(2048);
+            e.Property(x => x.DiscordWebhookHint).HasMaxLength(120);
             e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
             e.HasIndex(x => x.UserEmail).IsUnique();
         });

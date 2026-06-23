@@ -1,12 +1,18 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatIconModule } from '@angular/material/icon';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
+import { Api } from '../../core/api';
 import { ChatRealtime } from '../../core/chat-realtime';
-import { NotificationPreferenceDto } from '../../core/models';
+import { MyDiscord, NotificationPreferenceDto } from '../../core/models';
 
 /** Whether the browser exposes the Notification API at all (false in unsupported/older contexts). */
 function browserNotificationsSupported(): boolean {
@@ -26,12 +32,17 @@ function browserNotificationsSupported(): boolean {
  */
 @Component({
   selector: 'app-notification-preferences-dialog',
-  imports: [MatDialogModule, MatButtonModule, MatSlideToggleModule, MatIconModule],
+  imports: [
+    FormsModule, MatDialogModule, MatButtonModule, MatSlideToggleModule, MatIconModule,
+    MatFormFieldModule, MatInputModule, MatSnackBarModule,
+  ],
   templateUrl: './notification-preferences-dialog.html',
   styleUrl: './notification-preferences-dialog.scss',
 })
 export class NotificationPreferencesDialog {
   private chat = inject(ChatRealtime);
+  private api = inject(Api);
+  private snack = inject(MatSnackBar);
   private ref = inject(MatDialogRef<NotificationPreferencesDialog, NotificationPreferenceDto>);
 
   /** Editable working copy, seeded from the live preferences signal. */
@@ -68,6 +79,90 @@ export class NotificationPreferencesDialog {
   /** Flip a trigger/surface boolean on the working copy. */
   patch<K extends keyof NotificationPreferenceDto>(key: K, value: boolean): void {
     this.model.update(m => ({ ...m, [key]: value }));
+  }
+
+  // =========================================================================
+  // "Forward to my Discord" — a SEPARATE per-user endpoint (/api/notifications/me/discord).
+  // The webhook URL is never returned by the server: we only know { configured, hint, surfaceDiscord }.
+  // The text input is for ENTERING a new/replacement URL; a saved one shows only the masked hint + Clear.
+  // =========================================================================
+
+  /** Server-side state (configured/hint/surfaceDiscord). null until the GET resolves. */
+  readonly discord = signal<MyDiscord | null>(null);
+  /** Working value of the webhook URL input (only ever holds what the user just typed, never the saved URL). */
+  readonly webhookInput = signal('');
+  readonly discordBusy = signal(false);
+  readonly discordTesting = signal(false);
+
+  constructor() {
+    // Load the caller's own Discord state. Swallows errors (the section just stays in its default empty state).
+    this.api.myDiscord().subscribe({
+      next: d => this.discord.set(d),
+      error: () => { /* leave null — section renders as "not configured" */ },
+    });
+  }
+
+  /** Toggle "also forward my notifications to Discord" and persist it (keeps the stored webhook). */
+  surfaceDiscordChange(value: boolean): void {
+    const prev = this.discord();
+    this.discord.set({ configured: prev?.configured ?? false, hint: prev?.hint ?? null, surfaceDiscord: value });
+    this.discordBusy.set(true);
+    this.api.saveMyDiscord({ webhookUrl: null, surfaceDiscord: value }).subscribe({
+      next: d => { this.discord.set(d); this.discordBusy.set(false); },
+      error: () => {
+        this.discord.set(prev); // revert the optimistic flip
+        this.discordBusy.set(false);
+        this.snack.open('Could not update Discord forwarding', 'Dismiss', { duration: 4000 });
+      },
+    });
+  }
+
+  /** Save the typed webhook URL (validated + encrypted server-side). Graceful 400 on a non-Discord URL. */
+  saveWebhook(): void {
+    const url = this.webhookInput().trim();
+    if (!url || this.discordBusy()) return;
+    this.discordBusy.set(true);
+    this.api.saveMyDiscord({ webhookUrl: url, surfaceDiscord: this.discord()?.surfaceDiscord ?? false }).subscribe({
+      next: d => {
+        this.discord.set(d);
+        this.webhookInput.set('');
+        this.discordBusy.set(false);
+        this.snack.open('Discord webhook saved', 'OK', { duration: 2500 });
+      },
+      error: (e: HttpErrorResponse) => {
+        this.discordBusy.set(false);
+        const msg = e.status === 400
+          ? (e.error?.message ?? 'That doesn’t look like a Discord webhook URL.')
+          : 'Could not save your Discord webhook.';
+        this.snack.open(msg, 'Dismiss', { duration: 5000 });
+      },
+    });
+  }
+
+  /** Clear the stored webhook ("" = clear). Leaves the surface toggle as-is. */
+  clearWebhook(): void {
+    if (this.discordBusy()) return;
+    this.discordBusy.set(true);
+    this.api.saveMyDiscord({ webhookUrl: '', surfaceDiscord: this.discord()?.surfaceDiscord ?? false }).subscribe({
+      next: d => { this.discord.set(d); this.webhookInput.set(''); this.discordBusy.set(false); this.snack.open('Discord webhook removed', 'OK', { duration: 2500 }); },
+      error: () => { this.discordBusy.set(false); this.snack.open('Could not remove your Discord webhook', 'Dismiss', { duration: 4000 }); },
+    });
+  }
+
+  /** Send a test message to the saved webhook. 404 = none saved · 502 = Discord rejected. */
+  testWebhook(): void {
+    if (this.discordTesting()) return;
+    this.discordTesting.set(true);
+    this.api.testMyDiscord().subscribe({
+      next: r => { this.discordTesting.set(false); this.snack.open(r.message ?? 'Test sent', 'OK', { duration: 4000 }); },
+      error: (e: HttpErrorResponse) => {
+        this.discordTesting.set(false);
+        const fallback = e.status === 404
+          ? 'Save a webhook first, then send a test.'
+          : e.status === 502 ? 'Discord rejected the test message.' : 'Could not send the test.';
+        this.snack.open(e.error?.message ?? fallback, 'Dismiss', { duration: 5000 });
+      },
+    });
   }
 
   /**

@@ -33,20 +33,15 @@ public static class NotificationsEndpoints
                 else return Results.BadRequest(new { message = "Enter a valid Discord webhook URL (https://discord.com/api/webhooks/…)." });
             }
 
+            // NotificationSetting keeps the WEBHOOK + global Enabled + digest SCHEDULE (hour/day) + threshold
+            // VALUE + global mention. WHICH events forward (daily/weekly/threshold/security) now lives in the
+            // DiscordRoute routing table (PUT /routes/{eventKey}), not these booleans.
             s.Enabled = req.Enabled;
             s.DigestHourLocal = Math.Clamp(req.DigestHourLocal, 0, 23);
-            s.DailyDigest = req.DailyDigest;
-            s.WeeklyDigest = req.WeeklyDigest;
             s.WeeklyDay = Math.Clamp(req.WeeklyDay, 0, 6);
-            s.ThresholdEnabled = req.ThresholdEnabled;
             s.ThresholdUsd = Math.Max(0, req.ThresholdUsd);
             var mention = req.MentionOnAlert?.Trim();
             s.MentionOnAlert = string.IsNullOrEmpty(mention) ? null : (mention.Length > 64 ? mention[..64] : mention);
-
-            // When security alerts are turned ON, baseline to the newest audit id so existing history isn't replayed.
-            if (req.SecurityAlerts && !s.SecurityAlerts)
-                s.LastAuditAlertId = await db.AuditEntries.MaxAsync(a => (long?)a.Id, ct) ?? 0;
-            s.SecurityAlerts = req.SecurityAlerts;
 
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToDto(s));
@@ -80,7 +75,126 @@ public static class NotificationsEndpoints
                 : Results.Json(new { message = "Discord rejected the message — double-check the webhook URL." },
                     statusCode: StatusCodes.Status502BadGateway);
         }).RequirePermission(Permissions.NotificationsManage).RequireRateLimiting("notif-test");
+
+        // ---- System Discord ROUTING TABLE (admin) ----
+        // Which routable system events forward to Discord, and their per-route mention. Reads/writes are
+        // gated by the same notifications.manage group; the webhook/global-enable/schedule still live on the
+        // singleton NotificationSetting above.
+        g.MapGet("/routes", async (UsageDbContext db, CancellationToken ct) =>
+        {
+            var rows = await db.DiscordRoutes.AsNoTracking().OrderBy(r => r.SortOrder).ToListAsync(ct);
+            return Results.Ok(rows.Select(RouteDto));
+        }).RequireAnyPermission(Permissions.NotificationsView, Permissions.NotificationsManage);
+
+        g.MapPut("/routes/{eventKey}", async (string eventKey, DiscordRouteUpdateRequest req, UsageDbContext db, CancellationToken ct) =>
+        {
+            var route = await db.DiscordRoutes.FirstOrDefaultAsync(r => r.EventKey == eventKey, ct);
+            if (route is null) return Results.NotFound(new { message = "Unknown routing event." });
+
+            // When the security-alerts route is turned ON, baseline the audit high-water mark so existing
+            // history isn't replayed (the same guard the old SecurityAlerts flag had, now route-owned).
+            if (eventKey == DiscordRouteKeys.SecurityAlerts && req.Enabled && !route.Enabled)
+            {
+                var s = await db.NotificationSettings.FirstOrDefaultAsync(ct);
+                if (s is not null)
+                    s.LastAuditAlertId = await db.AuditEntries.MaxAsync(a => (long?)a.Id, ct) ?? 0;
+            }
+
+            route.Enabled = req.Enabled;
+            var mention = req.Mention?.Trim();
+            route.Mention = string.IsNullOrEmpty(mention) ? null : (mention.Length > 64 ? mention[..64] : mention);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(RouteDto(route));
+        }).RequirePermission(Permissions.NotificationsManage);
+
+        // ---- PER-USER Discord (the CALLER'S OWN webhook; authenticated, no admin gate) ----
+        // A user surfaces their own in-app notifications to their personal Discord. They can only ever
+        // read/set/test/clear THEIR OWN — keyed by their email — never another user's. The webhook URL is
+        // SSRF-validated + encrypted at rest; responses expose only {configured, hint, surfaceDiscord}.
+        var me = app.MapGroup("/api/notifications/me/discord").RequireAuthorization();
+
+        me.MapGet("/", async (CurrentUserAccessor accessor, UsageDbContext db, CancellationToken ct) =>
+        {
+            var user = (await accessor.GetUserAsync(ct))!;
+            var pref = await db.NotificationPreferences.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserEmail == user.Email, ct);
+            return Results.Ok(MyDiscord(pref));
+        });
+
+        me.MapPut("/", async (MyDiscordUpdateRequest req, CurrentUserAccessor accessor, UsageDbContext db, TokenProtector protector, CancellationToken ct) =>
+        {
+            var user = (await accessor.GetUserAsync(ct))!;
+            var pref = await db.NotificationPreferences.FirstOrDefaultAsync(p => p.UserEmail == user.Email, ct);
+            if (pref is null)
+            {
+                pref = new NotificationPreference { UserEmail = user.Email };
+                db.NotificationPreferences.Add(pref);
+            }
+
+            // Webhook: null = leave · "" = clear · value = validate (SSRF allowlist) + encrypt + store hint.
+            if (req.WebhookUrl is not null)
+            {
+                var url = req.WebhookUrl.Trim();
+                if (url.Length == 0)
+                {
+                    pref.DiscordWebhookEnc = null;
+                    pref.DiscordWebhookHint = null;
+                }
+                else if (DiscordWebhookValidator.IsValid(url))
+                {
+                    // Encrypt at rest; persist ONLY the blob + a masked, non-sensitive hint. Never the plaintext.
+                    pref.DiscordWebhookEnc = protector.Protect(url);
+                    pref.DiscordWebhookHint = DiscordWebhookValidator.Hint(url);
+                }
+                else
+                {
+                    return Results.BadRequest(new { message = "Enter a valid Discord webhook URL (https://discord.com/api/webhooks/…)." });
+                }
+            }
+
+            pref.SurfaceDiscord = req.SurfaceDiscord;
+            pref.UpdatedUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(MyDiscord(pref));
+        });
+
+        me.MapPost("/test", async (CurrentUserAccessor accessor, UsageDbContext db, TokenProtector protector, DiscordNotifier notifier, CancellationToken ct) =>
+        {
+            var user = (await accessor.GetUserAsync(ct))!;
+            var pref = await db.NotificationPreferences.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserEmail == user.Email, ct);
+            if (pref is null || string.IsNullOrEmpty(pref.DiscordWebhookEnc))
+                return Results.NotFound(new { message = "Save your Discord webhook first." });
+
+            var url = protector.Unprotect(pref.DiscordWebhookEnc);
+            if (string.IsNullOrEmpty(url) || !DiscordWebhookValidator.IsValid(url))
+                return Results.NotFound(new { message = "Save your Discord webhook first." });
+
+            var ok = await notifier.ForwardUserNotificationAsync(
+                url!, "directMessage", "Usage IQ",
+                "Your personal Discord is wired up — your notifications will land right here.", null, ct);
+            return ok.Ok
+                ? Results.Ok(new { message = "Test message sent to your Discord." })
+                : Results.Json(new { message = "Discord rejected the message — double-check the webhook URL." },
+                    statusCode: StatusCodes.Status502BadGateway);
+        }).RequireRateLimiting("notif-test");
     }
+
+    private static DiscordRouteDto RouteDto(DiscordRoute r) => new()
+    {
+        EventKey = r.EventKey,
+        Label = r.Label,
+        Enabled = r.Enabled,
+        Mention = r.Mention,
+        SortOrder = r.SortOrder,
+    };
+
+    private static MyDiscordDto MyDiscord(NotificationPreference? p) => new()
+    {
+        Configured = !string.IsNullOrEmpty(p?.DiscordWebhookEnc),
+        Hint = p?.DiscordWebhookHint,
+        SurfaceDiscord = p?.SurfaceDiscord ?? false,
+    };
 
     private static NotificationSettingDto ToDto(NotificationSetting s) => new()
     {
@@ -88,12 +202,8 @@ public static class NotificationsEndpoints
         WebhookMasked = Mask(s.DiscordWebhookUrl),
         Enabled = s.Enabled,
         DigestHourLocal = s.DigestHourLocal,
-        DailyDigest = s.DailyDigest,
-        WeeklyDigest = s.WeeklyDigest,
         WeeklyDay = s.WeeklyDay,
-        ThresholdEnabled = s.ThresholdEnabled,
         ThresholdUsd = s.ThresholdUsd,
-        SecurityAlerts = s.SecurityAlerts,
         MentionOnAlert = s.MentionOnAlert,
     };
 

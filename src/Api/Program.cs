@@ -80,6 +80,11 @@ builder.Services.AddHttpClient("discord").ConfigurePrimaryHttpMessageHandler(() 
     new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(5) });
 builder.Services.AddScoped<DiscordNotifier>();
 builder.Services.AddHostedService<NotificationBackgroundService>();
+// Per-user notification → personal-Discord forwarder: a SINGLETON queue (holds the channel + per-user
+// rate buckets) that ALSO runs as the hosted draining service. The fan-out path enqueues fire-and-forget;
+// the worker decrypts each user's webhook in-memory at send time, never blocking the request path.
+builder.Services.AddSingleton<DiscordForwarder>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DiscordForwarder>());
 
 // Food & fitness tracker: USDA FoodData Central proxy. The api_key is a secret (appsettings.Local.json
 // locally / Usda__ApiKey env var in prod) and is never logged; when blank the food lookup endpoints

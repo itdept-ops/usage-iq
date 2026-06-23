@@ -20,7 +20,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
-  IngestionSource, NotificationSettings, NotificationUpdate,
+  DiscordRoute, IngestionSource, NotificationSettings, NotificationUpdate,
   Settings as SettingsModel, SyncResult, SyncStatus, PERM,
 } from '../../core/models';
 import { timeAgo, humanizeInterval } from '../../shared/format';
@@ -52,13 +52,23 @@ export class Settings {
   readonly status = signal<SyncStatus | null>(null);
   private readonly now = signal(Date.now());
 
-  // ---- Discord notifications ----
+  // ---- Discord notifications (admin system config) ----
   readonly notif = signal<NotificationSettings | null>(null);
   readonly webhookInput = signal('');
   readonly savingNotif = signal(false);
   readonly testingNotif = signal(false);
   readonly sendingSnapshot = signal(false);
   readonly weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  /** True when the caller may edit (vs. read-only view) the Discord system config + routing table. */
+  readonly canManageNotif = computed(() => this.auth.hasPermission(PERM.notificationsManage));
+
+  // ---- Discord routing table (which events forward) ----
+  readonly routes = signal<DiscordRoute[]>([]);
+  readonly routesLoading = signal(false);
+  readonly routesError = signal(false);
+  /** eventKey currently being saved (disables that row's controls + shows a spinner). */
+  readonly savingRouteKey = signal<string | null>(null);
 
   /** newRecordsBySource as [name, count] pairs for the template. */
   readonly lastSyncBySource = computed(() => Object.entries(this.lastSync()?.newRecordsBySource ?? {}));
@@ -118,9 +128,46 @@ export class Settings {
       next: s => this.sources.set(s),
       error: () => this.snack.open('Failed to load sources', 'Dismiss', { duration: 4000 }),
     });
-    if (this.auth.hasPermission(PERM.settingsManage)) {
+    if (this.auth.hasPermission(PERM.notificationsView) || this.auth.hasPermission(PERM.notificationsManage)) {
       this.api.notifications().subscribe({ next: n => this.notif.set(n), error: () => { /* non-critical */ } });
+      this.loadRoutes();
     }
+  }
+
+  loadRoutes(): void {
+    this.routesLoading.set(true);
+    this.routesError.set(false);
+    this.api.discordRoutes().subscribe({
+      next: r => { this.routes.set([...r].sort((a, b) => a.sortOrder - b.sortOrder)); this.routesLoading.set(false); },
+      error: () => { this.routesLoading.set(false); this.routesError.set(true); },
+    });
+  }
+
+  /** Toggle a route's enabled flag (persists immediately; reverts the row on error). */
+  toggleRoute(route: DiscordRoute, enabled: boolean): void {
+    this.saveRoute(route, { enabled, mention: route.mention });
+  }
+
+  /** Persist a route's mention text (called on blur; persists with the current enabled state). */
+  saveRouteMention(route: DiscordRoute, mention: string): void {
+    const trimmed = mention.trim();
+    if ((trimmed || null) === (route.mention || null)) return; // no change
+    this.saveRoute(route, { enabled: route.enabled, mention: trimmed || null });
+  }
+
+  private saveRoute(route: DiscordRoute, body: { enabled: boolean; mention: string | null }): void {
+    this.savingRouteKey.set(route.eventKey);
+    this.api.updateDiscordRoute(route.eventKey, body).subscribe({
+      next: saved => {
+        this.routes.update(list => list.map(r => r.eventKey === saved.eventKey ? saved : r));
+        this.savingRouteKey.set(null);
+      },
+      error: (e: HttpErrorResponse) => {
+        this.savingRouteKey.set(null);
+        this.loadRoutes(); // re-sync the row to the server's truth
+        this.snack.open(e.error?.message ?? 'Could not update route', 'Dismiss', { duration: 5000 });
+      },
+    });
   }
 
   patchNotif<K extends keyof NotificationSettings>(key: K, value: NotificationSettings[K]): void {
@@ -130,10 +177,8 @@ export class Settings {
   private notifBody(over: Partial<NotificationUpdate> = {}): NotificationUpdate {
     const n = this.notif()!;
     return {
-      enabled: n.enabled, digestHourLocal: n.digestHourLocal, dailyDigest: n.dailyDigest,
-      weeklyDigest: n.weeklyDigest, weeklyDay: n.weeklyDay,
-      thresholdEnabled: n.thresholdEnabled, thresholdUsd: n.thresholdUsd,
-      securityAlerts: n.securityAlerts, mentionOnAlert: n.mentionOnAlert, ...over,
+      enabled: n.enabled, digestHourLocal: n.digestHourLocal, weeklyDay: n.weeklyDay,
+      thresholdUsd: n.thresholdUsd, mentionOnAlert: n.mentionOnAlert, ...over,
     };
   }
 

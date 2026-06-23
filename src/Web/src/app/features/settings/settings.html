@@ -89,83 +89,135 @@
     }
   </mat-card>
 
-  @if (auth.hasPermission(PERM.settingsManage) && notif(); as n) {
-    <mat-card appearance="outlined" class="panel s-panel">
-      <div class="s-panel-head">
-        <span class="panel-header">Discord notifications</span>
-        <mat-slide-toggle [ngModel]="n.enabled" (ngModelChange)="patchNotif('enabled', $event)">Enabled</mat-slide-toggle>
-      </div>
-      <p class="hint">Post usage digests and spend alerts to a Discord channel via an
-        <strong>incoming webhook</strong> (Server&nbsp;Settings → Integrations → Webhooks → Copy URL). The URL is a
-        secret — it's stored masked and never shown in full or written to the action log.</p>
+  @if (auth.hasPermission(PERM.notificationsView) || auth.hasPermission(PERM.notificationsManage)) {
+    @if (notif(); as n) {
+      <mat-card appearance="outlined" class="panel s-panel">
+        <div class="s-panel-head">
+          <span class="panel-header">Discord notifications</span>
+          <mat-slide-toggle [ngModel]="n.enabled" (ngModelChange)="patchNotif('enabled', $event)"
+                            [disabled]="!canManageNotif()">Enabled</mat-slide-toggle>
+        </div>
+        <p class="hint">Post usage digests and spend alerts to a Discord channel via an
+          <strong>incoming webhook</strong> (Server&nbsp;Settings → Integrations → Webhooks → Copy URL). The URL is a
+          secret — it's stored masked and never shown in full or written to the action log. The
+          <strong>routing table</strong> below controls which events actually forward.</p>
 
-      <div class="field-grid">
-        <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
-          <mat-label>Discord webhook URL</mat-label>
-          <input matInput class="mono-input" type="password" autocomplete="off"
-                 placeholder="https://discord.com/api/webhooks/…"
-                 [ngModel]="webhookInput()" (ngModelChange)="webhookInput.set($event)" />
-          <mat-hint>{{ n.webhookConfigured ? 'Configured (' + n.webhookMasked + ') — paste a new URL to replace it.' : 'Paste your channel webhook URL.' }}</mat-hint>
-        </mat-form-field>
-      </div>
+        <div class="field-grid">
+          <mat-form-field appearance="outline" class="full" subscriptSizing="dynamic">
+            <mat-label>Discord webhook URL</mat-label>
+            <input matInput class="mono-input" type="password" autocomplete="off"
+                   placeholder="https://discord.com/api/webhooks/…"
+                   [ngModel]="webhookInput()" (ngModelChange)="webhookInput.set($event)"
+                   [disabled]="!canManageNotif()" />
+            <mat-hint>{{ n.webhookConfigured ? 'Configured (' + n.webhookMasked + ') — paste a new URL to replace it.' : 'Paste your channel webhook URL.' }}</mat-hint>
+          </mat-form-field>
+        </div>
 
-      <div class="notif-row">
-        <mat-slide-toggle [ngModel]="n.dailyDigest" (ngModelChange)="patchNotif('dailyDigest', $event)">Daily digest</mat-slide-toggle>
-        <mat-slide-toggle [ngModel]="n.weeklyDigest" (ngModelChange)="patchNotif('weeklyDigest', $event)">Weekly digest</mat-slide-toggle>
-      </div>
+        <div class="field-grid">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Digest hour (local)</mat-label>
+            <input matInput class="mono-input" type="number" min="0" max="23"
+                   [ngModel]="n.digestHourLocal" (ngModelChange)="patchNotif('digestHourLocal', +$event)"
+                   [disabled]="!canManageNotif()" />
+            <mat-hint>0–23, in your display timezone</mat-hint>
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Weekly digest day</mat-label>
+            <mat-select [ngModel]="n.weeklyDay" (ngModelChange)="patchNotif('weeklyDay', $event)"
+                        [disabled]="!canManageNotif()">
+              @for (d of weekdays; track $index) { <mat-option [value]="$index">{{ d }}</mat-option> }
+            </mat-select>
+            <mat-hint>Used when the weekly-digest route is on.</mat-hint>
+          </mat-form-field>
+        </div>
 
-      <div class="field-grid">
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Digest hour (local)</mat-label>
-          <input matInput class="mono-input" type="number" min="0" max="23"
-                 [ngModel]="n.digestHourLocal" (ngModelChange)="patchNotif('digestHourLocal', +$event)" />
-          <mat-hint>0–23, in your display timezone</mat-hint>
-        </mat-form-field>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Weekly digest day</mat-label>
-          <mat-select [ngModel]="n.weeklyDay" (ngModelChange)="patchNotif('weeklyDay', $event)" [disabled]="!n.weeklyDigest">
-            @for (d of weekdays; track $index) { <mat-option [value]="$index">{{ d }}</mat-option> }
-          </mat-select>
-        </mat-form-field>
-      </div>
+        <div class="notif-row">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="threshold">
+            <mat-label>Spend alert at ($ / day)</mat-label>
+            <input matInput class="mono-input" type="number" min="0" step="10"
+                   [ngModel]="n.thresholdUsd" (ngModelChange)="patchNotif('thresholdUsd', +$event)"
+                   [disabled]="!canManageNotif()" />
+            <mat-hint>The level the spend-threshold route fires at.</mat-hint>
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mention">
+            <mat-label>Global mention</mat-label>
+            <input matInput class="mono-input" placeholder="@here or <@&roleId>" maxlength="64"
+                   [ngModel]="n.mentionOnAlert" (ngModelChange)="patchNotif('mentionOnAlert', $event)"
+                   [disabled]="!canManageNotif()" />
+            <mat-hint>Default ping; a route's own mention overrides it.</mat-hint>
+          </mat-form-field>
+        </div>
 
-      <div class="notif-row">
-        <mat-slide-toggle [ngModel]="n.thresholdEnabled" (ngModelChange)="patchNotif('thresholdEnabled', $event)">Daily spend alert</mat-slide-toggle>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="threshold">
-          <mat-label>Alert at ($ / day)</mat-label>
-          <input matInput class="mono-input" type="number" min="0" step="10"
-                 [ngModel]="n.thresholdUsd" (ngModelChange)="patchNotif('thresholdUsd', +$event)" [disabled]="!n.thresholdEnabled" />
-        </mat-form-field>
-      </div>
-
-      <div class="notif-row">
-        <mat-slide-toggle [ngModel]="n.securityAlerts" (ngModelChange)="patchNotif('securityAlerts', $event)">Security alerts</mat-slide-toggle>
-        <span class="notif-hint micro-label">User changes &amp; denied sign-ins → Discord</span>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mention">
-          <mat-label>Mention on alerts</mat-label>
-          <input matInput class="mono-input" placeholder="@here or <@&roleId>" maxlength="64"
-                 [ngModel]="n.mentionOnAlert" (ngModelChange)="patchNotif('mentionOnAlert', $event)" />
-          <mat-hint>Pings on threshold/security alerts only.</mat-hint>
-        </mat-form-field>
-      </div>
-
-      <div class="actions">
-        <button mat-flat-button color="primary" [disabled]="savingNotif()" (click)="saveNotif()">
-          <mat-icon aria-hidden="true">save</mat-icon> {{ savingNotif() ? 'Saving…' : 'Save' }}
-        </button>
-        <button mat-stroked-button [disabled]="testingNotif() || !n.webhookConfigured" (click)="testNotif()">
-          <mat-icon aria-hidden="true">send</mat-icon> {{ testingNotif() ? 'Sending…' : 'Send test' }}
-        </button>
-        <button mat-stroked-button [disabled]="sendingSnapshot() || !n.webhookConfigured" (click)="sendSnapshot()">
-          <mat-icon aria-hidden="true">insights</mat-icon> {{ sendingSnapshot() ? 'Sending…' : 'Send usage now' }}
-        </button>
-        @if (n.webhookConfigured) {
-          <button mat-button class="danger-btn" [disabled]="savingNotif()" (click)="removeWebhook()">
-            <mat-icon aria-hidden="true">link_off</mat-icon> Remove
-          </button>
+        @if (canManageNotif()) {
+          <div class="actions">
+            <button mat-flat-button color="primary" [disabled]="savingNotif()" (click)="saveNotif()">
+              <mat-icon aria-hidden="true">save</mat-icon> {{ savingNotif() ? 'Saving…' : 'Save' }}
+            </button>
+            <button mat-stroked-button [disabled]="testingNotif() || !n.webhookConfigured" (click)="testNotif()">
+              <mat-icon aria-hidden="true">send</mat-icon> {{ testingNotif() ? 'Sending…' : 'Send test' }}
+            </button>
+            <button mat-stroked-button [disabled]="sendingSnapshot() || !n.webhookConfigured" (click)="sendSnapshot()">
+              <mat-icon aria-hidden="true">insights</mat-icon> {{ sendingSnapshot() ? 'Sending…' : 'Send usage now' }}
+            </button>
+            @if (n.webhookConfigured) {
+              <button mat-button class="danger-btn" [disabled]="savingNotif()" (click)="removeWebhook()">
+                <mat-icon aria-hidden="true">link_off</mat-icon> Remove
+              </button>
+            }
+          </div>
         }
-      </div>
-    </mat-card>
+
+        <!-- Routing table: one row per event that can forward to Discord. -->
+        <div class="route-head">
+          <span class="micro-label route-head__title">Event routing</span>
+          <span class="micro-label route-head__hint">Choose which events forward to Discord; add an optional per-event mention.</span>
+        </div>
+
+        @if (routesLoading()) {
+          <mat-progress-bar mode="indeterminate" />
+        } @else if (routesError()) {
+          <div class="route-empty">
+            <mat-icon aria-hidden="true">cloud_off</mat-icon>
+            <span>Couldn't load the routing table.</span>
+            <button mat-stroked-button (click)="loadRoutes()">
+              <mat-icon aria-hidden="true">refresh</mat-icon> Retry
+            </button>
+          </div>
+        } @else {
+          <div class="route-table" role="table" aria-label="Discord event routing">
+            <div class="route-row route-row--head" role="row">
+              <span role="columnheader" class="route-cell route-cell--event micro-label">Event</span>
+              <span role="columnheader" class="route-cell route-cell--toggle micro-label">Forward</span>
+              <span role="columnheader" class="route-cell route-cell--mention micro-label">Mention (optional)</span>
+            </div>
+            @for (r of routes(); track r.eventKey) {
+              <div class="route-row" role="row" [class.disabled]="!r.enabled" [class.saving]="savingRouteKey() === r.eventKey">
+                <span class="route-cell route-cell--event" role="cell">
+                  <span class="route-dot" [class.on]="r.enabled"></span>
+                  <span class="route-label">{{ r.label }}</span>
+                  <code class="route-key">{{ r.eventKey }}</code>
+                </span>
+                <span class="route-cell route-cell--toggle" role="cell">
+                  <mat-slide-toggle [ngModel]="r.enabled" (ngModelChange)="toggleRoute(r, $event)"
+                                    [disabled]="!canManageNotif() || savingRouteKey() === r.eventKey"
+                                    [attr.aria-label]="'Forward ' + r.label + ' to Discord'" />
+                </span>
+                <span class="route-cell route-cell--mention" role="cell">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="route-mention">
+                    <input matInput class="mono-input" placeholder="@here or <@&roleId>" maxlength="64"
+                           [ngModel]="r.mention" (blur)="saveRouteMention(r, $any($event.target).value)"
+                           [disabled]="!canManageNotif() || savingRouteKey() === r.eventKey"
+                           [attr.aria-label]="'Mention for ' + r.label" />
+                  </mat-form-field>
+                </span>
+              </div>
+            } @empty {
+              <p class="hint">No routes configured.</p>
+            }
+          </div>
+        }
+      </mat-card>
+    }
   }
 
   @if (lastSync(); as r) {

@@ -109,7 +109,8 @@ public class Hardening_ChatNotificationInboxCount(WebAppFactory factory)
         var hub = new CapturingHub();
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
-        var svc = new ChatNotificationService(db, hub);
+        var discord = scope.ServiceProvider.GetRequiredService<DiscordForwarder>();
+        var svc = new ChatNotificationService(db, hub, discord);
 
         var written = await svc.NotifyFamily(
             new[] { idA, idB }, NotificationType.FamilyReminder, "Trash night", "/family");
