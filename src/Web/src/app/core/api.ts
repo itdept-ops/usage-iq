@@ -1,6 +1,6 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
 import {
   AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatLocationShareDto, ChatMessageDto, ChatRepliesResult, StartLocationShareRequest, UpdateLocationShareRequest, ExtendLocationShareRequest, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
@@ -14,6 +14,7 @@ import {
   SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
   WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WhatToEatRequest, WhatToEatResult, WorkoutXSearchResultDto,
   AskRequest, AskResponse,
+  VoiceParseRequest, VoiceParseResponse,
   CycleData, CyclePeriod, CycleNote, CycleSettings, CycleSettingsPatch, CycleOverlayMember,
   CycleDayLog, CycleDayLogPatch,
   IdentityMapData, IdentityRole, IdentityRoleInput, IdentityRolePatch, IdentityTimeEntry, IdentityTimeInput,
@@ -1052,6 +1053,50 @@ export class Api {
   daySummary(body: DaySummaryRequest): Observable<DaySummaryResponse> {
     return this.http.post<DaySummaryResponse>(`${this.base}/ai/day-summary`, body);
   }
+
+  /**
+   * PARSE-ONLY voice capture (POST /api/ai/voice-parse). Sends a spoken note as an on-device STT
+   * `transcript` (preferred — audio never leaves the device) OR an inline `audioBase64` + `mimeType` clip
+   * (the ai.vision-gated fallback). The server parses intent ONLY — it WRITES NOTHING — and returns
+   * confirmable {@link VoiceIntentDto}s, each carrying the exact payload for an EXISTING owner-scoped write
+   * endpoint the caller posts on confirm (see {@link postVoiceIntent}). ALWAYS 200: AI off/unconfigured/error
+   * floors to `{ aiUsed:false, intents:[], message }` so the mic never 500s. The transcript/audio is
+   * processed in-memory and is never persisted; nothing identifying is echoed back.
+   */
+  voiceParse(body: VoiceParseRequest): Observable<VoiceParseResponse> {
+    return this.http.post<VoiceParseResponse>(`${this.base}/ai/voice-parse`, body);
+  }
+
+  /**
+   * Log ONE confirmed voice intent by posting its server-issued, fully-clamped `payload` to its
+   * server-issued `endpoint` (one of the EXISTING owner-scoped tracker/family write routes). The endpoint
+   * is validated against the known voice-intent route allow-list FIRST, so a tampered/unknown path is
+   * rejected client-side and we never aim a write at an arbitrary URL — the actual write still rides that
+   * endpoint's own permission gate (tracker.self / family.use) + clamps server-side. No new write path is
+   * introduced. Rejects (no request sent) when the endpoint isn't an allowed voice-write route.
+   */
+  postVoiceIntent(endpoint: string, payload: Record<string, unknown>): Observable<unknown> {
+    if (!Api.VOICE_INTENT_ENDPOINTS.has(endpoint)) {
+      return throwError(() => new Error('Unsupported voice action.'));
+    }
+    return this.http.post(`${this.base}${endpoint}`, payload);
+  }
+
+  /**
+   * The closed allow-list of EXISTING owner-scoped write routes a voice intent may post to (mirrors the
+   * backend's `VoiceEndpointFor` map). Used by {@link postVoiceIntent} so voice can only ever drive these
+   * already-gated endpoints — never an arbitrary path.
+   */
+  private static readonly VOICE_INTENT_ENDPOINTS = new Set<string>([
+    '/api/tracker/food',
+    '/api/tracker/exercise',
+    '/api/tracker/hydration',
+    '/api/tracker/coffee',
+    '/api/tracker/weight',
+    '/api/tracker/supplement',
+    '/api/tracker/sleep',
+    '/api/family/quick-add',
+  ]);
 
   /**
    * "✨ This week" recap: a warm, encouraging read-only narration (+ 0–4 gentle coaching insight bullets) of

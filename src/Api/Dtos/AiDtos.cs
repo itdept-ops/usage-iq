@@ -608,3 +608,62 @@ public sealed class DaySummaryResponse
     /// <summary>An optional forward nudge for tomorrow; null when none.</summary>
     public string? Tomorrow { get; set; }
 }
+
+// ===================================================================================
+// voice-parse — transcribe + parse a spoken note into confirmable, loggable INTENTS
+// ===================================================================================
+
+/// <summary>
+/// A spoken-note capture to PARSE (never write). Send EITHER a <see cref="Transcript"/> (the preferred path —
+/// on-device speech-to-text, so audio never leaves the device) OR an inline <see cref="AudioBase64"/> +
+/// <see cref="MimeType"/> clip (for browsers without on-device STT; that path ADDITIONALLY requires the
+/// ai.vision permission). The clip/transcript is processed IN-MEMORY only and NEVER persisted or logged. The
+/// endpoint returns parsed intents for the user to CONFIRM; it writes nothing.
+/// </summary>
+public sealed class VoiceParseRequest
+{
+    /// <summary>The on-device STT transcript (preferred); cleaned + capped server-side.</summary>
+    public string? Transcript { get; set; }
+
+    /// <summary>Optional base64 audio clip (when the browser lacks on-device STT); requires ai.vision.</summary>
+    public string? AudioBase64 { get; set; }
+
+    /// <summary>The audio mime type (audio/webm, audio/ogg, audio/wav, audio/mpeg, audio/mp4, audio/aac,
+    /// audio/flac); required + validated when <see cref="AudioBase64"/> is sent.</summary>
+    public string? MimeType { get; set; }
+
+    /// <summary>"yyyy-MM-dd"; echoed for the model's "today". NOT trusted — the server resolves the caller's
+    /// own local today and every emitted payload uses THAT date (the eventual write re-resolves it too).</summary>
+    public string? Date { get; set; }
+}
+
+/// <summary>
+/// One parsed, confirmable voice intent. <see cref="Domain"/> is one of food | exercise | hydration | coffee |
+/// weight | supplement | sleep | family. <see cref="Summary"/> is the human confirm line. <see cref="Endpoint"/>
+/// is the EXISTING owner-scoped write endpoint the FRONTEND posts <see cref="Payload"/> to on confirm — voice
+/// adds NO new write path, so it rides the existing permission gates + clamps and can never write cross-user.
+/// </summary>
+public sealed class VoiceIntentDto
+{
+    public string Domain { get; set; } = "";
+    public string Summary { get; set; } = "";
+    public string Endpoint { get; set; } = "";
+    /// <summary>The exact request body for <see cref="Endpoint"/>, fully clamped server-side.</summary>
+    public IReadOnlyDictionary<string, object?> Payload { get; set; } =
+        new Dictionary<string, object?>();
+}
+
+/// <summary>
+/// The voice-parse result. <see cref="Transcript"/> is echoed for display and is NEVER stored server-side.
+/// <see cref="Intents"/> is the set of confirmable actions (empty when nothing loggable was heard).
+/// <see cref="AiUsed"/> is false on the friendly floor (AI off/unconfigured/error) — the endpoint ALWAYS
+/// returns 200 so the mic never 500s; <see cref="Message"/> carries the "type instead" hint on that floor.
+/// </summary>
+public sealed class VoiceParseResponse
+{
+    public string Transcript { get; set; } = "";
+    public bool AiUsed { get; set; }
+    public List<VoiceIntentDto> Intents { get; set; } = new();
+    /// <summary>A friendly hint on the floor path ("Voice is unavailable, type instead."); null otherwise.</summary>
+    public string? Message { get; set; }
+}

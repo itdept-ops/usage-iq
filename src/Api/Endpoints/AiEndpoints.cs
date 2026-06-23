@@ -341,6 +341,80 @@ public static class AiEndpoints
             });
         }).RequireRateLimiting(PhotoRateLimitPolicy);
 
+        // ---- VOICE CAPTURE: PARSE-ONLY a spoken note into confirmable, loggable intents (ALWAYS 200) ----
+        // The transcript (on-device STT, preferred) OR an inline audio clip is sent to Gemini, processed
+        // strictly IN-MEMORY, and parsed into 0..N intents — each mapped onto an EXISTING owner-scoped write
+        // endpoint's DTO. This endpoint WRITES NOTHING: the frontend posts each confirmed intent to that
+        // existing endpoint (so voice rides the existing tracker.self / family.use gates + clamps and can
+        // never bypass a gate or write cross-user). The transcript/audio is NEVER persisted or logged (only
+        // the AI-usage token-count row is recorded). Like /ask + /what-to-eat it NEVER 503s: AI off /
+        // unconfigured / error floors to 200 { aiUsed:false, intents:[], message:"...type instead." }.
+        // The transcript/audio is the CALLER's own and is treated strictly as DATA (injection-guarded).
+        g.MapPost("/voice-parse", async (
+            VoiceParseRequest body, CurrentUserAccessor me, GeminiService gemini, UsageDbContext db,
+            CancellationToken ct) =>
+        {
+            // The text path runs on tracker.ai (the group gate). An inline AUDIO clip makes the call
+            // multimodal, which is the SEPARATE, OFF-by-default ai.vision capability — so validate + gate it
+            // here (the route gate can't see the body). A bad/oversized/missing-mime clip is a clear 400.
+            (string base64, string mime)? audio = null;
+            var hasAudioField = !string.IsNullOrWhiteSpace(body?.AudioBase64);
+            if (hasAudioField)
+            {
+                if (!TryValidateAudio(body, out var b64, out var amime, out var bad)) return bad;
+
+                var caller0 = (await me.GetUserAsync(ct))!;
+                if (!caller0.Permissions.Contains(Permissions.AiVision))
+                    return Results.Json(
+                        new { message = $"You don't have permission: {Permissions.AiVision}" },
+                        statusCode: StatusCodes.Status403Forbidden);
+
+                audio = (b64, amime);
+            }
+
+            // Need a transcript or an audio clip to parse.
+            var hasTranscript = !string.IsNullOrWhiteSpace(body?.Transcript);
+            if (!hasTranscript && audio is null)
+                return Results.BadRequest(new { message = "Speak or type something to log." });
+
+            // Friendly always-200 floor when AI is off/unconfigured (NEVER a 503/500 from the mic).
+            if (!gemini.IsConfigured) return Results.Ok(VoiceFloor());
+
+            var caller = (await me.GetUserAsync(ct))!;
+            var localToday = await ResolveDateAsync(db, body?.Date, ct);
+            var weight = await db.TrackerProfiles.AsNoTracking()
+                .Where(p => p.UserEmail == caller.Email)
+                .Select(p => p.WeightKg)
+                .FirstOrDefaultAsync(ct);
+
+            GeminiService.VoiceParseResult? result;
+            try
+            {
+                result = await gemini.VoiceParseAsync(
+                    body?.Transcript, audio, localToday.ToString("yyyy-MM-dd"), weight, ct);
+            }
+            catch
+            {
+                result = null;
+            }
+
+            // AI unavailable/errored -> same friendly floor (200), not a 503.
+            if (result is null) return Results.Ok(VoiceFloor());
+
+            return Results.Ok(new VoiceParseResponse
+            {
+                Transcript = result.Transcript,
+                AiUsed = true,
+                Intents = result.Intents.Select(i => new VoiceIntentDto
+                {
+                    Domain = i.Domain,
+                    Summary = i.Summary,
+                    Endpoint = VoiceEndpointFor(i.Domain),
+                    Payload = i.Payload,
+                }).Where(i => i.Endpoint.Length > 0).ToList(),
+            });
+        });
+
         // ---- A celebratory end-of-day recap of the caller's LOGGED day (read server-side, cached 6h) ----
         g.MapPost("/day-summary", async (
             DaySummaryRequest body, CurrentUserAccessor me, GeminiService gemini, UsageDbContext db,
@@ -1248,6 +1322,67 @@ public static class AiEndpoints
         try { decoded = Convert.FromBase64String(data); }
         catch (FormatException) { return false; }
         if (decoded.Length == 0 || decoded.Length > GeminiService.MaxImageBytes) return false;
+
+        base64 = data;
+        mimeType = mime;
+        return true;
+    }
+
+    // ===================================================================================
+    // Voice-capture helpers
+    // ===================================================================================
+
+    /// <summary>The EXISTING owner-scoped write endpoint each voice domain maps to (no new write paths). An
+    /// unknown domain returns "" and the intent is dropped.</summary>
+    private static string VoiceEndpointFor(string domain) => domain switch
+    {
+        "food" => "/api/tracker/food",
+        "exercise" => "/api/tracker/exercise",
+        "hydration" => "/api/tracker/hydration",
+        "coffee" => "/api/tracker/coffee",
+        "weight" => "/api/tracker/weight",
+        "supplement" => "/api/tracker/supplement",
+        "sleep" => "/api/tracker/sleep",
+        "family" => "/api/family/quick-add",
+        _ => "",
+    };
+
+    /// <summary>The friendly always-200 floor: AI off / unconfigured / error -> no intents + a "type instead"
+    /// hint, so the mic NEVER surfaces a 503/500 (mirrors /ask + /what-to-eat).</summary>
+    private static VoiceParseResponse VoiceFloor() => new()
+    {
+        Transcript = "",
+        AiUsed = false,
+        Intents = new(),
+        Message = "Voice is unavailable, type instead.",
+    };
+
+    /// <summary>Validate an inline-audio clip the same way images are validated: a known mime + a decodable
+    /// payload under the size cap, returning a 400 <paramref name="bad"/> on failure.</summary>
+    private static bool TryValidateAudio(
+        VoiceParseRequest? body, out string base64, out string mimeType, out IResult bad)
+    {
+        base64 = "";
+        mimeType = "";
+        bad = Results.BadRequest(new { message = "A valid audio clip (webm/ogg/wav/mp3/m4a) under 10 MB is required." });
+
+        var mime = (body?.MimeType ?? "").Trim();
+        var data = (body?.AudioBase64 ?? "").Trim();
+        if (mime.Length == 0 || data.Length == 0) return false;
+        if (!GeminiService.AllowedAudioMimeTypes.Contains(mime)) return false;
+
+        // Strip an optional data-URL prefix ("data:audio/webm;base64,...") before decoding.
+        var comma = data.IndexOf(',');
+        if (data.StartsWith("data:", StringComparison.OrdinalIgnoreCase) && comma >= 0)
+            data = data[(comma + 1)..];
+
+        // Cheap length bound before decode (base64 ≈ 4/3 expansion).
+        if ((long)data.Length / 4 * 3 > GeminiService.MaxAudioBytes) return false;
+
+        byte[] decoded;
+        try { decoded = Convert.FromBase64String(data); }
+        catch (FormatException) { return false; }
+        if (decoded.Length == 0 || decoded.Length > GeminiService.MaxAudioBytes) return false;
 
         base64 = data;
         mimeType = mime;

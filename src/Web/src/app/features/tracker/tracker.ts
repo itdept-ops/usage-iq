@@ -37,6 +37,7 @@ import { LogWeightDialog, LogWeightData } from './log-weight-dialog';
 import { OnboardingCard, OnboardingResult } from './onboarding-card';
 import { MoveDayDialog, MoveDayData } from './move-day-dialog';
 import { AiDayBuilderDialog, AiDayBuilderData, AiDayBuilderResult } from './ai-day-builder-dialog';
+import { VoiceCaptureDialog, VoiceCaptureData, VoiceCaptureResult } from './voice-capture-dialog';
 import { WhatToEatDialog, WhatToEatData } from './what-to-eat-dialog';
 import { WeightTrend } from './weight-trend';
 import { WeightStats } from './weight-stats';
@@ -1111,6 +1112,21 @@ export class Tracker {
       .afterClosed().subscribe((res: AiDayBuilderResult) => {
         if (!res) return;
         void this.commitBuiltDay(res);
+      });
+  }
+
+  /**
+   * Open the voice-capture mic dialog (PARSE-ONLY). The dialog transcribes on-device (preferred) or via an
+   * ai.vision-gated audio clip, parses intent server-side WITHOUT writing, and on the user's confirm posts
+   * each intent to its EXISTING owner-scoped endpoint. We just reload the day if anything was logged.
+   * Hidden entirely without tracker.ai / on read-only views (same gate as the other AI affordances).
+   */
+  openVoiceCapture(): void {
+    if (!this.aiEnabled() || this.store.readOnly()) return;
+    const data: VoiceCaptureData = { date: this.store.date() };
+    this.dialog.open(VoiceCaptureDialog, { data, width: '480px', maxWidth: '94vw', maxHeight: '92dvh', panelClass: 'tracker-dialog', autoFocus: false })
+      .afterClosed().subscribe((res: VoiceCaptureResult) => {
+        if (res && res.logged > 0) void this.store.load();
       });
   }
 

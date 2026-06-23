@@ -27,6 +27,13 @@
       }
 
       @if (aiEnabled()) {
+        <button mat-stroked-button type="button" class="tracker__voicebtn"
+                (click)="openVoiceCapture()"
+                aria-label="Log by voice — speak a note and confirm what to log"
+                matTooltip="Log by voice — speak a note and confirm what to log">
+          <mat-icon aria-hidden="true">mic</mat-icon> Voice log
+        </button>
+
         <button mat-stroked-button type="button" class="tracker__buildbtn"
                 [disabled]="buildingDay()" (click)="openDayBuilder()"
                 aria-label="Build my whole day with AI from a description">

@@ -2103,6 +2103,52 @@ export interface AddExerciseRequest {
   source?: string;
 }
 
+// ---- Voice capture: PARSE-ONLY spoken note → confirmable, loggable intents ----
+
+/**
+ * A spoken-note capture to PARSE (never write) — POST /api/ai/voice-parse. Send EITHER a `transcript`
+ * (the preferred path: on-device speech-to-text, so the audio never leaves the device) OR an inline
+ * `audioBase64` + `mimeType` clip (a fallback for browsers without on-device STT — that path
+ * ADDITIONALLY requires the ai.vision permission). The clip/transcript is processed IN-MEMORY only and is
+ * NEVER persisted or logged; the endpoint returns parsed intents for the user to CONFIRM and writes
+ * nothing. `date` is "yyyy-MM-dd" and is NOT trusted (the server resolves the caller's own local today).
+ * Mirrors VoiceParseRequest.
+ */
+export interface VoiceParseRequest {
+  transcript?: string;
+  audioBase64?: string;
+  mimeType?: string;
+  date?: string;
+}
+
+/**
+ * One parsed, confirmable voice intent. `domain` is one of food | exercise | hydration | coffee | weight |
+ * supplement | sleep | family. `summary` is the human confirm line. `endpoint` is the EXISTING
+ * owner-scoped write endpoint the frontend posts `payload` to on confirm — voice adds NO new write path,
+ * so it rides the existing permission gates + server clamps and can never write cross-user. `payload` is
+ * the exact, fully-clamped request body for `endpoint` (camelCase keys, ready to POST as-is). Mirrors
+ * VoiceIntentDto.
+ */
+export interface VoiceIntentDto {
+  domain: string;
+  summary: string;
+  endpoint: string;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * The voice-parse result (ALWAYS 200). `transcript` is echoed for display and is NEVER stored server-side.
+ * `intents` is the set of confirmable actions (empty when nothing loggable was heard). `aiUsed` is false on
+ * the friendly floor (AI off/unconfigured/error) — the mic never 500s — and `message` carries the
+ * "type instead" hint on that floor. Mirrors VoiceParseResponse.
+ */
+export interface VoiceParseResponse {
+  transcript: string;
+  aiUsed: boolean;
+  intents: VoiceIntentDto[];
+  message?: string;
+}
+
 /**
  * One of the caller's saved "My exercises" (GET /api/tracker/exercises/saved) — a per-user library
  * auto-built from manual exercise logs. The defaults are the calories/duration last logged; re-picking
