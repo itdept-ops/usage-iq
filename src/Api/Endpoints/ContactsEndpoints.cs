@@ -74,7 +74,7 @@ public static class ContactsEndpoints
             {
                 if (!byId.TryGetValue(req.ContactUserId, out var contact))
                     return Results.BadRequest(new { message = "That contact doesn't exist or is disabled." });
-                await EnsurePairAsync(db, owner, contact, actor.Email, ct);
+                await ContactGraph.EnsureMutualAsync(db, owner, contact, actor.Email, ct);
             }
             return Results.Ok(await ContactsForAsync(db, owner, ct));
         }).RequirePermission(Permissions.ChatContactsManage);
@@ -100,47 +100,6 @@ public static class ContactsEndpoints
         }).RequirePermission(Permissions.ChatContactsManage);
     }
 
-    /// <summary>
-    /// Write both directions of a contact pair if missing. Idempotent: an existing pair is left as-is,
-    /// and a concurrent insert that trips the unique index is swallowed (the pair already exists).
-    /// </summary>
-    private static async Task EnsurePairAsync(
-        UsageDbContext db, string owner, string contact, string actorEmail, CancellationToken ct)
-    {
-        var present = await db.ChatContacts.AsNoTracking()
-            .Where(c => (c.OwnerEmail == owner && c.ContactEmail == contact)
-                     || (c.OwnerEmail == contact && c.ContactEmail == owner))
-            .Select(c => new { c.OwnerEmail, c.ContactEmail })
-            .ToListAsync(ct);
-        var has = present.ToHashSet();
-
-        var now = DateTime.UtcNow;
-        if (!has.Contains(new { OwnerEmail = owner, ContactEmail = contact }))
-            db.ChatContacts.Add(new ChatContact
-            {
-                OwnerEmail = owner, ContactEmail = contact, CreatedUtc = now, AddedByEmail = actorEmail,
-            });
-        if (!has.Contains(new { OwnerEmail = contact, ContactEmail = owner }))
-            db.ChatContacts.Add(new ChatContact
-            {
-                OwnerEmail = contact, ContactEmail = owner, CreatedUtc = now, AddedByEmail = actorEmail,
-            });
-
-        if (db.ChangeTracker.HasChanges())
-        {
-            try
-            {
-                await db.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
-            {
-                // A concurrent caller added the same pair between our read and save — the desired
-                // state already exists, so treat it as a successful no-op.
-                db.ChangeTracker.Clear();
-            }
-        }
-    }
-
     /// <summary>Resolve a user's contacts to display identity (id/name/picture from AppUser), name-sorted.
     /// The contact is exposed by AppUser id only — the raw email is NEVER put on the wire (email-privacy).</summary>
     private static async Task<List<ChatContactDto>> ContactsForAsync(
@@ -157,7 +116,4 @@ public static class ContactsEndpoints
                 Picture = u.Picture,
             })
             .ToListAsync(ct);
-
-    private static bool IsUniqueViolation(DbUpdateException ex) =>
-        ex.InnerException is Npgsql.PostgresException pg && pg.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation;
 }

@@ -96,6 +96,15 @@ public static class ChatEndpoints
             if (target == user.Email)
                 return Results.BadRequest(new { message = "Pick a different user to message." });
 
+            // A non-admin may only DM someone in their mutual contact circle (the same people their
+            // New-DM picker draws from). Chat admins (chat.contacts.manage — the capability that lets
+            // their picker draw from the full team directory) bypass this and may DM anyone enabled.
+            var isChatAdmin = user.Permissions.Contains(Permissions.ChatContactsManage);
+            if (!isChatAdmin && !await ContactGraph.IsContactAsync(db, user.Email, target, ct))
+                return Results.Json(
+                    new { message = "You can only message your contacts. Ask an admin to add them to your circle." },
+                    statusCode: StatusCodes.Status403Forbidden);
+
             var channelId = await GetOrCreateDirectAsync(db, user.Email, target, ct);
             var dto = (await BuildChannelDtosForMemberAsync(db, user.Email, channelId, ct)).First();
 

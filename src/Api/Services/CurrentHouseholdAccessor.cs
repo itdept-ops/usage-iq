@@ -76,6 +76,11 @@ public sealed class CurrentHouseholdAccessor(UsageDbContext db)
             return await GetForCallerAsync(caller, ct);
         }
 
+        // Auto-bridge the owner into any existing adult members' contact circles. A freshly-provisioned
+        // household has only the owner, so this is normally a no-op; it keeps the contact graph correct
+        // for the owner-provision path symmetrically with member-add (idempotent, email-resolved).
+        await ContactGraph.BridgeHouseholdAdultAsync(db, household.Id, caller.Id, "owner", caller.Email, ct);
+
         // Return a fresh, tracking-free read so callers see exactly the persisted shape.
         return await GetForCallerAsync(caller, ct);
     }

@@ -146,6 +146,10 @@ public static class FamilyEndpoints
                 return Results.BadRequest(new { message = "That person already belongs to a household." });
             }
 
+            // Auto-bridge the new ADULT into the existing adult members' contact circles (children are
+            // skipped — they may lack chat.read). Idempotent + email-resolved server-side.
+            await ContactGraph.BridgeHouseholdAdultAsync(db, household.Id, req.UserId, role, caller.Email, ct);
+
             var fresh = (await households.GetForCallerAsync(caller, ct))!;
             return Results.Ok(await ToDtoAsync(db, fresh, caller.Id, ct));
         });

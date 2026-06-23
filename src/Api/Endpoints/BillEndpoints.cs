@@ -183,8 +183,7 @@ public static class BillEndpoints
                 var target = await db.Users.AsNoTracking()
                     .FirstOrDefaultAsync(u => u.Id == req.AssignedToUserId.Value, ct);
                 if (target is null) return Results.NotFound();
-                var isContact = await db.ChatContacts.AsNoTracking()
-                    .AnyAsync(c => c.OwnerEmail == caller.Email && c.ContactEmail == target.Email, ct);
+                var isContact = await ContactGraph.IsContactAsync(db, caller.Email, target.Email, ct);
                 if (!isContact)
                     return Results.Json(new { message = "You can only assign items to your contacts." },
                         statusCode: StatusCodes.Status403Forbidden);

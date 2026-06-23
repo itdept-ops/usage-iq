@@ -200,12 +200,14 @@ public class DiscordOverhaulTests(WebAppFactory factory)
         var sender = await ProvisionUser("chat.read", "chat.send");
         var recipient = await ProvisionUser("chat.read", "chat.send");
 
-        // Resolve the recipient's AppUser id (the client addresses by id, never email).
+        // Resolve the recipient's AppUser id (the client addresses by id, never email) and make the pair
+        // mutual chat contacts so the DM contact-gate admits the DM.
         int recipientId;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
             recipientId = await db.Users.Where(u => u.Email == recipient).Select(u => u.Id).SingleAsync();
+            await ContactGraph.EnsureMutualAsync(db, sender, recipient, sender, default);
         }
 
         // Recipient turns on Discord forwarding with a webhook that will never actually deliver.

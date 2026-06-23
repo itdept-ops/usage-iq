@@ -560,12 +560,7 @@ public static class HardChallengeEndpoints
         if (caller.Permissions.Contains(Permissions.TrackerViewAll))
             return db.Users.AsNoTracking().Where(u => u.IsEnabled && u.Email != caller.Email);
 
-        var sharingEmails = db.ChatContacts.AsNoTracking()
-            .Where(c => c.ContactEmail == caller.Email)
-            .Join(db.TrackerProfiles.AsNoTracking().Where(p => p.ShareWithContacts),
-                c => c.OwnerEmail, p => p.UserEmail, (c, p) => p.UserEmail);
-        return db.Users.AsNoTracking()
-            .Where(u => u.IsEnabled && u.Email != caller.Email && sharingEmails.Contains(u.Email));
+        return ContactGraph.SharingUsers(db, caller.Email);
     }
 
     // =====================================================================================

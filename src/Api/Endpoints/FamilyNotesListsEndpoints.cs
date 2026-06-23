@@ -711,8 +711,7 @@ public static class FamilyNotesListsEndpoints
             return Results.BadRequest(new { message = "That person needs family access before you can share with them." });
 
         // The target must be one of the caller's mutual chat contacts.
-        var isContact = await db.ChatContacts.AsNoTracking()
-            .AnyAsync(c => c.OwnerEmail == caller.Email && c.ContactEmail == target.Email, ct);
+        var isContact = await ContactGraph.IsContactAsync(db, caller.Email, target.Email, ct);
         if (!isContact)
             return Results.BadRequest(new { message = "You can only share with one of your contacts." });
 

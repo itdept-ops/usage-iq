@@ -30,8 +30,9 @@ public static class TrackerVisibility
             .FirstOrDefaultAsync(ct);
         if (shares != true) return false;
 
-        return await db.ChatContacts.AsNoTracking()
-            .AnyAsync(c => c.OwnerEmail == target && c.ContactEmail == caller.Email, ct);
+        // The caller may read the target when the target has the caller in their circle (mutual edges,
+        // so target→caller existing is sufficient + correct).
+        return await ContactGraph.IsContactAsync(db, target, caller.Email, ct);
     }
 
     /// <summary>The app's display timezone, mirroring UsageQueries (UTC fallback on a bad/blank id).</summary>

@@ -857,14 +857,8 @@ public static class TrackerEndpoints
             }
             else
             {
-                // Mutual contacts (the contact's circle includes the caller) who have sharing on. The
-                // caller being in X's circle is the row OwnerEmail=X, ContactEmail=caller.
-                var sharingEmails = db.ChatContacts.AsNoTracking()
-                    .Where(c => c.ContactEmail == caller.Email)
-                    .Join(db.TrackerProfiles.AsNoTracking().Where(p => p.ShareWithContacts),
-                        c => c.OwnerEmail, p => p.UserEmail, (c, p) => p.UserEmail);
-                usersQ = db.Users.AsNoTracking()
-                    .Where(u => u.IsEnabled && u.Email != caller.Email && sharingEmails.Contains(u.Email));
+                // Mutual contacts (the contact's circle includes the caller) who have sharing on.
+                usersQ = ContactGraph.SharingUsers(db, caller.Email);
             }
 
             var people = await usersQ

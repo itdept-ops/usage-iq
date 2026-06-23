@@ -58,6 +58,16 @@ public class ChatIntegrationTests(WebAppFactory factory)
         return el.ValueKind == JsonValueKind.Object && el.TryGetProperty(name, out _);
     }
 
+    /// <summary>Make two users MUTUAL chat contacts via the admin contacts editor (chat.contacts.manage),
+    /// so the DM contact-gate admits a DM between them. Idempotent.</summary>
+    private async Task MakeContacts(int userIdA, int userIdB)
+    {
+        var (_, contactsAdmin, _) = await ProvisionUserWithId("chat.read", "chat.contacts.manage");
+        var res = await contactsAdmin.PostAsJsonAsync(
+            $"/api/chat/contacts/user/{userIdA}", new { contactUserId = userIdB });
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     /// <summary>Create a channel as a chat.send user, with the given member AppUser ids (email-privacy:
     /// members are addressed by id, never email).</summary>
     private static async Task<int> CreateChannel(HttpClient owner, string name, params int[] memberUserIds)
@@ -211,6 +221,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     {
         var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        await MakeContacts(aliceId, bobId); // DM gate: they must be mutual contacts
 
         // Open a DM by the other participant's AppUser id (email-privacy: no email on the wire).
         var first = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
@@ -391,6 +402,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     {
         var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        await MakeContacts(aliceId, bobId); // DM gate
 
         var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
         var channelId = (await Json(dm)).GetProperty("id").GetInt32();
@@ -453,8 +465,9 @@ public class ChatIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Marking_notifications_read_only_touches_the_callers_own_and_updates_count()
     {
-        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
+        var (_, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        await MakeContacts(aliceId, bobId); // DM gate
         var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
         var channelId = (await Json(dm)).GetProperty("id").GetInt32();
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages", new { body = "ping" });
@@ -478,8 +491,9 @@ public class ChatIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Read_all_clears_the_unread_count()
     {
-        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
+        var (_, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        await MakeContacts(aliceId, bobId); // DM gate
         var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
         var channelId = (await Json(dm)).GetProperty("id").GetInt32();
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages", new { body = "a" });
@@ -528,8 +542,9 @@ public class ChatIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Disabling_direct_message_notifications_suppresses_the_notification()
     {
-        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
+        var (_, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        await MakeContacts(aliceId, bobId); // DM gate
 
         // Bob turns OFF direct-message notifications.
         await bob.PutAsJsonAsync("/api/inbox/preferences", new
@@ -556,6 +571,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     {
         var (aliceEmail, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        await MakeContacts(aliceId, bobId); // DM gate
 
         // Fire both sides at once: the partial unique index on DirectKey must collapse this to ONE row.
         var fromAlice = alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
@@ -683,8 +699,9 @@ public class ChatIntegrationTests(WebAppFactory factory)
     [Fact]
     public async Task Per_channel_UnreadChanged_message_count_and_inbox_total_are_distinct_events()
     {
-        var (_, alice) = await ProvisionUser("chat.read", "chat.send");
+        var (_, alice, aliceId) = await ProvisionUserWithId("chat.read", "chat.send");
         var (bobEmail, bob, bobId) = await ProvisionUserWithId("chat.read", "chat.send");
+        await MakeContacts(aliceId, bobId); // DM gate
 
         // A DM (so Bob gets a directMessage notification by default) — exercises both events at once.
         var dm = await alice.PostAsJsonAsync("/api/chat/direct", new { userId = bobId });
