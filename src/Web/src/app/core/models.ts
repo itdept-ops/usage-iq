@@ -3852,14 +3852,15 @@ export interface IdentityRule {
   createdUtc: string;
 }
 
-/** One logged time fact (mirrors TimeEntryDto). `source` is 'manual' or 'calendar'; `date` is a plain ISO
- *  date ("YYYY-MM-DD"). Calendar rows carry the source event id for idempotent re-import (never shown). */
+/** One logged time fact (mirrors TimeEntryDto). `source` is 'manual', 'calendar' or 'auto' (derived from your
+ *  own recent Hub activity); `date` is a plain ISO date ("YYYY-MM-DD"). Calendar/auto rows carry a source event
+ *  id for idempotent re-import/re-apply (never shown). */
 export interface IdentityTimeEntry {
   id: number;
   roleId: number;
   date: string;
   minutes: number;
-  source: 'manual' | 'calendar';
+  source: 'manual' | 'calendar' | 'auto';
   note: string | null;
   createdUtc: string;
 }
@@ -3946,10 +3947,43 @@ export interface IdentityImportCommit {
   newRules?: IdentityNewRule[];
 }
 
-/** The result of committing an import (mirrors the commit result). */
+/** The result of committing an import / applying auto-suggestions (mirrors the commit + auto-apply result). */
 export interface IdentityImportResult {
   imported: number;
   skipped: number;
+}
+
+/** One auto-derived time signal from your OWN recent Hub activity (mirrors AutoSignalDto). `key` is a stable
+ *  id ("workouts" | "chores"); `minutes` is the derived total over the window; `estimated` flags a proxy
+ *  (chores have no real duration) vs a real measurement (workout minutes). `suggestedRoleId` is a best-effort
+ *  name match to one of your roles (0 = none — the user picks). */
+export interface IdentityAutoSignal {
+  key: string;
+  label: string;
+  minutes: number;
+  estimated: boolean;
+  detail: string;
+  suggestedRoleId: number;
+}
+
+/** The GET /api/family/identity/suggest payload (mirrors AutoSuggestDto): the derived signals over the window.
+ *  Pure read — proposes, writes nothing until the user confirms each signal→role via auto/apply. */
+export interface IdentityAutoSuggest {
+  signals: IdentityAutoSignal[];
+}
+
+/** One confirmed (signal → role) mapping the user is applying (mirrors AutoApplyItem). */
+export interface IdentityAutoApplyItem {
+  key: string;
+  roleId: number;
+}
+
+/** A POST /api/family/identity/auto/apply body. The same window must be passed so the server re-derives the
+ *  authoritative minutes (client minutes are never sent — only the signal key + chosen role). */
+export interface IdentityAutoApply {
+  items: IdentityAutoApplyItem[];
+  fromUtc?: string;
+  toUtc?: string;
 }
 
 /** A POST /api/family/identity/rules body (create/update a classification rule). */

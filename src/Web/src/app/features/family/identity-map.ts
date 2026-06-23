@@ -16,7 +16,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import {
-  IdentityImportPreview, IdentityMapData, IdentityProposedTime, IdentityRole, IdentityRoleTotal,
+  IdentityAutoSignal, IdentityImportPreview, IdentityMapData, IdentityProposedTime, IdentityRole,
+  IdentityRoleTotal,
 } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
 import { ConfirmData, FamilyConfirmDialog } from './confirm-dialog';
@@ -31,6 +32,14 @@ interface ImportRow {
   roleId: number | null;
   /** When true (and a role is chosen), commit upserts a rule from the event's keyword. */
   remember: boolean;
+}
+
+/** One auto-derived activity signal with the user's chosen role (defaults to the server's best-effort match).
+ *  null = skip this signal on Apply. */
+interface AutoRow {
+  signal: IdentityAutoSignal;
+  /** The role this signal will be applied to. null = skip. */
+  roleId: number | null;
 }
 
 /**
@@ -111,6 +120,16 @@ export class FamilyIdentityMap {
   /** The editable confirm rows derived from the preview (role assignment + "remember"). */
   readonly importRows = signal<ImportRow[]>([]);
 
+  // ---- auto-ingest: "Suggested from your activity" ----
+  /** True while deriving signals from recent Hub activity. */
+  readonly autoLoading = signal(false);
+  /** True while applying confirmed signals to the map. */
+  readonly autoApplying = signal(false);
+  /** True once a derive has run at least once (so we can distinguish "not run yet" from "ran, nothing found"). */
+  readonly autoLoaded = signal(false);
+  /** The editable rows derived from the latest suggest (signal + chosen role). */
+  readonly autoRows = signal<AutoRow[]>([]);
+
   /** The colour swatches offered in the add-role + recolor pickers. */
   readonly palette = FamilyIdentityMap.PALETTE;
 
@@ -180,6 +199,9 @@ export class FamilyIdentityMap {
 
   /** True if any import row has a role assigned (the Commit button is enabled). */
   readonly canCommitImport = computed<boolean>(() => this.importRows().some(r => r.roleId != null));
+
+  /** True if any auto signal has a role assigned (the Apply button is enabled). */
+  readonly canApplyAuto = computed<boolean>(() => this.autoRows().some(r => r.roleId != null));
 
   constructor() {
     void this.load();
@@ -451,6 +473,66 @@ export class FamilyIdentityMap {
   cancelImport(): void {
     this.preview.set(null);
     this.importRows.set([]);
+  }
+
+  // ============================================================== auto-ingest (from your activity)
+
+  /** Derive time signals from the caller's OWN recent Hub activity over the current range (read-only — writes
+   *  nothing). Pre-fills each signal with the server's best-effort role match (0 = none → unassigned). */
+  async refreshAuto(): Promise<void> {
+    if (this.autoLoading()) return;
+    this.autoLoading.set(true);
+    try {
+      const res = await firstValueFrom(this.api.identityAutoSuggest(this.fromDate(), this.toDate()));
+      this.autoRows.set((res.signals ?? []).map(signal => ({
+        signal,
+        // The server returns 0 for "no match"; treat that as unassigned (null) so the user picks.
+        roleId: signal.suggestedRoleId && signal.suggestedRoleId > 0 ? signal.suggestedRoleId : null,
+      })));
+      this.autoLoaded.set(true);
+    } catch (e) {
+      this.snack.open(this.messageOf(e, "Couldn't read your recent activity just now. Please try again."), 'OK',
+        { duration: 4000 });
+    } finally {
+      this.autoLoading.set(false);
+    }
+  }
+
+  /** Set the assigned role for one auto signal (from its dropdown). */
+  setAutoRole(row: AutoRow, roleId: number | null): void {
+    this.autoRows.update(rows => rows.map(r => (r === row ? { ...r, roleId } : r)));
+  }
+
+  /** Apply the assigned signals to the map over the SAME window. The server re-derives the authoritative
+   *  minutes (client minutes are never trusted) and writes idempotent `auto` rows — re-applying never
+   *  double-counts. */
+  async applyAuto(): Promise<void> {
+    if (this.autoApplying()) return;
+    const rows = this.autoRows().filter(r => r.roleId != null);
+    if (rows.length === 0) {
+      this.snack.open('Assign a role to at least one activity to apply it.', 'OK', { duration: 3500 });
+      return;
+    }
+    this.autoApplying.set(true);
+    try {
+      const res = await firstValueFrom(this.api.identityAutoApply({
+        items: rows.map(r => ({ key: r.signal.key, roleId: r.roleId! })),
+        fromUtc: this.fromDate(),
+        toUtc: this.toDate(),
+      }));
+      this.snack.open(
+        `Applied ${res.imported} ${res.imported === 1 ? 'activity' : 'activities'}`
+        + (res.skipped > 0 ? ` (${res.skipped} already applied)` : '') + '.',
+        undefined, { duration: 2800 });
+      await this.refresh();
+      // Re-derive so the card reflects what's now applied (and stays idempotent on a follow-up Apply).
+      await this.refreshAuto();
+    } catch (e) {
+      this.snack.open(this.messageOf(e, "Couldn't apply those just now. Please try again."), 'OK',
+        { duration: 4000 });
+    } finally {
+      this.autoApplying.set(false);
+    }
   }
 
   // ============================================================== helpers

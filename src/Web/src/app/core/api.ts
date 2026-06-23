@@ -18,7 +18,7 @@ import {
   CycleDayLog, CycleDayLogPatch,
   IdentityMapData, IdentityRole, IdentityRoleInput, IdentityRolePatch, IdentityTimeEntry, IdentityTimeInput,
   IdentityRule, IdentityRuleInput, IdentityCalendarStatus, IdentityImportPreview, IdentityImportCommit,
-  IdentityImportResult,
+  IdentityImportResult, IdentityAutoSuggest, IdentityAutoApply,
   HardChallengeDto, HardSharedPersonDto, StartChallengeRequest, UpsertHardDayRequest, HardDayDto, CheatDaysRequest,
   HardTaskDto, CreateHardTaskRequest, UpdateHardTaskRequest, HardLeaderboardRowDto, HardCoachDto,
   TrophiesResponse,
@@ -1933,6 +1933,24 @@ export class Api {
    *  (the source-event-id dedup index skips already-imported events). Returns { imported, skipped }. */
   identityImportCommit(body: IdentityImportCommit): Observable<IdentityImportResult> {
     return this.http.post<IdentityImportResult>(`${this.base}/family/identity/import/commit`, body);
+  }
+
+  /** Auto-ingest: derive the caller's OWN recent Hub activity (workouts = real minutes; completed chores =
+   *  an estimate) into time signals over [fromUtc, toUtc). Pure READ — proposes, writes nothing. Each signal
+   *  carries a best-effort `suggestedRoleId` (0 = none) the user can confirm/override before Apply. Only the
+   *  caller's own data, only the caller's own household — never another member's, never another household's. */
+  identityAutoSuggest(fromUtc?: string, toUtc?: string): Observable<IdentityAutoSuggest> {
+    let params = new HttpParams();
+    if (fromUtc) params = params.set('fromUtc', fromUtc);
+    if (toUtc) params = params.set('toUtc', toUtc);
+    return this.http.get<IdentityAutoSuggest>(`${this.base}/family/identity/suggest`, { params });
+  }
+
+  /** Apply confirmed (signal → role) auto-suggestions over the SAME window. The server RE-DERIVES the minutes
+   *  (client minutes are never trusted) and writes one idempotent `auto` row per signal — re-applying the same
+   *  window never double-counts (Refresh → Apply is safe). Returns { imported, skipped }. */
+  identityAutoApply(body: IdentityAutoApply): Observable<IdentityImportResult> {
+    return this.http.post<IdentityImportResult>(`${this.base}/family/identity/auto/apply`, body);
   }
 
   /** Create/update a classification rule directly (manage rules outside an import). Returns the rule. */

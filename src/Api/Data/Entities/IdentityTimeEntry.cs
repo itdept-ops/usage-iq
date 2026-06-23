@@ -7,6 +7,11 @@ public enum IdentityEntrySource
     Manual = 0,
     /// <summary>Imported from the owner's connected Google Calendar (carries a <see cref="IdentityTimeEntry.SourceEventId"/>).</summary>
     Calendar = 1,
+    /// <summary>Auto-derived from the owner's OWN recent Hub activity (workouts, completed chores) and applied
+    /// by the owner. Carries a synthetic <see cref="IdentityTimeEntry.SourceEventId"/> ("auto:{signal}:{date}")
+    /// so re-applying the same day is idempotent via the filtered UNIQUE (UserEmail, SourceEventId) index —
+    /// "Refresh then Apply again" never double-counts. NEVER derived from anyone else's data.</summary>
+    Auto = 2,
 }
 
 /// <summary>

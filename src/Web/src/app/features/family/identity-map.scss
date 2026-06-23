@@ -83,6 +83,43 @@
   &:hover, &:focus { border-color: var(--tech-border); background: var(--tech-panel-2, transparent); outline: none; }
 }
 
+/* ── Auto-ingest (suggested from your activity) ── */
+.idm__auto-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--tech-space-3, 12px);
+  flex-wrap: wrap;
+}
+.idm__auto-refresh { flex: none; }
+.idm__auto-help {
+  margin: var(--tech-space-2, 8px) 0 var(--tech-space-3, 12px); color: var(--tech-text-tertiary);
+  font-size: var(--tech-fs-caption, 0.82rem); line-height: 1.4;
+}
+.idm__auto-loading {
+  display: flex; align-items: center; gap: var(--tech-space-3, 12px);
+  padding: var(--tech-space-3, 12px) 0; color: var(--tech-text-secondary); font-size: var(--tech-fs-body);
+}
+.idm__auto-rows { list-style: none; margin: 0; padding: 0; }
+.idm__auto-row {
+  display: flex; align-items: center; gap: var(--tech-space-3, 12px); padding: var(--tech-space-2, 8px) 0;
+  flex-wrap: wrap;
+  & + .idm__auto-row { border-top: 1px solid var(--tech-border); }
+}
+.idm__auto-sig { display: flex; flex-direction: column; min-width: 0; flex: 1 1 160px; }
+.idm__auto-label {
+  display: inline-flex; align-items: center; gap: 6px; color: var(--tech-text); font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.idm__auto-est {
+  font-size: var(--tech-fs-caption, 0.7rem); font-weight: 600; line-height: 1; padding: 2px 6px;
+  border-radius: var(--tech-r-pill, 999px); background: var(--tech-panel-2, transparent);
+  border: 1px solid var(--tech-border); color: var(--tech-text-tertiary); cursor: help; flex: none;
+}
+.idm__auto-meta { font-size: var(--tech-fs-caption, 0.78rem); color: var(--tech-text-tertiary); }
+.idm__auto-role { flex: 0 1 150px; }
+.idm__auto-actions { display: flex; justify-content: flex-end; gap: var(--tech-space-2, 8px); margin-top: var(--tech-space-3, 12px); }
+.idm__auto-empty {
+  margin: var(--tech-space-2, 8px) 0 0; color: var(--tech-text-secondary); font-size: var(--tech-fs-body);
+}
+
 /* ── Calendar import ── */
 .idm__import-help { margin: 0 0 var(--tech-space-3, 12px); color: var(--tech-text-tertiary); font-size: var(--tech-fs-caption, 0.82rem); line-height: 1.4; }
 .idm__import-range { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tech-space-2, 8px); }

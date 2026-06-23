@@ -31,6 +31,9 @@ public static class IdentityEndpoints
     public sealed record ImportItem(string SourceEventId, int RoleId, DateOnly Date, int Minutes, string? Note);
     public sealed record NewRule(string Keyword, int RoleId);
     public sealed record ImportCommitRequest(IReadOnlyList<ImportItem>? Items, IReadOnlyList<NewRule>? NewRules);
+    /// <summary>One confirmed auto-signal → role mapping the user is applying.</summary>
+    public sealed record AutoApplyItem(string Key, int RoleId);
+    public sealed record AutoApplyRequest(IReadOnlyList<AutoApplyItem>? Items, DateTime? FromUtc, DateTime? ToUtc);
 
     // ---- Response DTOs ----
     public sealed record RoleDto(int Id, string Name, string Color, bool Archived, int SortOrder, DateTime CreatedUtc);
@@ -59,12 +62,26 @@ public static class IdentityEndpoints
         int AlreadyImported, int SkippedAllDay);
     public sealed record ImportCommitDto(int Imported, int Skipped);
 
+    /// <summary>One auto-derived time signal from the caller's OWN recent Hub activity, proposed for Apply.
+    /// <paramref name="Minutes"/> is the derived total over the window; <paramref name="Estimated"/> flags a
+    /// proxy (chores have no real duration) vs a real measurement (workout minutes). <paramref name="SuggestedRoleId"/>
+    /// is a best-effort name match to one of the caller's existing roles (0 = no match, user must pick).</summary>
+    public sealed record AutoSignalDto(
+        string Key, string Label, int Minutes, bool Estimated, string Detail, int SuggestedRoleId);
+    /// <summary>The auto-ingest proposal: derived signals over [from,to). Pure read — Apply writes nothing
+    /// until the user confirms each signal→role via POST /auto/apply.</summary>
+    public sealed record AutoSuggestDto(IReadOnlyList<AutoSignalDto> Signals, DateTime FromUtc, DateTime ToUtc);
+    public sealed record AutoApplyDto(int Imported, int Skipped);
+
     // ---- Caps + the allowed colour palette ----
     private const int MaxRoles = 64;
     private const int MaxNameLen = 64;
     private const int MaxKeywordLen = 128;
     private const int MaxNoteLen = 256;
     private const int RangeCapDays = 366;
+    /// <summary>Auto-ingest: minutes credited per chore-completion star, since chores carry no real duration.
+    /// A documented, fixed proxy (15 min per point) — the signal is labelled "estimated" so the user knows.</summary>
+    private const int MinutesPerChorePoint = 15;
 
     /// <summary>Default colours for new roles (mirrors the family calendar OVERLAY_PALETTE). A role colour must
     /// be one of these — free-text hex is rejected so nothing odd can be injected into the chart's CSS.</summary>
@@ -119,6 +136,91 @@ public static class IdentityEndpoints
 
             return Results.Ok(new IdentityMapDto(
                 roles.Select(ToRoleDto).ToList(), totals, rules.Select(ToRuleDto).ToList(), from, to));
+        });
+
+        // ---- GET /suggest : auto-derive the caller's OWN recent activity into time signals (READ-ONLY) ----
+        // Derives, NEVER writes. Two signals over the same window the map uses, attributed to the CALLER ONLY:
+        //   • workouts  — real minutes (SUM ExerciseEntry.DurationMin WHERE UserEmail == caller)
+        //   • chores    — an estimate (caller's OWN completions in the caller's OWN household × MinutesPerChorePoint)
+        // Household scope is read-only via GetForCallerAsync (no auto-create); chores are restricted to the
+        // caller's household AND to ByUserId == caller.Id, so no other member's and no other household's data
+        // can ever feed this. Cycle/intimacy/finance/location/notes are NEVER touched.
+        g.MapGet("/suggest", async (
+            DateTime? fromUtc, DateTime? toUtc, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var (from, to) = Window(fromUtc, toUtc);
+            var fromDate = DateOnly.FromDateTime(from);
+            var toDate = DateOnly.FromDateTime(to);
+
+            var signals = await DeriveSignalsAsync(db, households, caller, from, to, fromDate, toDate, ct);
+            return Results.Ok(new AutoSuggestDto(signals, from, to));
+        });
+
+        // ---- POST /auto/apply : write confirmed signal→role rows (idempotent via synthetic SourceEventId) ----
+        // Re-derives the SAME signals server-side (never trusts client minutes), then for each confirmed
+        // (signal, ownedRoleId) writes ONE Auto row per signal stamped SourceEventId "auto:{key}:{toDate}".
+        // Re-applying the same window is idempotent on the existing filtered UNIQUE (UserEmail, SourceEventId)
+        // index — Refresh then Apply again never double-counts. Reuses the per-row unique-violation fallback.
+        g.MapPost("/auto/apply", async (
+            AutoApplyRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var (from, to) = Window(req.FromUtc, req.ToUtc);
+            var fromDate = DateOnly.FromDateTime(from);
+            var toDate = DateOnly.FromDateTime(to);
+
+            var items = req.Items ?? Array.Empty<AutoApplyItem>();
+            var ownedRoleIds = (await db.IdentityRoles.AsNoTracking()
+                .Where(r => r.UserEmail == caller.Email).Select(r => r.Id).ToListAsync(ct)).ToHashSet();
+
+            // Re-derive authoritative minutes server-side; the client only chooses the role per signal.
+            var signals = await DeriveSignalsAsync(db, households, caller, from, to, fromDate, toDate, ct);
+            var minutesByKey = signals.ToDictionary(s => s.Key, s => s.Minutes, StringComparer.Ordinal);
+
+            var seen = (await db.IdentityTimeEntries.AsNoTracking()
+                .Where(t => t.UserEmail == caller.Email && t.SourceEventId != null)
+                .Select(t => t.SourceEventId!).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
+
+            var now = DateTime.UtcNow;
+            var imported = 0;
+            var skipped = 0;
+            var batchSeen = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var it in items)
+            {
+                var key = it.Key?.Trim().ToLowerInvariant() ?? "";
+                if (!minutesByKey.TryGetValue(key, out var minutes) || minutes < 1) { skipped++; continue; }
+                if (!ownedRoleIds.Contains(it.RoleId)) { skipped++; continue; }
+                // One synthetic id per (signal, window-end) → idempotent re-apply via the unique index.
+                var sourceId = $"auto:{key}:{toDate:yyyy-MM-dd}";
+                if (seen.Contains(sourceId) || !batchSeen.Add(sourceId)) { skipped++; continue; }
+
+                db.IdentityTimeEntries.Add(new IdentityTimeEntry
+                {
+                    UserEmail = caller.Email,
+                    UserId = caller.Id,
+                    RoleId = it.RoleId,
+                    Date = toDate,
+                    Minutes = Math.Clamp(minutes, 1, 1440),
+                    Source = IdentityEntrySource.Auto,
+                    SourceEventId = sourceId,
+                    Note = null,
+                    CreatedUtc = now,
+                });
+                imported++;
+            }
+
+            try { await db.SaveChangesAsync(ct); }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                (imported, skipped) = await ApplyAutoOneByOneAsync(
+                    db, caller, items, ownedRoleIds, minutesByKey, seen, toDate, now, ct);
+            }
+
+            return Results.Ok(new AutoApplyDto(imported, skipped));
         });
 
         // ---- POST /roles : create a role (name + colour) ----
@@ -466,6 +568,132 @@ public static class IdentityEndpoints
     }
 
     // =====================================================================================
+    // Auto-ingest — derive the CALLER's OWN recent activity into time signals (read-only)
+    // =====================================================================================
+
+    /// <summary>
+    /// Derive the auto-ingest signals for the caller over [from,to). STRICTLY self-scoped:
+    /// <list type="bullet">
+    ///   <item><b>workouts</b> — real minutes: SUM(<see cref="ExerciseEntry.DurationMin"/>) WHERE
+    ///   <c>UserEmail == caller.Email</c> AND LocalDate in window AND DurationMin &gt; 0.</item>
+    ///   <item><b>chores</b> — an ESTIMATE: the caller's OWN completions (<c>ByUserId == caller.Id</c>) of chores
+    ///   in the caller's OWN household (<c>HouseholdId == h.Id</c>), summed Points × <see cref="MinutesPerChorePoint"/>.
+    ///   Household is resolved read-only (no auto-create); no household ⇒ zero chore signal.</item>
+    /// </list>
+    /// Only signals with &gt; 0 minutes are returned. Each gets a best-effort role suggestion by case-insensitive
+    /// name match against the caller's existing roles (0 = none). No email, no other member's or household's
+    /// data, no sensitive overlay is ever read.
+    /// </summary>
+    private static async Task<List<AutoSignalDto>> DeriveSignalsAsync(
+        UsageDbContext db, CurrentHouseholdAccessor households, CurrentUserAccessor.CurrentUser caller,
+        DateTime from, DateTime to, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        // Workouts — real minutes, owner-scoped by email (exactly how IdentityTimeEntry is keyed).
+        var workoutMinutes = await db.ExerciseEntries.AsNoTracking()
+            .Where(e => e.UserEmail == caller.Email
+                && e.LocalDate >= fromDate && e.LocalDate <= toDate
+                && e.DurationMin != null && e.DurationMin > 0)
+            .SumAsync(e => (int?)e.DurationMin, ct) ?? 0;
+
+        // Chores — caller's OWN completions in the caller's OWN household only (read-only household resolve).
+        var chorePoints = 0;
+        var household = await households.GetForCallerAsync(caller, ct);
+        if (household is not null)
+        {
+            var choreIds = await db.FamilyChores.AsNoTracking()
+                .Where(c => c.HouseholdId == household.Id)
+                .Select(c => c.Id)
+                .ToListAsync(ct);
+            if (choreIds.Count > 0)
+            {
+                chorePoints = await db.FamilyChoreCompletions.AsNoTracking()
+                    .Where(c => choreIds.Contains(c.ChoreId)
+                        && c.ByUserId == caller.Id
+                        && c.AtUtc >= from && c.AtUtc < to)
+                    .SumAsync(c => (int?)c.Points, ct) ?? 0;
+            }
+        }
+        var choreMinutes = chorePoints * MinutesPerChorePoint;
+
+        // Best-effort role suggestion by name (the user confirms/overrides in the UI).
+        var roleNames = await db.IdentityRoles.AsNoTracking()
+            .Where(r => r.UserEmail == caller.Email && !r.Archived)
+            .Select(r => new { r.Id, r.Name })
+            .ToListAsync(ct);
+        int SuggestRole(params string[] wants)
+        {
+            foreach (var w in wants)
+            {
+                var hit = roleNames.FirstOrDefault(r =>
+                    r.Name.Contains(w, StringComparison.OrdinalIgnoreCase));
+                if (hit is not null) return hit.Id;
+            }
+            return 0;
+        }
+
+        var signals = new List<AutoSignalDto>();
+        if (workoutMinutes > 0)
+            signals.Add(new AutoSignalDto(
+                "workouts", "Workouts", Math.Clamp(workoutMinutes, 1, 1440), false,
+                $"{workoutMinutes} min logged in the tracker", SuggestRole("athlete", "fitness", "workout", "gym")));
+        if (choreMinutes > 0)
+            signals.Add(new AutoSignalDto(
+                "chores", "Completed chores", Math.Clamp(choreMinutes, 1, 1440), true,
+                $"{chorePoints} ⭐ completed (≈{MinutesPerChorePoint} min each)",
+                SuggestRole("chore", "home", "parent", "house")));
+        return signals;
+    }
+
+    /// <summary>Per-row fallback for /auto/apply when the batch hit a unique violation (a concurrent apply
+    /// claimed a synthetic id). Mirrors <see cref="CommitOneByOneAsync"/>: re-derived minutes are authoritative;
+    /// each winner persists, each loser is counted skipped.</summary>
+    private static async Task<(int Imported, int Skipped)> ApplyAutoOneByOneAsync(
+        UsageDbContext db, CurrentUserAccessor.CurrentUser caller, IReadOnlyList<AutoApplyItem> items,
+        IReadOnlySet<int> ownedRoleIds, IReadOnlyDictionary<string, int> minutesByKey,
+        IReadOnlySet<string> seen, DateOnly toDate, DateTime now, CancellationToken ct)
+    {
+        foreach (var e in db.ChangeTracker.Entries<IdentityTimeEntry>().ToList())
+            if (e.State == EntityState.Added) e.State = EntityState.Detached;
+
+        var imported = 0;
+        var skipped = 0;
+        var batchSeen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var it in items)
+        {
+            var key = it.Key?.Trim().ToLowerInvariant() ?? "";
+            if (!minutesByKey.TryGetValue(key, out var minutes) || minutes < 1
+                || !ownedRoleIds.Contains(it.RoleId))
+            {
+                skipped++;
+                continue;
+            }
+            var sourceId = $"auto:{key}:{toDate:yyyy-MM-dd}";
+            if (seen.Contains(sourceId) || !batchSeen.Add(sourceId)) { skipped++; continue; }
+
+            db.IdentityTimeEntries.Add(new IdentityTimeEntry
+            {
+                UserEmail = caller.Email,
+                UserId = caller.Id,
+                RoleId = it.RoleId,
+                Date = toDate,
+                Minutes = Math.Clamp(minutes, 1, 1440),
+                Source = IdentityEntrySource.Auto,
+                SourceEventId = sourceId,
+                Note = null,
+                CreatedUtc = now,
+            });
+            try { await db.SaveChangesAsync(ct); imported++; }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                foreach (var e in db.ChangeTracker.Entries<IdentityTimeEntry>().ToList())
+                    if (e.State == EntityState.Added) e.State = EntityState.Detached;
+                skipped++;
+            }
+        }
+        return (imported, skipped);
+    }
+
+    // =====================================================================================
     // Helpers
     // =====================================================================================
 
@@ -613,8 +841,12 @@ public static class IdentityEndpoints
         new(r.Id, r.Name, r.Color, r.Archived, r.SortOrder, r.CreatedUtc);
 
     private static TimeEntryDto ToTimeDto(IdentityTimeEntry t) =>
-        new(t.Id, t.RoleId, t.Date, t.Minutes, t.Source == IdentityEntrySource.Calendar ? "calendar" : "manual",
-            t.Note, t.CreatedUtc);
+        new(t.Id, t.RoleId, t.Date, t.Minutes, t.Source switch
+        {
+            IdentityEntrySource.Calendar => "calendar",
+            IdentityEntrySource.Auto => "auto",
+            _ => "manual",
+        }, t.Note, t.CreatedUtc);
 
     private static RuleDto ToRuleDto(IdentityRule r) => new(r.Id, r.Keyword, r.RoleId, r.Priority);
 }

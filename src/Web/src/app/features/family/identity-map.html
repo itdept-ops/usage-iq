@@ -115,6 +115,72 @@
           </button>
         </section>
 
+        <!-- Auto-ingest: suggested from your recent Hub activity -->
+        @if (hasRoles()) {
+          <section class="family__card idm__auto-card" aria-label="Suggested from your activity">
+            <div class="idm__auto-head">
+              <h2 class="family__card-title">Suggested from your activity</h2>
+              <button mat-stroked-button type="button" (click)="refreshAuto()" [disabled]="autoLoading()"
+                      class="idm__auto-refresh">
+                @if (autoLoading()) {
+                  <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+                } @else {
+                  <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+                }
+                Refresh from activity
+              </button>
+            </div>
+            <p class="idm__auto-help">Derived from your own recent Hub activity in this range — workout minutes
+              and completed chores. Pick a role for each, then Apply. Nothing is saved until you Apply, and
+              re-applying the same range won't double-count.</p>
+
+            @if (autoLoading() && !autoRows().length) {
+              <div class="idm__auto-loading" role="status" aria-live="polite">
+                <mat-progress-spinner mode="indeterminate" diameter="22" aria-hidden="true" />
+                <span>Reading your recent activity…</span>
+              </div>
+            } @else if (autoRows().length) {
+              <ul class="idm__auto-rows">
+                @for (row of autoRows(); track row.signal.key) {
+                  <li class="idm__auto-row">
+                    <span class="idm__auto-sig">
+                      <span class="idm__auto-label">
+                        {{ row.signal.label }}
+                        @if (row.signal.estimated) {
+                          <span class="idm__auto-est" matTooltip="Estimated — chores have no recorded duration">est.</span>
+                        }
+                      </span>
+                      <span class="idm__auto-meta">{{ minutesLabel(row.signal.minutes) }} · {{ row.signal.detail }}</span>
+                    </span>
+                    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="idm__auto-role">
+                      <mat-label>Role</mat-label>
+                      <mat-select [ngModel]="row.roleId" (ngModelChange)="setAutoRole(row, $event)">
+                        <mat-option [value]="null">— skip —</mat-option>
+                        @for (r of activeRoles(); track r.id) {
+                          <mat-option [value]="r.id">{{ r.name }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  </li>
+                }
+              </ul>
+              <div class="idm__auto-actions">
+                <button mat-flat-button color="primary" type="button" (click)="applyAuto()"
+                        [disabled]="autoApplying() || !canApplyAuto()">
+                  @if (autoApplying()) { <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" /> }
+                  Apply to map
+                </button>
+              </div>
+            } @else if (autoLoaded()) {
+              <p class="idm__auto-empty">No activity to suggest in this range yet. Log a workout or complete a
+                chore in the Hub, then Refresh.</p>
+            } @else {
+              <p class="idm__auto-empty">Tap “Refresh from activity” to pull workout minutes and completed chores
+                from this range as suggested time.</p>
+            }
+          </section>
+        }
+
         <!-- Roles manager -->
         <section class="family__card idm__roles-card" aria-label="Roles">
           <h2 class="family__card-title">Roles</h2>
