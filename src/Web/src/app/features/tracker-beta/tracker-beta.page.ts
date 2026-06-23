@@ -203,7 +203,7 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
 export class TrackerBetaPage {
   protected readonly store = inject(TrackerStore);
   protected readonly opt = inject(OptimisticTracker);
-  private readonly router = inject(Router);
+  protected readonly router = inject(Router);
 
   // ── read surface (off the shared day() signal) ──
   protected readonly day = this.opt.day;
