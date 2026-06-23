@@ -291,7 +291,7 @@ export class App implements AfterViewInit {
   private static readonly quickLinkDefs: readonly QuickLink[] = [
     { route: '/', label: 'Dashboard', icon: 'dashboard', perm: PERM.dashboardView },
     { route: '/locations', label: 'My locations', icon: 'place', perm: PERM.locationSelf },
-    { route: '/settings', label: 'Settings', icon: 'tune', perm: PERM.settingsView },
+    { route: '/settings', label: 'Admin settings', icon: 'tune', perm: PERM.settingsView },
     { route: '/users', label: 'Users', icon: 'group', perm: PERM.usersView },
   ];
   readonly quickLinks = computed<QuickLink[]>(() => {

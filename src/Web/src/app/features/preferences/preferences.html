@@ -1,0 +1,314 @@
+<section class="prefs">
+  <header class="prefs__head">
+    <h1 class="prefs__title">Settings</h1>
+    <p class="prefs__note">Your personal preferences, all in one place. Changes save automatically.</p>
+  </header>
+
+  <!-- ============================ (A) NOTIFICATIONS ============================ -->
+  @if (canChat()) {
+    <article class="card">
+      <div class="card__head">
+        <span class="card__icon"><mat-icon aria-hidden="true">notifications</mat-icon></span>
+        <div class="card__id">
+          <h2 class="card__title">Notifications</h2>
+          <p class="card__sub">How and where you're alerted.</p>
+        </div>
+      </div>
+
+      @if (prefs(); as p) {
+        <div class="group">
+          <div class="group__label">Where alerts appear</div>
+          <label class="row">
+            <span class="row__text"><span class="row__name">In-app toasts</span>
+              <span class="row__hint">A small pop-in while you're using the app</span></span>
+            <mat-slide-toggle [ngModel]="p.surfaceToasts" (ngModelChange)="setPref('surfaceToasts', $event)"
+                              aria-label="In-app toasts" />
+          </label>
+          <label class="row">
+            <span class="row__text"><span class="row__name">Browser notifications</span>
+              <span class="row__hint">Desktop alerts when this tab is in the background</span></span>
+            <mat-slide-toggle [ngModel]="p.surfaceBrowser" (ngModelChange)="setPref('surfaceBrowser', $event)"
+                              aria-label="Browser notifications" />
+          </label>
+        </div>
+
+        <div class="group">
+          <div class="group__label">What you get notified about</div>
+          <label class="row">
+            <span class="row__text"><span class="row__name">Direct messages</span></span>
+            <mat-slide-toggle [ngModel]="p.notifyDirectMessages" (ngModelChange)="setPref('notifyDirectMessages', $event)"
+                              aria-label="Notify on direct messages" />
+          </label>
+          <label class="row">
+            <span class="row__text"><span class="row__name">Mentions</span></span>
+            <mat-slide-toggle [ngModel]="p.notifyMentions" (ngModelChange)="setPref('notifyMentions', $event)"
+                              aria-label="Notify on mentions" />
+          </label>
+          <label class="row">
+            <span class="row__text"><span class="row__name">Channel messages</span></span>
+            <mat-slide-toggle [ngModel]="p.notifyChannelMessages" (ngModelChange)="setPref('notifyChannelMessages', $event)"
+                              aria-label="Notify on channel messages" />
+          </label>
+          <label class="row">
+            <span class="row__text"><span class="row__name">System events</span>
+              <span class="row__hint">Sync failures, sign-ups, fleet, automations</span></span>
+            <mat-slide-toggle [ngModel]="p.notifySystemEvents" (ngModelChange)="setPref('notifySystemEvents', $event)"
+                              aria-label="Notify on system events" />
+          </label>
+        </div>
+      } @else {
+        <p class="card__empty">Couldn't load your notification preferences.</p>
+      }
+
+      <!-- Per-user Discord forwarding -->
+      <div class="group group--discord">
+        <div class="group__label">Forward to your Discord</div>
+        @if (discord(); as d) {
+          <label class="row">
+            <span class="row__text"><span class="row__name">Mirror notifications to Discord</span>
+              <span class="row__hint">Send your alerts to your personal webhook</span></span>
+            <mat-slide-toggle [ngModel]="d.surfaceDiscord" (ngModelChange)="surfaceDiscordChange($event)"
+                              [disabled]="discordBusy()" aria-label="Forward to Discord" />
+          </label>
+
+          <!-- Per-category toggles (only meaningful when forwarding is on) -->
+          <div class="cats" [class.cats--off]="!d.surfaceDiscord">
+            <div class="cats__label">Which categories forward</div>
+            @for (c of categoryMeta; track c.key) {
+              <label class="row row--compact">
+                <span class="row__text"><span class="row__name">{{ c.label }}</span>
+                  <span class="row__hint">{{ c.hint }}</span></span>
+                <mat-slide-toggle [ngModel]="d.categories[c.key]" (ngModelChange)="setCategory(c.key, $event)"
+                                  [disabled]="discordBusy() || !d.surfaceDiscord"
+                                  [attr.aria-label]="'Forward ' + c.label + ' to Discord'" />
+              </label>
+            }
+          </div>
+
+          <label class="row">
+            <span class="row__text"><span class="row__name">Weekly recap</span>
+              <span class="row__hint">A Sunday summary of your week</span></span>
+            <mat-slide-toggle [ngModel]="d.weeklyRecapEnabled" (ngModelChange)="weeklyRecapChange($event)"
+                              [disabled]="discordBusy()" aria-label="Weekly recap" />
+          </label>
+
+          <!-- Webhook builder -->
+          <div class="webhook">
+            @if (d.configured) {
+              <div class="webhook__status">
+                <mat-icon class="webhook__ok" aria-hidden="true">check_circle</mat-icon>
+                <span>Webhook set <span class="webhook__hint mono-num">{{ d.hint }}</span></span>
+              </div>
+            } @else {
+              <div class="webhook__status webhook__status--none">
+                <mat-icon aria-hidden="true">link_off</mat-icon>
+                <span>No webhook saved yet</span>
+              </div>
+            }
+
+            <mat-form-field appearance="outline" class="webhook__field">
+              <mat-label>{{ d.configured ? 'Replace webhook URL' : 'Discord webhook URL' }}</mat-label>
+              <input matInput type="url" [ngModel]="webhookInput()" (ngModelChange)="webhookInput.set($event)"
+                     placeholder="https://discord.com/api/webhooks/…" autocomplete="off" />
+            </mat-form-field>
+
+            <div class="webhook__actions">
+              <button mat-flat-button color="primary" type="button"
+                      [disabled]="!webhookInput().trim() || discordBusy()" (click)="saveWebhook()">Save webhook</button>
+              <button mat-stroked-button type="button" [disabled]="!d.configured || discordTesting()"
+                      (click)="testWebhook()">Send test</button>
+              <button mat-stroked-button type="button" [disabled]="!d.configured || recapSending()"
+                      (click)="sendRecapNow()">Send recap now</button>
+              @if (d.configured) {
+                <button mat-button type="button" class="webhook__clear" [disabled]="discordBusy()"
+                        (click)="clearWebhook()">Clear</button>
+              }
+            </div>
+          </div>
+        } @else {
+          <p class="card__empty">Couldn't load your Discord forwarding state.</p>
+        }
+      </div>
+    </article>
+  }
+
+  <!-- ============================ (B) PRESENCE & PROFILE ============================ -->
+  @if (profile(); as pf) {
+    <article class="card">
+      <div class="card__head">
+        <span class="card__icon"><mat-icon aria-hidden="true">badge</mat-icon></span>
+        <div class="card__id">
+          <h2 class="card__title">Presence &amp; profile</h2>
+          <p class="card__sub">How others see you and your status.</p>
+        </div>
+      </div>
+
+      <div class="group">
+        <mat-form-field appearance="outline" class="field">
+          <mat-label>Display name</mat-label>
+          <mat-select [ngModel]="pf.displayNameMode" (ngModelChange)="setProfile('displayNameMode', $event)">
+            @for (m of nameModes; track m.value) {
+              <mat-option [value]="m.value">{{ m.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        @if (pf.displayNameMode === 'nickname') {
+          <mat-form-field appearance="outline" class="field">
+            <mat-label>Nickname</mat-label>
+            <input matInput [ngModel]="pf.nickname ?? ''" (blur)="commitText('nickname', $any($event.target).value)"
+                   maxlength="40" autocomplete="off" placeholder="What should we call you?" />
+          </mat-form-field>
+        }
+
+        <mat-form-field appearance="outline" class="field">
+          <mat-label>Status</mat-label>
+          <input matInput [ngModel]="pf.presenceStatus ?? ''" (blur)="commitText('presenceStatus', $any($event.target).value)"
+                 maxlength="60" autocomplete="off" placeholder="e.g. heads-down" />
+        </mat-form-field>
+      </div>
+
+      <div class="group">
+        <label class="row">
+          <span class="row__text"><span class="row__name">Appear offline</span>
+            <span class="row__hint">Hide yourself from the online roster</span></span>
+          <mat-slide-toggle [ngModel]="pf.appearOffline" (ngModelChange)="setProfile('appearOffline', $event)"
+                            aria-label="Appear offline" />
+        </label>
+        <label class="row">
+          <span class="row__text"><span class="row__name">Share auto context</span>
+            <span class="row__hint">Show a lightweight coarse location alongside presence</span></span>
+          <mat-slide-toggle [ngModel]="pf.shareAutoContext" (ngModelChange)="setProfile('shareAutoContext', $event)"
+                            aria-label="Share auto context" />
+        </label>
+        <label class="row">
+          <span class="row__text"><span class="row__name">Allow nudges</span>
+            <span class="row__hint">Let your circle send friendly canned pings</span></span>
+          <mat-slide-toggle [ngModel]="!pf.nudgesOptOut" (ngModelChange)="setProfile('nudgesOptOut', !$event)"
+                            aria-label="Allow nudges" />
+        </label>
+      </div>
+    </article>
+  }
+
+  <!-- ============================ (C) ACTIVITY ============================ -->
+  @if (profile(); as pf) {
+    <article class="card">
+      <div class="card__head">
+        <span class="card__icon"><mat-icon aria-hidden="true">dynamic_feed</mat-icon></span>
+        <div class="card__id">
+          <h2 class="card__title">Activity</h2>
+          <p class="card__sub">Your social activity feed.</p>
+        </div>
+      </div>
+
+      <div class="group">
+        <label class="row">
+          <span class="row__text"><span class="row__name">Share my activity</span>
+            <span class="row__hint">Let your circle see your workouts, streaks and goals</span></span>
+          <mat-slide-toggle [ngModel]="pf.shareActivity" (ngModelChange)="setProfile('shareActivity', $event)"
+                            aria-label="Share my activity" />
+        </label>
+        <label class="row">
+          <span class="row__text"><span class="row__name">View the circle feed</span>
+            <span class="row__hint">See your contacts' activity (not just your own)</span></span>
+          <mat-slide-toggle [ngModel]="pf.viewActivityFeed" (ngModelChange)="setProfile('viewActivityFeed', $event)"
+                            aria-label="View the circle feed" />
+        </label>
+      </div>
+    </article>
+  }
+
+  <!-- ============================ (D) LOCATION ============================ -->
+  @if (canLocation()) {
+    <article class="card">
+      <div class="card__head">
+        <span class="card__icon"><mat-icon aria-hidden="true">place</mat-icon></span>
+        <div class="card__id">
+          <h2 class="card__title">Location</h2>
+          <p class="card__sub">Private by default — capture is opt-in.</p>
+        </div>
+      </div>
+
+      @if (location(); as loc) {
+        <div class="group">
+          <label class="row">
+            <span class="row__text"><span class="row__name">Enable location capture</span>
+              <span class="row__hint">Record your own location history (only you can see it)</span></span>
+            <mat-slide-toggle [ngModel]="loc.locationEnabled" (ngModelChange)="setLocation('locationEnabled', $event)"
+                              aria-label="Enable location capture" />
+          </label>
+          <label class="row">
+            <span class="row__text"><span class="row__name">Share with household</span>
+              <span class="row__hint">Show your coarse city to household members</span></span>
+            <mat-slide-toggle [ngModel]="loc.shareHousehold" (ngModelChange)="setLocation('shareHousehold', $event)"
+                              [disabled]="!loc.locationEnabled" aria-label="Share with household" />
+          </label>
+        </div>
+      } @else {
+        <p class="card__empty">Couldn't load your location settings.</p>
+      }
+    </article>
+  }
+
+  <!-- ============================ (E) SYNC & TIME (settings.manage) ============================ -->
+  @if (canManageSync()) {
+    <article class="card">
+      <div class="card__head">
+        <span class="card__icon"><mat-icon aria-hidden="true">schedule</mat-icon></span>
+        <div class="card__id">
+          <h2 class="card__title">Sync &amp; time</h2>
+          <p class="card__sub">Display timezone and automatic syncing.</p>
+        </div>
+      </div>
+
+      @if (sync(); as s) {
+        <div class="group">
+          <mat-form-field appearance="outline" class="field">
+            <mat-label>Display timezone</mat-label>
+            <mat-select [ngModel]="s.displayTimeZone" (ngModelChange)="setSync('displayTimeZone', $event)">
+              @for (z of zones(); track z) {
+                <mat-option [value]="z">{{ z }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <label class="row">
+            <span class="row__text"><span class="row__name">Auto-sync</span>
+              <span class="row__hint">Periodically pull new usage automatically</span></span>
+            <mat-slide-toggle [ngModel]="s.autoSyncEnabled" (ngModelChange)="setSync('autoSyncEnabled', $event)"
+                              aria-label="Auto-sync" />
+          </label>
+        </div>
+      } @else {
+        <p class="card__empty">Couldn't load your sync settings.</p>
+      }
+    </article>
+  }
+
+  <!-- ============================ (F) QUICK LINKS ============================ -->
+  @if (links().length) {
+    <article class="card">
+      <div class="card__head">
+        <span class="card__icon"><mat-icon aria-hidden="true">open_in_new</mat-icon></span>
+        <div class="card__id">
+          <h2 class="card__title">More settings</h2>
+          <p class="card__sub">Jump to the full editors.</p>
+        </div>
+      </div>
+
+      <div class="links">
+        @for (l of links(); track l.route) {
+          <a class="linkout" [routerLink]="l.route">
+            <span class="linkout__icon"><mat-icon aria-hidden="true">{{ l.icon }}</mat-icon></span>
+            <span class="linkout__body">
+              <span class="linkout__label">{{ l.label }}</span>
+              <span class="linkout__blurb">{{ l.blurb }}</span>
+            </span>
+            <mat-icon class="linkout__chev" aria-hidden="true">chevron_right</mat-icon>
+          </a>
+        }
+      </div>
+    </article>
+  }
+</section>

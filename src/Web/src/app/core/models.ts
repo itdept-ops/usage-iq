@@ -767,7 +767,46 @@ export interface MyDiscord {
   surfaceDiscord: boolean;
   /** Opted in to the weekly personal recap (Sunday summary of the caller's own week). */
   weeklyRecapEnabled: boolean;
+  /** PER-CATEGORY Discord-forward toggles, independent of the in-app trigger gates. Default = all on. */
+  categories: MyDiscordCategories;
 }
+
+/**
+ * The seven user-facing PER-CATEGORY Discord-forward toggles. Each maps server-side to a set of
+ * notification types. true = mirror that category to Discord (the surfaceDiscord master toggle still wins).
+ * Mirrors MyDiscordCategoriesDto.
+ */
+export interface MyDiscordCategories {
+  directMessages: boolean;
+  mentions: boolean;
+  channelMessages: boolean;
+  systemEvents: boolean;
+  familyAlerts: boolean;
+  cheers: boolean;
+  nudges: boolean;
+}
+
+/** All seven per-category Discord-forward toggles ON — the server's non-breaking default (bitmask 127). */
+export const ALL_DISCORD_CATEGORIES: MyDiscordCategories = {
+  directMessages: true,
+  mentions: true,
+  channelMessages: true,
+  systemEvents: true,
+  familyAlerts: true,
+  cheers: true,
+  nudges: true,
+};
+
+/** The seven Discord categories in display order: toggle key, label, and a short blurb of what forwards. */
+export const DISCORD_CATEGORY_META: readonly { key: keyof MyDiscordCategories; label: string; hint: string }[] = [
+  { key: 'directMessages', label: 'Direct messages', hint: 'New 1:1 DMs' },
+  { key: 'mentions', label: 'Mentions', hint: 'When someone @-mentions you' },
+  { key: 'channelMessages', label: 'Channel messages', hint: 'New messages in your channels' },
+  { key: 'systemEvents', label: 'System events', hint: 'Sync failures, sign-ups, fleet, automations' },
+  { key: 'familyAlerts', label: 'Family alerts', hint: 'Reminders, timers, briefings, heads-ups' },
+  { key: 'cheers', label: 'Cheers', hint: 'When someone cheers your activity' },
+  { key: 'nudges', label: 'Nudges', hint: 'Friendly pings from your circle' },
+];
 
 /** Set/clear the caller's OWN per-user Discord webhook + surface toggle. Mirrors MyDiscordUpdateRequest. */
 export interface MyDiscordUpdate {
@@ -776,6 +815,8 @@ export interface MyDiscordUpdate {
   surfaceDiscord: boolean;
   /** Opt in to the weekly personal recap (default OFF; only effective with a webhook). */
   weeklyRecapEnabled: boolean;
+  /** PER-CATEGORY Discord-forward toggles. Omit/null = leave the stored mask unchanged. */
+  categories?: MyDiscordCategories | null;
 }
 
 /** A composed (but unsent) weekly-recap preview: the embed period/headline + the metric fields. */

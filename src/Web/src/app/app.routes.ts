@@ -72,6 +72,16 @@ export const routes: Routes = [
     title: 'Usage IQ · Settings',
   },
   {
+    // Settings hub — a sleek, sectioned aggregator over the caller's OWN preferences (notifications,
+    // presence, activity, location, sync). Reachable by ANY authenticated user (authGuard); each section
+    // is permission-aware and reuses the existing per-domain Api methods. DISTINCT from the admin /settings
+    // page (which becomes a link-out card here). Additive — it replaces no existing page.
+    path: 'preferences',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/preferences/preferences').then(m => m.Preferences),
+    title: 'Usage IQ · Settings',
+  },
+  {
     // "How others see me" — identity + presence prefs. Any authenticated user (no permission gate),
     // since it only governs how THEY appear to everyone.
     path: 'profile',
@@ -191,6 +201,14 @@ export const routes: Routes = [
     // so the more-specific `beta/wrapped` matches first (Angular is first-match). No live page is touched.
     path: 'beta/wrapped',
     loadChildren: () => import('./features/wrapped-beta/wrapped-beta.routes').then(m => m.WRAPPED_BETA_ROUTES),
+  },
+  {
+    // Settings "beta" — a sleek, mobile-first likeness of the live Settings hub's quick toggles over the
+    // SAME per-user Api methods (inbox-preferences, my-discord, profile, location). Purely additive +
+    // ISOLATED (imports no live page); the lazy children file holds the beta.access guard. Placed before
+    // the `beta` hub route so the more-specific `beta/settings` matches first (Angular is first-match).
+    path: 'beta/settings',
+    loadChildren: () => import('./features/beta-settings/beta-settings.routes').then(m => m.BETA_SETTINGS_ROUTES),
   },
   {
     // Beta hub — a permission-gated index of experimental surfaces. Purely additive: lives in the normal

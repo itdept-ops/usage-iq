@@ -237,4 +237,124 @@ public class DiscordOverhaulTests(WebAppFactory factory)
             .Content.ReadFromJsonAsync<JsonElement>();
         inbox.EnumerateArray().Should().NotBeEmpty("the in-app notification is created even when the forward fails");
     }
+
+    // ---- PER-CATEGORY: default mask is ALL ON (back-compat: forward everything) ----
+    [Fact]
+    public async Task Per_category_defaults_to_all_on()
+    {
+        var email = await ProvisionUser();
+
+        // A fresh user (no PUT yet) reads all-on.
+        var fresh = await (await Client(email).GetAsync("/api/notifications/me/discord"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        AssertAllCategories(fresh, expected: true);
+
+        // Saving a webhook WITHOUT a categories payload leaves the (all-on) default intact.
+        (await Client(email).PutAsJsonAsync("/api/notifications/me/discord",
+            new { webhookUrl = "https://discord.com/api/webhooks/77/tok", surfaceDiscord = true }))
+            .EnsureSuccessStatusCode();
+        var afterSave = await (await Client(email).GetAsync("/api/notifications/me/discord"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        AssertAllCategories(afterSave, expected: true);
+    }
+
+    // ---- PER-CATEGORY: a subset round-trips + persists as the expected bitmask ----
+    [Fact]
+    public async Task Per_category_subset_round_trips_and_persists()
+    {
+        var email = await ProvisionUser();
+
+        // Enable only directMessages + familyAlerts; everything else off.
+        var categories = new
+        {
+            directMessages = true, mentions = false, channelMessages = false, systemEvents = false,
+            familyAlerts = true, cheers = false, nudges = false,
+        };
+        (await Client(email).PutAsJsonAsync("/api/notifications/me/discord",
+            new { webhookUrl = "https://discord.com/api/webhooks/88/tok", surfaceDiscord = true, categories }))
+            .EnsureSuccessStatusCode();
+
+        var dto = await (await Client(email).GetAsync("/api/notifications/me/discord"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var cats = dto.GetProperty("categories");
+        cats.GetProperty("directMessages").GetBoolean().Should().BeTrue();
+        cats.GetProperty("familyAlerts").GetBoolean().Should().BeTrue();
+        cats.GetProperty("mentions").GetBoolean().Should().BeFalse();
+        cats.GetProperty("channelMessages").GetBoolean().Should().BeFalse();
+        cats.GetProperty("systemEvents").GetBoolean().Should().BeFalse();
+        cats.GetProperty("cheers").GetBoolean().Should().BeFalse();
+        cats.GetProperty("nudges").GetBoolean().Should().BeFalse();
+
+        // At rest the bitmask is exactly DirectMessages(1) | FamilyAlerts(16) = 17.
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var pref = await db.NotificationPreferences.AsNoTracking().SingleAsync(p => p.UserEmail == email);
+        pref.DiscordCategories.Should().Be(1 | 16);
+    }
+
+    // ---- PER-CATEGORY: omitting categories on a later PUT leaves the stored mask unchanged ----
+    [Fact]
+    public async Task Omitting_categories_leaves_the_stored_mask_unchanged()
+    {
+        var email = await ProvisionUser();
+
+        // First set a subset (only mentions on).
+        (await Client(email).PutAsJsonAsync("/api/notifications/me/discord", new
+        {
+            webhookUrl = "https://discord.com/api/webhooks/99/tok", surfaceDiscord = true,
+            categories = new
+            {
+                directMessages = false, mentions = true, channelMessages = false, systemEvents = false,
+                familyAlerts = false, cheers = false, nudges = false,
+            },
+        })).EnsureSuccessStatusCode();
+
+        // A later PUT with NO categories field (e.g. just toggling surfaceDiscord) must not reset the mask.
+        (await Client(email).PutAsJsonAsync("/api/notifications/me/discord",
+            new { surfaceDiscord = false })).EnsureSuccessStatusCode();
+
+        var dto = await (await Client(email).GetAsync("/api/notifications/me/discord"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var cats = dto.GetProperty("categories");
+        cats.GetProperty("mentions").GetBoolean().Should().BeTrue("the prior mask must survive an omitted payload");
+        cats.GetProperty("directMessages").GetBoolean().Should().BeFalse();
+    }
+
+    // ---- PER-CATEGORY: caller-scoped + the response NEVER leaks the url or other-user email ----
+    [Fact]
+    public async Task Per_category_is_caller_scoped_and_response_leaks_no_secret()
+    {
+        var alice = await ProvisionUser();
+        var bob = await ProvisionUser();
+        const string aliceToken = "AliceCatToken";
+
+        (await Client(alice).PutAsJsonAsync("/api/notifications/me/discord", new
+        {
+            webhookUrl = $"https://discord.com/api/webhooks/123/{aliceToken}", surfaceDiscord = true,
+            categories = new
+            {
+                directMessages = true, mentions = false, channelMessages = false, systemEvents = false,
+                familyAlerts = false, cheers = false, nudges = false,
+            },
+        })).EnsureSuccessStatusCode();
+
+        // Alice's response never carries the webhook url/token or her email.
+        var aliceRaw = await (await Client(alice).GetAsync("/api/notifications/me/discord")).Content.ReadAsStringAsync();
+        aliceRaw.Should().NotContain(aliceToken);
+        aliceRaw.Should().NotContain(alice);
+
+        // Bob's per-category mask is HIS own default (all-on) — Alice's subset never bleeds across users.
+        var bobDto = await (await Client(bob).GetAsync("/api/notifications/me/discord"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        bobDto.GetProperty("configured").GetBoolean().Should().BeFalse();
+        AssertAllCategories(bobDto, expected: true);
+    }
+
+    private static void AssertAllCategories(JsonElement dto, bool expected)
+    {
+        var cats = dto.GetProperty("categories");
+        foreach (var name in new[]
+                 { "directMessages", "mentions", "channelMessages", "systemEvents", "familyAlerts", "cheers", "nudges" })
+            cats.GetProperty(name).GetBoolean().Should().Be(expected, $"category '{name}' should be {expected}");
+    }
 }

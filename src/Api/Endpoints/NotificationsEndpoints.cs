@@ -154,6 +154,9 @@ public static class NotificationsEndpoints
 
             pref.SurfaceDiscord = req.SurfaceDiscord;
             pref.WeeklyRecapEnabled = req.WeeklyRecapEnabled;
+            // null Categories = leave the stored mask unchanged (older clients); otherwise replace it.
+            if (req.Categories is not null)
+                pref.DiscordCategories = (int)ToCategoryMask(req.Categories);
             pref.UpdatedUtc = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
             return Results.Ok(MyDiscord(pref));
@@ -231,7 +234,41 @@ public static class NotificationsEndpoints
         Hint = p?.DiscordWebhookHint,
         SurfaceDiscord = p?.SurfaceDiscord ?? false,
         WeeklyRecapEnabled = p?.WeeklyRecapEnabled ?? false,
+        // Absent row (or legacy 0 mask) ⇒ the all-on default, mirroring the gate's forward-everything fallback.
+        Categories = FromCategoryMask(p?.DiscordCategories ?? (int)DiscordForwardCategory.All),
     };
+
+    /// <summary>Project the seven boolean toggles to the stored <see cref="DiscordForwardCategory"/> bitmask.</summary>
+    private static DiscordForwardCategory ToCategoryMask(MyDiscordCategoriesDto c)
+    {
+        var m = DiscordForwardCategory.None;
+        if (c.DirectMessages) m |= DiscordForwardCategory.DirectMessages;
+        if (c.Mentions) m |= DiscordForwardCategory.Mentions;
+        if (c.ChannelMessages) m |= DiscordForwardCategory.ChannelMessages;
+        if (c.SystemEvents) m |= DiscordForwardCategory.SystemEvents;
+        if (c.FamilyAlerts) m |= DiscordForwardCategory.FamilyAlerts;
+        if (c.Cheers) m |= DiscordForwardCategory.Cheers;
+        if (c.Nudges) m |= DiscordForwardCategory.Nudges;
+        return m;
+    }
+
+    /// <summary>Expand a stored bitmask to the seven boolean toggles. A legacy 0 mask reads as all-on so an
+    /// unmigrated/blank row never appears "all off" in the UI (matching the gate's default).</summary>
+    private static MyDiscordCategoriesDto FromCategoryMask(int mask)
+    {
+        var m = mask == 0 ? (int)DiscordForwardCategory.All : mask;
+        bool On(DiscordForwardCategory c) => (m & (int)c) != 0;
+        return new MyDiscordCategoriesDto
+        {
+            DirectMessages = On(DiscordForwardCategory.DirectMessages),
+            Mentions = On(DiscordForwardCategory.Mentions),
+            ChannelMessages = On(DiscordForwardCategory.ChannelMessages),
+            SystemEvents = On(DiscordForwardCategory.SystemEvents),
+            FamilyAlerts = On(DiscordForwardCategory.FamilyAlerts),
+            Cheers = On(DiscordForwardCategory.Cheers),
+            Nudges = On(DiscordForwardCategory.Nudges),
+        };
+    }
 
     private static NotificationSettingDto ToDto(NotificationSetting s) => new()
     {

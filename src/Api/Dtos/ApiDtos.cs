@@ -34,6 +34,23 @@ public sealed class MyDiscordDto
 
     /// <summary>Whether the caller opted in to the weekly personal recap (Sunday summary of their own week).</summary>
     public bool WeeklyRecapEnabled { get; set; }
+
+    /// <summary>PER-CATEGORY Discord-forward toggles, independent of the in-app trigger gates. Controls only
+    /// which categories mirror to Discord (the SurfaceDiscord master toggle still wins). Default = all on.</summary>
+    public MyDiscordCategoriesDto Categories { get; set; } = new();
+}
+
+/// <summary>The seven user-facing PER-CATEGORY Discord-forward toggles. Each maps to a set of
+/// notification types (see <c>DiscordCategoryMap</c>). True = mirror this category to Discord.</summary>
+public sealed class MyDiscordCategoriesDto
+{
+    public bool DirectMessages { get; set; } = true;
+    public bool Mentions { get; set; } = true;
+    public bool ChannelMessages { get; set; } = true;
+    public bool SystemEvents { get; set; } = true;
+    public bool FamilyAlerts { get; set; } = true;
+    public bool Cheers { get; set; } = true;
+    public bool Nudges { get; set; } = true;
 }
 
 /// <summary>Set/clear the caller's OWN per-user Discord webhook + surface toggle.</summary>
@@ -48,6 +65,10 @@ public sealed class MyDiscordUpdateRequest
 
     /// <summary>Whether to opt in to the weekly personal recap (default OFF; only effective with a webhook).</summary>
     public bool WeeklyRecapEnabled { get; set; }
+
+    /// <summary>PER-CATEGORY Discord-forward toggles. null = leave the stored mask unchanged (back-compat for
+    /// older clients); a value replaces it. Independent of the in-app trigger gates.</summary>
+    public MyDiscordCategoriesDto? Categories { get; set; }
 }
 
 /// <summary>One system Discord routing row (admin view): which event, whether it forwards, its mention.</summary>

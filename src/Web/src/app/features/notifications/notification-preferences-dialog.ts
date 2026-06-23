@@ -12,7 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { ChatRealtime } from '../../core/chat-realtime';
-import { MyDiscord, NotificationPreferenceDto } from '../../core/models';
+import { ALL_DISCORD_CATEGORIES, MyDiscord, NotificationPreferenceDto } from '../../core/models';
 
 /** Whether the browser exposes the Notification API at all (false in unsupported/older contexts). */
 function browserNotificationsSupported(): boolean {
@@ -109,6 +109,7 @@ export class NotificationPreferencesDialog {
     this.discord.set({
       configured: prev?.configured ?? false, hint: prev?.hint ?? null,
       surfaceDiscord: value, weeklyRecapEnabled: prev?.weeklyRecapEnabled ?? false,
+      categories: prev?.categories ?? ALL_DISCORD_CATEGORIES,
     });
     this.discordBusy.set(true);
     this.api.saveMyDiscord({
@@ -129,6 +130,7 @@ export class NotificationPreferencesDialog {
     this.discord.set({
       configured: prev?.configured ?? false, hint: prev?.hint ?? null,
       surfaceDiscord: prev?.surfaceDiscord ?? false, weeklyRecapEnabled: value,
+      categories: prev?.categories ?? ALL_DISCORD_CATEGORIES,
     });
     this.discordBusy.set(true);
     this.api.saveMyDiscord({

@@ -136,7 +136,7 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
                 .SendAsync("InboxUnreadChanged", inboxUnreadByEmail.GetValueOrDefault(email, 0), ct);
             // Fire-and-forget: mirror this notification to the recipient's personal Discord webhook if they
             // opted in. Enqueue only — never block/slow/fail the fan-out; the worker gates on their prefs.
-            discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), actor?.Name, n.Text, n.Link));
+            discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), actor?.Name, n.Text, n.Link, Category: n.Type));
         }
     }
 
@@ -215,7 +215,7 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
                 .SendAsync("InboxUnreadChanged", inboxUnreadByEmail.GetValueOrDefault(email, 0), ct);
             // Fire-and-forget Discord mirror for opted-in recipients (no actor on a system event).
             if (!suppressDiscordMirror)
-                discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), null, n.Text, n.Link));
+                discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), null, n.Text, n.Link, Category: n.Type));
         }
     }
 
@@ -269,7 +269,7 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
             await hub.Clients.User(email)
                 .SendAsync("InboxUnreadChanged", inboxUnreadByEmail.GetValueOrDefault(email, 0), ct);
             // Fire-and-forget Discord mirror for opted-in recipients (no actor on a family alert).
-            discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), null, n.Text, n.Link));
+            discord.Enqueue(new DiscordForwardItem(email, NotificationTypeName(n.Type), null, n.Text, n.Link, Category: n.Type));
         }
         return created.Count;
     }
@@ -311,7 +311,7 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
         var inbox = (await UnreadInboxCountsAsync(new[] { actorEmail }, ct)).GetValueOrDefault(actorEmail, 0);
         await hub.Clients.User(actorEmail).SendAsync("ReceiveNotification", ToDto(n, reactor), ct);
         await hub.Clients.User(actorEmail).SendAsync("InboxUnreadChanged", inbox, ct);
-        discord.Enqueue(new DiscordForwardItem(actorEmail, NotificationTypeName(n.Type), reactorName, n.Text, n.Link));
+        discord.Enqueue(new DiscordForwardItem(actorEmail, NotificationTypeName(n.Type), reactorName, n.Text, n.Link, Category: n.Type));
     }
 
     /// <summary>
@@ -370,7 +370,7 @@ public sealed class ChatNotificationService(UsageDbContext db, IHubContext<ChatH
         var inbox = (await UnreadInboxCountsAsync(new[] { targetEmail }, ct)).GetValueOrDefault(targetEmail, 0);
         await hub.Clients.User(targetEmail).SendAsync("ReceiveNotification", ToDto(n, sender), ct);
         await hub.Clients.User(targetEmail).SendAsync("InboxUnreadChanged", inbox, ct);
-        discord.Enqueue(new DiscordForwardItem(targetEmail, NotificationTypeName(n.Type), senderName, n.Text, n.Link));
+        discord.Enqueue(new DiscordForwardItem(targetEmail, NotificationTypeName(n.Type), senderName, n.Text, n.Link, Category: n.Type));
         return true;
     }
 

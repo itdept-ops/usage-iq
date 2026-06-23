@@ -399,6 +399,14 @@
       </div>
 
       <div class="acct-section" role="presentation">
+        <!-- Settings hub: the centralized per-user preferences aggregator (/preferences). Reachable by
+             ANY authenticated user; DISTINCT from the admin /settings page (a link-out card inside the hub,
+             and the "Admin settings" quick-link below for settings.view holders). -->
+        <a mat-menu-item class="acct-item" routerLink="/preferences">
+          <mat-icon class="acct-item__icon" aria-hidden="true">settings</mat-icon>
+          <span class="acct-item__label">Settings</span>
+        </a>
+
         <!-- "How others see me": identity + presence prefs. Reachable by ANY authenticated user. -->
         <a mat-menu-item class="acct-item" routerLink="/profile">
           <mat-icon class="acct-item__icon" aria-hidden="true">badge</mat-icon>

@@ -42,3 +42,67 @@ public enum NotificationType
     /// text is a FIXED server-side template keyed by the nudge kind (never client free-text).</summary>
     SystemNudge = 12,
 }
+
+/// <summary>
+/// The user-facing CATEGORIES a notification can fall into for PER-CATEGORY Discord forwarding. A
+/// <see cref="FlagsAttribute"/> bitmask stored on <c>NotificationPreference.DiscordCategories</c>; each
+/// <see cref="NotificationType"/> maps to exactly one category via <see cref="DiscordCategoryMap.For"/>.
+/// This gates ONLY the Discord mirror — it is INDEPENDENT of the in-app trigger gates and never affects
+/// whether the in-app notification is created. The master <c>SurfaceDiscord</c> toggle still wins (off ⇒
+/// nothing forwards). <see cref="All"/> is the default so enabling Discord forwards everything (the
+/// pre-existing behavior), keeping the schema add non-breaking.
+/// </summary>
+[Flags]
+public enum DiscordForwardCategory
+{
+    None = 0,
+    DirectMessages = 1 << 0,
+    Mentions = 1 << 1,
+    ChannelMessages = 1 << 2,
+    SystemEvents = 1 << 3,
+    FamilyAlerts = 1 << 4,
+    Cheers = 1 << 5,
+    Nudges = 1 << 6,
+
+    /// <summary>Every category — the default mask (preserve "forward everything you receive").</summary>
+    All = DirectMessages | Mentions | ChannelMessages | SystemEvents | FamilyAlerts | Cheers | Nudges,
+}
+
+/// <summary>Maps each <see cref="NotificationType"/> to the single <see cref="DiscordForwardCategory"/>
+/// the user toggles for Discord forwarding, and tests a stored mask against a type.</summary>
+public static class DiscordCategoryMap
+{
+    /// <summary>The category a given notification type forwards under (1:1, total over all 13 types).</summary>
+    public static DiscordForwardCategory For(NotificationType type) => type switch
+    {
+        NotificationType.DirectMessage => DiscordForwardCategory.DirectMessages,
+        NotificationType.Mention => DiscordForwardCategory.Mentions,
+        NotificationType.ChannelMessage => DiscordForwardCategory.ChannelMessages,
+
+        NotificationType.SystemSyncFailed => DiscordForwardCategory.SystemEvents,
+        NotificationType.SystemUserJoined => DiscordForwardCategory.SystemEvents,
+        NotificationType.SystemFleetOffline => DiscordForwardCategory.SystemEvents,
+        NotificationType.SystemAutomation => DiscordForwardCategory.SystemEvents,
+
+        NotificationType.FamilyReminder => DiscordForwardCategory.FamilyAlerts,
+        NotificationType.FamilyTimer => DiscordForwardCategory.FamilyAlerts,
+        NotificationType.FamilyBriefing => DiscordForwardCategory.FamilyAlerts,
+        NotificationType.FamilyHeadsUp => DiscordForwardCategory.FamilyAlerts,
+
+        NotificationType.Cheer => DiscordForwardCategory.Cheers,
+        NotificationType.SystemNudge => DiscordForwardCategory.Nudges,
+
+        // Any future type defaults to SystemEvents (a safe, user-toggleable bucket) until mapped explicitly.
+        _ => DiscordForwardCategory.SystemEvents,
+    };
+
+    /// <summary>True when the stored category mask permits forwarding the given notification type. The mask
+    /// is treated as "all on" (the default) for the legacy 0 value so an unmigrated/blank row never goes
+    /// silent — only an explicit opt-out of a category suppresses it.</summary>
+    public static bool Allows(int categoriesMask, NotificationType type)
+    {
+        // A 0 mask means "never set" (legacy/blank) → preserve the forward-everything default.
+        var mask = categoriesMask == 0 ? (int)DiscordForwardCategory.All : categoriesMask;
+        return (mask & (int)For(type)) != 0;
+    }
+}

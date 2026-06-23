@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Ccusage.Api.Data;
+using Ccusage.Api.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ccusage.Api.Services;
@@ -15,10 +16,15 @@ namespace Ccusage.Api.Services;
 /// bypassing the recipient's per-user webhook/SurfaceDiscord gate (the rule webhook is its own opt-in). When
 /// null, the worker resolves the recipient's per-user webhook as before. The per-user rate-limit bucket
 /// (keyed on <paramref name="RecipientEmail"/>) applies either way, so a rule can't bypass the spam cap.</para>
+///
+/// <para><paramref name="Category"/> is the originating <see cref="NotificationType"/>, carried so the worker
+/// can apply the recipient's PER-CATEGORY Discord-forward mask (independent of the in-app trigger gates).
+/// It is honored ONLY on the per-user webhook path; the rule-webhook override path ignores it (the rule is
+/// its own opt-in). Null leaves the category gate open (forward) — used by callers with no notification type.</para>
 /// </summary>
 public readonly record struct DiscordForwardItem(
     string RecipientEmail, string Kind, string? ActorName, string Text, string? Link,
-    string? WebhookOverrideEnc = null);
+    string? WebhookOverrideEnc = null, NotificationType? Category = null);
 
 /// <summary>
 /// Off-request-path, fire-and-forget forwarder of per-user in-app notifications to each user's PERSONAL
@@ -103,7 +109,18 @@ public sealed class DiscordForwarder(
             var pref = await db.NotificationPreferences.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.UserEmail == item.RecipientEmail, ct);
             if (pref is null || !pref.SurfaceDiscord || string.IsNullOrEmpty(pref.DiscordWebhookEnc))
-                return; // toggled off or cleared since enqueue — nothing to do.
+                return; // master toggle off or webhook cleared since enqueue — nothing to do.
+
+            // Per-CATEGORY gate (independent of the in-app trigger gates): if the recipient disabled this
+            // notification's category for Discord, skip the mirror. The master SurfaceDiscord toggle already
+            // won above; a null Category (caller with no type) leaves the gate open. Default mask = all-on.
+            if (item.Category is { } catType && !DiscordCategoryMap.Allows(pref.DiscordCategories, catType))
+            {
+                logger.LogInformation(
+                    "Skipping Discord forward for {Recipient} ({Kind}): category disabled.",
+                    item.RecipientEmail, item.Kind);
+                return;
+            }
 
             // Decrypt ONLY in memory at send time; never logged, never stored back.
             url = protector.Unprotect(pref.DiscordWebhookEnc);

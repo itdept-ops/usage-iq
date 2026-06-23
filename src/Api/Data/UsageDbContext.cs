@@ -530,6 +530,10 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.SurfaceBrowser).HasDefaultValue(false);
             e.Property(x => x.SurfaceDiscord).HasDefaultValue(false);
             e.Property(x => x.WeeklyRecapEnabled).HasDefaultValue(false);
+            // Per-CATEGORY Discord-forward bitmask (DiscordForwardCategory). DEFAULT = All (127) so existing
+            // rows keep forwarding everything when SurfaceDiscord is on — a non-breaking schema add.
+            e.Property(x => x.DiscordCategories)
+                .HasDefaultValue((int)DiscordForwardCategory.All);
             // LastRecapSent is a nullable local DATE (the idempotency anchor) — no default; null = never sent.
             // The encrypted webhook is a base64 AES-GCM blob (nonce|tag|ciphertext) — generous cap (matches
             // GoogleCalendarConnection.EncryptedRefreshToken). The plaintext URL is NEVER persisted.

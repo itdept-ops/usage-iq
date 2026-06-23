@@ -44,6 +44,17 @@ public class NotificationPreference
     public string? DiscordWebhookHint { get; set; }
 
     /// <summary>
+    /// Per-CATEGORY Discord-forward mask, INDEPENDENT of the in-app trigger gates (Notify*) — it only
+    /// controls which categories mirror to the user's personal Discord webhook, never whether the in-app
+    /// notification is created. A bitmask over <see cref="DiscordForwardCategory"/>. DEFAULT = ALL ON
+    /// (<see cref="DiscordForwardCategory.All"/>) so enabling <see cref="SurfaceDiscord"/> forwards
+    /// everything the user receives, exactly as before this column existed (non-breaking migration).
+    /// The <see cref="SurfaceDiscord"/> master toggle still wins: off ⇒ nothing forwards regardless of
+    /// this mask.
+    /// </summary>
+    public int DiscordCategories { get; set; } = (int)DiscordForwardCategory.All;
+
+    /// <summary>
     /// Opt-in to the weekly personal recap (a Sunday summary of the user's OWN week — tracker totals,
     /// workouts, 75-Hard, hydration goal hits, bills — posted to <see cref="DiscordWebhookEnc"/>). OFF by
     /// default; only effective when a webhook is also configured. Independent of <see cref="SurfaceDiscord"/>.

@@ -64,4 +64,12 @@ export const BETA_EXPERIMENTS: readonly BetaExperiment[] = [
     // No `perm` → the route guard re-checks beta.access; the page itself is gated server-side by
     // tracker.self (the /api/wrapped endpoint), and only ever shows the caller's OWN data.
   },
+  {
+    title: 'Settings',
+    blurb: 'Your quick toggles, mobile-first',
+    route: '/beta/settings',
+    icon: 'tune',
+    // No `perm` → the route guard re-checks beta.access; the page mirrors the live Settings hub's quick
+    // toggles and reuses the same per-user Api methods (each toggle still self-gates by its own perm).
+  },
 ];
