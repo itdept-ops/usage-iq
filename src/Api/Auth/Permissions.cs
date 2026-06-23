@@ -46,6 +46,7 @@ public static class Permissions
     // ---- Tracker ----
     public const string TrackerSelf = "tracker.self";
     public const string TrackerViewAll = "tracker.viewall";
+    public const string TrackerBeta = "tracker.beta";
 
     // ---- Shares ----
     public const string SharesView = "shares.view";
@@ -128,6 +129,7 @@ public static class Permissions
         // ---- Fitness ----
         new PermissionInfo(TrackerSelf, "Fitness", "Track food & fitness", "Log and view your own food intake and exercises."),
         new PermissionInfo(TrackerViewAll, "Fitness", "View all trackers", "View every user’s food & fitness log (coach/admin)."),
+        new PermissionInfo(TrackerBeta, "Fitness", "Tracker Beta", "Access the new mobile-first \"Strata\" tracker experience (beta)."),
 
         // ---- Bills ----
         new PermissionInfo(BillsUse, "Bills", "Use Bill Splitter", "Create bills, break a receipt photo down with AI, assign items to your contacts, and share a public claim link so people can claim what they owe."),

@@ -83,6 +83,9 @@
         <a mat-button class="nav__item" routerLink="/tracker" routerLinkActive="active">Tracker</a>
         <a mat-button class="nav__item" routerLink="/challenge" routerLinkActive="active">75 Hard</a>
       }
+      @if (auth.hasPermission('tracker.beta')) {
+        <a mat-button class="nav__item" routerLink="/tracker-beta" routerLinkActive="active">Tracker Beta</a>
+      }
       @if (auth.hasPermission('bills.use')) {
         <a mat-button class="nav__item" routerLink="/bills" routerLinkActive="active">Bills</a>
       }
@@ -334,12 +337,18 @@
       }
     }
 
-    @if (auth.hasPermission('tracker.self')) {
+    @if (auth.hasPermission('tracker.self') || auth.hasPermission('tracker.beta')) {
       <div class="mobile-nav__head" role="presentation">Fitness</div>
-      <a class="mobile-nav__item" routerLink="/tracker" routerLinkActive="active"
-         (click)="closeMobileNav()">Tracker</a>
-      <a class="mobile-nav__item" routerLink="/challenge" routerLinkActive="active"
-         (click)="closeMobileNav()">75 Hard</a>
+      @if (auth.hasPermission('tracker.self')) {
+        <a class="mobile-nav__item" routerLink="/tracker" routerLinkActive="active"
+           (click)="closeMobileNav()">Tracker</a>
+        <a class="mobile-nav__item" routerLink="/challenge" routerLinkActive="active"
+           (click)="closeMobileNav()">75 Hard</a>
+      }
+      @if (auth.hasPermission('tracker.beta')) {
+        <a class="mobile-nav__item" routerLink="/tracker-beta" routerLinkActive="active"
+           (click)="closeMobileNav()">Tracker Beta</a>
+      }
     }
 
     @if (auth.hasPermission('bills.use')) {

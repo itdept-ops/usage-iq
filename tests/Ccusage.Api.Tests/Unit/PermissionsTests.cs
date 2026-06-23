@@ -6,7 +6,7 @@ namespace Ccusage.Api.Tests.Unit;
 
 public class PermissionsTests
 {
-    // The full catalog of 43 keys.
+    // The full catalog of 44 keys.
     private static readonly string[] AllKeys =
     {
         "dashboard.view", "dashboard.export", "sync.run",
@@ -16,7 +16,7 @@ public class PermissionsTests
         "reporter.view", "reporter.manage", "reporter.self", "fleet.view",
         "notifications.view", "notifications.manage",
         "chat.read", "chat.send", "chat.moderate", "chat.contacts.manage",
-        "tracker.self", "tracker.viewall",
+        "tracker.self", "tracker.viewall", "tracker.beta",
         "shares.view", "shares.manage",
         "bills.use",
         "family.use", "family.finance", "cycle.track", "chore.claim", "allowance.manage", "identity.map",
@@ -47,6 +47,7 @@ public class PermissionsTests
     [InlineData("chat.contacts.manage")]
     [InlineData("tracker.self")]
     [InlineData("tracker.viewall")]
+    [InlineData("tracker.beta")]
     [InlineData("shares.view")]
     [InlineData("shares.manage")]
     [InlineData("bills.use")]
@@ -108,6 +109,7 @@ public class PermissionsTests
         Permissions.ChatContactsManage.Should().Be("chat.contacts.manage");
         Permissions.TrackerSelf.Should().Be("tracker.self");
         Permissions.TrackerViewAll.Should().Be("tracker.viewall");
+        Permissions.TrackerBeta.Should().Be("tracker.beta");
         Permissions.SharesView.Should().Be("shares.view");
         Permissions.SharesManage.Should().Be("shares.manage");
         Permissions.BillsUse.Should().Be("bills.use");
@@ -133,9 +135,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_forty_three_known_keys()
+    public void All_contains_exactly_the_forty_four_known_keys()
     {
-        Permissions.All.Should().HaveCount(43);
+        Permissions.All.Should().HaveCount(44);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -146,9 +148,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_forty_three_entries()
+    public void Catalog_has_forty_four_entries()
     {
-        Permissions.Catalog.Should().HaveCount(43);
+        Permissions.Catalog.Should().HaveCount(44);
     }
 
     [Fact]

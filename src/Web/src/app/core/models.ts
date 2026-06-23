@@ -4017,6 +4017,8 @@ export const PERM = {
   chatContactsManage: 'chat.contacts.manage',
   trackerSelf: 'tracker.self',
   trackerViewAll: 'tracker.viewall',
+  /** Tracker Beta: the new mobile-first "Strata" tracker experience (beta). */
+  trackerBeta: 'tracker.beta',
   familyUse: 'family.use',
   familyFinance: 'family.finance',
   /** Bill Splitter: create bills, AI receipt breakdown, assign items to contacts, public claim link. */
@@ -4071,6 +4073,7 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   // ---- Fitness ----
   [PERM.trackerSelf]: 'Fitness',
   [PERM.trackerViewAll]: 'Fitness',
+  [PERM.trackerBeta]: 'Fitness',
   // ---- Bills ----
   [PERM.billsUse]: 'Bills',
   // ---- Family ----

@@ -1,0 +1,275 @@
+// ============================================================================
+// Tracker Beta — "Strata" design system + shell layout.
+//
+// ISOLATED design system: every token here is defined on :host of app-tracker-beta
+// so all child components inherit them via the cascade. NONE of the global Usage IQ
+// --tech-* tokens are used or imported. Child components reference var(--bg-base) etc.
+//
+// Tokens are VERBATIM from the Strata build brief. Dark is the default; light is
+// supplied via prefers-color-scheme. A prefers-reduced-motion killswitch, a
+// prefers-reduced-transparency / prefers-contrast blur-drop, and env() safe-area
+// insets are all honored here so child components inherit a consistent contract.
+// ============================================================================
+
+:host {
+  // ---- DARK (default) ----
+  --bg-base: #0d0e16;
+  --bg-rise: #15172a;
+  --bg-sink: #0a0b12;
+  --glass: rgba(26, 29, 52, .62);
+  --glass-edge: rgba(255, 255, 255, .10);
+  --hairline: rgba(255, 255, 255, .07);
+  --ink: #f3f4ff;
+  --ink-dim: #a4a7c6;
+  --ink-faint: #6d7194;
+
+  // domain accents (analogous gradients, applied as SVG <linearGradient> never flat)
+  --cal-a: #7c5cff;
+  --cal-b: #3b82f6; // calories  violet->blue (hero)
+  --pro-a: #22d3ee;
+  --pro-b: #34d399; // protein   cyan->green
+  --move-a: #fb7185;
+  --move-b: #f59e0b; // move/steps rose->amber
+  --water-a: #38bdf8;
+  --water-b: #22d3ee; // hydration sky->cyan
+  --coffee-a: #c2772e;
+  --coffee-b: #f0b760; // coffee bronze->tan
+  --signal: #34d399; // goal-hit success green
+  --warn: #f0a35a; // GRAFT(Daylight): over-goal = warm AMBER, never red
+  --focus: #7c5cff; // own visible focus ring, >=3:1 on bg-base
+
+  // ---- TYPE ----
+  --font-display: "Clash Display", system-ui, sans-serif; // numerals only
+  --font-ui: "Plus Jakarta Sans", system-ui, sans-serif; // labels/body
+
+  // ---- RADII ----
+  --r-glass: 28px;
+  --r-card: 24px;
+  --r-tile: 18px;
+  --r-ring: 32px;
+  --r-pill: 999px;
+
+  // ---- ELEVATION (the depth system) ----
+  --lift-1: 0 2px 8px rgba(4, 6, 20, .35); // sediment resting
+  --lift-2: 0 8px 24px rgba(4, 6, 20, .45), inset 0 1px 0 var(--glass-edge); // raised card
+  --lift-3: 0 16px 48px rgba(4, 6, 20, .55), inset 0 1px 0 var(--glass-edge); // floating glass
+  --press: inset 0 2px 8px rgba(4, 6, 20, .5); // depressed well
+
+  // ---- MOTION / EASING ----
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  // @supports upgrade to generated ~40pt springs (set below).
+  --ease-spring-up: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
+
+  // ---- BLUR (restricted to the 3 floating surfaces only) ----
+  --blur-glass: 18px; // capped; sediment cards are cheap matte extrusion, no blur
+
+  // ---- Safe-area gutters (resolved once, reused everywhere) ----
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --gutter: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+
+  // ---- Fixed-chrome heights (used by the scroll region to reserve space) ----
+  --day-strip-h: 52px;
+  --action-bar-h: 72px;
+
+  display: block;
+  position: relative;
+  width: 100%;
+  min-height: 100svh; // fixed chrome floor
+  background: var(--bg-base);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+// linear() spring upgrade where supported (richer overshoot than the cubic floor).
+@supports (animation-timing-function: linear(0, 1)) {
+  :host {
+    --ease-spring-up: linear(0, .006, .025 2.8%, .101 6.5%, .539 23%, .721, .849, .937, .991, 1.013, 1.019, 1.01, 1.004, .999, .998, 1);
+    --ease-bounce: linear(0, .004, .016, .035, .063, .098, .141, .191, .25, .316, .563, .737, .879, .969, 1.005, 1.011, 1.005, .996, 1);
+  }
+}
+
+// ---- LIGHT (prefers-color-scheme: light). Accents identical; pass contrast on both floors. ----
+@media (prefers-color-scheme: light) {
+  :host {
+    --bg-base: #eef0f8;
+    --bg-rise: #ffffff;
+    --bg-sink: #e3e6f2;
+    --glass: rgba(255, 255, 255, .66);
+    --glass-edge: rgba(255, 255, 255, .85);
+    --hairline: rgba(20, 24, 54, .08);
+    --ink: #171a2e;
+    --ink-dim: #565b80;
+    --ink-faint: #8b8fb0;
+    --lift-1: 0 2px 8px rgba(20, 24, 54, .10);
+    --lift-2: 0 8px 24px rgba(20, 24, 54, .12), inset 0 1px 0 var(--glass-edge);
+    --lift-3: 0 16px 48px rgba(20, 24, 54, .16), inset 0 1px 0 var(--glass-edge);
+    --press: inset 0 2px 8px rgba(20, 24, 54, .14);
+  }
+}
+
+// ---- a11y: reduced transparency / forced contrast => drop blur, solidify glass ----
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :host {
+    --blur-glass: 0px;
+    --glass: var(--bg-rise);
+  }
+}
+
+// ---- MOTION KILLSWITCH: collapse every animation/transition to instant ----
+// Optimistic swaps + undo still function — only the decorative motion is removed.
+@media (prefers-reduced-motion: reduce) {
+  :host,
+  :host *,
+  :host *::before,
+  :host *::after {
+    animation-duration: .001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// ============================================================================
+// SHELL LAYOUT — class names the page component (and children) bind to.
+// ============================================================================
+
+// The single vertical scroll region. 100dvh so it tracks the dynamic viewport
+// (URL bar collapse) under the fixed chrome. scroll-snap on section landings.
+:host ::ng-deep .tb-scroll,
+.tb-scroll {
+  height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scroll-snap-type: y proximity;
+  -webkit-overflow-scrolling: touch;
+  // Reserve room for the two fixed chrome bars so content never hides beneath them.
+  padding-top: calc(var(--day-strip-h) + var(--safe-top));
+  padding-bottom: calc(var(--action-bar-h) + var(--safe-bottom) + 12px);
+  padding-inline: var(--gutter) var(--gutter-r);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// Sticky glass DAY STRIP — fixed chrome at the top, safe-area aware. Hairline, no shadow.
+.tb-day-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  height: calc(var(--day-strip-h) + var(--safe-top));
+  padding-top: var(--safe-top);
+  padding-inline: var(--gutter) var(--gutter-r);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  border-bottom: 1px solid var(--hairline);
+}
+
+// HERO FLOATING LAYER — glass card, --lift-3, --r-ring. One of the 3 blurred surfaces.
+.tb-hero {
+  flex: 0 0 auto;
+  min-height: 38svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border-radius: var(--r-ring);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  box-shadow: var(--lift-3);
+  scroll-snap-align: start;
+}
+
+// QUICK RAIL — horizontal scroll-snap-x mandatory, hidden scrollbar, contain overscroll.
+.tb-quick-rail {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 2px;
+
+  &::-webkit-scrollbar { display: none; }
+}
+
+// Stacked sediment cards — matte extrusion (no blur), --lift-2, scroll-snap landing,
+// content-visibility for below-fold cost savings (paired with contain-intrinsic-size).
+.tb-card {
+  flex: 0 0 auto;
+  border-radius: var(--r-card);
+  background: var(--bg-rise);
+  box-shadow: var(--lift-2);
+  scroll-snap-align: start;
+  padding: 16px;
+}
+
+// Apply to cards below the fold to skip rendering work until they scroll near.
+.tb-defer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 180px;
+}
+
+// Fixed bottom ACTION BAR — glass, --lift-3 (the 3rd blurred surface). Thumb-arc anchor.
+.tb-action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  min-height: calc(var(--action-bar-h) + var(--safe-bottom));
+  padding-bottom: max(12px, var(--safe-bottom));
+  padding-top: 10px;
+  padding-inline: var(--gutter) var(--gutter-r);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  border-top: 1px solid var(--hairline);
+  box-shadow: var(--lift-3);
+}
+
+// ---- Own visible focus ring (never outline:none without a replacement) ----
+:host ::ng-deep :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+// Skeleton shimmer (off store.loading) — final layout dims for CLS~=0.
+.tb-skeleton {
+  background: linear-gradient(100deg, var(--bg-sink) 30%, var(--bg-rise) 50%, var(--bg-sink) 70%);
+  background-size: 200% 100%;
+  animation: tb-shimmer 1.4s var(--ease-out) infinite;
+  border-radius: var(--r-card);
+}
+
+@keyframes tb-shimmer {
+  to { background-position: -200% 0; }
+}

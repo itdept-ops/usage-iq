@@ -96,6 +96,15 @@ export const routes: Routes = [
     title: 'Usage IQ · Tracker',
   },
   {
+    // Tracker Beta — the redesigned, mobile-first "Strata" dashboard over the SAME tracker data
+    // (reuses the root TrackerStore). The lazy children file keeps echarts AND the OptimisticTracker
+    // route provider out of the initial bundle; the tracker.beta guard lives inside it, so the beta
+    // surfaces only to opted-in users. OptimisticTracker is provided at that route so every child
+    // sheet/card injects the same instance (it itself injects the root TrackerStore).
+    path: 'tracker-beta',
+    loadChildren: () => import('./features/tracker-beta/tracker-beta.routes').then(m => m.TRACKER_BETA_ROUTES),
+  },
+  {
     // Bill Splitter — its own permission-gated page. Owner-scoped CRUD + AI receipt breakdown + a public
     // anonymous claim link (the bare /bill/:token route below).
     path: 'bills',
