@@ -164,6 +164,16 @@ export const routes: Routes = [
     loadChildren: () => import('./features/dashboard-beta/dashboard-beta.routes').then(m => m.DASHBOARD_BETA_ROUTES),
   },
   {
+    // Family "Hearth" — the mobile-first family glance surface (today-first, nav-last) over the SAME
+    // family Api methods + DTOs (the Today snapshot read-mostly + the existing fast-action write
+    // endpoints). Purely additive; the lazy children file keeps it out of the initial bundle and STACKS
+    // both guards (beta.access + family.use), so a direct nav is never less strict than the live /family
+    // page it mirrors. Placed before the `beta` hub route so the more-specific `beta/family` matches first
+    // (Angular is first-match). No live family page is touched.
+    path: 'beta/family',
+    loadChildren: () => import('./features/family-beta/family-beta.routes').then(m => m.FAMILY_BETA_ROUTES),
+  },
+  {
     // Beta hub — a permission-gated index of experimental surfaces. Purely additive: lives in the normal
     // app shell, gated by beta.access; each experiment card inside is further gated by its own feature perm.
     path: 'beta',

@@ -129,6 +129,15 @@ export class BetaHubPage {
       icon: 'insights',
       // No `perm` → the route guard re-checks beta.access; same data as the live dashboard.
     },
+    {
+      title: 'Family',
+      blurb: 'Your household at a glance — mobile-first',
+      route: '/beta/family',
+      icon: 'cottage',
+      // Gated on `family.use` (the feature); the route additionally STACKS beta.access + family.use, so a
+      // direct nav re-checks both. Mirrors the live family glance — never surfaces cycle/finance data.
+      perm: 'family.use',
+    },
   ];
 
   /** Experiments visible to the current session (cards without a `perm` always show). */

@@ -1,0 +1,179 @@
+// Family "Hearth" beta — its OWN warm "Hearth-ember" token set on :host. These are scoped to this
+// component (and inherited by its child cards + the reused BottomSheet, which reads --glass/--blur-glass/
+// --r-glass/--lift-3/--ink-faint/--r-pill/--ease-out). NEVER the global --tech-* tokens — full isolation.
+:host {
+  display: block;
+  position: relative;
+  min-height: 100dvh;
+
+  // ── surfaces ──
+  --bg-base: #181210;
+  --bg-rise: #241b16;
+  --glass: rgba(40, 28, 22, .62);
+  --glass-edge: rgba(255, 236, 210, .10);
+
+  // ── ink ──
+  --ink: #fdf6ee;
+  --ink-dim: #c9b8a8;
+  --ink-faint: #8a786a;
+
+  // ── accents ──
+  --hearth-a: #f59e0b; // hero + Ask gradient start
+  --hearth-b: #ef6f53; // hero + Ask gradient end
+  --event: #6ee7b7;
+  --reminder: #fcd34d;
+  --list: #7dd3fc;
+  --note: #fcd34d;
+  --chore: #fca5a5;
+  --online: #34d399;
+
+  // ── shape ──
+  --r-card: 24px;
+  --r-glass: 28px;
+  --r-pill: 999px;
+
+  // ── elevation ──
+  --lift-1: 0 4px 16px rgba(8, 4, 2, .35);
+  --lift-2: 0 10px 30px rgba(8, 4, 2, .45);
+  --lift-3: 0 16px 48px rgba(8, 4, 2, .55), inset 0 1px 0 var(--glass-edge);
+
+  // ── motion ──
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+
+  // ── effects + safe-area ──
+  --blur-glass: 18px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  --bar-h: 64px;
+  --action-bar-h: 64px;
+
+  background: radial-gradient(120% 80% at 50% -10%, #2a1d15 0%, var(--bg-base) 60%);
+  color: var(--ink);
+  font-family: var(--font-ui, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+// Cap the blur + drop translucency for users who ask for less transparency / reduced motion.
+@media (prefers-reduced-transparency: reduce) {
+  :host { --blur-glass: 0px; --glass: var(--bg-rise); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :host { --ease-out: ease; }
+}
+
+// ── fixed glass greeting strip ───────────────────────────────────────────────
+.bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 20;
+  display: flex; align-items: center; gap: 12px;
+  min-height: calc(var(--bar-h) + var(--safe-top));
+  padding: var(--safe-top) max(16px, env(safe-area-inset-left)) 0 max(16px, env(safe-area-inset-left));
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.bar__text { display: flex; flex-direction: column; min-width: 0; }
+.bar__greet {
+  font-family: var(--font-display, inherit);
+  font-size: 18px; font-weight: 800; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bar__date { font-size: 12px; color: var(--ink-dim); }
+.bar__finder {
+  margin-left: auto; flex: 0 0 auto;
+  display: grid; place-items: center; width: 44px; height: 44px;
+  border-radius: 999px; color: var(--ink-dim); text-decoration: none;
+}
+.bar__finder:hover { background: rgba(255, 255, 255, .06); color: var(--ink); }
+.bar__finder:focus-visible { outline: 2px solid var(--hearth-a); outline-offset: 2px; }
+
+// ── thumb-scroll column ──────────────────────────────────────────────────────
+.scroll {
+  position: relative;
+  display: flex; flex-direction: column; gap: 14px;
+  min-height: 100dvh;
+  padding:
+    calc(var(--bar-h) + var(--safe-top) + 14px)
+    max(16px, env(safe-area-inset-right))
+    calc(var(--action-bar-h) + var(--safe-bottom) + 16px)
+    max(16px, env(safe-area-inset-left));
+  overflow-y: auto;
+  scroll-snap-type: y proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll__foot { height: 4px; }
+
+// Below-the-fold cards skip layout/paint until near the viewport (cheaper first paint on mobile).
+.scroll > fb-household-card,
+.scroll > fb-notes-card,
+.scroll > fb-weather-card,
+.scroll > fb-rooms-drawer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 140px;
+}
+
+// ── fixed bottom action bar ──────────────────────────────────────────────────
+.actions {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 20;
+  display: flex; align-items: center; gap: 12px;
+  min-height: calc(var(--action-bar-h) + var(--safe-bottom));
+  padding:
+    10px
+    max(16px, env(safe-area-inset-right))
+    max(10px, var(--safe-bottom))
+    max(16px, env(safe-area-inset-left));
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  border-top: 1px solid var(--glass-edge);
+  box-shadow: var(--lift-3);
+}
+.actions__ask {
+  flex: 1 1 auto;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 52px; border-radius: var(--r-pill);
+  border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--hearth-a), var(--hearth-b));
+  color: #1a0f06; font: inherit; font-size: 16px; font-weight: 800;
+}
+.actions__ask:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.actions__ask mat-icon { font-size: 22px; width: 22px; height: 22px; }
+.actions__add {
+  flex: 0 0 auto;
+  display: grid; place-items: center; width: 52px; height: 52px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--glass-edge); background: var(--bg-rise); color: var(--ink);
+  cursor: pointer;
+}
+.actions__add:focus-visible { outline: 2px solid var(--hearth-a); outline-offset: 2px; }
+
+// ── bottom-sheet bodies (Ask + Quick-add) ────────────────────────────────────
+.sheet { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.sheet__title { margin: 0; font-size: 18px; font-weight: 800; color: var(--ink); }
+.sheet__form { display: flex; gap: 8px; }
+.sheet__input {
+  flex: 1 1 auto; min-width: 0; min-height: 48px; padding: 0 16px;
+  border-radius: var(--r-pill); border: 1px solid var(--glass-edge);
+  background: var(--bg-base); color: var(--ink); font: inherit; font-size: 15px;
+}
+.sheet__input::placeholder { color: var(--ink-faint); }
+.sheet__input:focus-visible { outline: 2px solid var(--hearth-a); outline-offset: 1px; }
+.sheet__send {
+  flex: 0 0 auto; display: grid; place-items: center; width: 48px; height: 48px;
+  border-radius: 999px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--hearth-a), var(--hearth-b)); color: #1a0f06;
+}
+.sheet__send:disabled { opacity: .4; cursor: default; }
+.sheet__send:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.sheet__hint { margin: 0; font-size: 12px; color: var(--ink-dim); }
+.sheet__answer { margin: 4px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink); }
+.sheet__answer--load { color: var(--ink-dim); }
+.sheet__answer--err { color: var(--hearth-b); }
+
+// No 390px overflow: everything is fluid (max-width:100%, min-width:0 on flex children) by construction.
+:host, .scroll, .bar, .actions { max-width: 100vw; }
