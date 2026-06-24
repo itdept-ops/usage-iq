@@ -99,7 +99,7 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
             if (state.IsUnchanged(path, size, mtime)) continue;
 
             List<ParsedUsage> rows;
-            try { rows = ParseFile(parser, path, name); }
+            try { rows = ParseFile(parser, path); }
             catch (Exception ex) { emit(ReporterEvent.Warning($"{kind}: parse failed ({name}): {ex.Message}", ex)); continue; }
 
             changed++;
@@ -159,11 +159,13 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
         staged.Clear();
     }
 
-    private static List<ParsedUsage> ParseFile(ISourceParser parser, string path, string name)
+    private static List<ParsedUsage> ParseFile(ISourceParser parser, string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = new StreamReader(stream);
-        return parser.Parse(reader, name).ToList();
+        // Pass the FULL path so path-aware parsers (Gemini/Antigravity) can derive a stable
+        // per-conversation dedup key + file mtime; content-keyed parsers (Claude/Codex) ignore it.
+        return parser.Parse(reader, path).ToList();
     }
 
     private static bool ShouldSkip(string path) =>

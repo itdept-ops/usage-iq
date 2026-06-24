@@ -114,11 +114,12 @@ public sealed class JsonlIngestionService(UsageDbContext db, ILogger<JsonlIngest
         List<UsageRecord> pending, SyncResult result, CancellationToken ct)
     {
         var rows = 0;
-        var fileName = Path.GetFileName(path);
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = new StreamReader(stream);
 
-        foreach (var pu in parser.Parse(reader, fileName))
+        // Pass the FULL path so path-aware parsers (Gemini/Antigravity) derive a stable per-conversation
+        // dedup key + file mtime; content-keyed parsers (Claude/Codex) ignore it.
+        foreach (var pu in parser.Parse(reader, path))
         {
             rows++;
             if (!seen.Add(pu.DedupKey)) continue;
