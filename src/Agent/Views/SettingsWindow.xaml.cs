@@ -35,6 +35,7 @@ public partial class SettingsWindow : Window
         IntervalBox.Text = opt.IntervalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
         ClaudeBox.Text = opt.ClaudePath ?? "";
         CodexBox.Text = opt.CodexPath ?? "";
+        GeminiBox.Text = opt.GeminiPath ?? "";
         StartMinimizedCheck.IsChecked = opt.StartMinimized;
         RunOnStartupCheck.IsChecked = StartupRegistry.IsEnabled();
 
@@ -116,6 +117,7 @@ public partial class SettingsWindow : Window
             Machine = NullIfBlank(MachineBox.Text),
             ClaudePath = NullIfBlank(ClaudeBox.Text),
             CodexPath = NullIfBlank(CodexBox.Text),
+            GeminiPath = NullIfBlank(GeminiBox.Text),
             IntervalSeconds = interval,
             StartMinimized = StartMinimizedCheck.IsChecked == true,
             RunOnStartup = RunOnStartupCheck.IsChecked == true,
