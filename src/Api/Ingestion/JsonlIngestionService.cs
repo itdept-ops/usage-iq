@@ -18,7 +18,7 @@ public sealed class JsonlIngestionService(UsageDbContext db, ILogger<JsonlIngest
     private static readonly string[] SkipSegments = [@"\.tmp\", @"\node_modules\", "plugins-backup"];
 
     private readonly Dictionary<string, ISourceParser> _parsers =
-        new[] { (ISourceParser)new ClaudeParser(), new CodexParser() }
+        new[] { (ISourceParser)new ClaudeParser(), new CodexParser(), new GeminiParser() }
             .ToDictionary(p => p.Kind, StringComparer.OrdinalIgnoreCase);
 
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)

@@ -356,6 +356,7 @@ using (var scope = app.Services.CreateScope())
     var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     var claudePath = builder.Configuration["Ingestion:ClaudeProjectsPath"];
     var codexPath = builder.Configuration["Ingestion:CodexPath"];
+    var geminiPath = builder.Configuration["Ingestion:GeminiPath"];
 
     var appConfig = await db.AppConfigs.FirstOrDefaultAsync();
     if (appConfig is null)
@@ -380,7 +381,9 @@ using (var scope = app.Services.CreateScope())
             new IngestionSource { Name = "claude-code", Kind = "claude", Enabled = true,
                 RootPath = string.IsNullOrWhiteSpace(claudePath) ? Path.Combine(home, ".claude", "projects") : claudePath },
             new IngestionSource { Name = "codex", Kind = "codex", Enabled = true,
-                RootPath = string.IsNullOrWhiteSpace(codexPath) ? Path.Combine(home, ".codex") : codexPath });
+                RootPath = string.IsNullOrWhiteSpace(codexPath) ? Path.Combine(home, ".codex") : codexPath },
+            new IngestionSource { Name = "gemini", Kind = "gemini", Enabled = true,
+                RootPath = string.IsNullOrWhiteSpace(geminiPath) ? Path.Combine(home, ".gemini") : geminiPath });
         await db.SaveChangesAsync();
     }
 
@@ -399,6 +402,9 @@ using (var scope = app.Services.CreateScope())
     if (!string.IsNullOrWhiteSpace(codexPath))
         await db.IngestionSources.Where(s => s.Kind == "codex" && s.RootPath != codexPath)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RootPath, codexPath));
+    if (!string.IsNullOrWhiteSpace(geminiPath))
+        await db.IngestionSources.Where(s => s.Kind == "gemini" && s.RootPath != geminiPath)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RootPath, geminiPath));
 
     // Bootstrap users so someone can sign in and manage the rest. Admins always get every
     // permission and stay enabled (so they can't be locked out); allowlisted emails are seeded

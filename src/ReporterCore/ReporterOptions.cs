@@ -22,6 +22,13 @@ public sealed class ReporterOptions
     /// <summary>OpenAI Codex sessions directory. Defaults to <c>~/.codex</c>.</summary>
     public string? CodexPath { get; set; }
 
+    /// <summary>
+    /// Google Gemini / Antigravity logs directory. Defaults to <c>~/.gemini</c>; the parser walks the
+    /// Antigravity brain-log tree underneath it
+    /// (<c>antigravity/brain/&lt;conversation-id&gt;/.system_generated/logs/*.jsonl</c>).
+    /// </summary>
+    public string? GeminiPath { get; set; }
+
     /// <summary>Where the per-file sync state is persisted. Defaults to <c>~/.usage-iq/reporter-state.json</c>.</summary>
     public string? StatePath { get; set; }
 
@@ -52,6 +59,9 @@ public sealed class ReporterOptions
 
     public string ResolvedCodexPath => string.IsNullOrWhiteSpace(CodexPath)
         ? Path.Combine(Home, ".codex") : CodexPath!;
+
+    public string ResolvedGeminiPath => string.IsNullOrWhiteSpace(GeminiPath)
+        ? Path.Combine(Home, ".gemini") : GeminiPath!;
 
     // Per-server state file: the file/size/mtime fingerprints only mean "already sent to THIS server".
     // Pointing the reporter at a different URL (e.g. switching from localhost to the cloud) uses a

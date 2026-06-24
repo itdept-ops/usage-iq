@@ -52,7 +52,7 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
 
     private const string Endpoint = "api/ingest";
 
-    public async Task<ScanSummary> ScanAsync(string claudeRoot, string codexRoot, CancellationToken ct)
+    public async Task<ScanSummary> ScanAsync(string claudeRoot, string codexRoot, string geminiRoot, CancellationToken ct)
     {
         var summary = new ScanSummary();
         var sw = Stopwatch.StartNew();
@@ -62,6 +62,7 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
 
         await ScanSourceAsync("claude", new ClaudeParser(), claudeRoot, summary, seen, ct);
         await ScanSourceAsync("codex", new CodexParser(), codexRoot, summary, seen, ct);
+        await ScanSourceAsync("gemini", new GeminiParser(), geminiRoot, summary, seen, ct);
 
         state.Save();
         summary.ElapsedMs = sw.ElapsedMilliseconds;

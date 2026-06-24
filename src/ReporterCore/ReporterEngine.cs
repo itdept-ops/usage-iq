@@ -69,7 +69,7 @@ public sealed class ReporterEngine : IDisposable, IObservable<ReporterEvent>
         Emit(ReporterEvent.PassStarted(once));
         try
         {
-            var summary = await _scanner.ScanAsync(_options.ResolvedClaudePath, _options.ResolvedCodexPath, ct);
+            var summary = await _scanner.ScanAsync(_options.ResolvedClaudePath, _options.ResolvedCodexPath, _options.ResolvedGeminiPath, ct);
 
             if (summary.Unpriced.Count > 0)
                 Emit(ReporterEvent.Warning(

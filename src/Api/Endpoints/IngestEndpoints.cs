@@ -17,7 +17,7 @@ public static class IngestEndpoints
         app.MapPost("/api/ingest", async (IngestBatchDto batch, HttpContext http, IngestWriteService writer, CancellationToken ct) =>
         {
             if (!IngestWriteService.IsKnownSource(batch.Source))
-                return Results.BadRequest(new { message = "Unknown source. Expected 'claude' or 'codex'." });
+                return Results.BadRequest(new { message = "Unknown source. Expected 'claude', 'codex', or 'gemini'." });
             if (batch.Rows is null || batch.Rows.Count == 0)
                 return Results.Ok(new IngestResultDto());
             if (batch.Rows.Count > IngestWriteService.MaxRowsPerBatch)

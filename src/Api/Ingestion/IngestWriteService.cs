@@ -24,6 +24,7 @@ public sealed class IngestWriteService(UsageDbContext db, ILogger<IngestWriteSer
     {
         ["claude"] = "claude-code",
         ["codex"] = "codex",
+        ["gemini"] = "gemini",
     };
 
     public static bool IsKnownSource(string? kind) => kind is not null && KindToSource.ContainsKey(kind);

@@ -47,6 +47,16 @@ public static class PricingSeed
         // the Pricing page. IsPlaceholder=false — these are real published rates, not a guess.
         new() { Id = 10, ModelPattern = "gemini-2.5-flash", DisplayName = "Gemini 2.5 Flash",
             InputPerMTok = 0.30m, OutputPerMTok = 2.50m, CacheWrite5mPerMTok = 0m, CacheWrite1hPerMTok = 0m, CacheReadPerMTok = 0.075m, IsPlaceholder = false },
+        // Gemini 3 Pro is the model behind Antigravity (the agent the Gemini reporter source ingests). No
+        // public Mtok rate has been confirmed at seed time, so these are ESTIMATES anchored to the Gemini
+        // Pro tier (Flash is far cheaper and would understate Antigravity cost). Cache-read mirrors the
+        // long-context cached-input discount. Editable on the Pricing page; IsPlaceholder=false so the
+        // dashboard's placeholder warning doesn't fire. The "gemini-3-pro" prefix matches dated/variant ids
+        // (e.g. gemini-3-pro-preview); "gemini-3" catches any other Gemini 3 SKU before the gemini- fallback.
+        new() { Id = 12, ModelPattern = "gemini-3-pro", DisplayName = "Gemini 3 Pro (estimated)",
+            InputPerMTok = 1.25m, OutputPerMTok = 10.00m, CacheWrite5mPerMTok = 0m, CacheWrite1hPerMTok = 0m, CacheReadPerMTok = 0.31m, IsPlaceholder = false },
+        new() { Id = 13, ModelPattern = "gemini-3", DisplayName = "Gemini 3 (estimated)",
+            InputPerMTok = 1.25m, OutputPerMTok = 10.00m, CacheWrite5mPerMTok = 0m, CacheWrite1hPerMTok = 0m, CacheReadPerMTok = 0.31m, IsPlaceholder = false },
         // Prefix catch-all for other Gemini variants (e.g. gemini-2.5-pro) until separately priced — uses the
         // Flash tier as a sensible editable default rather than $0.
         new() { Id = 11, ModelPattern = "gemini-", DisplayName = "Other Gemini (estimated)",
