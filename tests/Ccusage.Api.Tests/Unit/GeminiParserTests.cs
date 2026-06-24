@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Ccusage.Api.Ingestion;
 using FluentAssertions;
 
@@ -225,5 +226,106 @@ public class GeminiParserTests
             row.SessionId.Should().Be("conv-xyz");
         }
         finally { try { Directory.Delete(geminiRoot, recursive: true); } catch { /* best-effort temp cleanup */ } }
+    }
+
+    // ---- Antigravity transcripts: NO token metadata exists, so usage is ESTIMATED from text length ----
+
+    private const string AgPath =
+        "C:/Users/junio/.gemini/antigravity/brain/conv-ag/.system_generated/logs/transcript_full.jsonl";
+
+    // Mirrors the real Antigravity brain-log line shape: {step_index, source, type, status, created_at,
+    // content, (optional) thinking} — NO token fields at all.
+    private static string AgStep(int step, string source, string type, string content,
+        string ts = "2026-06-23T23:16:29Z", string? thinking = null)
+    {
+        var t = thinking is null ? "" : $"\"thinking\":{JsonSerializer.Serialize(thinking)},";
+        return "{" +
+            $"\"step_index\":{step}," +
+            $"\"source\":\"{source}\"," +
+            $"\"type\":\"{type}\"," +
+            "\"status\":\"DONE\"," +
+            $"\"created_at\":\"{ts}\"," +
+            t +
+            $"\"content\":{JsonSerializer.Serialize(content)}" +
+            "}";
+    }
+
+    // The model is announced inside a USER_INPUT's content via a settings-change block (verbatim shape).
+    private const string SettingsChange =
+        "<USER_SETTINGS_CHANGE>\nThe user changed setting `Model Selection` from None to Gemini 3.5 Flash (Low). No need to comment.\n</USER_SETTINGS_CHANGE>";
+
+    [Fact]
+    public void Antigravity_model_reply_yields_one_estimated_row_tagged_est()
+    {
+        var jsonl =
+            AgStep(0, "USER_EXPLICIT", "USER_INPUT", "summarize this meal for me please\n" + SettingsChange) + "\n" +
+            AgStep(2, "MODEL", "PLANNER_RESPONSE", "Here are a few options you can paste into chat ...");
+        var rows = Parse(jsonl, AgPath);
+
+        rows.Should().ContainSingle();
+        var r = rows[0];
+        r.Model.Should().Be("gemini-3.5-flash (est)"); // model parsed from the settings line + tagged estimated
+        r.Input.Should().BeGreaterThan(0);             // estimated from the user prompt + settings text
+        r.Output.Should().BeGreaterThan(0);            // estimated from the reply text
+        r.CacheRead.Should().Be(0);
+        r.Version.Should().Be("antigravity");
+        r.SessionId.Should().Be("conv-ag");
+    }
+
+    [Fact]
+    public void Antigravity_dedup_key_uses_conversation_and_step_index()
+    {
+        var jsonl =
+            AgStep(0, "USER_EXPLICIT", "USER_INPUT", "hello") + "\n" +
+            AgStep(3, "MODEL", "PLANNER_RESPONSE", "hi there");
+        Parse(jsonl, AgPath).Single().DedupKey.Should().Be("gemini|conv-ag|3");
+    }
+
+    [Fact]
+    public void Antigravity_thinking_counts_toward_estimated_output()
+    {
+        var withThinking = Parse(
+            AgStep(0, "USER_EXPLICIT", "USER_INPUT", "x") + "\n" +
+            AgStep(2, "MODEL", "PLANNER_RESPONSE", "short", thinking: new string('t', 4000)), AgPath).Single();
+        var without = Parse(
+            AgStep(0, "USER_EXPLICIT", "USER_INPUT", "x") + "\n" +
+            AgStep(2, "MODEL", "PLANNER_RESPONSE", "short"), AgPath).Single();
+        withThinking.Output.Should().BeGreaterThan(without.Output);
+    }
+
+    [Fact]
+    public void Antigravity_accrued_user_and_system_text_feeds_the_next_reply_input()
+    {
+        var small = Parse(
+            AgStep(0, "USER_EXPLICIT", "USER_INPUT", "hi") + "\n" +
+            AgStep(2, "MODEL", "PLANNER_RESPONSE", "ok"), AgPath).Single();
+        var large = Parse(
+            AgStep(0, "USER_EXPLICIT", "USER_INPUT", new string('q', 8000)) + "\n" +
+            AgStep(1, "SYSTEM", "CONVERSATION_HISTORY", new string('c', 8000)) + "\n" +
+            AgStep(2, "MODEL", "PLANNER_RESPONSE", "ok"), AgPath).Single();
+        large.Input.Should().BeGreaterThan(small.Input); // user + system/context text both feed input
+    }
+
+    [Fact]
+    public void Antigravity_emits_one_row_per_model_reply()
+    {
+        var jsonl = string.Join("\n",
+            AgStep(0, "USER_EXPLICIT", "USER_INPUT", "q1\n" + SettingsChange),
+            AgStep(1, "SYSTEM", "CONVERSATION_HISTORY", "big context block"),
+            AgStep(2, "MODEL", "PLANNER_RESPONSE", "a1"),
+            AgStep(4, "USER_EXPLICIT", "USER_INPUT", "q2"),
+            AgStep(5, "MODEL", "PLANNER_RESPONSE", "a2"),
+            AgStep(6, "USER_EXPLICIT", "USER_INPUT", "q3"),
+            AgStep(7, "MODEL", "PLANNER_RESPONSE", "a3"));
+        var rows = Parse(jsonl, AgPath);
+        rows.Should().HaveCount(3); // one per MODEL reply, not per line
+        rows.Should().OnlyContain(r => r.Model == "gemini-3.5-flash (est)" && r.Output > 0);
+    }
+
+    [Fact]
+    public void Antigravity_user_only_lines_without_a_reply_yield_nothing()
+    {
+        Parse(AgStep(0, "USER_EXPLICIT", "USER_INPUT", "just talking, no reply yet"), AgPath)
+            .Should().BeEmpty();
     }
 }

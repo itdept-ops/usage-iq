@@ -4,23 +4,23 @@ using System.Text.Json;
 namespace Ccusage.Api.Ingestion;
 
 /// <summary>
-/// Parses Google Gemini / Antigravity usage transcripts. The confirmed shape is the Antigravity
-/// brain log tree:
-/// <c>~/.gemini/antigravity/brain/&lt;conversation-id&gt;/.system_generated/logs/*.jsonl</c>
-/// — newline-delimited JSON where per-turn token usage lives in a <c>usage_metadata</c> /
-/// <c>usageMetadata</c> block that uses the Gemini-API field names (<c>promptTokenCount</c>,
-/// <c>candidatesTokenCount</c>, <c>cachedContentTokenCount</c>, <c>thoughtsTokenCount</c>,
-/// <c>totalTokenCount</c>) alongside a <c>model</c> id like <c>gemini-3-pro</c>.
+/// Parses Google Gemini / Antigravity usage transcripts. TWO real shapes exist, handled in one pass:
 ///
-/// The parser is deliberately FORMAT-TOLERANT because the exact nesting varies between Antigravity
-/// builds and the other Gemini surfaces (<c>~/.gemini/history/*.json</c>, <c>.gemini/telemetry.log</c>):
-/// every line is JSON-parsed independently and we recursively hunt for ANY object carrying a usage
-/// block, pairing it with the nearest model id, timestamp and ids we can find on the same line. A line
-/// without a usage block is skipped; a malformed line never throws.
+/// <para><b>1. Token-metadata transcripts (Gemini CLI / API).</b> Newline-delimited JSON where per-turn
+/// usage lives in a <c>usage_metadata</c> / <c>usageMetadata</c> block using the Gemini-API field names
+/// (<c>promptTokenCount</c>, <c>candidatesTokenCount</c>, <c>cachedContentTokenCount</c>,
+/// <c>thoughtsTokenCount</c>) alongside a <c>model</c> id. We recursively hunt for ANY usage block and map
+/// <c>promptTokenCount → Input</c>, <c>candidatesTokenCount + thoughtsTokenCount → Output</c>,
+/// <c>cachedContentTokenCount → CacheRead</c> (no cache-write tiers, so Cache5m/Cache1h stay 0). These are
+/// EXACT counts.</para>
 ///
-/// Mapping: <c>promptTokenCount → Input</c>, <c>candidatesTokenCount → Output</c>,
-/// <c>cachedContentTokenCount → CacheRead</c>, <c>thoughtsTokenCount</c> (thinking) is added to
-/// <c>Output</c>. Gemini exposes no cache-write tiers, so <c>Cache5m</c>/<c>Cache1h</c> stay 0.
+/// <para><b>2. Antigravity brain-log transcripts</b> at
+/// <c>~/.gemini/antigravity/brain/&lt;conversation-id&gt;/.system_generated/logs/*.jsonl</c>. These record
+/// only <c>{step_index, source, type, status, created_at, content, thinking}</c> — Antigravity logs NO
+/// token counts at all. So for these we ESTIMATE: each MODEL reply becomes one row whose output tokens are
+/// estimated from the reply text (+ thinking) at ~4 chars/token and whose input is estimated from the
+/// user/context text accrued since the previous reply; the model (read from a settings-change line) is
+/// tagged <c>"(est)"</c> so the figures never read as exact. A malformed line never throws.</para>
 /// </summary>
 public sealed class GeminiParser : ISourceParser
 {
@@ -55,6 +55,13 @@ public sealed class GeminiParser : ISourceParser
         var fileMtime = FileMtimeUtc(fileName);
         var index = 0;
 
+        // Antigravity-transcript state (used only for lines that carry NO usage_metadata — the Antigravity
+        // brain log records the conversation text but no token counts). The model is announced once via a
+        // settings-change line; user/context text accumulates until the next MODEL reply, which becomes one
+        // ESTIMATED-usage row.
+        string? antigravityModel = null;
+        long pendingInputChars = 0;
+
         string? line;
         while ((line = reader.ReadLine()) is not null)
         {
@@ -66,46 +73,142 @@ public sealed class GeminiParser : ISourceParser
 
             using (doc)
             {
-                // A single line can in principle carry more than one usage block (batched turns);
-                // emit a row for each, but keep the index monotonic so dedup keys stay stable.
-                foreach (var hit in FindUsages(doc.RootElement))
+                var root = doc.RootElement;
+
+                // ---- Path 1: real Gemini-API usage metadata (Gemini CLI / API transcripts) ----
+                // A single line can carry more than one usage block; emit a row for each, keeping the index
+                // monotonic so dedup keys stay stable.
+                var hits = FindUsages(root);
+                if (hits.Count > 0)
                 {
-                    var u = hit.Usage;
-                    var prompt = GetLong(u, "promptTokenCount", "prompt_token_count");
-                    var candidates = GetLong(u, "candidatesTokenCount", "candidates_token_count");
-                    var cached = GetLong(u, "cachedContentTokenCount", "cached_content_token_count");
-                    var thoughts = GetLong(u, "thoughtsTokenCount", "thoughts_token_count");
+                    foreach (var hit in hits)
+                    {
+                        var u = hit.Usage;
+                        var prompt = GetLong(u, "promptTokenCount", "prompt_token_count");
+                        var candidates = GetLong(u, "candidatesTokenCount", "candidates_token_count");
+                        var cached = GetLong(u, "cachedContentTokenCount", "cached_content_token_count");
+                        var thoughts = GetLong(u, "thoughtsTokenCount", "thoughts_token_count");
 
-                    // Skip lines that carry a usage object but no actual spend.
-                    if (prompt == 0 && candidates == 0 && cached == 0 && thoughts == 0)
-                        continue;
+                        // Skip lines that carry a usage object but no actual spend.
+                        if (prompt == 0 && candidates == 0 && cached == 0 && thoughts == 0)
+                            continue;
 
-                    index++;
+                        index++;
 
-                    var turnId = hit.TurnId;
-                    var ts = hit.TimestampUtc ?? fileMtime;
-                    var dedup = !string.IsNullOrEmpty(turnId)
-                        ? $"gemini|{conversationId}|{turnId}"
-                        : $"gemini|{conversationId}|{index}|{ts:O}";
+                        var turnId = hit.TurnId;
+                        var ts = hit.TimestampUtc ?? fileMtime;
+                        var dedup = !string.IsNullOrEmpty(turnId)
+                            ? $"gemini|{conversationId}|{turnId}"
+                            : $"gemini|{conversationId}|{index}|{ts:O}";
 
-                    yield return new ParsedUsage(
-                        DedupKey: dedup,
-                        TimestampUtc: ts,
-                        Model: string.IsNullOrEmpty(hit.Model) ? "(unknown)" : hit.Model!,
-                        Input: prompt,
-                        Output: candidates + thoughts, // thinking counts as output spend
-                        CacheRead: cached,
-                        Cache5m: 0,
-                        Cache1h: 0,
-                        SessionId: conversationId,
-                        Cwd: hit.Cwd,
-                        GitBranch: hit.GitBranch,
-                        IsSidechain: false,
-                        AgentId: hit.AgentId,
-                        Version: hit.Version);
+                        yield return new ParsedUsage(
+                            DedupKey: dedup,
+                            TimestampUtc: ts,
+                            Model: string.IsNullOrEmpty(hit.Model) ? "(unknown)" : hit.Model!,
+                            Input: prompt,
+                            Output: candidates + thoughts, // thinking counts as output spend
+                            CacheRead: cached,
+                            Cache5m: 0,
+                            Cache1h: 0,
+                            SessionId: conversationId,
+                            Cwd: hit.Cwd,
+                            GitBranch: hit.GitBranch,
+                            IsSidechain: false,
+                            AgentId: hit.AgentId,
+                            Version: hit.Version);
+                    }
+                    continue; // a usage-metadata line is never also an Antigravity transcript step
                 }
+
+                // ---- Path 2: Antigravity brain-log transcript step (NO token metadata exists) ----
+                // Antigravity records only {step_index, source, type, status, created_at, content, thinking}
+                // — there are no token counts. So tokens are ESTIMATED from text length (~4 chars/token) and
+                // the model is tagged "(est)" so the figure never reads as an exact count.
+                if (root.ValueKind != JsonValueKind.Object) continue;
+                if (!root.TryGetProperty("content", out var contentEl) || contentEl.ValueKind != JsonValueKind.String)
+                    continue;
+
+                var content = contentEl.GetString() ?? "";
+
+                // A settings-change line announces the active model for the turns that follow.
+                if (ModelFromSettingsChange(content) is { } picked) antigravityModel = picked;
+
+                var source = FirstStr(root, "source") ?? "";
+                if (!source.Equals("MODEL", StringComparison.OrdinalIgnoreCase))
+                {
+                    // user prompt / injected context / history → counts toward the NEXT reply's input
+                    pendingInputChars += content.Length;
+                    continue;
+                }
+
+                // A MODEL reply → output = reply text + any thinking; input = everything accrued since the
+                // previous reply. One estimated row per reply.
+                var thinking = FirstStr(root, "thinking") ?? "";
+                var outTokens = EstimateTokens((long)content.Length + thinking.Length);
+                var inTokens = EstimateTokens(pendingInputChars);
+                pendingInputChars = 0;
+                if (inTokens == 0 && outTokens == 0) continue;
+
+                index++;
+                var stepKey = root.TryGetProperty("step_index", out var si) && si.ValueKind == JsonValueKind.Number
+                    ? si.GetRawText()
+                    : index.ToString(CultureInfo.InvariantCulture);
+                var stamp = ParseTs(FirstStr(root, "created_at")) ?? fileMtime;
+                var model = $"{(string.IsNullOrEmpty(antigravityModel) ? "gemini-antigravity" : antigravityModel)} (est)";
+
+                yield return new ParsedUsage(
+                    DedupKey: $"gemini|{conversationId}|{stepKey}",
+                    TimestampUtc: stamp,
+                    Model: model,
+                    Input: inTokens,
+                    Output: outTokens,
+                    CacheRead: 0,
+                    Cache5m: 0,
+                    Cache1h: 0,
+                    SessionId: conversationId,
+                    Cwd: null,
+                    GitBranch: null,
+                    IsSidechain: false,
+                    AgentId: null,
+                    Version: "antigravity");
             }
         }
+    }
+
+    /// <summary>~4 characters per token (the common rough estimate). Returns 0 for non-positive input.</summary>
+    private static long EstimateTokens(long chars) => chars <= 0 ? 0 : (chars + 3) / 4;
+
+    /// <summary>
+    /// Pull the model out of an Antigravity settings-change line — e.g. "...changed setting `Model Selection`
+    /// from None to Gemini 3.5 Flash (Low). ..." → <c>gemini-3.5-flash</c>. Null if the line isn't one.
+    /// </summary>
+    private static string? ModelFromSettingsChange(string content)
+    {
+        var sel = content.IndexOf("Model Selection", StringComparison.OrdinalIgnoreCase);
+        if (sel < 0) return null;
+        var to = content.IndexOf(" to ", sel, StringComparison.OrdinalIgnoreCase);
+        if (to < 0) return null;
+        var rest = content[(to + 4)..];
+
+        // The model name runs to the end of the sentence: a period FOLLOWED BY whitespace (so a version like
+        // "3.5" is kept, but the trailing "(Low). No need…" is cut), or a newline — whichever comes first.
+        var cut = rest.Length;
+        for (var i = 0; i < rest.Length; i++)
+        {
+            if (rest[i] == '\n') { cut = i; break; }
+            if (rest[i] == '.' && (i + 1 >= rest.Length || char.IsWhiteSpace(rest[i + 1]))) { cut = i; break; }
+        }
+        var name = rest[..cut].Trim();
+        return string.IsNullOrWhiteSpace(name) ? null : NormalizeModel(name);
+    }
+
+    /// <summary>Normalize a human model name ("Gemini 3.5 Flash (Low)") to an id ("gemini-3.5-flash").</summary>
+    private static string NormalizeModel(string raw)
+    {
+        var paren = raw.IndexOf('(');          // drop a trailing reasoning tier like "(Low)"
+        if (paren > 0) raw = raw[..paren];
+        raw = raw.Trim().ToLowerInvariant().Replace(' ', '-');
+        return string.IsNullOrEmpty(raw) ? "gemini-antigravity" : raw;
     }
 
     /// <summary>Carries a discovered usage block plus the nearest context found on the same line.</summary>
@@ -118,7 +221,7 @@ public sealed class GeminiParser : ISourceParser
     /// object found, pairing each with the model/timestamp/ids carried by the nearest ancestor (context
     /// is inherited down the tree and overridden by closer values).
     /// </summary>
-    private static IEnumerable<UsageHit> FindUsages(JsonElement root)
+    private static List<UsageHit> FindUsages(JsonElement root)
     {
         var hits = new List<UsageHit>();
         Walk(root, new Ctx(), hits);
