@@ -191,4 +191,39 @@ public class GeminiParserTests
     {
         Parse(Turn(100, 50, 0, 0), file: "history.jsonl").Single().SessionId.Should().Be("history");
     }
+
+    // ---- End-to-end: a REAL file buried in the dot-prefixed .system_generated/logs/ dir ----
+
+    [Fact]
+    public void Antigravity_nested_dotdir_file_is_found_matched_and_parsed_end_to_end()
+    {
+        // Build a real on-disk Antigravity tree under a temp ~/.gemini — INCLUDING the dot-prefixed
+        // ".system_generated" directory — then prove the exact find -> match -> parse path the agent
+        // runs: (1) a recursive *.jsonl walk reaches a file nested under a hidden dot-dir, (2) the
+        // Gemini source claims it, (3) parsing the real file yields the mapped tokens + conversation id.
+        var geminiRoot = Path.Combine(Path.GetTempPath(), "uiq-gemini-" + Guid.NewGuid().ToString("N"));
+        var logDir = Path.Combine(geminiRoot, "antigravity", "brain", "conv-xyz", ".system_generated", "logs");
+        Directory.CreateDirectory(logDir);
+        var file = Path.Combine(logDir, "transcript.jsonl");
+        try
+        {
+            File.WriteAllText(file, Turn(prompt: 1200, candidates: 400, cached: 300, thoughts: 150) + "\n");
+
+            // (1) recursion reaches the dot-dir-nested file (the agent's walk uses the same OS enumeration)
+            var found = Directory.GetFiles(geminiRoot, "*.jsonl", SearchOption.AllDirectories);
+            found.Should().ContainSingle().Which.Should().Be(file);
+
+            // (2) the Gemini source owns it
+            new GeminiParser().MatchesFile(file).Should().BeTrue();
+
+            // (3) parsing the real file yields the mapped row
+            using var sr = File.OpenText(file);
+            var row = new GeminiParser().Parse(sr, file).Single();
+            row.Input.Should().Be(1200);
+            row.Output.Should().Be(550);     // candidates + thoughts
+            row.CacheRead.Should().Be(300);
+            row.SessionId.Should().Be("conv-xyz");
+        }
+        finally { try { Directory.Delete(geminiRoot, recursive: true); } catch { /* best-effort temp cleanup */ } }
+    }
 }
