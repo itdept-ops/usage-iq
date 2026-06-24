@@ -1270,22 +1270,23 @@
                             inputmode="decimal"
                             [ngModel]="editQuantity()"
                             name="editQty"
-                            (ngModelChange)="editQuantity.set($any($event))"
+                            (ngModelChange)="onEditQuantity($any($event))"
                           />
                         </label>
-                        <label class="tracker__edit-field">
-                          <span class="tracker__edit-lbl">Meal</span>
-                          <select
-                            class="tracker__edit-input"
-                            [ngModel]="editMeal()"
-                            name="editMeal"
-                            (ngModelChange)="editMeal.set($any($event))"
-                          >
-                            @for (m of editMeals; track m.value) {
-                              <option [value]="m.value">{{ m.label }}</option>
-                            }
-                          </select>
-                        </label>
+                      </div>
+                      <div class="tracker__edit-field tracker__edit-field--meal">
+                        <span class="tracker__edit-lbl">Meal</span>
+                        <mat-button-toggle-group
+                          class="tracker__edit-meal"
+                          [value]="editMeal()"
+                          (change)="editMeal.set($any($event.value))"
+                          aria-label="Meal"
+                          hideSingleSelectionIndicator
+                        >
+                          @for (m of editMeals; track m.value) {
+                            <mat-button-toggle [value]="m.value">{{ m.label }}</mat-button-toggle>
+                          }
+                        </mat-button-toggle-group>
                       </div>
                       @if (editPreview(); as p) {
                         <p class="tracker__edit-preview mono-num">
@@ -1306,18 +1307,52 @@
                             (ngModelChange)="editDesc.set($any($event))"
                           />
                         </label>
-                        <label class="tracker__edit-field">
-                          <span class="tracker__edit-lbl">Meal</span>
-                          <select
-                            class="tracker__edit-input"
-                            [ngModel]="editMeal()"
-                            name="editMeal"
-                            (ngModelChange)="editMeal.set($any($event))"
+                        @if (aiEnabled()) {
+                          <button
+                            mat-stroked-button
+                            type="button"
+                            class="tracker__edit-ai"
+                            [disabled]="repullLoading() || editDesc().trim().length === 0"
+                            (click)="repullMacros()"
+                            aria-label="Re-estimate this food's macros from the description with AI"
+                            matTooltip="Re-pull macros from the description with AI"
                           >
-                            @for (m of editMeals; track m.value) {
-                              <option [value]="m.value">{{ m.label }}</option>
+                            @if (repullLoading()) {
+                              <mat-progress-spinner mode="indeterminate" diameter="16" aria-hidden="true" />
+                            } @else {
+                              <mat-icon aria-hidden="true">auto_awesome</mat-icon>
                             }
-                          </select>
+                            AI macros
+                          </button>
+                        }
+                      </div>
+                      <div class="tracker__edit-field tracker__edit-field--meal">
+                        <span class="tracker__edit-lbl">Meal</span>
+                        <mat-button-toggle-group
+                          class="tracker__edit-meal"
+                          [value]="editMeal()"
+                          (change)="editMeal.set($any($event.value))"
+                          aria-label="Meal"
+                          hideSingleSelectionIndicator
+                        >
+                          @for (m of editMeals; track m.value) {
+                            <mat-button-toggle [value]="m.value">{{ m.label }}</mat-button-toggle>
+                          }
+                        </mat-button-toggle-group>
+                      </div>
+                      <div class="tracker__edit-row">
+                        <label class="tracker__edit-field tracker__edit-field--qty">
+                          <span class="tracker__edit-lbl">Quantity</span>
+                          <input
+                            class="tracker__edit-input mono-num"
+                            type="number"
+                            min="0"
+                            step="any"
+                            inputmode="decimal"
+                            [ngModel]="editQuantity()"
+                            name="editQtyManual"
+                            (ngModelChange)="onEditQuantity($any($event))"
+                          />
                         </label>
                       </div>
                       <div class="tracker__edit-row tracker__edit-macros">
@@ -1331,7 +1366,7 @@
                             inputmode="numeric"
                             [ngModel]="editCalories()"
                             name="editCal"
-                            (ngModelChange)="editCalories.set($any($event))"
+                            (ngModelChange)="onEditMacro('calories', $any($event))"
                           />
                         </label>
                         <label class="tracker__edit-field">
@@ -1344,7 +1379,7 @@
                             inputmode="decimal"
                             [ngModel]="editProtein()"
                             name="editP"
-                            (ngModelChange)="editProtein.set($any($event))"
+                            (ngModelChange)="onEditMacro('proteinG', $any($event))"
                           />
                         </label>
                         <label class="tracker__edit-field">
@@ -1357,7 +1392,7 @@
                             inputmode="decimal"
                             [ngModel]="editCarb()"
                             name="editC"
-                            (ngModelChange)="editCarb.set($any($event))"
+                            (ngModelChange)="onEditMacro('carbG', $any($event))"
                           />
                         </label>
                         <label class="tracker__edit-field">
@@ -1370,7 +1405,7 @@
                             inputmode="decimal"
                             [ngModel]="editFat()"
                             name="editF"
-                            (ngModelChange)="editFat.set($any($event))"
+                            (ngModelChange)="onEditMacro('fatG', $any($event))"
                           />
                         </label>
                       </div>

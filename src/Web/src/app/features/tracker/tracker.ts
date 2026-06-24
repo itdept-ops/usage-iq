@@ -15,6 +15,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -95,6 +96,9 @@ const READONLY_REFRESH_MS = 30_000;
 function safeNum(n: number | null | undefined): number {
   return typeof n === 'number' && Number.isFinite(n) ? n : 0;
 }
+
+/** Round to one decimal (macro grams) — matches the server + the add-food dialog. */
+const round1 = (n: number): number => Math.round(n * 10) / 10;
 
 interface MealSection {
   meal: Meal;
@@ -212,6 +216,7 @@ const QUICK_FOOD_TILES: QuickFoodTile[] = [
     MatDialogModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
+    MatButtonToggleModule,
     CalorieRing,
     HydrationRing,
     CoffeeRing,
@@ -1721,6 +1726,12 @@ export class Tracker {
   private editOrigQuantity = 1;
   /** The original calories/macros of the row being edited (the priced-row per-unit basis is derived from these). */
   private editOrig = { calories: 0, proteinG: 0, carbG: 0, fatG: 0 };
+  /** Macros per ONE serving for the row being edited — the baseline a MANUAL row's quantity rescales against
+   *  (full precision; refreshed when the user edits a macro directly). */
+  private editPerUnit = { calories: 0, proteinG: 0, carbG: 0, fatG: 0 };
+
+  /** True while the AI macro re-estimate ("re-pull") is in flight — latches its button. */
+  readonly repullLoading = signal(false);
 
   // Edit-form fields (mirrors the add-food dialog's manual fields + a quantity for priced rows).
   readonly editMeal = signal<Meal>('breakfast');
@@ -1786,6 +1797,13 @@ export class Tracker {
     this.editIsPriced.set(f.fdcId != null);
     this.editOrigQuantity = f.quantity > 0 ? f.quantity : 1;
     this.editOrig = { calories: f.calories, proteinG: f.proteinG, carbG: f.carbG, fatG: f.fatG };
+    // Per-serving baseline so a MANUAL row's quantity edits rescale the macros live (priced rows scale via editPreview).
+    this.editPerUnit = {
+      calories: f.calories / this.editOrigQuantity,
+      proteinG: f.proteinG / this.editOrigQuantity,
+      carbG: f.carbG / this.editOrigQuantity,
+      fatG: f.fatG / this.editOrigQuantity,
+    };
     this.editMeal.set(f.meal);
     this.editQuantity.set(f.quantity > 0 ? f.quantity : 1);
     this.editDesc.set(f.description);
@@ -1799,6 +1817,81 @@ export class Tracker {
   cancelEditFood(): void {
     this.editingFoodId.set(null);
     this.savingEdit.set(false);
+  }
+
+  /**
+   * Quantity changed in the inline editor. Clamp it, then — for a MANUAL row — rescale the macro fields LIVE
+   * from the per-serving baseline (a priced row scales server-side; its editPreview reads editQuantity()).
+   */
+  onEditQuantity(v: number | null): void {
+    const q = Math.min(9999, Math.max(0, safeNum(v)));
+    this.editQuantity.set(q);
+    if (this.editIsPriced()) return;
+    this.editCalories.set(Math.max(0, Math.round(this.editPerUnit.calories * q)));
+    this.editProtein.set(round1(Math.max(0, this.editPerUnit.proteinG * q)));
+    this.editCarb.set(round1(Math.max(0, this.editPerUnit.carbG * q)));
+    this.editFat.set(round1(Math.max(0, this.editPerUnit.fatG * q)));
+  }
+
+  /**
+   * A macro field changed on a MANUAL row. Store the typed total AND refresh that macro's per-serving rate,
+   * so a later quantity change still scales from the value you typed.
+   */
+  onEditMacro(field: 'calories' | 'proteinG' | 'carbG' | 'fatG', v: number | null): void {
+    const val = Math.max(0, safeNum(v));
+    const clean = field === 'calories' ? Math.round(val) : val;
+    if (field === 'calories') this.editCalories.set(clean);
+    else if (field === 'proteinG') this.editProtein.set(clean);
+    else if (field === 'carbG') this.editCarb.set(clean);
+    else this.editFat.set(clean);
+    const q = this.editQuantity() > 0 ? this.editQuantity() : 1;
+    this.editPerUnit = { ...this.editPerUnit, [field]: clean / q };
+  }
+
+  /**
+   * Re-estimate a MANUAL row's macros from its (possibly edited) description via AI — "use AI to repull
+   * macros, or better describe what it is". Replaces the macro fields + quantity with the fresh estimate
+   * and resets the per-serving baseline; leaves the description as the user typed it. Gated on trackerAi.
+   */
+  async repullMacros(): Promise<void> {
+    if (!this.aiEnabled() || this.repullLoading()) return;
+    const text = this.editDesc().trim();
+    if (text.length === 0) {
+      this.snack.open('Type what the food is first, then re-estimate', 'OK', { duration: 3500 });
+      return;
+    }
+    this.repullLoading.set(true);
+    try {
+      const res = await firstValueFrom(this.api.parseMeal({ text }));
+      const item = res.items?.[0];
+      if (!item) {
+        this.snack.open('AI couldn’t estimate that — enter it manually', 'OK', { duration: 4000 });
+        return;
+      }
+      const qty = item.quantity > 0 ? item.quantity : 1;
+      const total = {
+        calories: Math.max(0, Math.round(safeNum(item.calories))),
+        proteinG: round1(Math.max(0, safeNum(item.proteinG))),
+        carbG: round1(Math.max(0, safeNum(item.carbG))),
+        fatG: round1(Math.max(0, safeNum(item.fatG))),
+      };
+      this.editQuantity.set(qty);
+      this.editCalories.set(total.calories);
+      this.editProtein.set(total.proteinG);
+      this.editCarb.set(total.carbG);
+      this.editFat.set(total.fatG);
+      this.editPerUnit = {
+        calories: total.calories / qty,
+        proteinG: total.proteinG / qty,
+        carbG: total.carbG / qty,
+        fatG: total.fatG / qty,
+      };
+      this.statusMsg.set(`AI estimated ${total.calories} calories for ${text}`);
+    } catch {
+      this.snack.open('AI estimate unavailable — enter it manually', 'OK', { duration: 4000 });
+    } finally {
+      this.repullLoading.set(false);
+    }
   }
 
   /**
@@ -1818,6 +1911,9 @@ export class Tracker {
       : {
           meal,
           description: this.editDesc().trim(),
+          // Quantity is an informational label on a manual row (the backend stores it but never rescales
+          // macros from it — the macros below already reflect the chosen serving via onEditQuantity).
+          quantity: this.editQuantity(),
           calories: Math.max(0, Math.round(safeNum(this.editCalories()))),
           proteinG: Math.max(0, safeNum(this.editProtein())),
           carbG: Math.max(0, safeNum(this.editCarb())),
@@ -1840,6 +1936,7 @@ export class Tracker {
       : {
           ...f,
           meal,
+          quantity: this.editQuantity(),
           description: body.description!,
           calories: body.calories!,
           proteinG: body.proteinG!,

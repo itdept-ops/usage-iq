@@ -539,6 +539,28 @@
 
   &--qty { flex: 0 0 7rem; }
   &--grow { flex: 2 1 10rem; }
+  &--meal { flex: 1 1 100%; }
+}
+
+/* Segmented meal picker — replaces the old native <select> (which read as "weird"); fills the row and
+   degrades to a horizontal scroll on very narrow widths. */
+.tracker__edit-meal.mat-button-toggle-group {
+  width: 100%;
+  border-radius: var(--tech-radius);
+  overflow: hidden;
+
+  .mat-button-toggle { flex: 1 1 0; min-width: 0; }
+  .mat-button-toggle-label-content { padding: 0 var(--tech-space-2); }
+}
+
+/* AI "re-pull macros" button — sits inline at the end of the Food row on a manual entry. */
+.tracker__edit-ai.mat-mdc-outlined-button {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  min-height: 44px;
+  white-space: nowrap;
+
+  .mat-mdc-progress-spinner { margin-right: 6px; }
 }
 
 .tracker__edit-lbl {
