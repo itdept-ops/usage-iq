@@ -94,6 +94,9 @@ public sealed class AgentController : IDisposable
     private CancellationTokenSource? _loopCts;
     private Task? _loopTask;
 
+    // 0 until the one-time GpsLocator.FixAcquired hook is installed (guards against re-subscribing per build).
+    private int _gpsHookInstalled;
+
     // Guards against two passes overlapping (e.g. "Sync now" while the watch loop is mid-pass).
     private readonly SemaphoreSlim _passLock = new(1, 1);
 
@@ -204,14 +207,41 @@ public sealed class AgentController : IDisposable
     private ReporterEngine BuildEngine(ReporterOptions opt)
     {
         // Inject the desktop agent's precise-GPS provider (Windows.Devices.Geolocation, consented +
-        // graceful-null) so machineInfo carries an exact "agent" location when permitted. ReporterCore
-        // stays portable; on denial/failure the provider returns null and the server uses coarse IP-geo.
+        // graceful-null). It is NON-BLOCKING: the first invoke returns null and gathers in the background,
+        // so constructing the engine on the UI thread never stalls (a sync GPS wait there deadlocks the
+        // dispatcher and freezes the app). When a fix lands we rebuild the engine so its MachineInfo carries
+        // the coordinates. On denial/failure the provider stays null and the server uses coarse IP-geo.
         ReporterEngine.GpsProvider = GpsLocator.TryGetFix;
+        if (Interlocked.Exchange(ref _gpsHookInstalled, 1) == 0)
+            GpsLocator.FixAcquired += OnGpsFixAcquired;
 
         var engine = new ReporterEngine(opt);
         engine.Progress += OnEngineEvent;
         return engine;
     }
+
+    /// <summary>
+    /// A deferred GPS fix arrived (on a background thread). Rebuild the engine so its freshly-gathered
+    /// MachineInfo now includes the coordinates, preserving the running/paused state. Runs entirely off the
+    /// UI thread, so it never re-introduces the startup freeze.
+    /// </summary>
+    private void OnGpsFixAcquired() => Task.Run(() =>
+    {
+        ReporterOptions? opt;
+        bool wasRunning;
+        lock (_gate)
+        {
+            opt = _options;
+            wasRunning = _loopTask is { IsCompleted: false };
+        }
+        if (opt is null || opt.Validate() is not null) return;
+
+        Stop(keepEngine: false);                  // unwind the loop + dispose the coordinate-less engine
+        ReporterEngine.ResetMachineInfoCache();   // forget the GPS-less machine info
+        lock (_gate) _engine = BuildEngine(opt);  // rebuild → MachineInfo now carries the cached fix
+        if (wasRunning) Start();
+        Emit(LogLine.Info("location fix acquired — telemetry now includes precise GPS"));
+    });
 
     /// <summary>Start watching (the engine's RunForever loop) on a background task. No-op if already running.</summary>
     public void Start()

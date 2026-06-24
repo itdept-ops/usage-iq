@@ -74,6 +74,16 @@ public sealed class ReporterEngine : IDisposable, IObservable<ReporterEvent>
         }
     }
 
+    /// <summary>
+    /// Forget the cached machine info so the next engine construction re-gathers it. Used when a deferred
+    /// GPS fix lands after the first (coordinate-less) engine was already built, so a rebuilt engine picks
+    /// the coordinates up.
+    /// </summary>
+    public static void ResetMachineInfoCache()
+    {
+        lock (MachineInfoGate) MachineInfoCache.Clear();
+    }
+
     /// <summary>The resolved configuration this engine is running with (no secrets surfaced by listeners).</summary>
     public ReporterOptions Options => _options;
 

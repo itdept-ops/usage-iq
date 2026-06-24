@@ -19,32 +19,45 @@ namespace UsageIq.Agent.Services;
 public static class GpsLocator
 {
     private static readonly object Gate = new();
-    private static bool _attempted;
+    private static bool _started;
     private static (double Lat, double Lng, double? AccuracyM)? _cached;
 
     /// <summary>
-    /// A synchronous provider suitable for <c>ReporterEngine.GpsProvider</c>. Returns the cached fix (or
-    /// null). The actual sensor call is async + bounded; this wrapper blocks only the first time and only
-    /// up to the internal timeout, then caches forever for the process.
+    /// Raised at most once, on a background thread, when a fix is first acquired — so the host can rebuild
+    /// its cached <c>MachineInfo</c> to include the coordinates. Never raised if no fix is ever obtained.
+    /// </summary>
+    public static event Action? FixAcquired;
+
+    /// <summary>
+    /// NON-BLOCKING provider for <c>ReporterEngine.GpsProvider</c>. Returns the cached fix (or null)
+    /// immediately and NEVER blocks the caller. This matters because the engine constructor invokes it, and
+    /// on the desktop agent that constructor runs on the WPF UI thread — a sync-over-async wait there
+    /// deadlocks the dispatcher and freezes the entire app. The first call kicks off a background gather;
+    /// when it lands, <see cref="FixAcquired"/> fires so the engine can be rebuilt to carry the fix.
     /// </summary>
     public static (double Lat, double Lng, double? AccuracyM)? TryGetFix()
     {
         lock (Gate)
         {
-            if (_attempted) return _cached;
-            _attempted = true;
+            if (_cached is not null) return _cached;
+            if (_started) return null;
+            _started = true;
         }
 
-        try
+        // Gather on the thread pool: there is no UI SynchronizationContext there, so the awaits inside
+        // GetFixAsync resume on pool threads and cannot deadlock the UI thread.
+        _ = Task.Run(async () =>
         {
-            // Bounded: a hung sensor / consent dialog must not stall a sync pass forever.
-            _cached = GetFixAsync().GetAwaiter().GetResult();
-        }
-        catch
-        {
-            _cached = null; // denial / no sensor / OS error → fall back to IP-geo
-        }
-        return _cached;
+            (double, double, double?)? fix;
+            try { fix = await GetFixAsync().ConfigureAwait(false); }
+            catch { fix = null; } // denial / no sensor / OS error → stay on IP-geo
+            if (fix is null) return;
+
+            lock (Gate) _cached = fix;
+            try { FixAcquired?.Invoke(); } catch { /* a host refresh must never crash the gatherer */ }
+        });
+
+        return null;
     }
 
     private static async Task<(double, double, double?)?> GetFixAsync()
