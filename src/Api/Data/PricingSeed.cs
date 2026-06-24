@@ -57,6 +57,12 @@ public static class PricingSeed
             InputPerMTok = 1.25m, OutputPerMTok = 10.00m, CacheWrite5mPerMTok = 0m, CacheWrite1hPerMTok = 0m, CacheReadPerMTok = 0.31m, IsPlaceholder = false },
         new() { Id = 13, ModelPattern = "gemini-3", DisplayName = "Gemini 3 (estimated)",
             InputPerMTok = 1.25m, OutputPerMTok = 10.00m, CacheWrite5mPerMTok = 0m, CacheWrite1hPerMTok = 0m, CacheReadPerMTok = 0.31m, IsPlaceholder = false },
+        // Gemini 3.5 Flash is what Antigravity reports; the Gemini reporter tags those estimated-token rows
+        // "gemini-3.5-flash (est)". This "gemini-3.5-flash" prefix is LONGER than "gemini-3", so longest-match
+        // picks it and prices the Flash tier (far cheaper than the Gemini 3 Pro estimate it would otherwise
+        // inherit). Rates mirror the Gemini 2.5 Flash tier; editable on the Pricing page. IsPlaceholder=false.
+        new() { Id = 14, ModelPattern = "gemini-3.5-flash", DisplayName = "Gemini 3.5 Flash (estimated)",
+            InputPerMTok = 0.30m, OutputPerMTok = 2.50m, CacheWrite5mPerMTok = 0m, CacheWrite1hPerMTok = 0m, CacheReadPerMTok = 0.075m, IsPlaceholder = false },
         // Prefix catch-all for other Gemini variants (e.g. gemini-2.5-pro) until separately priced — uses the
         // Flash tier as a sensible editable default rather than $0.
         new() { Id = 11, ModelPattern = "gemini-", DisplayName = "Other Gemini (estimated)",
