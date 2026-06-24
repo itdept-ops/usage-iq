@@ -239,6 +239,22 @@ public sealed class ReadLabelResponse
 }
 
 // ===================================================================================
+// scan-pantry — multimodal "what's in my pantry/fridge" ingredient read
+// ===================================================================================
+
+/// <summary>
+/// The pantry-scan result: the distinct food ingredients the model read from the photo, as PLAIN generic names
+/// (lowercased, deduped, no quantities/brands/packaging; each &lt;=40 chars, list &lt;=~40 items). <see cref="AiUsed"/>
+/// is false on the friendly floor (Gemini off / unavailable / unreadable) — then <see cref="Ingredients"/> is empty.
+/// The endpoint ALWAYS returns 200; the caller reviews the list (e.g. to seed the meal planner's on-hand chips).
+/// </summary>
+public sealed class ScanPantryResponse
+{
+    public IReadOnlyList<string> Ingredients { get; set; } = Array.Empty<string>();
+    public bool AiUsed { get; set; }
+}
+
+// ===================================================================================
 // suggest-foods — from the caller's remaining calories/macros today (read server-side)
 // ===================================================================================
 
@@ -341,6 +357,14 @@ public sealed class PlanMealsRequest
     public IReadOnlyList<string>? Slots { get; set; }
     public string? Constraints { get; set; }
     public string? WeekStart { get; set; }
+
+    /// <summary>
+    /// OPTIONAL on-hand pantry ingredients (e.g. seeded from a /scan-pantry photo, then edited). When present the
+    /// planner STRONGLY prefers meals that use them and minimizes new shopping. Treated strictly as DATA; the
+    /// endpoint trims/lowercases/dedupes and clamps the count + each entry's length before passing it to the model.
+    /// Null/empty → unchanged planner behaviour. No schema/DB impact — this is request-only.
+    /// </summary>
+    public IReadOnlyList<string>? IngredientsOnHand { get; set; }
 }
 
 /// <summary>One planned slot in the AI day/week plan: a <see cref="Slot"/> (breakfast|lunch|dinner|snack), a

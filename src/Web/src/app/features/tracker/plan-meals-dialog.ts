@@ -14,14 +14,18 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
+import { AuthService } from '../../core/auth';
 import {
   EatIngredient,
   FamilyMealSlot,
+  ImageRequest,
+  PERM,
   PlanMealDay,
   PlanMealSlot,
   PlanMealToWrite,
   PlanMealsResult,
 } from '../../core/models';
+import { captureImage, pickImage, confirmPhotoNotice } from './ai-image';
 
 /**
  * Opened from the Meal Planner (or tracker) with the caller's local "today" + an anchor week start. Nothing
@@ -86,9 +90,17 @@ export class PlanMealsDialog {
   private ref = inject(MatDialogRef<PlanMealsDialog, PlanMealsDialogResult>);
   private api = inject(Api);
   private snack = inject(MatSnackBar);
+  private auth = inject(AuthService);
   readonly data = inject<PlanMealsData>(MAT_DIALOG_DATA);
 
   readonly slotMeta = SLOT_META;
+
+  /**
+   * Multimodal AI (the pantry-scan photo path) is gated by ai.vision — the SAME permission the server enforces
+   * on /api/ai/scan-pantry — so we never show a vision action the server will 403. When false the whole
+   * "What's in your pantry?" affordance is hidden and the planner simply runs without an on-hand list.
+   */
+  readonly canUseVision = this.auth.hasPermission(PERM.aiVision);
 
   // ---- form ----
   readonly scope = signal<Scope>('today');
@@ -97,6 +109,12 @@ export class PlanMealsDialog {
     new Set<FamilyMealSlot>(['breakfast', 'lunch', 'dinner']),
   );
   readonly constraints = signal('');
+
+  // ---- pantry (on-hand ingredients) ----
+  /** The on-hand ingredients (from a pantry scan and/or manual entry), threaded into the plan request. */
+  readonly pantry = signal<string[]>([]);
+  /** True while a pantry-scan photo is being read by AI (drives the scan button's spinner/disabled state). */
+  readonly pantryScanning = signal(false);
 
   // ---- result ----
   readonly phase = signal<Phase>('form');
@@ -139,6 +157,113 @@ export class PlanMealsDialog {
     this.scope.set(scope);
   }
 
+  // ─────────────────────────────────────────── pantry scan ─────────────────────────────────────
+
+  /** Scan the pantry/fridge with the rear camera (mobile) / file picker (desktop) → detected ingredients. */
+  scanPantry(): Promise<void> {
+    return this.runPantryScan(captureImage);
+  }
+
+  /** Attach an existing photo from the gallery/files → detected ingredients (the sibling of scanPantry). */
+  attachPantry(): Promise<void> {
+    return this.runPantryScan(pickImage);
+  }
+
+  /**
+   * Shared pantry-scan flow (mirrors add-food-dialog.runPhoto): one-time privacy notice, obtain the
+   * (downscaled, in-memory) image, POST it to /api/ai/scan-pantry, and merge the detected ingredients into
+   * the editable chip row (deduped). The image is only read to list ingredients — never stored. AI off /
+   * empty (always-200 floor) snacks a friendly "nothing found"; an error snacks gracefully. Never throws.
+   */
+  private async runPantryScan(source: () => Promise<ImageRequest | null>): Promise<void> {
+    if (!this.canUseVision || this.pantryScanning()) return;
+    if (!(await confirmPhotoNotice())) return; // declined the privacy notice → abort, nothing sent.
+    let image: ImageRequest | null;
+    try {
+      image = await source();
+    } catch {
+      this.snack.open('Could not read that image — try another photo', 'OK', { duration: 4000 });
+      return;
+    }
+    if (!image) return; // picker cancelled.
+    this.pantryScanning.set(true);
+    this.announce.set('Scanning your pantry with AI…');
+    try {
+      const res = await firstValueFrom(this.api.scanPantry(image));
+      const found = (res.ingredients ?? []).map((s) => s.trim()).filter(Boolean);
+      if (found.length === 0) {
+        this.snack.open(
+          res.aiUsed
+            ? "I couldn't spot any ingredients in that photo — try a clearer shot, or add them by hand"
+            : 'AI is unavailable right now — add your ingredients by hand',
+          'OK',
+          { duration: 4000 },
+        );
+        return;
+      }
+      const added = this.mergePantry(found);
+      this.announce.set(`Added ${added} ingredient${added === 1 ? '' : 's'} from your pantry photo.`);
+    } catch {
+      this.snack.open("Couldn't scan that photo — try again, or add ingredients by hand", 'Dismiss', {
+        duration: 4000,
+      });
+    } finally {
+      this.pantryScanning.set(false);
+    }
+  }
+
+  // ─────────────────────────────────────────── pantry chips ────────────────────────────────────
+
+  /** Append a manually-typed ingredient to the chip row (deduped, case-insensitive). No-op when blank. */
+  addPantryItem(name: string): void {
+    const clean = name.trim();
+    if (!clean) return;
+    this.mergePantry([clean]);
+  }
+
+  /** Remove the chip at `index` from the on-hand list. */
+  removePantryItem(index: number): void {
+    this.pantry.update((list) => list.filter((_, i) => i !== index));
+  }
+
+  /**
+   * Edit the chip at `index` in place to `value`. Blank clears the chip (removes it); a value that would
+   * duplicate another chip (case-insensitive) is dropped so the row stays deduped.
+   */
+  editPantryItem(index: number, value: string): void {
+    const clean = value.trim();
+    this.pantry.update((list) => {
+      if (index < 0 || index >= list.length) return list;
+      if (!clean) return list.filter((_, i) => i !== index);
+      const dupe = list.some((p, i) => i !== index && p.toLowerCase() === clean.toLowerCase());
+      if (dupe) return list.filter((_, i) => i !== index);
+      return list.map((p, i) => (i === index ? clean : p));
+    });
+  }
+
+  /**
+   * Merge new ingredient names into the chip row, skipping case-insensitive duplicates of what's already
+   * there (and within the batch). Returns how many were actually added (for the live announcement).
+   */
+  private mergePantry(names: string[]): number {
+    let added = 0;
+    this.pantry.update((list) => {
+      const next = [...list];
+      const seen = new Set(next.map((p) => p.toLowerCase()));
+      for (const raw of names) {
+        const clean = raw.trim();
+        if (!clean) continue;
+        const key = clean.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        next.push(clean);
+        added++;
+      }
+      return next;
+    });
+    return added;
+  }
+
   // ─────────────────────────────────────────── generate ────────────────────────────────────────
 
   /**
@@ -158,6 +283,7 @@ export class PlanMealsDialog {
           slots: SLOT_META.map((m) => m.slot).filter((s) => this.slots().has(s)),
           constraints: this.constraints().trim() || null,
           weekStart: this.data.weekStart,
+          ingredientsOnHand: this.pantry().length ? this.pantry() : null,
         }),
       );
       const days = (res.days ?? []).filter((d) => d.slots?.length);

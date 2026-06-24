@@ -43,6 +43,56 @@
         </div>
       </div>
 
+      <!-- Pantry scan: AI lists what's on hand so the plan favours it. Vision-gated; hidden without ai.vision. -->
+      @if (canUseVision) {
+        <div class="pm-field">
+          <span class="pm-field__label">What's in your pantry? (optional)</span>
+          <p class="pm-pantry-hint">Snap your pantry or fridge and the plan will favour what you already have.</p>
+
+          <div class="pm-pantry-actions">
+            <button mat-stroked-button type="button" class="pm-pantry-scan"
+                    [disabled]="phase() === 'loading' || pantryScanning()" (click)="scanPantry()">
+              @if (pantryScanning()) {
+                <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+                <span>Scanning…</span>
+              } @else {
+                <mat-icon aria-hidden="true">photo_camera</mat-icon>
+                <span>Scan pantry</span>
+              }
+            </button>
+            <button mat-stroked-button type="button" class="pm-pantry-attach"
+                    [disabled]="phase() === 'loading' || pantryScanning()" (click)="attachPantry()">
+              <mat-icon aria-hidden="true">add_photo_alternate</mat-icon>
+              <span>Attach photo</span>
+            </button>
+          </div>
+
+          <!-- Editable, removable chips for the detected/manual on-hand ingredients + a manual-add input. -->
+          <div class="pm-pantry-chips" role="list" aria-label="Ingredients you have on hand">
+            @for (item of pantry(); track $index; let i = $index) {
+              <span class="pm-chip" role="listitem">
+                <input class="pm-chip__input" type="text" [value]="item"
+                       [disabled]="phase() === 'loading'"
+                       (change)="editPantryItem(i, $any($event.target).value)"
+                       [attr.aria-label]="'Edit ingredient ' + item" />
+                <button mat-icon-button type="button" class="pm-chip__remove"
+                        [disabled]="phase() === 'loading'" (click)="removePantryItem(i)"
+                        [attr.aria-label]="'Remove ' + item">
+                  <mat-icon aria-hidden="true">close</mat-icon>
+                </button>
+              </span>
+            }
+            <span class="pm-chip pm-chip--add">
+              <input #addItem class="pm-chip__input pm-chip__input--add" type="text" maxlength="40"
+                     placeholder="+ add" [disabled]="phase() === 'loading'"
+                     (keydown.enter)="addPantryItem(addItem.value); addItem.value = ''"
+                     (blur)="addPantryItem(addItem.value); addItem.value = ''"
+                     aria-label="Add an ingredient you have on hand" />
+            </span>
+          </div>
+        </div>
+      }
+
       <mat-form-field appearance="outline" class="pm-refine" subscriptSizing="dynamic">
         <mat-label>Any preferences? (optional)</mat-label>
         <input matInput maxlength="200" placeholder="high protein · vegetarian · quick · budget"

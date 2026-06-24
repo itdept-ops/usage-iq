@@ -9,7 +9,7 @@ import {
   AddSleepRequest, SleepEntryDto, ClientInfoRequest,
   CoffeeEntryDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   AiUsageFilter, AiUsageResponse,
-  NotificationUpdate, DiscordRoute, DiscordRouteUpdate, MyDiscord, MyDiscordUpdate, RecapPreview, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, ParseMealResultDto, PermissionItem, PermissionPreset, Presence, PersonDto, NudgeKind, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
+  NotificationUpdate, DiscordRoute, DiscordRouteUpdate, MyDiscord, MyDiscordUpdate, RecapPreview, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, ParseMealResultDto, PermissionItem, PermissionPreset, Presence, PersonDto, NudgeKind, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, ScanPantryResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
   SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
   WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WhatToEatRequest, WhatToEatResult, WorkoutXSearchResultDto,
@@ -1005,6 +1005,15 @@ export class Api {
   }
 
   /**
+   * MULTIMODAL: scan a pantry/fridge photo for the food ingredients on hand. `imageBase64` is raw base64 (no
+   * `data:` prefix). ALWAYS 200: AI off/unconfigured/unreadable → `{ ingredients: [], aiUsed: false }`; a bad/
+   * oversized image is the only non-200 (400). ai.vision-gated server-side; rate-limited "ai-photo".
+   */
+  scanPantry(body: ImageRequest): Observable<ScanPantryResponse> {
+    return this.http.post<ScanPantryResponse>(`${this.base}/ai/scan-pantry`, body);
+  }
+
+  /**
    * "✨ What should I eat?": ask Gemini for 3-5 meal/snack OPTIONS that fit the caller's REMAINING macros
    * today. Reads the caller's OWN context server-side (today's logged foods + goal, recent foods, on-hand
    * groceries, planned meals) — NO identity is sent. Pass an empty body on open; `craving`/`constraints`
@@ -1034,6 +1043,7 @@ export class Api {
       slots: body.slots ?? null,
       constraints: body.constraints ?? null,
       weekStart: body.weekStart ?? null,
+      ingredientsOnHand: body.ingredientsOnHand ?? null,
     });
   }
 

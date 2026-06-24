@@ -1710,6 +1710,17 @@ export interface ReadLabelResponse {
   servingSize?: string | null;
 }
 
+/**
+ * Pantry scan result (POST /api/ai/scan-pantry; mirrors ScanPantryResponse). A photo of a pantry/fridge is
+ * sent to Gemini, which lists the distinct food ingredients it sees as plain generic names (deduped,
+ * lowercased, clamped server-side). `aiUsed` is false on the always-200 floor (AI off/unconfigured/unreadable)
+ * — in which case `ingredients` is empty. WRITES NOTHING; the chips just bias the planner toward on-hand items.
+ */
+export interface ScanPantryResponse {
+  ingredients: string[];
+  aiUsed: boolean;
+}
+
 /** Meal-feedback request (POST /api/ai/meal-feedback): a free-text meal to get a verdict + swaps for. Mirrors MealFeedbackRequest. */
 export interface MealFeedbackRequest {
   description: string;
@@ -3458,6 +3469,12 @@ export interface PlanMealsRequest {
   slots?: FamilyMealSlot[] | null;
   constraints?: string | null;
   weekStart?: string | null;
+  /**
+   * Optional list of ingredients the caller ALREADY HAS on hand (from a pantry scan or manual entry). When
+   * present the planner strongly prefers meals that use them and minimizes new shopping; normalized + clamped
+   * server-side. Null/empty leaves planner behaviour unchanged. Mirrors PlanMealsRequest.IngredientsOnHand.
+   */
+  ingredientsOnHand?: string[] | null;
 }
 
 /**

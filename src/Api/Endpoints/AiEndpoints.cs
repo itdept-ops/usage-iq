@@ -121,6 +121,32 @@ public static class AiEndpoints
             return result is null ? Unavailable() : Results.Ok(result);
         }).RequirePermission(Permissions.AiVision).RequireRateLimiting(PhotoRateLimitPolicy);
 
+        // ---- MULTIMODAL: list the on-hand FOOD ingredients visible in a pantry/fridge photo (tighter rate cap) ----
+        // Feeds the meal planner's "what's in your pantry?" chips: the model returns PLAIN generic ingredient names
+        // (no quantities/brands/packaging), which the user reviews/edits then threads into /plan-meals as a strong
+        // preference. Same ai.vision gate + same image validation (jpeg/png/webp, <=5 MB) + same in-memory-only,
+        // never-stored handling as /photo-meal / /read-label; AI-usage is logged at the GeminiService chokepoint.
+        // UNLIKE those two it NEVER 503s (per the planner contract): AI off / unconfigured / unreadable floors to
+        // 200 { ingredients: [], aiUsed: false }. The ONLY non-200 is a bad/oversized image (400), like /parse-meal.
+        g.MapPost("/scan-pantry", async (
+            ImageRequest body, GeminiService gemini, CancellationToken ct) =>
+        {
+            // Validate the image FIRST so a bad/oversized upload is a clear 400 regardless of config.
+            if (!TryValidateImage(body, out var base64, out var mime, out var bad)) return bad;
+
+            // Friendly always-200 floor when AI is off/unconfigured (NEVER a 503 from the pantry scan).
+            if (!gemini.IsConfigured) return Results.Ok(new ScanPantryResponse());
+
+            IReadOnlyList<string>? list;
+            try { list = await gemini.ScanPantryAsync(base64, mime, ct); }
+            catch { list = null; }
+
+            // Unavailable / unreadable -> the same friendly floor (200), not a 503. An EMPTY-but-non-null list
+            // still counts as a successful AI read (aiUsed:true, ingredients:[]).
+            if (list is null) return Results.Ok(new ScanPantryResponse());
+            return Results.Ok(new ScanPantryResponse { AiUsed = true, Ingredients = list });
+        }).RequirePermission(Permissions.AiVision).RequireRateLimiting(PhotoRateLimitPolicy);
+
         // ---- Quick feedback (verdict + swaps) on a free-text meal ----
         g.MapPost("/meal-feedback", async (
             MealFeedbackRequest body, GeminiService gemini, CancellationToken ct) =>
@@ -198,12 +224,15 @@ public static class AiEndpoints
             var dayCount = Math.Clamp(body?.Days ?? 1, 1, MaxPlanDays);
             var dates = Enumerable.Range(0, dayCount).Select(i => anchor.AddDays(i)).ToList();
             var slots = NormalizePlanSlots(body?.Slots);
+            // Optional on-hand pantry list (e.g. from /scan-pantry, then edited): trimmed/lowered/deduped + clamped,
+            // then threaded as a STRONG preference into the planner prompt. Treated strictly as DATA; null when empty.
+            var onHand = NormalizeOnHand(body?.IngredientsOnHand);
 
             if (gemini.IsConfigured)
             {
                 var result = await gemini.PlanMealsAsync(
                     ctx.Snapshot, body?.Constraints, dates, slots,
-                    ctx.RemCal, ctx.RemP, ctx.RemC, ctx.RemF, ct);
+                    ctx.RemCal, ctx.RemP, ctx.RemC, ctx.RemF, onHand, ct);
                 if (result is { Days.Count: > 0 })
                     return Results.Ok(new PlanMealsDto
                     {
@@ -1302,6 +1331,36 @@ public static class AiEndpoints
             if (PlanSlotVocab.Contains(s) && seen.Add(s)) outp.Add(s);
         }
         return outp.Count > 0 ? outp : DefaultPlanSlots;
+    }
+
+    /// <summary>Max on-hand pantry ingredients the planner accepts (mirrors GeminiService.MaxPantryItems).</summary>
+    private const int MaxOnHandItems = 40;
+    /// <summary>Max length of one on-hand ingredient name (mirrors GeminiService.MaxPantryItemLen).</summary>
+    private const int MaxOnHandItemLen = 40;
+
+    /// <summary>
+    /// Normalize the optional on-hand pantry list threaded into /plan-meals: trim, lowercase, drop empties, dedupe
+    /// (case-insensitive), clamp each entry to <see cref="MaxOnHandItemLen"/> chars and the list to
+    /// <see cref="MaxOnHandItems"/> items — the SAME cleaning <see cref="GeminiService.ScanPantryAsync"/> applies to
+    /// its own output, so a scan→edit→plan round-trip stays consistent. Null/empty → null (unchanged planner behaviour).
+    /// </summary>
+    private static IReadOnlyList<string>? NormalizeOnHand(IReadOnlyList<string>? items)
+    {
+        if (items is null || items.Count == 0) return null;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var outp = new List<string>();
+        foreach (var raw in items)
+        {
+            if (outp.Count >= MaxOnHandItems) break;
+            // Collapse any internal whitespace (incl. newlines/tabs) to a single space so a chip can't smuggle
+            // a line break into the ON_HAND prompt block (defense-in-depth — the block is already framed as DATA).
+            var s = System.Text.RegularExpressions.Regex.Replace((raw ?? "").Trim(), @"\s+", " ").ToLowerInvariant();
+            if (s.Length == 0) continue;
+            if (s.Length > MaxOnHandItemLen) s = s[..MaxOnHandItemLen].Trim();
+            if (s.Length == 0 || !seen.Add(s)) continue;
+            outp.Add(s);
+        }
+        return outp.Count > 0 ? outp : null;
     }
 
     /// <summary>Parse a plain "YYYY-MM-DD" anchor date for the planner (null/blank/invalid → null, the caller's

@@ -81,6 +81,62 @@
 
 .pm-refine { width: 100%; }
 
+// ── pantry scan (on-hand ingredients) ────────────────────────────────────────────────────────
+.pm-pantry-hint {
+  margin: 0 0 2px;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+}
+.pm-pantry-actions {
+  display: flex; flex-wrap: wrap; gap: var(--tech-space-2);
+  button {
+    min-height: 38px;
+    border-radius: var(--tech-r-control);
+    font-weight: 600;
+    mat-icon { font-size: 18px; width: 18px; height: 18px; }
+    mat-progress-spinner { display: inline-block; margin-right: 6px; }
+  }
+}
+.pm-pantry-chips {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 6px;
+}
+.pm-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px 4px 2px 10px;
+  border-radius: var(--tech-r-pill);
+  border: 1px solid var(--tech-border);
+  background: var(--tech-accent-tint, rgba(99, 140, 255, 0.12));
+  color: var(--tech-text-accent);
+}
+.pm-chip__input {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit; font-size: var(--tech-fs-label); font-weight: 600;
+  padding: 4px 0;
+  width: 7.5ch; min-width: 4ch; max-width: 18ch;
+  field-sizing: content; // grow to content where supported (graceful fallback to the fixed width).
+  outline: none;
+  &:disabled { opacity: 0.6; }
+  &::placeholder { color: var(--tech-text-tertiary); font-weight: 600; }
+}
+.pm-chip__remove {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  color: var(--tech-text-secondary);
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  &:not([disabled]):hover { color: var(--tech-warn); }
+}
+.pm-chip--add {
+  background: var(--tech-panel);
+  border-style: dashed;
+  border-color: var(--tech-border);
+  color: var(--tech-text-secondary);
+  padding-right: 10px;
+}
+.pm-chip__input--add { color: var(--tech-text); }
+
 .pm-go {
   align-self: flex-start;
   min-height: 42px;
