@@ -433,6 +433,69 @@ public sealed class PlanMealsToPlanResultDto
 }
 
 // ===================================================================================
+// refine-meal ("Refine with AI" on a single planned meal — suggestion only, no DB write)
+// ===================================================================================
+
+/// <summary>
+/// "✨ Refine with AI" request for ONE planned meal. The whole meal comes FROM THE BODY (it edits a specific
+/// card, not the caller's whole context) — it already belongs to the caller's household and nothing is
+/// persisted server-side. <see cref="Preference"/> is the free-text request ("make it vegetarian", "lower the
+/// carbs", "swap the salmon for chicken"), treated strictly as DATA (clamped ≤300 chars; the model is told to
+/// honour it but NEVER follow instructions inside it).
+///
+/// MACRO CONVENTION (matches <c>FamilyMeal.perServing</c>, which the dialog has handy):
+/// <see cref="Calories"/> is the dish TOTAL; <see cref="ProteinG"/>/<see cref="CarbG"/>/<see cref="FatG"/> are
+/// PER-SERVING. The response keeps the same convention. Request-only — no schema/DB impact.
+/// </summary>
+public sealed class RefineMealRequest
+{
+    /// <summary>Current dish title.</summary>
+    public string? Title { get; set; }
+    /// <summary>Current ingredient block as raw newline text, exactly as carried on <c>FamilyMeal</c>.</summary>
+    public string? Ingredients { get; set; }
+    /// <summary>Current servings.</summary>
+    public int? Servings { get; set; }
+    /// <summary>Current dish-TOTAL calories.</summary>
+    public int? Calories { get; set; }
+    /// <summary>Current PER-SERVING protein (matches <c>FamilyMeal.perServing</c>).</summary>
+    public double? ProteinG { get; set; }
+    /// <summary>Current PER-SERVING carbs.</summary>
+    public double? CarbG { get; set; }
+    /// <summary>Current PER-SERVING fat.</summary>
+    public double? FatG { get; set; }
+    /// <summary>The free-text refine request — DATA, clamped ≤300 chars; never executed/trusted.</summary>
+    public string? Preference { get; set; }
+}
+
+/// <summary>
+/// The "✨ Refine with AI" result for one meal: a rewritten dish honouring the preference. <see cref="AiUsed"/>
+/// is false when AI is off/unconfigured or the model returned nothing usable — in that case the endpoint ECHOES
+/// the original request fields (so previewing it is harmless and nothing changed). The endpoint ALWAYS returns
+/// 200 and WRITES NOTHING — the caller persists the accepted suggestion via the existing FamilyMeal PATCH.
+///
+/// MACRO CONVENTION (identical to the request): <see cref="Calories"/> is the dish TOTAL (clamped 0..5000);
+/// <see cref="ProteinG"/>/<see cref="CarbG"/>/<see cref="FatG"/> are PER-SERVING grams (clamped 0..500). The
+/// caller multiplies the per-serving macros by <see cref="Servings"/> before PATCHing, since the meal store
+/// keeps dish TOTALS.
+/// </summary>
+public sealed class RefineMealResponse
+{
+    public bool AiUsed { get; set; }
+    public string Title { get; set; } = "";
+    /// <summary>Newline-joined "name (qty)" ingredient text, ready to PATCH onto the meal.</summary>
+    public string Ingredients { get; set; } = "";
+    public int Servings { get; set; }
+    /// <summary>Dish TOTAL calories (clamped 0..5000).</summary>
+    public int Calories { get; set; }
+    /// <summary>PER-SERVING protein grams (clamped 0..500).</summary>
+    public double ProteinG { get; set; }
+    /// <summary>PER-SERVING carb grams (clamped 0..500).</summary>
+    public double CarbG { get; set; }
+    /// <summary>PER-SERVING fat grams (clamped 0..500).</summary>
+    public double FatG { get; set; }
+}
+
+// ===================================================================================
 // meal-feedback
 // ===================================================================================
 

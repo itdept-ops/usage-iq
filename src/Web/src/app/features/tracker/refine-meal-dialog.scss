@@ -1,0 +1,216 @@
+:host {
+  display: block;
+}
+
+// ── header (outside the scroll region — already pinned) ───────────────────────────────────────
+.wte-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tech-space-2);
+  padding: var(--tech-space-3) var(--tech-space-4) var(--tech-space-2);
+  background: var(--tech-panel);
+  border-bottom: 1px solid var(--tech-border-subtle);
+}
+.wte-head-id { display: flex; align-items: flex-start; gap: 10px; }
+.wte-spark {
+  color: var(--tech-accent);
+  font-size: 26px; width: 26px; height: 26px;
+  margin-top: 2px;
+}
+.wte-title {
+  margin: 0;
+  font-family: var(--tech-font-ui);
+  font-weight: 700;
+  font-size: var(--tech-fs-panel-hd);
+  color: var(--tech-text);
+}
+.wte-sub {
+  margin: 1px 0 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+}
+.wte-close { flex: 0 0 auto; color: var(--tech-text-secondary); }
+
+.wte-sr-status {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+// ── body (the single scroll region) ───────────────────────────────────────────────────────────
+.wte-body {
+  min-width: min(480px, 90vw);
+  padding-top: var(--tech-space-3) !important;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-3);
+}
+
+// ── current meal summary ───────────────────────────────────────────────────────────────────────
+.rm-current {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--tech-space-3);
+  border-radius: var(--tech-radius);
+  background: var(--tech-bg-sunken);
+  border: 1px solid var(--tech-border-subtle);
+}
+.rm-current__label {
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tech-text-secondary);
+}
+.rm-current__title {
+  margin: 0;
+  font-family: var(--tech-font-ui);
+  font-weight: 700;
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text);
+  word-break: break-word;
+}
+.rm-current__total,
+.rm-proposal__total {
+  margin: 0;
+  font-size: var(--tech-fs-label);
+  color: var(--tech-text-secondary);
+}
+.rm-muted { color: var(--tech-text-tertiary); }
+
+// ── form (the preference) ──────────────────────────────────────────────────────────────────────
+.rm-form { display: flex; flex-direction: column; gap: var(--tech-space-3); }
+.pm-field { display: flex; flex-direction: column; gap: 6px; }
+.pm-field__label {
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tech-text-secondary);
+}
+
+// example chips
+.rm-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.rm-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 12px 6px 8px;
+  border-radius: var(--tech-r-pill);
+  border: 1px solid var(--tech-border);
+  background: var(--tech-panel);
+  color: var(--tech-text-secondary);
+  font: inherit; font-size: var(--tech-fs-label); font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  &:disabled { opacity: 0.5; cursor: default; }
+  &:not(:disabled):hover {
+    border-color: var(--tech-accent);
+    color: var(--tech-text-accent);
+    background: var(--tech-accent-tint, rgba(99, 140, 255, 0.12));
+  }
+}
+
+.rm-pref { width: 100%; }
+
+.pm-go {
+  align-self: flex-start;
+  min-height: 42px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  mat-progress-spinner { display: inline-block; margin-right: 6px; }
+}
+
+// ── proposal (preview) ──────────────────────────────────────────────────────────────────────────
+.rm-proposal { display: flex; flex-direction: column; gap: var(--tech-space-2); }
+.rm-proposal__label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tech-text-accent);
+  mat-icon { color: var(--tech-accent); font-size: 16px; width: 16px; height: 16px; }
+}
+
+// option card (shared look with the planner / what-to-eat dialogs)
+.wte-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tech-space-2);
+  padding: var(--tech-space-3);
+  border-radius: var(--tech-radius);
+  background: var(--tech-panel-raised);
+  border: 1px solid var(--tech-border);
+}
+.wte-card-title {
+  margin: 0;
+  font-family: var(--tech-font-ui);
+  font-weight: 700;
+  font-size: var(--tech-fs-h1);
+  color: var(--tech-text);
+  word-break: break-word;
+}
+
+// macros row
+.wte-macros { display: flex; flex-wrap: wrap; gap: 6px; }
+.wte-macro {
+  display: inline-flex; align-items: baseline; gap: 2px;
+  padding: 3px 8px;
+  border-radius: var(--tech-r-pill);
+  background: var(--tech-panel);
+  border: 1px solid var(--tech-border-subtle);
+  color: var(--tech-text);
+  font-size: var(--tech-fs-num);
+  font-weight: 600;
+  small { color: var(--tech-text-tertiary); font-size: var(--tech-fs-micro); font-weight: 600; }
+}
+.wte-macro--cal { border-color: var(--tech-accent); color: var(--tech-text-accent); }
+
+// ingredients
+.wte-ings { display: flex; flex-direction: column; gap: var(--tech-space-2); }
+.wte-ing-label {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--tech-fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tech-text-secondary);
+  mat-icon { font-size: 15px; width: 15px; height: 15px; }
+}
+.wte-ings-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.wte-ing {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px 5px 10px;
+  border-radius: var(--tech-r-control);
+  border: 1px solid var(--tech-border-subtle);
+  background: var(--tech-bg-sunken);
+}
+.wte-ing-name {
+  flex: 1 1 auto; min-width: 0;
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text);
+  word-break: break-word;
+}
+
+// ── actions ───────────────────────────────────────────────────────────────────────────────────
+.wte-actions {
+  display: flex; flex-wrap: wrap; gap: var(--tech-space-2);
+  margin-top: 2px;
+}
+.wte-action {
+  flex: 1 1 auto;
+  min-height: 40px;
+  border-radius: var(--tech-r-control);
+  font-weight: 600;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  mat-progress-spinner { display: inline-block; margin-right: 6px; }
+}
+
+// On narrow viewports stack the actions full-width.
+@media (max-width: 480px) {
+  .wte-action { flex-basis: 100%; }
+  .pm-go { align-self: stretch; }
+}

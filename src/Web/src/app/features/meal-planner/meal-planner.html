@@ -121,6 +121,12 @@
                         <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
                       </button>
                     }
+                    @if (canTrackerAi()) {
+                      <button mat-icon-button class="meal__btn" matTooltip="Refine with AI"
+                              aria-label="Refine this meal with AI" (click)="refineMeal(cell, meal)">
+                        <mat-icon class="meals__spark" aria-hidden="true">auto_awesome</mat-icon>
+                      </button>
+                    }
                     <button mat-icon-button class="meal__btn" matTooltip="Edit" aria-label="Edit" (click)="editMeal(cell, meal)">
                       <mat-icon aria-hidden="true">edit</mat-icon>
                     </button>

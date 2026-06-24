@@ -3533,6 +3533,52 @@ export interface PlanMealsToPlanResult {
 }
 
 /**
+ * "Refine with AI" request (POST /api/ai/refine-meal; mirrors RefineMealRequest). Rewrite ONE planned meal to
+ * honour a free-text `preference` ("make it vegetarian", "lower the carbs", "swap the salmon for chicken"),
+ * treated strictly as DATA. The current meal travels in the body (it's editing a specific card, not the
+ * caller's whole context); nothing is persisted server-side. `calories` is the dish TOTAL; `proteinG`/`carbG`/
+ * `fatG` are PER-SERVING (the values FamilyMeal.perServing exposes). `preference` is clamped to <=300 chars.
+ */
+export interface RefineMealRequest {
+  title: string;
+  /** Raw newline-separated ingredient text, as stored on FamilyMeal. */
+  ingredients: string;
+  servings: number;
+  /** Dish TOTAL calories. */
+  calories: number;
+  /** PER-SERVING protein (g). */
+  proteinG: number;
+  /** PER-SERVING carbohydrate (g). */
+  carbG: number;
+  /** PER-SERVING fat (g). */
+  fatG: number;
+  /** The free-text refine request — treated strictly as DATA, clamped <=300 server-side. */
+  preference: string;
+}
+
+/**
+ * "Refine with AI" result (POST /api/ai/refine-meal; mirrors RefineMealResponse). The proposed rewrite — NOTHING
+ * is saved; the dialog previews it then the user confirms and the caller PATCHes the meal. `aiUsed` is false on
+ * the always-200 floor (AI off/unavailable or the model failed), in which case the response ECHOES the original
+ * fields unchanged. `calories` is the dish TOTAL (clamped 0..5000); `proteinG`/`carbG`/`fatG` are PER-SERVING
+ * (clamped 0..500); `ingredients` is newline-joined "name (qty)" text.
+ */
+export interface RefineMealResponse {
+  aiUsed: boolean;
+  title: string;
+  ingredients: string;
+  servings: number;
+  /** Dish TOTAL calories (clamped). */
+  calories: number;
+  /** PER-SERVING protein (g) (clamped). */
+  proteinG: number;
+  /** PER-SERVING carbohydrate (g) (clamped). */
+  carbG: number;
+  /** PER-SERVING fat (g) (clamped). */
+  fatG: number;
+}
+
+/**
  * "Ask my life" request (POST /api/ai/ask): ONLY a free-text question, treated strictly as DATA. Identity is
  * NEVER sent — the server resolves the caller from the JWT and assembles a perm-filtered, caller-scoped
  * snapshot of their own data server-side.

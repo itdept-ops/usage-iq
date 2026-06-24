@@ -35,6 +35,11 @@ import {
   PlanMealsData,
   PlanMealsDialogResult,
 } from '../tracker/plan-meals-dialog';
+import {
+  RefineMealDialog,
+  RefineMealData,
+  RefineMealDialogResult,
+} from '../tracker/refine-meal-dialog';
 
 /** A day's planned-macro rollup (sum of each meal's per-serving macros), with optional goal comparisons. */
 interface DayRollup {
@@ -432,6 +437,32 @@ export class MealPlanner {
       .open<PlanMealsDialog, PlanMealsData, PlanMealsDialogResult>(PlanMealsDialog, {
         data,
         width: '680px',
+        maxWidth: '95vw',
+        maxHeight: '92dvh',
+        panelClass: 'tracker-dialog',
+        autoFocus: false,
+      })
+      .afterClosed()
+      .subscribe((result) => {
+        if (result === 'wrote') this.reload();
+      });
+  }
+
+  // ---- ✨ Refine with AI (rewrite one planned meal to honour a free-text preference) ----
+
+  /**
+   * Open the "Refine with AI" dialog for a single planned meal (tracker.ai). The user gives a free-text
+   * preference, previews the AI rewrite, and on Apply the dialog PATCHes the meal (per-serving → dish-total
+   * macros, source "ai"). On a `'wrote'` close we reload the grid. Hidden without tracker.ai.
+   */
+  refineMeal(cell: DayCell, meal: FamilyMeal): void {
+    if (!this.canTrackerAi()) return;
+    void cell; // the dialog edits the meal directly; the cell is only for caller symmetry with editMeal.
+    const data: RefineMealData = { meal };
+    this.dialog
+      .open<RefineMealDialog, RefineMealData, RefineMealDialogResult>(RefineMealDialog, {
+        data,
+        width: '560px',
         maxWidth: '95vw',
         maxHeight: '92dvh',
         panelClass: 'tracker-dialog',

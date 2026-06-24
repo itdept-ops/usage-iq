@@ -257,6 +257,32 @@ public static class AiEndpoints
             return Results.Ok(new PlanMealsDto { AiUsed = false, Days = FallbackPlan(ctx, dates, slots) });
         });
 
+        // ---- "✨ Refine with AI": rewrite ONE planned meal to honour a free-text preference (SUGGESTION ONLY) --
+        // The single-meal sibling of /plan-meals. The whole meal comes FROM THE BODY (it edits a specific card,
+        // not the caller's whole context) — it already belongs to the caller's household and nothing is persisted
+        // server-side. WRITES NOTHING: the frontend reviews the suggestion then commits via the EXISTING FamilyMeal
+        // PATCH (PATCH /api/family/meals/{id}). Like /plan-meals it NEVER 503s: AI off/unconfigured/null result
+        // floors to 200 ECHOING the original fields with aiUsed:false (so previewing is harmless). The preference
+        // is clamped + treated strictly as DATA in the prompt; AI-usage is logged automatically (kind "refine-meal").
+        g.MapPost("/refine-meal", async (
+            RefineMealRequest body, GeminiService gemini, CancellationToken ct) =>
+        {
+            var echo = EchoRefine(body);                        // AiUsed:false — the always-200 floor.
+            if (!gemini.IsConfigured) return Results.Ok(echo);
+
+            try
+            {
+                var result = await gemini.RefineMealAsync(
+                    body?.Title, body?.Ingredients, body?.Servings, body?.Calories,
+                    body?.ProteinG, body?.CarbG, body?.FatG, body?.Preference, ct);
+                return Results.Ok(result ?? echo);             // result is a RefineMealResponse(AiUsed:true).
+            }
+            catch
+            {
+                return Results.Ok(echo);                       // never 500 — mirror /parse-meal's graceful floor.
+            }
+        });
+
         // ---- "Add to plan": COMMIT the reviewed AI plan into the household meal planner (FamilyMeals) ----
         // The single WRITE in the planner flow: the frontend posts the meals the user accepted (date+slot+title,
         // optional ingredients/macros) and we create them through the SAME shared meal-create path as POST
@@ -1713,4 +1739,20 @@ public static class AiEndpoints
         title: "AI estimate unavailable, enter manually.",
         detail: "AI estimate unavailable, enter manually.",
         statusCode: StatusCodes.Status503ServiceUnavailable);
+
+    /// <summary>The always-200 floor for /refine-meal: echo the ORIGINAL meal fields with <c>AiUsed = false</c>
+    /// (AI off/unconfigured/null result). Servings clamped 1..99; calories + macros floored non-negative; title
+    /// and ingredient text passed through unchanged. Keeps the request's macro convention (calories = dish TOTAL,
+    /// protein/carb/fat = PER-SERVING) so previewing the echo is harmless.</summary>
+    private static RefineMealResponse EchoRefine(RefineMealRequest? body) => new()
+    {
+        AiUsed = false,
+        Title = body?.Title ?? "",
+        Ingredients = body?.Ingredients ?? "",
+        Servings = Math.Clamp(body?.Servings ?? 1, 1, 99),
+        Calories = Math.Max(0, body?.Calories ?? 0),
+        ProteinG = Math.Max(0, body?.ProteinG ?? 0),
+        CarbG = Math.Max(0, body?.CarbG ?? 0),
+        FatG = Math.Max(0, body?.FatG ?? 0),
+    };
 }

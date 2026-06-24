@@ -14,6 +14,7 @@ import {
   SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
   WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WhatToEatRequest, WhatToEatResult, WorkoutXSearchResultDto,
   PlanMealsRequest, PlanMealsResult, PlanMealToWrite, PlanMealsToPlanResult,
+  RefineMealRequest, RefineMealResponse,
   AskRequest, AskResponse,
   VoiceParseRequest, VoiceParseResponse,
   CycleData, CyclePeriod, CycleNote, CycleSettings, CycleSettingsPatch, CycleOverlayMember,
@@ -1054,6 +1055,17 @@ export class Api {
    */
   planMealsToPlan(meals: PlanMealToWrite[]): Observable<PlanMealsToPlanResult> {
     return this.http.post<PlanMealsToPlanResult>(`${this.base}/ai/plan-meals/to-plan`, { meals });
+  }
+
+  /**
+   * "Refine with AI": rewrite ONE planned meal to honour a free-text `preference` (e.g. "make it vegetarian",
+   * "lower the carbs"). The current meal travels in the body; `calories` is the dish TOTAL and `proteinG`/`carbG`/
+   * `fatG` are PER-SERVING (matching FamilyMeal.perServing). ALWAYS 200 — AI off/unavailable echoes the original
+   * with `aiUsed:false`. WRITES NOTHING; the caller persists the accepted rewrite via patchFamilyMeal. Gated
+   * tracker.ai; rate-limited "ai".
+   */
+  refineMeal(body: RefineMealRequest): Observable<RefineMealResponse> {
+    return this.http.post<RefineMealResponse>(`${this.base}/ai/refine-meal`, body);
   }
 
   /**
