@@ -13,7 +13,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
-import { AddFoodRequest, EatOption, FamilyMealSlot, Meal, WhatToEatResult } from '../../core/models';
+import { AddFoodRequest, EatIngredient, EatOption, FamilyMealSlot, Meal, RecipeFromBreakdownRequest, WhatToEatResult } from '../../core/models';
 
 /**
  * Opened from the tracker (or meals page) with the active date + a sensible default meal slot, plus the
@@ -35,13 +35,18 @@ export interface WhatToEatData {
    * actions are hidden — only "Add to tracker" (tracker.self-aligned) is offered.
    */
   canFamily: boolean;
+  /**
+   * Whether the caller has recipes.use. Gates the "Save as recipe" action (POST /api/recipes/from-breakdown),
+   * which persists the option as the caller's own recipe in "My Recipes". When false the action is hidden.
+   */
+  canRecipes: boolean;
 }
 
 /** The dialog's lifecycle phases. */
 type Phase = 'loading' | 'options' | 'empty' | 'error';
 
 /** Which per-card action is currently in flight (so only that card's buttons spin/disable). */
-type ActionKind = 'tracker' | 'plan' | 'grocery';
+type ActionKind = 'tracker' | 'plan' | 'grocery' | 'recipe';
 
 /**
  * "✨ What should I eat?" dialog. On open it AUTO-FETCHES options (no prompt needed) that fit the caller's
@@ -89,6 +94,9 @@ export class WhatToEatDialog {
 
   // ---- per-card action state: keyed "<index>:<kind>" while that action is in flight ----
   private readonly busyKeys = signal<Set<string>>(new Set());
+
+  /** Per-ingredient add state, keyed "<cardIndex>:<ingredientIndex>" while that single +add is in flight. */
+  private readonly busyIngredients = signal<Set<string>>(new Set());
 
   /** Skeleton placeholders shown while the first fetch is loading. */
   readonly skeletons = [0, 1, 2];
@@ -156,6 +164,16 @@ export class WhatToEatDialog {
   /** Whether the family-scoped actions (meal plan / grocery) may render — gated on the caller's family.use. */
   readonly canFamily = computed(() => this.data.canFamily);
 
+  /** Whether the "Save as recipe" action may render — gated on the caller's recipes.use. */
+  readonly canRecipes = computed(() => this.data.canRecipes);
+
+  /** Card ids already saved to "My Recipes" this session (so the button flips to a saved/disabled state). */
+  private readonly savedRecipes = signal<Set<number>>(new Set());
+
+  isSavedAsRecipe(index: number): boolean {
+    return this.savedRecipes().has(index);
+  }
+
   /** Whether a specific card action is in flight (so only that button spins/disables). */
   isBusy(index: number, kind: ActionKind): boolean {
     return this.busyKeys().has(`${index}:${kind}`);
@@ -164,7 +182,8 @@ export class WhatToEatDialog {
   /** Whether ANY action on a card is in flight (to disable its sibling actions). */
   cardBusy(index: number): boolean {
     const keys = this.busyKeys();
-    return keys.has(`${index}:tracker`) || keys.has(`${index}:plan`) || keys.has(`${index}:grocery`);
+    return keys.has(`${index}:tracker`) || keys.has(`${index}:plan`)
+      || keys.has(`${index}:grocery`) || keys.has(`${index}:recipe`);
   }
 
   private setBusy(index: number, kind: ActionKind, on: boolean): void {
@@ -190,6 +209,42 @@ export class WhatToEatDialog {
       return `${Math.abs(Math.round(afterCal))} kcal over your remaining`;
     }
     return `leaves ${Math.round(afterCal)} kcal · ${afterP}g protein to go`;
+  }
+
+  /** The option's ingredients NOT yet on the household grocery list (drives the "Add needed" button/count). */
+  missingCount(o: EatOption): number {
+    return (o.ingredients ?? []).filter(i => !i.onList && i.name?.trim()).length;
+  }
+
+  /** Whether a single ingredient's "+ add" is in flight (so only that chip's control spins/disables). */
+  isIngredientBusy(cardIndex: number, ingIndex: number): boolean {
+    return this.busyIngredients().has(`${cardIndex}:${ingIndex}`);
+  }
+
+  private setIngredientBusy(cardIndex: number, ingIndex: number, on: boolean): void {
+    this.busyIngredients.update(set => {
+      const next = new Set(set);
+      const key = `${cardIndex}:${ingIndex}`;
+      if (on) next.add(key); else next.delete(key);
+      return next;
+    });
+  }
+
+  /**
+   * Locally mark an ingredient as now on the grocery list, bumping its listedQty. Each grocery write returns
+   * the WHOLE list (not this DTO), so we reflect the change client-side so the badge flips to "On your list"
+   * without a re-fetch. Replaces the option's ingredient array immutably so the signal re-renders.
+   */
+  private markOnList(cardIndex: number, ingIndex: number, addedQty: number): void {
+    this.options.update(opts => opts.map((o, oi) => {
+      if (oi !== cardIndex) return o;
+      const ingredients = o.ingredients.map((ing, ii) => {
+        if (ii !== ingIndex) return ing;
+        const prior = ing.onList ? (ing.listedQty ?? 1) : 0;
+        return { ...ing, onList: true, listedQty: prior + addedQty } as EatIngredient;
+      });
+      return { ...o, ingredients };
+    }));
   }
 
   // ─────────────────────────────────────────── actions ─────────────────────────────────────────
@@ -229,8 +284,10 @@ export class WhatToEatDialog {
   async addToPlan(index: number, o: EatOption): Promise<void> {
     if (this.cardBusy(index)) return;
     this.setBusy(index, 'plan', true);
-    const ingredients = [...(o.have ?? []), ...(o.missing ?? [])]
-      .map(s => s.trim()).filter(Boolean).join('\n');
+    // The plan's ingredients blob is the option's FULL ingredient list (name + optional quantity).
+    const ingredients = (o.ingredients ?? [])
+      .map(i => (i.quantity?.trim() ? `${i.name.trim()} (${i.quantity.trim()})` : i.name.trim()))
+      .filter(Boolean).join('\n');
     try {
       await firstValueFrom(this.api.createFamilyMeal({
         localDate: this.data.date,
@@ -247,26 +304,87 @@ export class WhatToEatDialog {
   }
 
   /**
-   * Add missing → grocery: append the option's MISSING items to the household's Groceries list (find-or-create,
-   * de-duped server-side). Reuses POST /family/meals/recipe-breakdown/to-grocery via api.recipeBreakdownToGrocery
-   * (gated family.use). No-op + quiet snackbar when there's nothing missing.
+   * Add needed → grocery: append the option's NEEDED items (those not already on the household Groceries list)
+   * to the list (find-or-create, de-duped server-side). Reuses POST /family/meals/recipe-breakdown/to-grocery
+   * via api.recipeBreakdownToGrocery (gated family.use). On success each added ingredient's badge flips to "On
+   * your list" client-side. No-op + quiet snackbar when there's nothing needed.
    */
   async addMissingToGrocery(index: number, o: EatOption): Promise<void> {
     if (this.cardBusy(index)) return;
-    const missing = (o.missing ?? []).map(s => s.trim()).filter(Boolean);
-    if (missing.length === 0) {
-      this.snack.open('Nothing missing — you have it all', 'OK', { duration: 2500 });
+    // "Needed" = the option's ingredients NOT already on the household grocery list (server-labelled onList).
+    const neededIdx = (o.ingredients ?? [])
+      .map((i, ii) => ({ i, ii }))
+      .filter(({ i }) => !i.onList && i.name?.trim());
+    if (neededIdx.length === 0) {
+      this.snack.open('Nothing needed — it’s all on your list', 'OK', { duration: 2500 });
       return;
     }
     this.setBusy(index, 'grocery', true);
     try {
-      await firstValueFrom(this.api.recipeBreakdownToGrocery(missing));
-      const n = missing.length;
+      await firstValueFrom(this.api.recipeBreakdownToGrocery(neededIdx.map(({ i }) => i.name.trim())));
+      for (const { ii } of neededIdx) this.markOnList(index, ii, 1);
+      const n = neededIdx.length;
       this.snack.open(`Added ${n} item${n === 1 ? '' : 's'} to your grocery list`, 'OK', { duration: 3000 });
     } catch {
       this.snack.open("Couldn't add to the grocery list — try again", 'Dismiss', { duration: 4000 });
     } finally {
       this.setBusy(index, 'grocery', false);
+    }
+  }
+
+  /**
+   * Per-ingredient quantity-aware add: push a single ingredient onto the household Groceries list via the
+   * qty-aware endpoint (POST /grocery/items/quantity, gated grocery.use), so adding one that's already on the
+   * list bumps its "xN" rather than duplicating. Used by the chip's "+" control. On success the chip flips to
+   * "On your list" (+1) client-side. Family-gated alongside the card actions (the caller already has family.use
+   * when these render); a missing grocery.use surfaces a friendly snackbar.
+   */
+  async addIngredientToGrocery(cardIndex: number, ingIndex: number, ing: EatIngredient): Promise<void> {
+    const name = ing.name?.trim();
+    if (!name || this.isIngredientBusy(cardIndex, ingIndex)) return;
+    this.setIngredientBusy(cardIndex, ingIndex, true);
+    try {
+      await firstValueFrom(this.api.groceryAddQuantity(name, 1));
+      this.markOnList(cardIndex, ingIndex, 1);
+      this.snack.open(`Added “${name}” to your grocery list`, 'OK', { duration: 2500 });
+    } catch {
+      this.snack.open("Couldn't add that to the grocery list — try again", 'Dismiss', { duration: 4000 });
+    } finally {
+      this.setIngredientBusy(cardIndex, ingIndex, false);
+    }
+  }
+
+  /**
+   * Save as recipe: persist the option (title, servings=1, its per-option macros, full ingredient list +
+   * steps) as the caller's OWN recipe via POST /api/recipes/from-breakdown (api.saveRecipeFromBreakdown,
+   * gated recipes.use). The option's macros are a per-serving total, so servings=1. On success the button
+   * flips to a saved state. Snackbar either way.
+   */
+  async saveAsRecipe(index: number, o: EatOption): Promise<void> {
+    if (this.cardBusy(index) || this.isSavedAsRecipe(index)) return;
+    this.setBusy(index, 'recipe', true);
+    const req: RecipeFromBreakdownRequest = {
+      title: o.title,
+      servings: 1,
+      macros: {
+        calories: Math.max(0, Math.round(o.macros.calories)),
+        protein: Math.max(0, o.macros.proteinG),
+        carb: Math.max(0, o.macros.carbsG),
+        fat: Math.max(0, o.macros.fatG),
+      },
+      ingredients: (o.ingredients ?? [])
+        .map(i => ({ name: i.name?.trim() ?? '', quantity: i.quantity?.trim() ?? '' }))
+        .filter(i => i.name.length > 0),
+      steps: o.steps ?? [],
+    };
+    try {
+      await firstValueFrom(this.api.saveRecipeFromBreakdown(req));
+      this.savedRecipes.update(set => new Set(set).add(index));
+      this.snack.open(`Saved “${o.title}” to My Recipes`, 'OK', { duration: 3000 });
+    } catch {
+      this.snack.open("Couldn't save the recipe — try again", 'Dismiss', { duration: 4000 });
+    } finally {
+      this.setBusy(index, 'recipe', false);
     }
   }
 

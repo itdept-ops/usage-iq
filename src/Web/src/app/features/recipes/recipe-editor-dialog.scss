@@ -1,0 +1,111 @@
+.re-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 4px 0;
+}
+
+.re-title {
+  margin: 0;
+  font-family: var(--tech-font-ui);
+  color: var(--tech-text);
+}
+
+.re-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  min-width: min(92vw, 520px);
+}
+
+.re-field--full { width: 100%; }
+
+.re-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.re-hint {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  color: var(--tech-text-tertiary, var(--tech-text-dim));
+}
+
+/* ─────────────────────────── ingredients ─────────────────────────── */
+.re-section { margin: 6px 0 4px; }
+
+.re-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.re-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--tech-text);
+
+  mat-icon { font-size: 20px; width: 20px; height: 20px; color: var(--tech-accent); }
+}
+
+.re-add mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+.re-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.re-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.re-field--name { flex: 1 1 auto; min-width: 0; }
+.re-field--qty { flex: 0 0 110px; }
+
+.re-row-del {
+  flex: 0 0 auto;
+  color: var(--tech-text-secondary);
+  &:not([disabled]):hover { color: var(--tech-error, #ff5d6c); }
+  mat-icon { font-size: 20px; width: 20px; height: 20px; }
+}
+
+.re-empty {
+  margin: 6px 0;
+  font-size: 13px;
+  color: var(--tech-text-secondary);
+}
+
+/* ─────────────────────────── share ─────────────────────────── */
+.re-share {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-r-control, 10px);
+  background: var(--tech-bg-sunken, transparent);
+}
+
+.re-share-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--tech-text-secondary);
+
+  mat-icon { font-size: 16px; width: 16px; height: 16px; margin-top: 1px; }
+}
+
+.re-actions {
+  padding: 8px 4px 4px;
+  gap: 8px;
+}

@@ -281,19 +281,34 @@ public sealed class WhatToEatRequest
 }
 
 /// <summary>
+/// One ingredient of a "✨ What should I eat?" option (mirrors the frontend EatIngredient). <see cref="Name"/> +
+/// a free-text <see cref="Quantity"/> ("2", "1 cup", "" when none). <see cref="OnList"/> is set DETERMINISTICALLY
+/// by the endpoint by cross-referencing <see cref="Name"/> against the household Groceries list (case/space-
+/// insensitive, same normalization as the grocery de-dupe); <see cref="ListedQty"/> is the quantity currently on
+/// the list ("x3" → 3, plain item → 1), or null when not on the list. The model never sets these.
+/// </summary>
+public sealed class EatIngredientDto
+{
+    public string Name { get; set; } = "";
+    public string Quantity { get; set; } = "";
+    public bool OnList { get; set; }
+    public int? ListedQty { get; set; }
+}
+
+/// <summary>
 /// One option from "✨ What should I eat?" (mirrors the frontend EatOption). <see cref="Macros"/> is the
 /// per-option total (kcal + grams, CLAMPED) so it's addable to the tracker in one call. <see cref="Why"/> is a
-/// one-line "fits your remaining" rationale. <see cref="Have"/> are ingredients the caller already has on hand;
-/// <see cref="Missing"/> are the few items still needed (add to grocery). <see cref="Steps"/> are optional quick
-/// prep steps.
+/// one-line "fits your remaining" rationale. <see cref="Ingredients"/> is the FULL ingredient list the option
+/// needs; each item is labelled (<see cref="EatIngredientDto.OnList"/> / <see cref="EatIngredientDto.ListedQty"/>)
+/// against the household Groceries list by the endpoint, so the UI can show what's already on the list and add
+/// the rest. <see cref="Steps"/> are optional quick prep steps.
 /// </summary>
 public sealed class EatOptionDto
 {
     public string Title { get; set; } = "";
     public string Why { get; set; } = "";
     public MacroSet Macros { get; set; } = new();
-    public IReadOnlyList<string> Have { get; set; } = Array.Empty<string>();
-    public IReadOnlyList<string> Missing { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<EatIngredientDto> Ingredients { get; set; } = Array.Empty<EatIngredientDto>();
     public IReadOnlyList<string> Steps { get; set; } = Array.Empty<string>();
 }
 

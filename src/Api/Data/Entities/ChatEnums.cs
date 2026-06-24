@@ -96,13 +96,12 @@ public static class DiscordCategoryMap
         _ => DiscordForwardCategory.SystemEvents,
     };
 
-    /// <summary>True when the stored category mask permits forwarding the given notification type. The mask
-    /// is treated as "all on" (the default) for the legacy 0 value so an unmigrated/blank row never goes
-    /// silent — only an explicit opt-out of a category suppresses it.</summary>
+    /// <summary>True when the stored category mask permits forwarding the given notification type. A mask of 0
+    /// is treated LITERALLY as <see cref="DiscordForwardCategory.None"/> — an EXPLICIT "forward nothing" — not
+    /// as a legacy all-on fallback. The entity CLR-defaults the column to <see cref="DiscordForwardCategory.All"/>
+    /// and the migration backfilled existing rows to <see cref="DiscordForwardCategory.All"/>, so the only way a
+    /// row holds 0 is a user deliberately turning every category off (which then correctly suppresses the mirror).
+    /// The master <c>SurfaceDiscord</c> toggle is gated upstream and still wins.</summary>
     public static bool Allows(int categoriesMask, NotificationType type)
-    {
-        // A 0 mask means "never set" (legacy/blank) → preserve the forward-everything default.
-        var mask = categoriesMask == 0 ? (int)DiscordForwardCategory.All : categoriesMask;
-        return (mask & (int)For(type)) != 0;
-    }
+        => (categoriesMask & (int)For(type)) != 0;
 }

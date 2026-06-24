@@ -9,7 +9,7 @@ namespace Ccusage.Api.Tests.Unit;
 /// <list type="bullet">
 ///   <item>every <see cref="NotificationType"/> maps to exactly one user-facing category (total mapping);</item>
 ///   <item>a mask forwards ONLY the categories it has enabled (and the type→category routing is correct);</item>
-///   <item>the DEFAULT mask = ALL ON, and a legacy/blank 0 mask reads as all-on (non-breaking);</item>
+///   <item>the DEFAULT mask = ALL ON, and a 0 mask is taken LITERALLY as explicit-none (forward nothing);</item>
 ///   <item>disabling one category never suppresses an unrelated one.</item>
 /// </list>
 /// The SurfaceDiscord master toggle (off ⇒ nothing) is enforced upstream in the forwarder and covered by the
@@ -57,11 +57,13 @@ public class DiscordCategoryGateTests
     }
 
     [Fact]
-    public void Legacy_zero_mask_reads_as_all_on_so_unmigrated_rows_still_forward()
+    public void Explicit_zero_mask_forwards_nothing()
     {
-        // A blank/unmigrated row (mask 0) must NOT go silent — it preserves the forward-everything default.
+        // A 0 mask is taken LITERALLY (every category off) — an explicit "forward nothing". The entity
+        // CLR-defaults to all-on and the migration backfilled existing rows, so 0 only ever means the user
+        // deliberately disabled every category; it must suppress the mirror for every type.
         foreach (var type in Enum.GetValues<NotificationType>())
-            DiscordCategoryMap.Allows(0, type).Should().BeTrue();
+            DiscordCategoryMap.Allows(0, type).Should().BeFalse();
     }
 
     [Fact]
@@ -101,11 +103,12 @@ public class DiscordCategoryGateTests
     [Fact]
     public void A_fully_disabled_explicit_mask_forwards_nothing()
     {
-        // An explicit None is distinct from the legacy 0 read only conceptually — None IS 0, so this also
-        // documents that a user cannot "disable everything" via the mask; clearing the master SurfaceDiscord
-        // toggle is the off-switch. With every category bit individually off but a non-zero sentinel absent,
-        // the gate falls back to all-on, matching FromCategoryMask in the endpoint. So we assert via a single
-        // remaining bit to prove suppression is real for the others.
+        // An explicit all-off (DiscordForwardCategory.None == 0) suppresses EVERY type — the user disabled all
+        // seven categories. This is no longer conflated with a legacy fallback: 0 means nothing forwards.
+        foreach (var type in Enum.GetValues<NotificationType>())
+            DiscordCategoryMap.Allows((int)DiscordForwardCategory.None, type).Should().BeFalse();
+
+        // And a single remaining bit still proves per-category suppression is real for the others.
         var oneOn = (int)DiscordForwardCategory.Cheers;
         DiscordCategoryMap.Allows(oneOn, NotificationType.Cheer).Should().BeTrue();
         DiscordCategoryMap.Allows(oneOn, NotificationType.DirectMessage).Should().BeFalse();

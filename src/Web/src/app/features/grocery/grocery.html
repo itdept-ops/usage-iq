@@ -1,0 +1,165 @@
+<div class="grocery">
+
+  <!-- Header -->
+  <header class="grocery__head">
+    <div class="grocery__id">
+      <span class="grocery__glyph" aria-hidden="true"><mat-icon>shopping_cart</mat-icon></span>
+      <div>
+        <h1 class="grocery__title">Grocery list</h1>
+        <p class="grocery__sub">
+          Your household shopping list. Add what you need, check it off as you shop.
+          @if (list()) {
+            <span class="grocery__count">· {{ openCount() }} to buy</span>
+          }
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─────────────────────────── LOADING ─────────────────────────── -->
+  @if (loading()) {
+    <div class="grocery__state" aria-live="polite">
+      <mat-progress-spinner mode="indeterminate" diameter="36" aria-hidden="true" />
+      <p>Loading your grocery list…</p>
+    </div>
+  }
+
+  <!-- ─────────────────────────── ERROR ─────────────────────────── -->
+  @else if (error()) {
+    <div class="grocery__state">
+      <mat-icon class="grocery__state-glyph" aria-hidden="true">cloud_off</mat-icon>
+      <p class="grocery__state-title">Couldn't load your grocery list</p>
+      <button mat-stroked-button type="button" (click)="load()">
+        <mat-icon aria-hidden="true">refresh</mat-icon> Try again
+      </button>
+    </div>
+  }
+
+  <!-- ─────────────────────────── LIST ─────────────────────────── -->
+  @else if (list(); as l) {
+
+    <!-- Add bar (sticky on mobile). Quantity-aware: "Milk x2" or just a name (bumps an existing item). -->
+    @if (canEdit()) {
+      <form class="grocery__add" (ngSubmit)="add()">
+        <mat-icon class="grocery__add-icon" aria-hidden="true">add</mat-icon>
+        <input class="grocery__add-input" type="text" maxlength="120"
+               placeholder="Add an item — e.g. Eggs, Milk x2"
+               [ngModel]="draft()" (ngModelChange)="draft.set($event)" name="draft"
+               aria-label="Add an item to your grocery list" [disabled]="busy()" />
+        <button mat-flat-button color="primary" type="submit" class="grocery__add-btn"
+                [disabled]="busy() || !draft().trim()" aria-label="Add item">
+          @if (busy()) {
+            <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+          } @else { Add }
+        </button>
+      </form>
+    } @else {
+      <p class="grocery__readonly">
+        <mat-icon aria-hidden="true">visibility</mat-icon>
+        This list was shared with you read-only.
+      </p>
+    }
+
+    <!-- Open items: the shopping list proper. -->
+    @if (openItems().length) {
+      <ul class="grocery__items" aria-label="Items to buy">
+        @for (it of openItems(); track it.id) {
+          <li class="g-item" [class.g-item--busy]="isItemBusy(it.id)">
+            <mat-checkbox class="g-item__check" [checked]="it.done"
+                          [disabled]="!canEdit() || isItemBusy(it.id)"
+                          (change)="toggle(it)"
+                          [attr.aria-label]="'Check off ' + baseName(it.text)" />
+
+            <span class="g-item__name">
+              {{ baseName(it.text) }}
+              @if (itemQty(it.text) > 1) {
+                <span class="g-item__qty" aria-label="quantity">×{{ itemQty(it.text) }}</span>
+              }
+            </span>
+
+            @if (canEdit()) {
+              <div class="g-item__ctrls">
+                <!-- Quantity stepper -->
+                <button mat-icon-button type="button" class="g-item__btn"
+                        [disabled]="isItemBusy(it.id) || itemQty(it.text) <= 1" (click)="lower(it)"
+                        matTooltip="Less" [attr.aria-label]="'Decrease quantity of ' + baseName(it.text)">
+                  <mat-icon>remove</mat-icon>
+                </button>
+                <button mat-icon-button type="button" class="g-item__btn"
+                        [disabled]="isItemBusy(it.id)" (click)="bump(it)"
+                        matTooltip="More" [attr.aria-label]="'Increase quantity of ' + baseName(it.text)">
+                  <mat-icon>add</mat-icon>
+                </button>
+
+                <!-- Reorder -->
+                <button mat-icon-button type="button" class="g-item__btn g-item__btn--move"
+                        [disabled]="busy() || $first" (click)="move(it, -1)"
+                        matTooltip="Move up" [attr.aria-label]="'Move ' + baseName(it.text) + ' up'">
+                  <mat-icon>keyboard_arrow_up</mat-icon>
+                </button>
+                <button mat-icon-button type="button" class="g-item__btn g-item__btn--move"
+                        [disabled]="busy() || $last" (click)="move(it, 1)"
+                        matTooltip="Move down" [attr.aria-label]="'Move ' + baseName(it.text) + ' down'">
+                  <mat-icon>keyboard_arrow_down</mat-icon>
+                </button>
+
+                <!-- Delete -->
+                <button mat-icon-button type="button" class="g-item__btn g-item__btn--del"
+                        [disabled]="isItemBusy(it.id)" (click)="remove(it)"
+                        matTooltip="Remove" [attr.aria-label]="'Remove ' + baseName(it.text)">
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    } @else {
+      <div class="grocery__empty">
+        <mat-icon class="grocery__empty-glyph" aria-hidden="true">remove_shopping_cart</mat-icon>
+        <p class="grocery__empty-title">Nothing to buy yet</p>
+        <p class="grocery__empty-sub">
+          Add items above, or pull missing ingredients from a recipe in your meal planner.
+        </p>
+      </div>
+    }
+
+    <!-- Checked-off items -->
+    @if (doneItems().length) {
+      <div class="grocery__done-head">
+        <span>In the cart ({{ doneCount() }})</span>
+        @if (canEdit()) {
+          <button mat-button type="button" class="grocery__clear" [disabled]="busy()" (click)="clearDone()">
+            <mat-icon aria-hidden="true">delete_sweep</mat-icon> Clear checked
+          </button>
+        }
+      </div>
+      <ul class="grocery__items grocery__items--done" aria-label="Checked-off items">
+        @for (it of doneItems(); track it.id) {
+          <li class="g-item g-item--done" [class.g-item--busy]="isItemBusy(it.id)">
+            <mat-checkbox class="g-item__check" [checked]="it.done"
+                          [disabled]="!canEdit() || isItemBusy(it.id)"
+                          (change)="toggle(it)"
+                          [attr.aria-label]="'Un-check ' + baseName(it.text)" />
+            <span class="g-item__name">
+              {{ baseName(it.text) }}
+              @if (itemQty(it.text) > 1) {
+                <span class="g-item__qty">×{{ itemQty(it.text) }}</span>
+              }
+              @if (it.doneByName) {
+                <span class="g-item__by">· {{ it.doneByName }}</span>
+              }
+            </span>
+            @if (canEdit()) {
+              <button mat-icon-button type="button" class="g-item__btn g-item__btn--del"
+                      [disabled]="isItemBusy(it.id)" (click)="remove(it)"
+                      matTooltip="Remove" [attr.aria-label]="'Remove ' + baseName(it.text)">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            }
+          </li>
+        }
+      </ul>
+    }
+  }
+</div>

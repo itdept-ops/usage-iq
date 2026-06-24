@@ -18,7 +18,7 @@ import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
   FamilyMeal, FamilyMealDay, FamilyMealSlot, MealIdea, PERM, PlanWeekMeal, RecipeBreakdownResult,
-  RecipeIngredient, TrackerProfileDto,
+  RecipeFromBreakdownRequest, RecipeIngredient, TrackerProfileDto,
 } from '../../core/models';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { MealEditorDialog, MealEditorData, MealEditorResult } from './meal-editor-dialog';
@@ -121,6 +121,13 @@ export class FamilyMeals {
    * auth.permissions() so this recomputes when permissions load.
    */
   readonly canTrackerAi = computed(() => { this.auth.permissions(); return this.auth.hasPermission(PERM.trackerAi); });
+
+  /** Whether the "Save as recipe" affordance (on a recipe breakdown) may render — gated on recipes.use. */
+  readonly canRecipes = computed(() => { this.auth.permissions(); return this.auth.hasPermission(PERM.recipesUse); });
+  /** True while a breakdown is being saved to "My Recipes" (locks that button). */
+  readonly savingBreakdownRecipe = signal(false);
+  /** True once the staged breakdown has been saved as a recipe this session (flips the button to saved). */
+  readonly savedBreakdownRecipe = signal(false);
 
   // ---- Tracker tie-in (Slice 2): "✨ Add to my tracker" + the goal-aware planner rollups ----
   /** True when the caller holds tracker.self (gates the "Add to my tracker" button + goal comparisons). */
@@ -571,6 +578,7 @@ export class FamilyMeals {
       date: this.toIso(new Date()), meal: 'dinner', remaining: null,
       // This is the family meals page, so the caller has family.use — the plan/grocery actions are valid.
       canFamily: this.auth.hasPermission(PERM.familyUse),
+      canRecipes: this.auth.hasPermission(PERM.recipesUse),
     };
     this.dialog.open(WhatToEatDialog, {
       data, width: '640px', maxWidth: '95vw', maxHeight: '92dvh', panelClass: 'tracker-dialog', autoFocus: false,
@@ -717,6 +725,7 @@ export class FamilyMeals {
     this.breakdownCarb.set(this.round1(Math.max(0, m?.carb ?? 0)));
     this.breakdownFat.set(this.round1(Math.max(0, m?.fat ?? 0)));
     this.breakdownSteps.set((r.steps ?? []).map(s => (s ?? '').trim()).filter(Boolean));
+    this.savedBreakdownRecipe.set(false); // a fresh/regenerated breakdown hasn't been saved as a recipe yet
     this.hasBreakdown.set(true);
   }
 
@@ -818,6 +827,43 @@ export class FamilyMeals {
       this.snack.open(this.messageOf(e, "Couldn't save that meal. Please try again."), 'OK', { duration: 4000 });
     } finally {
       this.savingBreakdown.set(false);
+    }
+  }
+
+  /**
+   * Save the reviewed breakdown to the caller's OWN "My Recipes" (POST /api/recipes/from-breakdown via
+   * api.saveRecipeFromBreakdown, gated recipes.use). Reuses the same edited title/servings/ingredient rows/
+   * per-serving macros/steps. Distinct from "Save as meal" (the household plan) — this is a private,
+   * reusable recipe. Degrades gracefully; flips the button to a saved state on success.
+   */
+  async saveBreakdownAsRecipe(): Promise<void> {
+    const title = this.breakdownTitle().trim();
+    if (this.savingBreakdownRecipe() || this.savedBreakdownRecipe()) return;
+    if (!title) { this.snack.open('Give the recipe a title before saving it.', 'OK', { duration: 4000 }); return; }
+
+    const req: RecipeFromBreakdownRequest = {
+      title,
+      servings: Math.max(1, Math.round(this.breakdownServings() || 1)),
+      macros: {
+        calories: Math.max(0, Math.round(this.breakdownCalories())),
+        protein: this.round1(Math.max(0, this.breakdownProtein())),
+        carb: this.round1(Math.max(0, this.breakdownCarb())),
+        fat: this.round1(Math.max(0, this.breakdownFat())),
+      },
+      ingredients: this.breakdownRows()
+        .map(r => ({ name: r.name.trim(), quantity: r.quantity.trim() }))
+        .filter(i => i.name.length > 0),
+      steps: this.breakdownSteps(),
+    };
+    this.savingBreakdownRecipe.set(true);
+    try {
+      await firstValueFrom(this.api.saveRecipeFromBreakdown(req));
+      this.savedBreakdownRecipe.set(true);
+      this.snack.open(`Saved “${title}” to My Recipes.`, 'OK', { duration: 4000 });
+    } catch (e) {
+      this.snack.open(this.messageOf(e, "Couldn't save that recipe. Please try again."), 'OK', { duration: 4000 });
+    } finally {
+      this.savingBreakdownRecipe.set(false);
     }
   }
 

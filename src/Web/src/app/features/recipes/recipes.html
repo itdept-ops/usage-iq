@@ -1,0 +1,176 @@
+<div class="recipes">
+
+  <!-- Header -->
+  <header class="recipes__head">
+    <div class="recipes__id">
+      <span class="recipes__glyph" aria-hidden="true"><mat-icon>menu_book</mat-icon></span>
+      <div>
+        <h1 class="recipes__title">My Recipes</h1>
+        <p class="recipes__sub">
+          Save your go-to recipes, organize the macros, and share read-only with your contacts.
+        </p>
+      </div>
+    </div>
+    <button mat-flat-button color="primary" type="button" class="recipes__new" (click)="create()">
+      <mat-icon aria-hidden="true">add</mat-icon> New recipe
+    </button>
+  </header>
+
+  <!-- ─────────────────────────── LOADING ─────────────────────────── -->
+  @if (loading()) {
+    <div class="recipes__state" aria-live="polite">
+      <mat-progress-spinner mode="indeterminate" diameter="36" aria-hidden="true" />
+      <p>Loading your recipes…</p>
+    </div>
+  }
+
+  <!-- ─────────────────────────── ERROR ─────────────────────────── -->
+  @else if (error()) {
+    <div class="recipes__state">
+      <mat-icon class="recipes__state-glyph" aria-hidden="true">cloud_off</mat-icon>
+      <p class="recipes__state-title">Couldn't load your recipes</p>
+      <button mat-stroked-button type="button" (click)="load()">
+        <mat-icon aria-hidden="true">refresh</mat-icon> Try again
+      </button>
+    </div>
+  }
+
+  @else {
+
+    <!-- ─────────────────────────── MINE ─────────────────────────── -->
+    <section class="recipes__section">
+      <h2 class="recipes__section-title">
+        Your recipes <span class="recipes__count">{{ mineCount() }}</span>
+      </h2>
+
+      @if (mine().length) {
+        <div class="recipes__grid">
+          @for (r of mine(); track r.id) {
+            <ng-container
+              *ngTemplateOutlet="card; context: { $implicit: r, owned: true }"></ng-container>
+          }
+        </div>
+      } @else {
+        <div class="recipes__empty">
+          <mat-icon class="recipes__empty-glyph" aria-hidden="true">restaurant_menu</mat-icon>
+          <p class="recipes__empty-title">No recipes yet</p>
+          <p class="recipes__empty-sub">
+            Create one with “New recipe”, or save an idea from the tracker's “What should I eat?”.
+          </p>
+          <button mat-stroked-button type="button" (click)="create()">
+            <mat-icon aria-hidden="true">add</mat-icon> New recipe
+          </button>
+        </div>
+      }
+    </section>
+
+    <!-- ─────────────────────────── SHARED WITH ME ─────────────────────────── -->
+    @if (shared().length) {
+      <section class="recipes__section">
+        <h2 class="recipes__section-title">
+          Shared with me <span class="recipes__count">{{ sharedCount() }}</span>
+        </h2>
+        <div class="recipes__grid">
+          @for (r of shared(); track r.id) {
+            <ng-container
+              *ngTemplateOutlet="card; context: { $implicit: r, owned: false }"></ng-container>
+          }
+        </div>
+      </section>
+    }
+  }
+</div>
+
+<!-- ─────────────────────────── recipe card template ─────────────────────────── -->
+<ng-template #card let-r let-owned="owned">
+  <article class="r-card" [class.r-card--busy]="isBusy(r.id)">
+
+    <!-- summary row (click to expand) -->
+    <button type="button" class="r-card__summary" (click)="toggleExpanded(r.id)"
+            [attr.aria-expanded]="isExpanded(r.id)">
+      <div class="r-card__head">
+        <h3 class="r-card__title">{{ r.title }}</h3>
+        @if (!owned && r.ownerName) {
+          <span class="r-card__owner">
+            <mat-icon aria-hidden="true">person</mat-icon> {{ r.ownerName }}
+          </span>
+        }
+      </div>
+      <div class="r-card__meta">
+        <span class="r-card__chip"><mat-icon aria-hidden="true">restaurant</mat-icon>{{ r.servings }} serving{{ r.servings === 1 ? '' : 's' }}</span>
+        <span class="r-card__chip mono-num">{{ r.calories | number }} kcal/serving</span>
+        @if (r.ingredients.length) {
+          <span class="r-card__chip">{{ r.ingredients.length }} ingredient{{ r.ingredients.length === 1 ? '' : 's' }}</span>
+        }
+      </div>
+      <mat-icon class="r-card__chev" aria-hidden="true">
+        {{ isExpanded(r.id) ? 'expand_less' : 'expand_more' }}
+      </mat-icon>
+    </button>
+
+    <!-- detail (expanded) -->
+    @if (isExpanded(r.id)) {
+      <div class="r-card__detail">
+
+        <!-- per-serving macros -->
+        <div class="r-macros">
+          <span class="r-macro mono-num">{{ r.proteinG | number:'1.0-0' }}<small>P</small></span>
+          <span class="r-macro mono-num">{{ r.carbG | number:'1.0-0' }}<small>C</small></span>
+          <span class="r-macro mono-num">{{ r.fatG | number:'1.0-0' }}<small>F</small></span>
+          <span class="r-macro r-macro--total mono-num">{{ totalCalories(r) | number }} kcal total</span>
+        </div>
+
+        @if (r.ingredients.length) {
+          <div class="r-block">
+            <span class="r-block-title"><mat-icon aria-hidden="true">list_alt</mat-icon> Ingredients</span>
+            <ul class="r-ings">
+              @for (ing of r.ingredients; track $index) {
+                <li class="r-ing">
+                  <span class="r-ing-name">{{ ing.name }}</span>
+                  @if (ing.quantity) { <span class="r-ing-qty">{{ ing.quantity }}</span> }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        @if (r.steps.length) {
+          <div class="r-block">
+            <span class="r-block-title"><mat-icon aria-hidden="true">format_list_numbered</mat-icon> Steps</span>
+            <ol class="r-steps">
+              @for (step of r.steps; track $index) { <li>{{ step }}</li> }
+            </ol>
+          </div>
+        }
+
+        @if (r.notes) {
+          <p class="r-notes">{{ r.notes }}</p>
+        }
+
+        <!-- owner controls -->
+        @if (owned) {
+          <div class="r-card__actions">
+            <mat-slide-toggle class="r-share" [ngModel]="r.shareWithContacts"
+                              [disabled]="isBusy(r.id)"
+                              (ngModelChange)="toggleShare(r, $event)"
+                              [matTooltip]="'Let your mutual contacts view this read-only'">
+              Share with my contacts
+            </mat-slide-toggle>
+            <span class="r-card__spacer"></span>
+            <button mat-stroked-button type="button" [disabled]="isBusy(r.id)" (click)="edit(r)">
+              <mat-icon aria-hidden="true">edit</mat-icon> Edit
+            </button>
+            <button mat-stroked-button type="button" class="r-del" [disabled]="isBusy(r.id)" (click)="remove(r)">
+              <mat-icon aria-hidden="true">delete_outline</mat-icon> Delete
+            </button>
+          </div>
+        } @else {
+          <p class="r-shared-note">
+            <mat-icon aria-hidden="true">visibility</mat-icon>
+            Shared with you read-only by {{ r.ownerName }}.
+          </p>
+        }
+      </div>
+    }
+  </article>
+</ng-template>

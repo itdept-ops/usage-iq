@@ -227,6 +227,24 @@ export const routes: Routes = [
     title: 'Usage IQ · Bill Splitter',
   },
   {
+    // Grocery Tool — a focused shopping-list page over the household's single "Groceries" FamilyList
+    // (find-or-create, via /api/grocery). Pulled out of the Family Hub into the Tools nav. Gated grocery.use;
+    // the meal-planner → grocery tie-in stays on the Family meals page.
+    path: 'grocery',
+    canActivate: [permissionGuard(PERM.groceryUse)],
+    loadComponent: () => import('./features/grocery/grocery').then(m => m.Grocery),
+    title: 'Usage IQ · Grocery list',
+  },
+  {
+    // My Recipes — a per-user recipe book (own CRUD + a "Shared with me" section of recipes mutual contacts
+    // chose to share read-only). Gated recipes.use; every /api/recipes route is owner-scoped + share-gated
+    // server-side. Lives in the Tools nav alongside Grocery.
+    path: 'recipes',
+    canActivate: [permissionGuard(PERM.recipesUse)],
+    loadComponent: () => import('./features/recipes/recipes').then(m => m.Recipes),
+    title: 'Usage IQ · My Recipes',
+  },
+  {
     // 75 Hard — a six-task daily challenge layered on the tracker. Gated by the SAME tracker permission
     // (tracker.self); a coach/admin read of someone else is enforced server-side via tracker.viewall.
     path: 'challenge',

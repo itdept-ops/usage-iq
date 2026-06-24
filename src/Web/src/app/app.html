@@ -108,8 +108,8 @@
         </mat-menu>
       }
 
-      <!-- Tools ▾ : Ask (tracker.ai), Automations (automations.use), Bills (bills.use) -->
-      @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use')) {
+      <!-- Tools ▾ : Ask (tracker.ai), Automations (automations.use), Bills (bills.use), Grocery (grocery.use), Recipes (recipes.use) -->
+      @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use', 'grocery.use', 'recipes.use')) {
         <button type="button" mat-button class="nav__item nav__group"
                 [matMenuTriggerFor]="toolsMenu" #toolsTrigger="matMenuTrigger"
                 [class.nav__group--open]="toolsTrigger.menuOpen"
@@ -134,6 +134,18 @@
             <a mat-menu-item class="nav-menu__item" routerLink="/bills" routerLinkActive="active">
               <mat-icon class="nav-menu__icon" aria-hidden="true">receipt_long</mat-icon>
               <span>Bills</span>
+            </a>
+          }
+          @if (auth.hasPermission('grocery.use')) {
+            <a mat-menu-item class="nav-menu__item" routerLink="/grocery" routerLinkActive="active">
+              <mat-icon class="nav-menu__icon" aria-hidden="true">shopping_cart</mat-icon>
+              <span>Grocery</span>
+            </a>
+          }
+          @if (auth.hasPermission('recipes.use')) {
+            <a mat-menu-item class="nav-menu__item" routerLink="/recipes" routerLinkActive="active">
+              <mat-icon class="nav-menu__icon" aria-hidden="true">menu_book</mat-icon>
+              <span>My Recipes</span>
             </a>
           }
         </mat-menu>
@@ -503,7 +515,7 @@
          (click)="closeMobileNav()">Activity</a>
     }
 
-    @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use')) {
+    @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use', 'grocery.use', 'recipes.use')) {
       <div class="mobile-nav__head" role="presentation">Tools</div>
       @if (auth.hasPermission('tracker.ai')) {
         <a class="mobile-nav__item" routerLink="/ask" routerLinkActive="active"
@@ -516,6 +528,14 @@
       @if (auth.hasPermission('bills.use')) {
         <a class="mobile-nav__item" routerLink="/bills" routerLinkActive="active"
            (click)="closeMobileNav()">Bills</a>
+      }
+      @if (auth.hasPermission('grocery.use')) {
+        <a class="mobile-nav__item" routerLink="/grocery" routerLinkActive="active"
+           (click)="closeMobileNav()">Grocery</a>
+      }
+      @if (auth.hasPermission('recipes.use')) {
+        <a class="mobile-nav__item" routerLink="/recipes" routerLinkActive="active"
+           (click)="closeMobileNav()">My Recipes</a>
       }
     }
 

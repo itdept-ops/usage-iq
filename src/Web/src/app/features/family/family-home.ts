@@ -35,7 +35,7 @@ interface FeatureTile {
  */
 const TILES: FeatureTile[] = [
   { key: 'notes', label: 'Notes', icon: 'sticky_note_2', blurb: 'Shared notes for the whole family', route: '/family/notes' },
-  { key: 'lists', label: 'Lists', icon: 'checklist', blurb: 'Groceries, to-dos, and wish lists', route: '/family/lists' },
+  { key: 'lists', label: 'Lists', icon: 'checklist', blurb: 'To-dos and wish lists (groceries live in the Grocery tool)', route: '/family/lists' },
   { key: 'reminders', label: 'Reminders', icon: 'notifications_active', blurb: 'Nudges so nothing slips', route: '/family/reminders' },
   { key: 'timer', label: 'Timer', icon: 'timer', blurb: 'Shared timers and countdowns', route: '/family/timer' },
   { key: 'meals', label: 'Meal Planner', icon: 'restaurant', blurb: 'Plan the week around the table', route: '/family/meals' },

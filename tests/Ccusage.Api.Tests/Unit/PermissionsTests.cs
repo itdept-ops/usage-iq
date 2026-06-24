@@ -18,7 +18,7 @@ public class PermissionsTests
         "chat.read", "chat.send", "chat.moderate", "chat.contacts.manage",
         "tracker.self", "tracker.viewall", "tracker.beta",
         "shares.view", "shares.manage",
-        "bills.use",
+        "bills.use", "recipes.use", "grocery.use",
         "family.use", "family.finance", "cycle.track", "chore.claim", "allowance.manage", "identity.map",
         "location.self", "location.share", "location.view-all",
         "automations.use",
@@ -117,6 +117,8 @@ public class PermissionsTests
         Permissions.SharesView.Should().Be("shares.view");
         Permissions.SharesManage.Should().Be("shares.manage");
         Permissions.BillsUse.Should().Be("bills.use");
+        Permissions.RecipesUse.Should().Be("recipes.use");
+        Permissions.GroceryUse.Should().Be("grocery.use");
         Permissions.FamilyUse.Should().Be("family.use");
         Permissions.FamilyFinance.Should().Be("family.finance");
         Permissions.CycleTrack.Should().Be("cycle.track");
@@ -141,9 +143,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_forty_six_known_keys()
+    public void All_contains_exactly_the_forty_eight_known_keys()
     {
-        Permissions.All.Should().HaveCount(46);
+        Permissions.All.Should().HaveCount(48);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -154,9 +156,22 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_forty_six_entries()
+    public void Catalog_has_forty_eight_entries()
     {
-        Permissions.Catalog.Should().HaveCount(46);
+        Permissions.Catalog.Should().HaveCount(48);
+    }
+
+    [Fact]
+    public void RecipesUse_and_GroceryUse_are_Tools_non_ai_and_not_defaultable()
+    {
+        // Both gate private, owner/household-scoped data, so they are deliberate grants in the "Tools" group.
+        Permissions.Catalog.Single(p => p.Key == Permissions.RecipesUse).Group.Should().Be("Tools");
+        Permissions.Catalog.Single(p => p.Key == Permissions.GroceryUse).Group.Should().Be("Tools");
+        Permissions.IsAi(Permissions.RecipesUse).Should().BeFalse();
+        Permissions.IsAi(Permissions.GroceryUse).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.RecipesUse).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.GroceryUse).Should().BeFalse();
+        Permissions.All.Should().Contain(Permissions.RecipesUse).And.Contain(Permissions.GroceryUse);
     }
 
     [Fact]

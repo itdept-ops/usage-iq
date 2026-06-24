@@ -169,7 +169,7 @@ public static class AiEndpoints
                     ctx.Snapshot, body?.Craving, body?.Constraints,
                     ctx.RemCal, ctx.RemP, ctx.RemC, ctx.RemF, ct);
                 if (result is { Options.Count: > 0 })
-                    return Results.Ok(new WhatToEatDto { AiUsed = true, Options = ToEatOptionDtos(result.Options) });
+                    return Results.Ok(new WhatToEatDto { AiUsed = true, Options = ToEatOptionDtos(result.Options, ctx.GroceryByName) });
             }
 
             // Gemini off, unavailable, or returned nothing usable -> friendly deterministic fallback (200).
@@ -1075,8 +1075,11 @@ public static class AiEndpoints
             foreach (var n in recent) sb.Append("- ").Append(n).Append('\n');
         }
 
-        // Household-scoped reads (groceries on hand + planned meals). Read-only: absent household => empty.
+        // Household-scoped reads (groceries on the list + planned meals). Read-only: absent household => empty.
+        // The grocery list is the SOURCE OF TRUTH the endpoint cross-references each AI ingredient against
+        // (deterministically, below) — it is NOT fed to the model as "pantry"/"on-hand" to infer from anymore.
         var onHand = new List<string>();
+        var groceryByName = new Dictionary<string, int>(StringComparer.Ordinal);
         var household = await households.GetForCallerAsync(caller, ct);
         if (household is not null)
         {
@@ -1084,16 +1087,23 @@ public static class AiEndpoints
                 .Where(l => l.HouseholdId == household.Id && l.Kind == "shopping"
                     && l.Name.ToLower() == "groceries")
                 .SelectMany(l => l.Items.Where(i => !i.Done).Select(i => i.Text))
-                .Take(60)
+                .Take(200)
                 .ToListAsync(ct);
             foreach (var t in groceryItems)
             {
                 var s = Snip(t, 80);
-                if (s.Length > 0) onHand.Add(s);
+                if (s.Length == 0) continue;
+                onHand.Add(s);
+                // Normalized base-name -> listed quantity ("Milk x3" -> 3), summing duplicates. Reuses the grocery
+                // tool's "xN" parse + the SAME case/space-insensitive de-dupe normalization.
+                var (baseName, qty) = GroceryEndpoints.SplitQuantity(s);
+                var key = FamilyMealsChoresEndpoints.Normalize(baseName);
+                if (key.Length == 0) continue;
+                groceryByName[key] = groceryByName.GetValueOrDefault(key) + (qty ?? 1);
             }
             if (onHand.Count > 0)
             {
-                sb.Append("on_hand_groceries:\n");
+                sb.Append("grocery_list:\n");
                 foreach (var s in onHand) sb.Append("- ").Append(s).Append('\n');
             }
 
@@ -1115,7 +1125,7 @@ public static class AiEndpoints
         var craving = Snip(body?.Craving, 400);
         var constraints = Snip(body?.Constraints, 400);
 
-        return new EatContext(sb.ToString(), remCal, remP, remC, remF, onHand,
+        return new EatContext(sb.ToString(), remCal, remP, remC, remF, onHand, groceryByName,
             await PlannedMealTitlesAsync(db, household, today, ct), recent, craving, constraints);
     }
 
@@ -1143,18 +1153,20 @@ public static class AiEndpoints
         var options = new List<EatOptionDto>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        void Add(string title, string why, IReadOnlyList<string>? have = null)
+        void Add(string title, string why, IReadOnlyList<string>? ingredientNames = null)
         {
             if (options.Count >= MaxFallbackOptions) return;
             var t = title?.Trim();
             if (string.IsNullOrEmpty(t) || !seen.Add(t)) return; // skip blanks + de-dupe across all sources
+            // The deterministic floor has no recipe; any seed names ARE the grocery items, so label them onList.
+            var ingredients = (ingredientNames ?? Array.Empty<string>())
+                .Select(n => LabelIngredient(n, "", ctx.GroceryByName)).ToList();
             options.Add(new EatOptionDto
             {
                 Title = t,
                 Why = why,
                 Macros = new MacroSet(), // deterministic floor — no AI, so no estimated macros
-                Have = have ?? Array.Empty<string>(),
-                Missing = Array.Empty<string>(),
+                Ingredients = ingredients,
                 Steps = Array.Empty<string>(),
             });
         }
@@ -1167,25 +1179,45 @@ public static class AiEndpoints
         foreach (var title in ctx.RecentFoods)
             Add(title, "Something you've had recently.");
 
-        // 3) Failing all else, a single "use what's on hand" idea seeded with the on-hand groceries.
+        // 3) Failing all else, a single "use what's on hand" idea seeded with the grocery-list items.
         if (options.Count == 0 && ctx.OnHand.Count > 0)
-            Add("Make something with what you have", "Built from your on-hand groceries.",
+            Add("Make something with what you have", "Built from items on your grocery list.",
                 ctx.OnHand.Take(MaxFallbackHave).ToList());
 
         return options;
     }
 
-    /// <summary>Map the parsed Gemini options to the wire DTO (field-for-field; macros already CLAMPED).</summary>
-    private static IReadOnlyList<EatOptionDto> ToEatOptionDtos(IReadOnlyList<EatOption> options) =>
+    /// <summary>Map the parsed Gemini options to the wire DTO (macros already CLAMPED), DETERMINISTICALLY
+    /// labelling each ingredient against the household grocery list: <c>onList</c> + the current <c>listedQty</c>
+    /// (null when not on the list). The cross-reference is case/space-insensitive and "xN"-aware, reusing the
+    /// grocery tool's normalization — the model never decides this.</summary>
+    private static IReadOnlyList<EatOptionDto> ToEatOptionDtos(
+        IReadOnlyList<EatOption> options, IReadOnlyDictionary<string, int> groceryByName) =>
         options.Select(o => new EatOptionDto
         {
             Title = o.Title,
             Why = o.Why,
             Macros = o.Macros,
-            Have = o.Have,
-            Missing = o.Missing,
+            Ingredients = o.Ingredients.Select(i => LabelIngredient(i.Name, i.Quantity, groceryByName)).ToList(),
             Steps = o.Steps,
         }).ToList();
+
+    /// <summary>Build one labelled ingredient DTO: cross-reference its NAME (the "xN" stripped, case/space-
+    /// insensitive) against the household grocery list. On a match, <c>onList=true</c> + <c>listedQty</c> = the
+    /// quantity currently on the list; otherwise <c>onList=false</c>, <c>listedQty=null</c>.</summary>
+    private static EatIngredientDto LabelIngredient(
+        string name, string quantity, IReadOnlyDictionary<string, int> groceryByName)
+    {
+        var key = FamilyMealsChoresEndpoints.Normalize(GroceryEndpoints.SplitQuantity(name).BaseName);
+        var onList = key.Length > 0 && groceryByName.TryGetValue(key, out var listed);
+        return new EatIngredientDto
+        {
+            Name = name,
+            Quantity = quantity ?? "",
+            OnList = onList,
+            ListedQty = onList ? groceryByName[key] : (int?)null,
+        };
+    }
 
     private const int MaxFallbackOptions = 5;
     private const int MaxFallbackHave = 12;
@@ -1194,7 +1226,8 @@ public static class AiEndpoints
     /// raw lists used to build the deterministic fallback. Carries NO identity.</summary>
     private sealed record EatContext(
         string Snapshot, int RemCal, double RemP, double RemC, double RemF,
-        IReadOnlyList<string> OnHand, IReadOnlyList<string> PlannedMeals, IReadOnlyList<string> RecentFoods,
+        IReadOnlyList<string> OnHand, IReadOnlyDictionary<string, int> GroceryByName,
+        IReadOnlyList<string> PlannedMeals, IReadOnlyList<string> RecentFoods,
         string Craving, string Constraints);
 
     /// <summary>A compact, model-friendly summary of the caller's day so far (goal, intake, burn, foods).</summary>

@@ -82,6 +82,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
     public DbSet<ActivityReaction> ActivityReactions => Set<ActivityReaction>();
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
+    public DbSet<Recipe> Recipes => Set<Recipe>();
+    public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -530,10 +532,13 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.SurfaceBrowser).HasDefaultValue(false);
             e.Property(x => x.SurfaceDiscord).HasDefaultValue(false);
             e.Property(x => x.WeeklyRecapEnabled).HasDefaultValue(false);
-            // Per-CATEGORY Discord-forward bitmask (DiscordForwardCategory). DEFAULT = All (127) so existing
-            // rows keep forwarding everything when SurfaceDiscord is on — a non-breaking schema add.
-            e.Property(x => x.DiscordCategories)
-                .HasDefaultValue((int)DiscordForwardCategory.All);
+            // Per-CATEGORY Discord-forward bitmask (DiscordForwardCategory). NO store default: the entity
+            // CLR-defaults to All (127), so new rows still forward everything, while an EXPLICIT all-off
+            // (mask 0) PERSISTS as 0 rather than being silently rewritten to the store default. (With a DB
+            // HasDefaultValue, EF treats the property's 0 as "unset" and writes the default instead — which
+            // would resurrect the very "all-off forwards everything" bug this fix removes.) Existing/backfilled
+            // rows already hold 127 from the original migration.
+            // (column default dropped — see migration DiscordCategoriesDropStoreDefault)
             // LastRecapSent is a nullable local DATE (the idempotency anchor) — no default; null = never sent.
             // The encrypted webhook is a base64 AES-GCM blob (nonce|tag|ciphertext) — generous cap (matches
             // GoogleCalendarConnection.EncryptedRefreshToken). The plaintext URL is NEVER persisted.
@@ -1065,6 +1070,31 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => new { x.ActorEmail, x.Id }).IsDescending(false, true);
             // Cross-actor keyset paging is ordered by Id desc.
             e.HasIndex(x => x.Id).IsDescending();
+        });
+
+        b.Entity<Recipe>(e =>
+        {
+            e.Property(x => x.OwnerEmail).HasMaxLength(256);
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Servings).HasDefaultValue(1);
+            e.Property(x => x.Steps).HasMaxLength(8000).HasDefaultValue("");
+            e.Property(x => x.Notes).HasMaxLength(2000).HasDefaultValue("");
+            e.Property(x => x.ShareWithContacts).HasDefaultValue(false);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // The "My Recipes" list reads one owner's recipes newest-first; the OwnerEmail prefix also
+            // serves the share lookup (an owner's shared recipes joined to the caller's contact circle).
+            e.HasIndex(x => new { x.OwnerEmail, x.Id }).IsDescending(false, true);
+            e.HasMany(x => x.Ingredients).WithOne(i => i.Recipe!)
+                .HasForeignKey(i => i.RecipeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<RecipeIngredient>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Quantity).HasMaxLength(100).HasDefaultValue("");
+            // Load a recipe's ingredient lines in sort order.
+            e.HasIndex(x => x.RecipeId);
         });
     }
 }

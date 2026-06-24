@@ -66,8 +66,17 @@ public class HardChallengeTests(WebAppFactory factory)
         return await db.Users.AsNoTracking().Where(u => u.Email == email).Select(u => u.Id).FirstAsync();
     }
 
-    // The test container has no configured display timezone → "today" is UTC today.
-    private static readonly string Today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+    // "today" must match the API, which anchors off the configured DISPLAY timezone (default America/New_York),
+    // NOT raw UTC. Late-evening New York is already the next UTC day, so a UTC "today" is off-by-one then — it
+    // reads as a FUTURE date to the API and breaks the future/streak window assertions.
+    private static readonly string Today = DisplayTzToday().ToString("yyyy-MM-dd");
+
+    private static DateOnly DisplayTzToday()
+    {
+        TimeZoneInfo tz;
+        try { tz = TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); } catch { tz = TimeZoneInfo.Utc; }
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+    }
 
     // ---- Gating ----
 

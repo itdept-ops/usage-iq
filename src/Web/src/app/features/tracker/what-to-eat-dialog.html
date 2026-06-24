@@ -63,7 +63,7 @@
   <!-- ─────────────────────────── OPTIONS ─────────────────────────── -->
   @if (phase() === 'options') {
     <div class="wte-list">
-      @for (o of options(); track $index) {
+      @for (o of options(); track $index; let oi = $index) {
         <article class="wte-card" [attr.aria-label]="o.title">
           <h3 class="wte-card-title">{{ o.title }}</h3>
           @if (o.why) { <p class="wte-card-why">{{ o.why }}</p> }
@@ -79,33 +79,46 @@
             <p class="wte-fits"><mat-icon aria-hidden="true">check_circle</mat-icon> Fits your remaining: {{ hint }}</p>
           }
 
-          <!-- Ingredients: HAVE vs MISSING (missing visually distinct). -->
-          @if (o.have.length || o.missing.length) {
+          <!-- Full ingredient list; each row badged "On your list" (with qty) vs "Need", with a per-item +add. -->
+          @if (o.ingredients.length) {
             <div class="wte-ings">
-              @if (o.have.length) {
-                <div class="wte-ing-group">
-                  <span class="wte-ing-label wte-ing-label--have">
-                    <mat-icon aria-hidden="true">check</mat-icon> You have
-                  </span>
-                  <ul class="wte-chips">
-                    @for (h of o.have; track $index) {
-                      <li class="wte-chip wte-chip--have">{{ h }}</li>
+              <span class="wte-ing-label">
+                <mat-icon aria-hidden="true">list_alt</mat-icon> Ingredients
+              </span>
+              <ul class="wte-ings-list">
+                @for (ing of o.ingredients; track $index; let ii = $index) {
+                  <li class="wte-ing" [class.wte-ing--have]="ing.onList" [class.wte-ing--need]="!ing.onList">
+                    <span class="wte-ing-name">
+                      {{ ing.name }}@if (ing.quantity) { <span class="wte-ing-qty">· {{ ing.quantity }}</span> }
+                    </span>
+
+                    @if (ing.onList) {
+                      <span class="wte-badge wte-badge--have"
+                            [matTooltip]="'Already on your grocery list'">
+                        <mat-icon aria-hidden="true">check</mat-icon>
+                        On your list@if (ing.listedQty && ing.listedQty > 1) { <span class="wte-badge-qty">×{{ ing.listedQty }}</span> }
+                      </span>
+                    } @else {
+                      <span class="wte-badge wte-badge--need">Need</span>
                     }
-                  </ul>
-                </div>
-              }
-              @if (o.missing.length) {
-                <div class="wte-ing-group">
-                  <span class="wte-ing-label wte-ing-label--missing">
-                    <mat-icon aria-hidden="true">add_shopping_cart</mat-icon> Missing
-                  </span>
-                  <ul class="wte-chips">
-                    @for (m of o.missing; track $index) {
-                      <li class="wte-chip wte-chip--missing">{{ m }}</li>
+
+                    <!-- Per-ingredient quantity-aware add (family-gated alongside the card grocery action). -->
+                    @if (canFamily()) {
+                      <button mat-icon-button type="button" class="wte-ing-add"
+                              [disabled]="isIngredientBusy(oi, ii)"
+                              (click)="addIngredientToGrocery(oi, ii, ing)"
+                              [matTooltip]="ing.onList ? 'Add one more to your grocery list' : 'Add to your grocery list'"
+                              [attr.aria-label]="'Add ' + ing.name + ' to your grocery list'">
+                        @if (isIngredientBusy(oi, ii)) {
+                          <mat-progress-spinner mode="indeterminate" diameter="16" aria-hidden="true" />
+                        } @else {
+                          <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
+                        }
+                      </button>
                     }
-                  </ul>
-                </div>
-              }
+                  </li>
+                }
+              </ul>
             </div>
           }
 
@@ -143,15 +156,29 @@
               </button>
 
               <button mat-stroked-button type="button" class="wte-action"
-                      [disabled]="cardBusy($index) || o.missing.length === 0" (click)="addMissingToGrocery($index, o)"
-                      [matTooltip]="o.missing.length === 0 ? 'Nothing missing' : ''"
-                      [attr.aria-label]="'Add the missing ingredients of ' + o.title + ' to your grocery list'">
+                      [disabled]="cardBusy($index) || missingCount(o) === 0" (click)="addMissingToGrocery($index, o)"
+                      [matTooltip]="missingCount(o) === 0 ? 'Everything is already on your list' : ''"
+                      [attr.aria-label]="'Add the needed ingredients of ' + o.title + ' to your grocery list'">
                 @if (isBusy($index, 'grocery')) {
                   <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
                 } @else {
                   <mat-icon aria-hidden="true">add_shopping_cart</mat-icon>
                 }
-                Add missing to grocery
+                Add needed to grocery@if (missingCount(o) > 0) { <span class="wte-action-count">({{ missingCount(o) }})</span> }
+              </button>
+            }
+
+            <!-- Save as recipe: persists the option to the caller's own "My Recipes" (recipes.use-gated). -->
+            @if (canRecipes()) {
+              <button mat-stroked-button type="button" class="wte-action"
+                      [disabled]="cardBusy($index) || isSavedAsRecipe($index)" (click)="saveAsRecipe($index, o)"
+                      [attr.aria-label]="'Save ' + o.title + ' to My Recipes'">
+                @if (isBusy($index, 'recipe')) {
+                  <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+                } @else {
+                  <mat-icon aria-hidden="true">{{ isSavedAsRecipe($index) ? 'bookmark_added' : 'bookmark_add' }}</mat-icon>
+                }
+                {{ isSavedAsRecipe($index) ? 'Saved to recipes' : 'Save as recipe' }}
               </button>
             }
           </div>

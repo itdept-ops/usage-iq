@@ -1055,6 +1055,7 @@ export class Tracker {
       date: this.store.date(), meal: this.defaultMeal(), remaining: rem,
       // The meal-plan / grocery actions are family.use-gated server-side; hide them for tracker-only users.
       canFamily: this.auth.hasPermission(PERM.familyUse),
+      canRecipes: this.auth.hasPermission(PERM.recipesUse),
     };
     this.dialog.open(WhatToEatDialog, { data, width: '640px', maxWidth: '95vw', maxHeight: '92dvh', panelClass: 'tracker-dialog', autoFocus: false })
       .afterClosed().subscribe((result?: string) => {

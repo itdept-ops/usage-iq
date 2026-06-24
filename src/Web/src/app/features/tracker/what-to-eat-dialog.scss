@@ -139,29 +139,63 @@
 .wte-ing-label--have { color: var(--tech-success); }
 .wte-ing-label--missing { color: var(--tech-warn); }
 
-.wte-chips {
+// One row per ingredient: name + an "On your list"/"Need" badge + a per-item quantity-aware add.
+.wte-ings-list {
   list-style: none; margin: 0; padding: 0;
-  display: flex; flex-wrap: wrap; gap: 5px;
+  display: flex; flex-direction: column; gap: 4px;
 }
-.wte-chip {
-  padding: 3px 9px;
+.wte-ing {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px 5px 10px;
+  border-radius: var(--tech-r-control);
+  border: 1px solid var(--tech-border-subtle);
+  background: var(--tech-bg-sunken);
+}
+.wte-ing--need {
+  border-style: dashed;
+  border-color: var(--tech-warn);
+}
+.wte-ing-name {
+  flex: 1 1 auto; min-width: 0;
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text);
+  word-break: break-word;
+}
+.wte-ing-qty { color: var(--tech-text-secondary); }
+
+// Status badge: on-the-list (success) vs need-to-buy (warm).
+.wte-badge {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px;
   border-radius: var(--tech-r-chip);
   font-size: var(--tech-fs-label);
-  border: 1px solid var(--tech-border-subtle);
-}
-.wte-chip--have {
-  background: var(--tech-success-tint);
-  border-color: rgba(61, 214, 140, 0.4);
-  color: var(--tech-text);
-}
-// MISSING is visually distinct: warm tint + dashed border + leading marker.
-.wte-chip--missing {
-  background: var(--tech-warn-tint);
-  border: 1px dashed var(--tech-warn);
-  color: var(--tech-text);
   font-weight: 600;
-  &::before { content: '+ '; color: var(--tech-warn); }
+  white-space: nowrap;
+  mat-icon { font-size: 14px; width: 14px; height: 14px; }
 }
+.wte-badge--have {
+  background: var(--tech-success-tint);
+  color: var(--tech-success);
+  border: 1px solid rgba(61, 214, 140, 0.4);
+}
+.wte-badge--need {
+  background: var(--tech-warn-tint);
+  color: var(--tech-warn);
+  border: 1px solid var(--tech-warn);
+}
+.wte-badge-qty { font-family: var(--tech-font-mono, monospace); }
+
+.wte-ing-add {
+  flex: 0 0 auto;
+  width: 32px; height: 32px;
+  color: var(--tech-text-secondary);
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  mat-progress-spinner { display: inline-block; }
+  &:not([disabled]):hover { color: var(--tech-accent); }
+}
+
+.wte-action-count { margin-left: 4px; opacity: 0.85; }
 
 // ── steps ───────────────────────────────────────────────────────────────────────────────────────
 .wte-steps {

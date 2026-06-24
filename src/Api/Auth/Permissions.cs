@@ -58,6 +58,17 @@ public static class Permissions
     /// user. The receipt-AI route ALSO requires <see cref="AiVision"/> (the multimodal gate).</summary>
     public const string BillsUse = "bills.use";
 
+    /// <summary>Page-gate for the personal "My Recipes" book (<c>/api/recipes</c>). OWNER-SCOPED private
+    /// data: a caller only ever sees/edits their own recipes. A recipe may be opted-in to share read-only
+    /// with the owner's mutual chat contacts. Never default — granted deliberately per user, since it gates
+    /// private data.</summary>
+    public const string RecipesUse = "recipes.use";
+
+    /// <summary>Page-gate for the household Grocery list tool (<c>/api/grocery</c>): the shopping
+    /// <see cref="FamilyList"/> ("Groceries"), private to the household and optionally shared to contacts.
+    /// Never default — granted deliberately per user, since it gates private household data.</summary>
+    public const string GroceryUse = "grocery.use";
+
     // ---- Family ----
     public const string FamilyUse = "family.use";
     public const string FamilyFinance = "family.finance";
@@ -146,6 +157,8 @@ public static class Permissions
 
         // ---- Tools ----
         new PermissionInfo(BillsUse, "Tools", "Use Bill Splitter", "Create bills, break a receipt photo down with AI, assign items to your contacts, and share a public claim link so people can claim what they owe."),
+        new PermissionInfo(RecipesUse, "Tools", "Use My Recipes", "Save, edit, and organize your own recipes, and optionally share a recipe read-only with your mutual contacts."),
+        new PermissionInfo(GroceryUse, "Tools", "Use Grocery list", "Keep a household grocery list: add, check off, and clear items, and pull missing ingredients straight from a recipe."),
 
         // ---- Family ----
         new PermissionInfo(FamilyUse, "Family", "Use Family Hub", "Access the Family Hub: see your household, its members, and shared family data."),
@@ -280,6 +293,9 @@ public static class Permissions
     /// Likewise excludes <see cref="AutomationsUse"/>: an automation rule can carry the owner's OWN Discord
     /// webhook (SSRF-allowlisted + encrypted), so the capability is a deliberate grant, never inherited by
     /// every new account.
+    /// Likewise excludes <see cref="RecipesUse"/> and <see cref="GroceryUse"/>: both gate private,
+    /// owner/household-scoped data (a personal recipe book and the household grocery list), so they must be
+    /// granted deliberately per user, never inherited by every new account.
     /// Finally excludes ALL AI keys (<see cref="AiKeys"/>) and ALL Location keys (<see cref="LocationKeys"/>):
     /// AI capabilities spend tokens and the Location feature reveals where a user is, so both must be
     /// granted deliberately per user — every new account starts with AI off and location off.
@@ -289,5 +305,6 @@ public static class Permissions
         && key != TrackerViewAll && key != FamilyUse && key != FamilyFinance && key != CycleTrack
         && key != ChoreClaim && key != AllowanceManage && key != IdentityMap
         && key != AiUsageView && key != BillsUse && key != BetaAccess && key != AutomationsUse
+        && key != RecipesUse && key != GroceryUse
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }

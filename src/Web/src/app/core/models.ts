@@ -3347,19 +3347,33 @@ export interface WhatCanIMakeAiResult {
 }
 
 /**
+ * One ingredient of a "✨ What should I eat?" option (mirrors EatIngredientDto): the food `name` + a free-text
+ * `quantity` ("2", "1 cup", "" when none). `onList`/`listedQty` are set DETERMINISTICALLY by the server by
+ * cross-referencing `name` against the household Groceries list (case/space-insensitive, "xN"-aware): `onList`
+ * is true when the item is already on the list, and `listedQty` is the quantity currently on it (null when not
+ * on the list). The UI uses these to show what's already covered and add only what's not.
+ */
+export interface EatIngredient {
+  name: string;
+  quantity: string;
+  onList: boolean;
+  listedQty: number | null;
+}
+
+/**
  * One option from "✨ What should I eat?" (POST /api/ai/what-to-eat; mirrors EatOptionDto). The model
  * proposes a meal/snack that fits the caller's REMAINING macros today, reading their own day + goal,
- * recent foods, on-hand groceries and planned meals server-side. `macros` is the per-option total
+ * recent foods, the household grocery list and planned meals server-side. `macros` is the per-option total
  * (kcal + grams) so it's addable to the tracker in one call. `why` is a one-line "fits your remaining"
- * rationale. `have` are ingredients the caller already has on hand; `missing` are the few items still
- * needed (add to grocery). `steps` are optional quick prep steps.
+ * rationale. `ingredients` is the FULL ingredient list the option needs, each labelled `onList`/`listedQty`
+ * against the household grocery list by the server (the model never splits have/missing). `steps` are optional
+ * quick prep steps.
  */
 export interface EatOption {
   title: string;
   why: string;
   macros: MacroSet;
-  have: string[];
-  missing: string[];
+  ingredients: EatIngredient[];
   steps: string[];
 }
 
@@ -3440,6 +3454,75 @@ export interface RecipeBreakdownResult {
   ingredients: RecipeIngredient[];
   macrosPerServing: RecipeMacros;
   steps: string[] | null;
+}
+
+// ---- My Recipes (the gated /recipes Tool; mirrors RecipeEndpoints.RecipeDto) ----
+
+/**
+ * One structured ingredient line on a saved {@link Recipe} (mirrors RecipeIngredientDto): a `name` + an
+ * optional free-text `quantity` ("2 cups", "200 g", "" when none).
+ */
+export interface SavedRecipeIngredient {
+  name: string;
+  quantity: string;
+}
+
+/**
+ * One SAVED recipe in "My Recipes" (mirrors RecipeEndpoints.RecipeDto; GET /api/recipes). Owner-scoped: the
+ * caller's own recipes carry `owned: true` and are fully editable; a recipe shared by a mutual contact carries
+ * `owned: false` plus the owner's `ownerUserId` + `ownerName` (display name only — NEVER an email). Macros are
+ * PER-SERVING. `shareWithContacts` is the owner's read-only-share toggle (meaningful only on owned rows).
+ */
+export interface Recipe {
+  id: number;
+  title: string;
+  servings: number;
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  ingredients: SavedRecipeIngredient[];
+  steps: string[];
+  notes: string;
+  shareWithContacts: boolean;
+  owned: boolean;
+  ownerUserId?: number | null;
+  ownerName?: string | null;
+  createdUtc: string;
+  updatedUtc: string;
+}
+
+/** Create/update body for a recipe (mirrors RecipeEndpoints.RecipeUpsertRequest). On UPDATE a null
+ * `shareWithContacts` leaves the stored flag unchanged; on CREATE it defaults to false. */
+export interface RecipeUpsertRequest {
+  title: string;
+  servings?: number | null;
+  calories?: number | null;
+  proteinG?: number | null;
+  carbG?: number | null;
+  fatG?: number | null;
+  ingredients?: SavedRecipeIngredient[];
+  steps?: string[];
+  notes?: string | null;
+  shareWithContacts?: boolean | null;
+}
+
+/** Per-serving macros for the save-as-recipe payload (mirrors RecipeEndpoints.RecipeMacrosDto). */
+export interface RecipeFromBreakdownMacros {
+  calories: number;
+  protein: number;
+  carb: number;
+  fat: number;
+}
+
+/** The "save as recipe" (export) body — the shape a what-to-eat / recipe-breakdown PROPOSAL carries
+ * (mirrors RecipeEndpoints.RecipeFromBreakdownRequest). */
+export interface RecipeFromBreakdownRequest {
+  title: string;
+  servings?: number | null;
+  macros?: RecipeFromBreakdownMacros | null;
+  ingredients?: SavedRecipeIngredient[];
+  steps?: string[];
 }
 
 /**
@@ -4647,6 +4730,10 @@ export const PERM = {
   locationViewAll: 'location.view-all',
   // ---- Automations (group "Tools"; page-gate; deliberate grant — a rule may carry a Discord webhook) ----
   automationsUse: 'automations.use',
+  /** Grocery list (group "Tools"; page-gate): the household's shared shopping list. Private, never default. */
+  groceryUse: 'grocery.use',
+  /** My Recipes (group "Tools"; page-gate): save/organize your own recipes, optionally share read-only. */
+  recipesUse: 'recipes.use',
   // ---- Beta (group "Beta"; page-gate for the experimental Beta section) ----
   betaAccess: 'beta.access',
   // ---- AI (group "AI"; token-spending; never default) ----
@@ -4691,6 +4778,8 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   // ---- Tools ----
   [PERM.billsUse]: 'Tools',
   [PERM.automationsUse]: 'Tools',
+  [PERM.groceryUse]: 'Tools',
+  [PERM.recipesUse]: 'Tools',
   // ---- Beta ----
   [PERM.trackerBeta]: 'Beta',
   [PERM.betaAccess]: 'Beta',

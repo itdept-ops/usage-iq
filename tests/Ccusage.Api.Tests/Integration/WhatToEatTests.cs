@@ -116,9 +116,34 @@ public class WhatToEatTests(WebAppFactory factory)
         macros.TryGetProperty("proteinG", out _).Should().BeTrue();
         macros.TryGetProperty("carbsG", out _).Should().BeTrue();
         macros.TryGetProperty("fatG", out _).Should().BeTrue();
-        first.GetProperty("have").ValueKind.Should().Be(JsonValueKind.Array);
-        first.GetProperty("missing").ValueKind.Should().Be(JsonValueKind.Array);
+        first.GetProperty("ingredients").ValueKind.Should().Be(JsonValueKind.Array);
         first.GetProperty("steps").ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
+    public async Task Fallback_use_what_you_have_labels_grocery_items_onList()
+    {
+        // No planned meals / recent foods: the deterministic floor seeds a "use what you have" idea from the
+        // household grocery list, and every seeded ingredient is labelled onList (it IS a grocery item).
+        var (_, user) = await ProvisionUser("tracker.ai", "tracker.self", "family.use", "grocery.use");
+        await EnsureHousehold(user);
+        (await user.PostAsJsonAsync("/api/grocery/items/quantity", new { text = "Eggs", quantity = 6 }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await user.PostAsJsonAsync("/api/grocery/items", new { text = "Spinach" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await Json(await user.PostAsJsonAsync("/api/ai/what-to-eat", new { }));
+        var options = body.GetProperty("options").EnumerateArray().ToList();
+        options.Should().NotBeEmpty();
+        var ings = options[0].GetProperty("ingredients").EnumerateArray().ToList();
+        ings.Should().NotBeEmpty();
+        ings.Should().OnlyContain(i => i.GetProperty("onList").GetBoolean());
+        ings.Select(i => i.GetProperty("name").GetString()).Should().Contain(new[] { "Eggs x6", "Spinach" });
+        // listedQty reflects the grocery "xN" quantity (Eggs x6 -> 6; plain Spinach -> 1).
+        ings.Single(i => i.GetProperty("name").GetString() == "Eggs x6")
+            .GetProperty("listedQty").GetInt32().Should().Be(6);
+        ings.Single(i => i.GetProperty("name").GetString() == "Spinach")
+            .GetProperty("listedQty").GetInt32().Should().Be(1);
     }
 
     [Fact]

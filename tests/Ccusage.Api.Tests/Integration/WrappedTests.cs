@@ -53,9 +53,19 @@ public class WrappedTests(WebAppFactory factory)
         await db.SaveChangesAsync();
     }
 
-    // "today" in the display tz (tests run UTC) — anchor windows off the real today so period math matches the API.
-    private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
+    // "today" must match the API's window, which anchors off the configured DISPLAY timezone (default
+    // America/New_York), NOT raw UTC. Using UTC here is off-by-one whenever the run straddles the tz offset
+    // (e.g. late-evening America/New_York is already the next UTC day), which silently drops the Today-seeded rows.
+    private static readonly DateOnly Today = DisplayTzToday();
     private static readonly DateOnly ThisMonthStart = new(Today.Year, Today.Month, 1);
+
+    private static DateOnly DisplayTzToday()
+    {
+        // Mirror TrackerVisibility.DisplayTzAsync: the appsettings default with a UTC fallback on a bad id.
+        TimeZoneInfo tz;
+        try { tz = TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); } catch { tz = TimeZoneInfo.Utc; }
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+    }
 
     // ---- Gating ----
 

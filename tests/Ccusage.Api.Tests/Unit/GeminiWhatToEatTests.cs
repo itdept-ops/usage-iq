@@ -14,7 +14,7 @@ namespace Ccusage.Api.Tests.Unit;
 /// against a stubbed Gemini HTTP response so the SERVER-SIDE parse/clamp logic is covered without a live key:
 ///
 /// <list type="bullet">
-///   <item>a well-formed reply maps option-for-option (title/why/macros/have/missing/steps);</item>
+///   <item>a well-formed reply maps option-for-option (title/why/macros/ingredients/steps);</item>
 ///   <item>the option COUNT is capped (at most 5) and absurd/negative macros are CLAMPED (cal 0..5000,
 ///   macros 0..500 g) — a hostile reply can never inject out-of-range values or unbounded options;</item>
 ///   <item>the snapshot is treated strictly as DATA: an "ignore your instructions" line inside the caller
@@ -100,8 +100,12 @@ public class GeminiWhatToEatTests
             title = "Greek yogurt bowl",
             why = "High protein, fits your remaining budget.",
             calories = 220, protein_g = 20.0, carbs_g = 18.0, fat_g = 6.0,
-            have = new[] { "greek yogurt", "berries" },
-            missing = new[] { "honey" },
+            ingredients = new object[]
+            {
+                new { name = "greek yogurt", quantity = "1 cup" },
+                new { name = "berries", quantity = "" },
+                new { name = "honey", quantity = "1 tsp" },
+            },
             steps = new[] { "Combine", "Top with berries" },
         });
 
@@ -116,8 +120,8 @@ public class GeminiWhatToEatTests
         o.Macros.ProteinG.Should().Be(20.0);
         o.Macros.CarbsG.Should().Be(18.0);
         o.Macros.FatG.Should().Be(6.0);
-        o.Have.Should().BeEquivalentTo("greek yogurt", "berries");
-        o.Missing.Should().BeEquivalentTo("honey");
+        o.Ingredients.Select(i => i.Name).Should().BeEquivalentTo("greek yogurt", "berries", "honey");
+        o.Ingredients.Single(i => i.Name == "greek yogurt").Quantity.Should().Be("1 cup");
         o.Steps.Should().BeEquivalentTo("Combine", "Top with berries");
     }
 
@@ -195,7 +199,13 @@ public class GeminiWhatToEatTests
         {
             title = "Chicken & rice", why = "Lean protein.",
             calories = 500, protein_g = 45.0, carbs_g = 50.0, fat_g = 10.0,
-            have = new[] { "chicken", "rice" }, missing = new[] { "broccoli" }, steps = new[] { "Cook", "Plate" },
+            ingredients = new object[]
+            {
+                new { name = "chicken", quantity = "8 oz" },
+                new { name = "rice", quantity = "1 cup" },
+                new { name = "broccoli", quantity = "" },
+            },
+            steps = new[] { "Cook", "Plate" },
         });
         var third = full.Length / 3;
         var handler = new MultiPartStubHandler(full[..third], full[third..(2 * third)], full[(2 * third)..]);

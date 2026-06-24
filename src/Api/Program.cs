@@ -504,6 +504,8 @@ app.MapPeopleEndpoints();
 app.MapNudgeEndpoints();
 app.MapInboxEndpoints();
 app.MapTrackerEndpoints();
+app.MapRecipeEndpoints();
+app.MapGroceryEndpoints();
 app.MapHardChallengeEndpoints();
 app.MapTrophyEndpoints();
 app.MapWrappedEndpoints();

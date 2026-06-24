@@ -1,0 +1,119 @@
+<div class="re-head">
+  <h2 mat-dialog-title class="re-title">{{ isEdit ? 'Edit recipe' : 'New recipe' }}</h2>
+  <button mat-icon-button type="button" class="re-close" (click)="cancel()" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<mat-dialog-content class="re-body">
+
+  <!-- Title -->
+  <mat-form-field appearance="outline" class="re-field re-field--full" subscriptSizing="dynamic">
+    <mat-label>Title</mat-label>
+    <input matInput maxlength="200" placeholder="e.g. Chicken & rice bowl"
+           [ngModel]="title()" (ngModelChange)="title.set($event)" name="title" />
+  </mat-form-field>
+
+  <!-- Servings + macros (per serving) -->
+  <div class="re-grid">
+    <mat-form-field appearance="outline" class="re-field" subscriptSizing="dynamic">
+      <mat-label>Servings</mat-label>
+      <input matInput type="number" min="1" inputmode="numeric"
+             [ngModel]="servings()" (ngModelChange)="servings.set(+$event)" name="servings" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="re-field" subscriptSizing="dynamic">
+      <mat-label>Calories / serving</mat-label>
+      <input matInput type="number" min="0" inputmode="numeric"
+             [ngModel]="calories()" (ngModelChange)="calories.set(+$event)" name="calories" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="re-field" subscriptSizing="dynamic">
+      <mat-label>Protein (g)</mat-label>
+      <input matInput type="number" min="0" inputmode="decimal"
+             [ngModel]="proteinG()" (ngModelChange)="proteinG.set(+$event)" name="protein" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="re-field" subscriptSizing="dynamic">
+      <mat-label>Carbs (g)</mat-label>
+      <input matInput type="number" min="0" inputmode="decimal"
+             [ngModel]="carbG()" (ngModelChange)="carbG.set(+$event)" name="carb" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="re-field" subscriptSizing="dynamic">
+      <mat-label>Fat (g)</mat-label>
+      <input matInput type="number" min="0" inputmode="decimal"
+             [ngModel]="fatG()" (ngModelChange)="fatG.set(+$event)" name="fat" />
+    </mat-form-field>
+  </div>
+  <p class="re-hint">Macros are per serving.</p>
+
+  <!-- Ingredients -->
+  <div class="re-section">
+    <div class="re-section-head">
+      <span class="re-section-title"><mat-icon aria-hidden="true">list_alt</mat-icon> Ingredients</span>
+      <button mat-button type="button" class="re-add" (click)="addRow()">
+        <mat-icon aria-hidden="true">add</mat-icon> Add ingredient
+      </button>
+    </div>
+    @if (rows().length) {
+      <div class="re-rows">
+        @for (r of rows(); track r.key) {
+          <div class="re-row">
+            <mat-form-field appearance="outline" class="re-field re-field--name" subscriptSizing="dynamic">
+              <mat-label>Ingredient</mat-label>
+              <input matInput maxlength="200" [ngModel]="r.name"
+                     (ngModelChange)="setRowName(r.key, $event)" [name]="'ing-name-' + r.key" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="re-field re-field--qty" subscriptSizing="dynamic">
+              <mat-label>Qty</mat-label>
+              <input matInput maxlength="100" placeholder="2 cups" [ngModel]="r.quantity"
+                     (ngModelChange)="setRowQty(r.key, $event)" [name]="'ing-qty-' + r.key" />
+            </mat-form-field>
+            <button mat-icon-button type="button" class="re-row-del" (click)="removeRow(r.key)"
+                    matTooltip="Remove" [attr.aria-label]="'Remove ingredient'">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <p class="re-empty">No ingredients yet — add a few above.</p>
+    }
+  </div>
+
+  <!-- Steps -->
+  <mat-form-field appearance="outline" class="re-field re-field--full" subscriptSizing="dynamic">
+    <mat-label>Steps (one per line)</mat-label>
+    <textarea matInput rows="4" placeholder="Cook the rice…&#10;Sear the chicken…"
+              [ngModel]="stepsText()" (ngModelChange)="stepsText.set($event)" name="steps"></textarea>
+  </mat-form-field>
+
+  <!-- Notes -->
+  <mat-form-field appearance="outline" class="re-field re-field--full" subscriptSizing="dynamic">
+    <mat-label>Notes (optional)</mat-label>
+    <textarea matInput rows="2" maxlength="2000" [ngModel]="notes()"
+              (ngModelChange)="notes.set($event)" name="notes"></textarea>
+  </mat-form-field>
+
+  <!-- Share -->
+  <div class="re-share">
+    <mat-slide-toggle [ngModel]="shareWithContacts()" (ngModelChange)="shareWithContacts.set($event)"
+                      name="share">
+      Share read-only with my contacts
+    </mat-slide-toggle>
+    <p class="re-share-hint">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      Only people in your mutual contacts can view it. Your email is never shared.
+    </p>
+  </div>
+
+</mat-dialog-content>
+
+<mat-dialog-actions class="re-actions" align="end">
+  <button mat-stroked-button type="button" (click)="cancel()" [disabled]="saving()">Cancel</button>
+  <button mat-flat-button color="primary" type="button" (click)="save()" [disabled]="!canSave()">
+    @if (saving()) {
+      <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+    } @else {
+      <mat-icon aria-hidden="true">save</mat-icon>
+    }
+    {{ isEdit ? 'Save changes' : 'Create recipe' }}
+  </button>
+</mat-dialog-actions>

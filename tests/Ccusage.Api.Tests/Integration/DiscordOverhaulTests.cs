@@ -292,6 +292,71 @@ public class DiscordOverhaulTests(WebAppFactory factory)
         pref.DiscordCategories.Should().Be(1 | 16);
     }
 
+    // ---- PER-CATEGORY: an explicit all-off mask persists as 0 + reads back all-off (forward nothing) ----
+    [Fact]
+    public async Task Per_category_explicit_all_off_persists_and_forwards_nothing()
+    {
+        var email = await ProvisionUser();
+
+        // Turn EVERY category off (the user's deliberate "stop mirroring everything to Discord, but keep the
+        // webhook + master toggle as-is" choice). This must NOT be treated as a legacy all-on fallback.
+        var categories = new
+        {
+            directMessages = false, mentions = false, channelMessages = false, systemEvents = false,
+            familyAlerts = false, cheers = false, nudges = false,
+        };
+        (await Client(email).PutAsJsonAsync("/api/notifications/me/discord",
+            new { webhookUrl = "https://discord.com/api/webhooks/4040/tok", surfaceDiscord = true, categories }))
+            .EnsureSuccessStatusCode();
+
+        // Reads back ALL OFF (a 0 mask is literal, not a fallback to all-on).
+        var dto = await (await Client(email).GetAsync("/api/notifications/me/discord"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        AssertAllCategories(dto, expected: false);
+
+        // At rest the mask is exactly 0 (DiscordForwardCategory.None) and the gate forwards nothing.
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var pref = await db.NotificationPreferences.AsNoTracking().SingleAsync(p => p.UserEmail == email);
+        pref.DiscordCategories.Should().Be(0);
+        foreach (var type in Enum.GetValues<Ccusage.Api.Data.Entities.NotificationType>())
+            Ccusage.Api.Data.Entities.DiscordCategoryMap.Allows(pref.DiscordCategories, type)
+                .Should().BeFalse($"an explicit all-off mask must forward nothing (type {type})");
+    }
+
+    // ---- PER-CATEGORY: an existing/backfilled all-on row (127) still forwards everything ----
+    [Fact]
+    public async Task Per_category_backfilled_all_on_mask_still_forwards_everything()
+    {
+        var email = await ProvisionUser();
+
+        // Seed a row as the migration backfill would: mask = 127 (DiscordForwardCategory.All).
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+            db.NotificationPreferences.Add(new Ccusage.Api.Data.Entities.NotificationPreference
+            {
+                UserEmail = email,
+                DiscordCategories = (int)Ccusage.Api.Data.Entities.DiscordForwardCategory.All,
+                UpdatedUtc = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // Reads back all-on, and the gate forwards every type.
+        var dto = await (await Client(email).GetAsync("/api/notifications/me/discord"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        AssertAllCategories(dto, expected: true);
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var pref = await verifyDb.NotificationPreferences.AsNoTracking().SingleAsync(p => p.UserEmail == email);
+        pref.DiscordCategories.Should().Be(127);
+        foreach (var type in Enum.GetValues<Ccusage.Api.Data.Entities.NotificationType>())
+            Ccusage.Api.Data.Entities.DiscordCategoryMap.Allows(pref.DiscordCategories, type)
+                .Should().BeTrue($"a backfilled all-on (127) mask must forward everything (type {type})");
+    }
+
     // ---- PER-CATEGORY: omitting categories on a later PUT leaves the stored mask unchanged ----
     [Fact]
     public async Task Omitting_categories_leaves_the_stored_mask_unchanged()

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Ccusage.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Ccusage.Api.Migrations
 {
     [DbContext(typeof(UsageDbContext))]
-    partial class UsageDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260624002701_DiscordCategoriesDropStoreDefault")]
+    partial class DiscordCategoriesDropStoreDefault
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3243,107 +3246,6 @@ namespace Ccusage.Api.Migrations
                     b.ToTable("Projects");
                 });
 
-            modelBuilder.Entity("Ccusage.Api.Data.Entities.Recipe", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("Calories")
-                        .HasColumnType("integer");
-
-                    b.Property<double>("CarbG")
-                        .HasColumnType("double precision");
-
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<double>("FatG")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("Notes")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasDefaultValue("");
-
-                    b.Property<string>("OwnerEmail")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<double>("ProteinG")
-                        .HasColumnType("double precision");
-
-                    b.Property<int>("Servings")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1);
-
-                    b.Property<bool>("ShareWithContacts")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("Steps")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(8000)
-                        .HasColumnType("character varying(8000)")
-                        .HasDefaultValue("");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("UpdatedUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OwnerEmail", "Id")
-                        .IsDescending(false, true);
-
-                    b.ToTable("Recipes");
-                });
-
-            modelBuilder.Entity("Ccusage.Api.Data.Entities.RecipeIngredient", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Quantity")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasDefaultValue("");
-
-                    b.Property<long>("RecipeId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RecipeId");
-
-                    b.ToTable("RecipeIngredients");
-                });
-
             modelBuilder.Entity("Ccusage.Api.Data.Entities.RequestLog", b =>
                 {
                     b.Property<long>("Id")
@@ -4202,17 +4104,6 @@ namespace Ccusage.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Ccusage.Api.Data.Entities.RecipeIngredient", b =>
-                {
-                    b.HasOne("Ccusage.Api.Data.Entities.Recipe", "Recipe")
-                        .WithMany("Ingredients")
-                        .HasForeignKey("RecipeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Recipe");
-                });
-
             modelBuilder.Entity("Ccusage.Api.Data.Entities.SavedView", b =>
                 {
                     b.HasOne("Ccusage.Api.Data.Entities.AppUser", "User")
@@ -4310,11 +4201,6 @@ namespace Ccusage.Api.Migrations
             modelBuilder.Entity("Ccusage.Api.Data.Entities.Project", b =>
                 {
                     b.Navigation("Records");
-                });
-
-            modelBuilder.Entity("Ccusage.Api.Data.Entities.Recipe", b =>
-                {
-                    b.Navigation("Ingredients");
                 });
 #pragma warning restore 612, 618
         }

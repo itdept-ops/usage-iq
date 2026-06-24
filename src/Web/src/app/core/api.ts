@@ -4,7 +4,7 @@ import { Observable, throwError } from 'rxjs';
 import {
   AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, UpdateFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatLocationShareDto, ChatMessageDto, ChatRepliesResult, StartLocationShareRequest, UpdateLocationShareRequest, ExtendLocationShareRequest, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
-  FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChoreSource, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, Allowance, AllowanceMe, AllowanceMoveRequest, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, RecipeBreakdownResult, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation,
+  FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChoreSource, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, Allowance, AllowanceMe, AllowanceMoveRequest, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, RecipeBreakdownResult, Recipe, RecipeUpsertRequest, RecipeFromBreakdownRequest, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation,
   AddSupplementRequest, SupplementEntryDto, SupplementMacrosRequest, SupplementMacrosResponse,
   AddSleepRequest, SleepEntryDto,
   CoffeeEntryDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
@@ -1654,6 +1654,85 @@ export class Api {
   recipeBreakdownToGrocery(items: string[], listId?: number): Observable<FamilyList> {
     return this.http.post<FamilyList>(`${this.base}/family/meals/recipe-breakdown/to-grocery`,
       { items, listId: listId ?? null });
+  }
+
+  // ---- Grocery Tool: the household's single "Groceries" list (find-or-create), gated grocery.use + family.use ----
+
+  /** The household's Groceries list (find-or-create). Returns the F1 list shape (items + shares). */
+  grocery(): Observable<FamilyList> {
+    return this.http.get<FamilyList>(`${this.base}/grocery`);
+  }
+
+  /** Add one item to the Groceries list (plain de-dupe against open items). Returns the updated list. */
+  groceryAddItem(text: string): Observable<FamilyList> {
+    return this.http.post<FamilyList>(`${this.base}/grocery/items`, { text });
+  }
+
+  /**
+   * Quantity-aware add: append a new item OR increment an existing matching item's trailing "xN" quantity.
+   * `text` is the item NAME (an embedded "xN" is honoured as the amount); `quantity` is how many to add
+   * (default 1). e.g. adding "Milk" when "Milk x2" is on the list bumps it to "Milk x3". Returns the updated list.
+   */
+  groceryAddQuantity(text: string, quantity?: number): Observable<FamilyList> {
+    return this.http.post<FamilyList>(`${this.base}/grocery/items/quantity`, { text, quantity: quantity ?? null });
+  }
+
+  /** Toggle (or set) an item's done flag. Omit `done` to flip it. Returns the updated list. */
+  groceryToggleItem(itemId: number, done?: boolean): Observable<FamilyList> {
+    return this.http.patch<FamilyList>(`${this.base}/grocery/items/${itemId}`, { done: done ?? null });
+  }
+
+  /** Delete an item from the Groceries list. Returns the updated list. */
+  groceryDeleteItem(itemId: number): Observable<FamilyList> {
+    return this.http.delete<FamilyList>(`${this.base}/grocery/items/${itemId}`);
+  }
+
+  /** Reorder the Groceries list: items named in `itemIds` take that order; the rest keep their relative order. */
+  groceryReorder(itemIds: number[]): Observable<FamilyList> {
+    return this.http.put<FamilyList>(`${this.base}/grocery/reorder`, { itemIds });
+  }
+
+  // ---- My Recipes: the caller's own per-user recipe book (find/CRUD/share), gated recipes.use ----
+
+  /** The caller's OWN saved recipes, newest-first (each `owned: true`). */
+  recipes(): Observable<Recipe[]> {
+    return this.http.get<Recipe[]>(`${this.base}/recipes`);
+  }
+
+  /** Recipes shared TO the caller by their mutual contacts (each `owned: false`, id + owner display name only). */
+  recipesSharedWithMe(): Observable<Recipe[]> {
+    return this.http.get<Recipe[]>(`${this.base}/recipes/shared`);
+  }
+
+  /** A single recipe — the caller's own, OR one shared by a mutual contact (else 404 server-side). */
+  recipe(id: number): Observable<Recipe> {
+    return this.http.get<Recipe>(`${this.base}/recipes/${id}`);
+  }
+
+  /** Create a new recipe (owned). Returns the saved row. */
+  createRecipe(req: RecipeUpsertRequest): Observable<Recipe> {
+    return this.http.post<Recipe>(`${this.base}/recipes`, req);
+  }
+
+  /** Save a what-to-eat / recipe-breakdown PROPOSAL as the caller's recipe ("export a recipe"). */
+  saveRecipeFromBreakdown(req: RecipeFromBreakdownRequest): Observable<Recipe> {
+    return this.http.post<Recipe>(`${this.base}/recipes/from-breakdown`, req);
+  }
+
+  /** Update an OWN recipe (foreign/missing → 404). Returns the saved row. */
+  updateRecipe(id: number, req: RecipeUpsertRequest): Observable<Recipe> {
+    return this.http.put<Recipe>(`${this.base}/recipes/${id}`, req);
+  }
+
+  /** Toggle share-with-contacts on an OWN recipe. Returns `{ id, shareWithContacts }`. */
+  setRecipeShare(id: number, shareWithContacts: boolean): Observable<{ id: number; shareWithContacts: boolean }> {
+    return this.http.put<{ id: number; shareWithContacts: boolean }>(
+      `${this.base}/recipes/${id}/share`, { shareWithContacts });
+  }
+
+  /** Delete an OWN recipe (cascade removes its ingredients; foreign/missing → 404). */
+  deleteRecipe(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/recipes/${id}`);
   }
 
   // ---- Family Hub F4: chore board (assignee; stars/points; recurrence; the stars tally) ----

@@ -252,12 +252,13 @@ public static class NotificationsEndpoints
         return m;
     }
 
-    /// <summary>Expand a stored bitmask to the seven boolean toggles. A legacy 0 mask reads as all-on so an
-    /// unmigrated/blank row never appears "all off" in the UI (matching the gate's default).</summary>
+    /// <summary>Expand a stored bitmask to the seven boolean toggles. A 0 mask is taken LITERALLY (every
+    /// toggle off) — an explicit "forward nothing", NOT a legacy all-on fallback — matching the gate's
+    /// <see cref="DiscordCategoryMap.Allows"/>. The entity CLR-defaults to all-on and the migration backfilled
+    /// existing rows, so 0 only ever appears when the user deliberately disabled every category.</summary>
     private static MyDiscordCategoriesDto FromCategoryMask(int mask)
     {
-        var m = mask == 0 ? (int)DiscordForwardCategory.All : mask;
-        bool On(DiscordForwardCategory c) => (m & (int)c) != 0;
+        bool On(DiscordForwardCategory c) => (mask & (int)c) != 0;
         return new MyDiscordCategoriesDto
         {
             DirectMessages = On(DiscordForwardCategory.DirectMessages),

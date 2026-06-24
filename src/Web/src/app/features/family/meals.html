@@ -319,6 +319,18 @@
               }
               <span>Add to grocery list</span>
             </button>
+            @if (canRecipes()) {
+              <button mat-stroked-button type="button" (click)="saveBreakdownAsRecipe()"
+                      [disabled]="savingBreakdownRecipe() || savedBreakdownRecipe() || addingBreakdownGrocery()
+                                  || savingBreakdown() || !breakdownTitle().trim()">
+                @if (savingBreakdownRecipe()) {
+                  <mat-spinner [diameter]="18" />
+                } @else {
+                  <mat-icon aria-hidden="true">{{ savedBreakdownRecipe() ? 'bookmark_added' : 'bookmark_add' }}</mat-icon>
+                }
+                <span>{{ savedBreakdownRecipe() ? 'Saved to recipes' : 'Save as recipe' }}</span>
+              </button>
+            }
             <button mat-flat-button color="primary" type="button" (click)="saveBreakdownAsMeal()"
                     [disabled]="addingBreakdownGrocery() || savingBreakdown() || !breakdownTitle().trim()">
               @if (savingBreakdown()) {

@@ -1629,13 +1629,13 @@ public static class FamilyMealsChoresEndpoints
     // GROCERY-LIST TIE-IN (find-or-create the household's "Groceries" shopping list)
     // =====================================================================================
 
-    private const string GroceriesName = "Groceries";
+    internal const string GroceriesName = "Groceries";
 
     /// <summary>
     /// Find the household's existing "Groceries" shopping list, or create one. Prefers an existing shopping
     /// list named "Groceries" (case-insensitive), else any shopping list, else creates "Groceries".
     /// </summary>
-    private static async Task<FamilyList> FindOrCreateGroceriesAsync(
+    internal static async Task<FamilyList> FindOrCreateGroceriesAsync(
         UsageDbContext db, int householdId, int callerId, CancellationToken ct)
     {
         // Reuse the household's "Groceries" list if it exists; otherwise make one. Don't dump ingredients
@@ -1668,7 +1668,7 @@ public static class FamilyMealsChoresEndpoints
     /// number of items added. The SHARED grocery-add path reused by /meals/to-grocery and the recipe-breakdown
     /// "add ingredients" action — never invents a new list.
     /// </summary>
-    private static async Task<int> AppendLinesToListAsync(
+    internal static async Task<int> AppendLinesToListAsync(
         UsageDbContext db, long listId, IEnumerable<string> lines, CancellationToken ct)
     {
         var existingOpen = await db.FamilyListItems.AsNoTracking()
@@ -1914,7 +1914,7 @@ public static class FamilyMealsChoresEndpoints
     }
 
     /// <summary>Case/space-insensitive key for de-duping grocery lines.</summary>
-    private static string Normalize(string s) => s.Trim().ToLowerInvariant();
+    internal static string Normalize(string s) => s.Trim().ToLowerInvariant();
 
     private static IResult NotFound() =>
         Results.NotFound(new { message = "That item doesn't exist." });
