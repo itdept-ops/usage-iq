@@ -1,3 +1,4 @@
+using System.IO;
 using Ccusage.Reporter.Core;
 
 namespace UsageIq.Agent.Services;
@@ -62,6 +63,21 @@ public sealed record AgentStatus
 }
 
 /// <summary>
+/// One ingest source's at-a-glance state for the desktop UI: which tool, where it reads from, whether
+/// that path exists on THIS machine, and how many rows it has contributed this session. Surfaced in the
+/// main window's "Data sources" panel so Claude, Codex and Gemini/Antigravity are each visible + auditable.
+/// </summary>
+public sealed record SourceInfo(string Kind, string Display, string Path, bool Present, int RowsThisSession)
+{
+    /// <summary>A short human status: the absent reason, or this source's live row contribution.</summary>
+    public string Status => !Present
+        ? "not found on this machine"
+        : RowsThisSession > 0
+            ? $"{RowsThisSession.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} rows this session"
+            : "ready — watching for new logs";
+}
+
+/// <summary>
 /// Owns the <see cref="ReporterEngine"/> lifecycle for the desktop agent: start/stop the watch loop,
 /// pause/resume, and an on-demand single pass ("Sync now"). It runs the engine on a background task,
 /// subscribes to its <see cref="ReporterEvent"/>s, and re-raises two coarse signals — <see cref="Log"/>
@@ -83,16 +99,54 @@ public sealed class AgentController : IDisposable
 
     private AgentStatus _status = new();
 
+    // Rows each source (claude/codex/gemini) has contributed this session, keyed by kind. Guarded by _gate.
+    private readonly Dictionary<string, int> _sessionRowsBySource = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>One log line per reporter event. Raised on a background thread — marshal before touching UI.</summary>
     public event Action<LogLine>? Log;
 
     /// <summary>A new status snapshot. Raised on a background thread — marshal before touching UI.</summary>
     public event Action<AgentStatus>? StatusChanged;
 
+    /// <summary>The per-source breakdown changed (paths/presence, or a source's session rows). Background thread.</summary>
+    public event Action<IReadOnlyList<SourceInfo>>? SourcesChanged;
+
     /// <summary>The latest status snapshot (thread-safe read).</summary>
     public AgentStatus Status { get { lock (_gate) return _status; } }
 
     public bool IsRunning { get { lock (_gate) return _loopTask is { IsCompleted: false }; } }
+
+    /// <summary>
+    /// Snapshot the three ingest sources (Claude, Codex, Gemini/Antigravity) with their resolved paths,
+    /// whether each exists on THIS machine, and the rows each has contributed this session. Cheap (three
+    /// directory probes); safe to call from the UI on any refresh.
+    /// </summary>
+    public IReadOnlyList<SourceInfo> GetSources()
+    {
+        ReporterOptions opt;
+        Dictionary<string, int> rows;
+        lock (_gate)
+        {
+            opt = _options ?? new ReporterOptions();
+            rows = new Dictionary<string, int>(_sessionRowsBySource, StringComparer.OrdinalIgnoreCase);
+        }
+
+        SourceInfo Make(string kind, string display, string path)
+        {
+            var present = !string.IsNullOrWhiteSpace(path) && Directory.Exists(path);
+            rows.TryGetValue(kind, out var n);
+            return new SourceInfo(kind, display, path, present, n);
+        }
+
+        return new[]
+        {
+            Make("claude", "Claude Code", opt.ResolvedClaudePath),
+            Make("codex", "Codex", opt.ResolvedCodexPath),
+            Make("gemini", "Gemini / Antigravity", opt.ResolvedGeminiPath),
+        };
+    }
+
+    private void EmitSources() => SourcesChanged?.Invoke(GetSources());
 
     /// <summary>
     /// (Re)load configuration from disk and rebuild the engine. Stops any running loop first. Does NOT
@@ -143,6 +197,7 @@ public sealed class AgentController : IDisposable
         Emit(LogLine.Info(_options is { } o && o.Validate() is null
             ? $"configuration loaded — {o.Url} as {o.ResolvedMachine}"
             : "configuration incomplete — open Settings to add the server URL and ingest key"));
+        EmitSources(); // publish the now-resolved source paths + presence to the UI
         return opt;
     }
 
@@ -296,6 +351,19 @@ public sealed class AgentController : IDisposable
 
             case ReporterEventKind.BatchPosted:
                 SetStatus(s => s with { SessionRows = s.SessionRows + e.Inserted });
+                break;
+
+            case ReporterEventKind.RowsFound:
+                // Tally this source's discovered rows so the Data Sources panel shows live per-source pull.
+                if (!string.IsNullOrEmpty(e.Source) && e.RowsFoundCount > 0)
+                {
+                    lock (_gate)
+                    {
+                        _sessionRowsBySource.TryGetValue(e.Source, out var prev);
+                        _sessionRowsBySource[e.Source] = prev + e.RowsFoundCount;
+                    }
+                    EmitSources();
+                }
                 break;
 
             case ReporterEventKind.PassCompleted:

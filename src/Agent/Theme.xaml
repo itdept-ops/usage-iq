@@ -10,6 +10,7 @@
     <!-- Log severity → color converters (live activity view) -->
     <s:SeverityToBrushConverter x:Key="SeverityToBrush"/>
     <s:SeverityToTextConverter  x:Key="SeverityToText"/>
+    <s:PresentToBrushConverter  x:Key="PresentToBrush"/>
 
     <!-- Surfaces -->
     <SolidColorBrush x:Key="Bg"          Color="#0B0F1A"/>

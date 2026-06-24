@@ -31,6 +31,13 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Pin a known-good culture BEFORE any UI is created. On some machines the resolved CurrentCulture
+        // round-trips to a tag (e.g. "en-us") that WPF's text/number subsystem can't map back to a
+        // non-neutral culture, throwing "Cannot find non-neutral culture related to 'en-us'" during the
+        // first layout — leaving the window invisible while the process keeps running. Forcing en-US +
+        // overriding the FrameworkElement.Language default makes every element render against a valid culture.
+        ForceStableCulture();
+
         // Wire crash capture FIRST, before anything can throw.
         AppDomain.CurrentDomain.UnhandledException += (_, ev) =>
             LogCrash("AppDomain", ev.ExceptionObject as Exception, fatal: ev.IsTerminating);
@@ -89,6 +96,28 @@ public partial class App : Application
 
         // Reflect initial state in the tray tooltip/menu.
         _tray.Refresh();
+    }
+
+    /// <summary>
+    /// Force a stable, fully-specified culture so WPF's first render can't trip over a malformed
+    /// CurrentCulture ("Cannot find non-neutral culture related to 'en-us'"). Pins en-US on this + future
+    /// threads and overrides the default FrameworkElement.Language. Never throws.
+    /// </summary>
+    private static void ForceStableCulture()
+    {
+        try
+        {
+            var ci = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            System.Globalization.CultureInfo.DefaultThreadCurrentCulture = ci;
+            System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = ci;
+            Thread.CurrentThread.CurrentCulture = ci;
+            Thread.CurrentThread.CurrentUICulture = ci;
+            FrameworkElement.LanguageProperty.OverrideMetadata(
+                typeof(FrameworkElement),
+                new FrameworkPropertyMetadata(
+                    System.Windows.Markup.XmlLanguage.GetLanguage(ci.IetfLanguageTag)));
+        }
+        catch { /* culture-pinning must never itself break startup */ }
     }
 
     private void OnDispatcherException(object sender, DispatcherUnhandledExceptionEventArgs ev)

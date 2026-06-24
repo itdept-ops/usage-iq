@@ -28,6 +28,23 @@ public sealed class SeverityToBrushConverter : IValueConverter
 }
 
 /// <summary>
+/// Maps a source's "present on this machine" flag to its status-dot brush: brand green when the source's
+/// path exists here (it can be scanned), muted grey when it doesn't (e.g. Gemini/Antigravity on a box
+/// where ~/.gemini isn't present). Used by the main window's Data Sources panel.
+/// </summary>
+public sealed class PresentToBrushConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var key = value is true ? "SevSuccess" : "TextMuted";
+        return Application.Current?.TryFindResource(key) as Brush ?? Brushes.Gray;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>
 /// Maps a <see cref="LogSeverity"/> to the message text brush. Warnings/errors keep their accent color;
 /// everything else uses primary/secondary text so the log stays readable, not a rainbow.
 /// </summary>

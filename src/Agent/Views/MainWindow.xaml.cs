@@ -18,6 +18,7 @@ public partial class MainWindow : Window
 
     private readonly AgentController _controller;
     private readonly ObservableCollection<LogLine> _log = new();
+    private readonly ObservableCollection<SourceInfo> _sources = new();
     private readonly DispatcherTimer _countdown;
 
     private DateTime? _nextRunAt;
@@ -32,17 +33,20 @@ public partial class MainWindow : Window
 
         Icon = BrandIcon.LoadImage();
         LogList.ItemsSource = _log;
+        SourcesList.ItemsSource = _sources;
 
         // Subscribe; events fire on a background thread, so each handler marshals to the Dispatcher.
         _controller.Log += OnLog;
         _controller.StatusChanged += OnStatus;
+        _controller.SourcesChanged += OnSources;
 
         // 1s countdown ticker for the "next scan in …" header (purely cosmetic; engine drives the rest).
         _countdown = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _countdown.Tick += (_, _) => UpdateCountdown();
         _countdown.Start();
 
-        OnStatus(_controller.Status); // paint initial state
+        OnStatus(_controller.Status);            // paint initial state
+        OnSources(_controller.GetSources());     // paint initial source list
     }
 
     // ---- controller events (background thread → Dispatcher) ----
@@ -60,6 +64,12 @@ public partial class MainWindow : Window
     }
 
     private void OnStatus(AgentStatus status) => Dispatcher.BeginInvoke(() => ApplyStatus(status));
+
+    private void OnSources(IReadOnlyList<SourceInfo> sources) => Dispatcher.BeginInvoke(() =>
+    {
+        _sources.Clear();
+        foreach (var s in sources) _sources.Add(s);
+    });
 
     private void ApplyStatus(AgentStatus status)
     {
@@ -196,6 +206,7 @@ public partial class MainWindow : Window
         }
         _controller.Log -= OnLog;
         _controller.StatusChanged -= OnStatus;
+        _controller.SourcesChanged -= OnSources;
         _countdown.Stop();
         base.OnClosing(e);
     }
