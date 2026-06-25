@@ -1522,6 +1522,16 @@ public sealed class AddFoodFromMealRequest
 
     /// <summary>The day (yyyy-MM-dd) to log onto; null/blank/invalid ⇒ the meal's own planned date.</summary>
     public string? LocalDate { get; set; }
+
+    /// <summary>How many servings to log; null ⇒ 1 (the historical "log ONE serving" behavior). Clamped 0.1..99
+    /// (non-finite ⇒ 1). The logged macros are the per-serving values × this, and the row's quantity/serving
+    /// description reflect it.</summary>
+    public double? Servings { get; set; }
+
+    /// <summary>Whose tracker to log onto — a household co-member's AppUser id; null/absent (or == caller) ⇒ the
+    /// caller's own day. When set to another user, that user MUST be a member of the meal's household (else 404 —
+    /// never leaked); the created FoodEntry is owned by that target.</summary>
+    public int? TargetUserId { get; set; }
 }
 
 /// <summary>One of the caller's saved "My foods" — a per-user library auto-built from manual food logs.

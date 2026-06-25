@@ -24,10 +24,16 @@ import {
   FamilyMeal,
   FamilyMealDay,
   FamilyMealSlot,
+  HouseholdMember,
   PERM,
   TrackerProfileDto,
 } from '../../core/models';
 import { FamilyConfirmDialog, ConfirmData } from '../family/confirm-dialog';
+import {
+  AddMealToTrackerDialog,
+  AddMealToTrackerData,
+  AddMealToTrackerResult,
+} from './add-meal-to-tracker-dialog';
 import { MealEditorDialog, MealEditorData, MealEditorResult } from '../family/meal-editor-dialog';
 import { WhatToEatDialog, WhatToEatData } from '../tracker/what-to-eat-dialog';
 import {
@@ -128,6 +134,11 @@ export class MealPlanner {
   readonly trackerProfile = signal<TrackerProfileDto | null>(null);
   /** The meal id currently being logged to the tracker (locks just that card's button), or null. */
   readonly loggingMealId = signal<number | null>(null);
+  /**
+   * The household members for the "whose tracker?" picker, loaded once on first use (cached). Null until the
+   * first load; on failure or without family.use we fall back to a Me-only list inside the dialog.
+   */
+  private householdMembers: HouseholdMember[] | null = null;
 
   /** The Monday (local) of the week being viewed. */
   readonly weekStart = signal<Date>(this.thisMonday());
@@ -296,27 +307,82 @@ export class MealPlanner {
     return this.canTrack() && this.hasMacros(meal);
   }
 
-  /** Log ONE serving of a planned meal's per-serving macros onto the caller's OWN tracker. */
+  /**
+   * Open the small "Add to tracker" dialog for a planned meal: pick how many servings (default 1) and whose
+   * tracker (Me + household co-members), with a live macro preview. On Add, log per-serving × servings onto the
+   * chosen tracker day (dinner, on the meal's planned date). Keeps the per-card busy-lock (`loggingMealId`) +
+   * graceful snackbars. Hidden/disabled under exactly the same conditions as before (`canAddToTracker`).
+   */
   async addToTracker(meal: FamilyMeal): Promise<void> {
     if (this.loggingMealId() !== null || !this.canAddToTracker(meal)) return;
+
+    const members = await this.loadHouseholdMembers();
+    const data: AddMealToTrackerData = { meal, members };
+    const choice = await firstValueFrom(
+      this.dialog
+        .open<AddMealToTrackerDialog, AddMealToTrackerData, AddMealToTrackerResult>(
+          AddMealToTrackerDialog,
+          {
+            data,
+            width: '460px',
+            maxWidth: '94vw',
+            maxHeight: '92dvh',
+            panelClass: 'tracker-dialog',
+            autoFocus: false,
+          },
+        )
+        .afterClosed(),
+    );
+    if (!choice) return;
+
     this.loggingMealId.set(meal.id);
     try {
-      await firstValueFrom(this.api.addMealToTracker(meal.id, this.dateOnly(meal.localDate)));
-      const ref = this.snack.open('Logged 1 serving to your tracker.', 'Open tracker', {
-        duration: 5000,
-      });
+      await firstValueFrom(
+        this.api.addMealToTracker(meal.id, {
+          localDate: this.dateOnly(meal.localDate),
+          servings: choice.servings,
+          targetUserId: choice.targetUserId,
+        }),
+      );
+      const n = choice.servings;
+      const serving = n === 1 ? 'serving' : 'servings';
+      const ref = this.snack.open(
+        `Added ${n} ${serving} of “${meal.title}” to ${choice.targetName} tracker.`,
+        'Open tracker',
+        { duration: 5000 },
+      );
       ref.onAction().subscribe(() => {
         this.router.navigateByUrl('/tracker');
       });
     } catch (e) {
       this.snack.open(
-        this.messageOf(e, "Couldn't add this meal to your tracker. Please try again."),
+        this.messageOf(e, "Couldn't add this meal to the tracker. Please try again."),
         'OK',
         { duration: 4000 },
       );
     } finally {
       this.loggingMealId.set(null);
     }
+  }
+
+  /**
+   * The household members for the "whose tracker?" picker, loaded once and cached. Without family.use (or on
+   * any error) we fall back to an empty list — the dialog then offers a Me-only choice, so self-logging always
+   * works. Identity is display name only (never an email).
+   */
+  private async loadHouseholdMembers(): Promise<HouseholdMember[]> {
+    if (this.householdMembers) return this.householdMembers;
+    if (!this.auth.hasPermission(PERM.familyUse)) {
+      this.householdMembers = [];
+      return this.householdMembers;
+    }
+    try {
+      const household = await firstValueFrom(this.api.getHousehold());
+      this.householdMembers = household.members ?? [];
+    } catch {
+      this.householdMembers = [];
+    }
+    return this.householdMembers;
   }
 
   // ---- Meals (add / edit / delete) ----

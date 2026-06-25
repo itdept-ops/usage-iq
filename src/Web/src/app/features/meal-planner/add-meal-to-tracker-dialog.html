@@ -1,0 +1,81 @@
+<!-- Sticky-feel header (sits outside the single scroll region): title + close. -->
+<div class="wte-head">
+  <div class="wte-head-id">
+    <mat-icon class="wte-spark" aria-hidden="true">restaurant</mat-icon>
+    <div>
+      <h2 mat-dialog-title class="wte-title">Add to tracker</h2>
+      <p class="wte-sub">Log this meal onto a tracker day</p>
+    </div>
+  </div>
+  <button mat-icon-button type="button" class="wte-close" (click)="close()" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<mat-dialog-content class="wte-body">
+
+  <!-- The meal being logged: title + the per-serving macros it's derived from. -->
+  <section class="rm-current" aria-label="Meal">
+    <span class="rm-current__label">Meal</span>
+    <h3 class="rm-current__title">{{ meal.title }}</h3>
+    <div class="wte-macros">
+      <span class="wte-macro wte-macro--cal mono-num">{{ meal.perServing.calories | number }} <small>kcal</small></span>
+      <span class="wte-macro mono-num">{{ meal.perServing.proteinG | number:'1.0-1' }}<small>P</small></span>
+      <span class="wte-macro mono-num">{{ meal.perServing.carbG | number:'1.0-1' }}<small>C</small></span>
+      <span class="wte-macro mono-num">{{ meal.perServing.fatG | number:'1.0-1' }}<small>F</small></span>
+    </div>
+    <p class="rm-current__total">per serving · logs to dinner on the meal's planned date</p>
+  </section>
+
+  <!-- Servings -->
+  <div class="pm-field">
+    <span class="pm-field__label">Servings</span>
+    <mat-form-field appearance="outline" class="amt-servings" subscriptSizing="dynamic">
+      <mat-label>How many servings?</mat-label>
+      <input matInput type="number" [min]="minServings" [max]="maxServings" step="0.5"
+             [ngModel]="servings()" (ngModelChange)="servings.set($event)" cdkFocusInitial />
+    </mat-form-field>
+  </div>
+
+  <!-- Live macro preview (per serving × servings), rounded exactly as the server logs it. -->
+  <section class="amt-preview" aria-label="What will be logged">
+    <span class="rm-proposal__label"><mat-icon aria-hidden="true">analytics</mat-icon> You'll log</span>
+    <div class="wte-macros">
+      <span class="wte-macro wte-macro--cal mono-num">{{ preview().calories | number }} <small>kcal</small></span>
+      <span class="wte-macro mono-num">{{ preview().proteinG | number:'1.0-1' }}<small>P</small></span>
+      <span class="wte-macro mono-num">{{ preview().carbG | number:'1.0-1' }}<small>C</small></span>
+      <span class="wte-macro mono-num">{{ preview().fatG | number:'1.0-1' }}<small>F</small></span>
+    </div>
+  </section>
+
+  <!-- Whose tracker? -->
+  <div class="pm-field">
+    <span class="pm-field__label">Whose tracker?</span>
+    <mat-form-field appearance="outline" class="amt-whose" subscriptSizing="dynamic">
+      <mat-label>Add to</mat-label>
+      <mat-select [ngModel]="targetUserId()" (ngModelChange)="targetUserId.set($event)">
+        @for (m of members; track m.userId) {
+          <mat-option [value]="m.userId">
+            <span class="picker-opt">
+              @if (m.picture) {
+                <img class="picker-opt__avatar" [src]="m.picture" [alt]="m.name" referrerpolicy="no-referrer" />
+              } @else {
+                <span class="picker-opt__avatar picker-opt__avatar--init" aria-hidden="true">{{ initials(m.name) }}</span>
+              }
+              <span class="picker-opt__name">{{ m.isSelf ? 'Me' : m.name }}</span>
+            </span>
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="amt-actions">
+  <button mat-stroked-button type="button" (click)="close()">Cancel</button>
+  <button mat-flat-button color="primary" type="button" [disabled]="!canAdd()" (click)="add()">
+    <mat-icon aria-hidden="true">add</mat-icon>
+    Add
+  </button>
+</mat-dialog-actions>

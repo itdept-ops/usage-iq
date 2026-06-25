@@ -422,7 +422,9 @@ export class FamilyMeals {
     if (this.loggingMealId() !== null || !this.canAddToTracker(meal)) return;
     this.loggingMealId.set(meal.id);
     try {
-      await firstValueFrom(this.api.addMealToTracker(meal.id, this.dateOnly(meal.localDate)));
+      await firstValueFrom(
+        this.api.addMealToTracker(meal.id, { localDate: this.dateOnly(meal.localDate) }),
+      );
       const ref = this.snack.open('Logged 1 serving to your tracker.', 'Open tracker', {
         duration: 5000,
       });

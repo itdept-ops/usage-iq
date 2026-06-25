@@ -1652,14 +1652,22 @@ export class Api {
   }
 
   /**
-   * "✨ Add to my tracker": log ONE serving of a planned meal's per-serving macros onto the caller's OWN
-   * tracker day (gated tracker.self). The meal must already have macros set (else 400) and the caller must be
-   * a member of its household (else 404). `localDate` ("YYYY-MM-DD") defaults to the meal's own planned date.
-   * Returns the created food entry.
+   * "✨ Add to tracker": log a planned meal's per-serving macros (× `servings`, default 1) onto a tracker day
+   * (gated tracker.self). The meal must already have macros set (else 400) and the caller must be a member of
+   * its household (else 404). `opts.localDate` ("YYYY-MM-DD") defaults to the meal's own planned date;
+   * `opts.servings` (0.1..99, default 1) scales the logged portion; `opts.targetUserId` logs onto a household
+   * co-member's tracker (defaults to the caller; a non-member target → 404). Returns the created food entry.
    */
-  addMealToTracker(mealId: number, localDate?: string): Observable<FoodEntryDto> {
-    return this.http.post<FoodEntryDto>(`${this.base}/tracker/food/from-meal`,
-      { mealId, localDate: localDate ?? null });
+  addMealToTracker(
+    mealId: number,
+    opts: { localDate?: string; servings?: number; targetUserId?: number } = {},
+  ): Observable<FoodEntryDto> {
+    return this.http.post<FoodEntryDto>(`${this.base}/tracker/food/from-meal`, {
+      mealId,
+      localDate: opts.localDate ?? null,
+      servings: opts.servings ?? null,
+      targetUserId: opts.targetUserId ?? null,
+    });
   }
 
   /**

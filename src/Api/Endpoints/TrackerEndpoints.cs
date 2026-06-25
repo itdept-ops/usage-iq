@@ -188,13 +188,18 @@ public static class TrackerEndpoints
             return Results.Ok(ToFoodDto(entry));
         }).RequirePermission(Permissions.TrackerSelf);
 
-        // ---- Log a family meal's PER-SERVING macros onto the caller's own day (tracker ⇄ Family Hub) ----
-        // Cross-feature tie-in (Slice 2): take ONE serving of a planned FamilyMeal and log it as a FoodEntry on
-        // the CALLER's own tracker. Strict isolation: the caller must be a MEMBER of the meal's household (else
-        // 404 — a foreign meal's existence is never leaked, no email anywhere). The meal must already have macros
-        // (MacroSource != "none"), else 400 ("estimate macros first"). The logged values are the DERIVED
-        // per-serving macros (dish total / max(Servings, 1), rounded) — one person's portion — vs the CALLER's
-        // own tracker goals. Owner-only write (the caller logs onto their OWN day), like the manual add-food path.
+        // ---- Log a family meal's PER-SERVING macros onto a household member's day (tracker ⇄ Family Hub) ----
+        // Cross-feature tie-in (Slice 2): take N servings of a planned FamilyMeal and log it as a FoodEntry on the
+        // CALLER's — or a household co-member's — tracker. Strict isolation: the caller must be a MEMBER of the
+        // meal's household (else 404 — a foreign meal's existence is never leaked, no email anywhere). The meal must
+        // already have macros (MacroSource != "none"), else 400 ("estimate macros first"). The logged values are the
+        // DERIVED per-serving macros (dish total / max(Servings, 1), rounded) × the requested servings (default 1).
+        //
+        // Cross-user write: when req.TargetUserId names another user, that user MUST be a member of the SAME
+        // household as the meal (the SAME membership predicate the caller is validated by) — else 404 (never 403,
+        // never leak, never write to a stranger). The entry is then OWNED by the target (FoodEntry is keyed by
+        // UserEmail, so we resolve the target's email by AppUser id and lower-case it). The trust boundary is
+        // household co-membership + the tracker.self gate on this endpoint — no extra permission, no migration.
         g.MapPost("/food/from-meal", async (
             AddFoodFromMealRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
         {
@@ -214,12 +219,37 @@ public static class TrackerEndpoints
             if (string.Equals(meal.MacroSource, "none", StringComparison.OrdinalIgnoreCase))
                 return Results.BadRequest(new { message = "Estimate this meal's macros first, then add it to your tracker." });
 
+            // Owner = the caller by default. When TargetUserId names ANOTHER user, that user must be a member of
+            // the meal's household (SAME predicate as the caller's check above) — else 404 (never leak, never write
+            // to a stranger). FoodEntry is keyed by UserEmail, so resolve the target's email by AppUser id.
+            var ownerEmail = caller.Email;
+            if (req.TargetUserId is int targetUserId && targetUserId != caller.Id)
+            {
+                var targetIsMember = await db.HouseholdMembers.AsNoTracking()
+                    .AnyAsync(hm => hm.HouseholdId == meal.HouseholdId && hm.UserId == targetUserId, ct);
+                if (!targetIsMember) return Results.NotFound();
+
+                var targetEmail = await db.Users.AsNoTracking()
+                    .Where(u => u.Id == targetUserId && u.IsEnabled).Select(u => u.Email).FirstOrDefaultAsync(ct);
+                if (string.IsNullOrEmpty(targetEmail)) return Results.NotFound();  // disabled/unknown target ⇒ 404
+                ownerEmail = targetEmail.ToLowerInvariant();
+            }
+
+            // Servings to log: null ⇒ 1 (the historical "log ONE serving"); else clamp 0.1..99 (non-finite ⇒ 1).
+            var s = req.Servings is { } reqS && double.IsFinite(reqS) ? Math.Clamp(reqS, 0.1, 99) : 1.0;
+
             // PER-SERVING = dish total / max(Servings, 1), rounded (calories whole, macros 1 dp). One portion.
             var servings = Math.Max(meal.Servings, 1);
-            var calories = (int)Math.Round((double)meal.Calories / servings, MidpointRounding.AwayFromZero);
-            var proteinG = Math.Round(meal.ProteinG / servings, 1);
-            var carbG = Math.Round(meal.CarbG / servings, 1);
-            var fatG = Math.Round(meal.FatG / servings, 1);
+            var perServingCal = (double)meal.Calories / servings;
+            var perServingProtein = meal.ProteinG / servings;
+            var perServingCarb = meal.CarbG / servings;
+            var perServingFat = meal.FatG / servings;
+
+            // Logged macros = per-serving × s, rounded like the server already rounds per-serving, floored >= 0.
+            var calories = Math.Max(0, (int)Math.Round(perServingCal * s, MidpointRounding.AwayFromZero));
+            var proteinG = Math.Max(0, Math.Round(perServingProtein * s, 1));
+            var carbG = Math.Max(0, Math.Round(perServingCarb * s, 1));
+            var fatG = Math.Max(0, Math.Round(perServingFat * s, 1));
 
             // LocalDate = provided localDate (if valid) else the meal's own planned date.
             var localDate = TryParseDate(req.LocalDate, out var parsed) ? parsed : meal.LocalDate;
@@ -230,15 +260,16 @@ public static class TrackerEndpoints
 
             var entry = new FoodEntry
             {
-                UserEmail = caller.Email,
+                UserEmail = ownerEmail,
                 LocalDate = localDate,
                 Meal = MealType.Dinner, // a planned dish defaults onto dinner; the user can recategorise later
                 Description = description,
-                Quantity = 1,
-                Calories = Math.Max(0, calories),
-                ProteinG = Math.Max(0, proteinG),
-                CarbG = Math.Max(0, carbG),
-                FatG = Math.Max(0, fatG),
+                Quantity = s,
+                ServingDesc = Trunc($"{s:0.##} serving(s)", 128),
+                Calories = calories,
+                ProteinG = proteinG,
+                CarbG = carbG,
+                FatG = fatG,
                 CreatedUtc = DateTime.UtcNow,
             };
             db.FoodEntries.Add(entry);
