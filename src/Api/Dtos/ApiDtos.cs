@@ -1237,6 +1237,53 @@ public sealed class TrackerProfileDto
 
     /// <summary>Daily step goal, or null (the UI then shows a ~10000 default). Not required.</summary>
     public int? StepGoal { get; set; }
+
+    // ---- optional goal-builder refinements (all nullable / neutral-default; never required) ----
+
+    /// <summary>Signed desired pace in kg/week (− = lose, + = gain), clamped to ±2; null ⇒ a goal-based default.</summary>
+    public double? WeeklyRateKg { get; set; }
+
+    /// <summary>Body-fat % (0..75); enables Katch-McArdle BMR + lean-mass protein.</summary>
+    public double? BodyFatPct { get; set; }
+
+    /// <summary>Neck circumference (cm) — a U.S. Navy tape input.</summary>
+    public double? NeckCm { get; set; }
+
+    /// <summary>Waist circumference (cm) — a U.S. Navy tape input.</summary>
+    public double? WaistCm { get; set; }
+
+    /// <summary>Hip circumference (cm) — the U.S. Navy tape input used for females only.</summary>
+    public double? HipCm { get; set; }
+
+    /// <summary>One of the <c>DietPattern</c> names: "Balanced" | "HighProtein" | "LowCarb" | "Keto" | "Vegetarian" | "Vegan" | "Mediterranean" | "Paleo".</summary>
+    public string DietPattern { get; set; } = "Balanced";
+
+    /// <summary>Free-text / CSV dietary restrictions (allergies, dislikes), or null. An AI constraint only.</summary>
+    public string? Restrictions { get; set; }
+
+    /// <summary>One of the <c>TrainingType</c> names: "None" | "Strength" | "Endurance" | "Hybrid".</summary>
+    public string TrainingType { get; set; } = "None";
+
+    /// <summary>One of the <c>ProteinBasis</c> names: "PerBodyweight" | "PerLeanMass".</summary>
+    public string ProteinBasis { get; set; } = "PerBodyweight";
+
+    /// <summary>One of the <c>LifeStage</c> names: "None" | "Pregnant" | "Breastfeeding".</summary>
+    public string LifeStage { get; set; } = "None";
+
+    /// <summary>Pregnancy trimester (1..3); only meaningful when <see cref="LifeStage"/> is "Pregnant".</summary>
+    public int? Trimester { get; set; }
+
+    /// <summary>Preferred meals per day (1..12); an AI cadence hint only.</summary>
+    public int? MealsPerDay { get; set; }
+
+    /// <summary>One of the <c>EatingWindow</c> names: "None" | "W16x8" | "W18x6" | "OMAD".</summary>
+    public string EatingWindow { get; set; } = "None";
+
+    /// <summary>The bodyweight (kg) the currently-saved goal was computed against — the check-in drift basis, or null.</summary>
+    public double? GoalBasisWeightKg { get; set; }
+
+    /// <summary>ISO-8601 UTC timestamp of the last recompute-and-save (check-in staleness basis), or null.</summary>
+    public string? BaselineReviewedUtc { get; set; }
 }
 
 /// <summary>Computed body-metric estimates from the current profile (all metric inputs). Any field whose

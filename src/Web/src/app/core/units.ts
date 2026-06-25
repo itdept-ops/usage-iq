@@ -71,6 +71,11 @@ export function ftInToCm(ft: number, inches: number): number {
   return (ft * 12 + inches) * CM_PER_IN;
 }
 
+/** Centimetres → inches (for body-circumference fields like neck/waist/hip). */
+export function cmToIn(cm: number): number { return cm / CM_PER_IN; }
+/** Inches → centimetres (for body-circumference fields like neck/waist/hip). */
+export function inToCm(inches: number): number { return inches * CM_PER_IN; }
+
 // ── distance: m <-> mi, km <-> mi ──────────────────────────────────────────────
 
 export function kmToMi(km: number): number { return km * MI_PER_KM; }

@@ -1254,6 +1254,29 @@ export type ActivityLevel = 'Sedentary' | 'Light' | 'Moderate' | 'Active' | 'Ver
 /** Display unit preference. Backend always stores/returns metric (kg + cm). Mirrors UnitSystem. */
 export type UnitSystem = 'Metric' | 'Imperial';
 
+/** Optional eating-pattern hint for the goal builder / AI. Mirrors DietPattern (default "Balanced"). */
+export type DietPattern =
+  | 'Balanced'
+  | 'HighProtein'
+  | 'LowCarb'
+  | 'Keto'
+  | 'Vegetarian'
+  | 'Vegan'
+  | 'Mediterranean'
+  | 'Paleo';
+
+/** Optional training style that nudges the protein/macro split. Mirrors TrainingType (default "None"). */
+export type TrainingType = 'None' | 'Strength' | 'Endurance' | 'Hybrid';
+
+/** Whether protein is anchored on bodyweight or lean mass. Mirrors ProteinBasis (default "PerBodyweight"). */
+export type ProteinBasis = 'PerBodyweight' | 'PerLeanMass';
+
+/** Optional life stage that forces a non-deficit goal + maintenance increment. Mirrors LifeStage (default "None"). */
+export type LifeStage = 'None' | 'Pregnant' | 'Breastfeeding';
+
+/** Optional eating-window / fasting cadence hint for the AI. Mirrors EatingWindow (default "None"). */
+export type EatingWindow = 'None' | 'W16x8' | 'W18x6' | 'OMAD';
+
 /** Which meal a food entry belongs to. */
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
@@ -1376,6 +1399,38 @@ export interface TrackerProfileDto {
   coffeeGoalCups?: number;
   /** Daily step goal (UI defaults to ~10000 when unset), or null. */
   stepGoal?: number;
+
+  // ---- optional goal-builder refinements (all nullable; never required) ----
+  /** Signed target pace in kg/week (− lose, + gain); null falls back to the goal default. */
+  weeklyRateKg?: number;
+  /** Body-fat % (3..60); enables Katch-McArdle BMR + lean-mass protein. */
+  bodyFatPct?: number;
+  /** Navy-tape measurement: neck circumference in cm. */
+  neckCm?: number;
+  /** Navy-tape measurement: waist circumference in cm. */
+  waistCm?: number;
+  /** Navy-tape measurement (female): hip circumference in cm. */
+  hipCm?: number;
+  /** Eating-pattern hint; default "Balanced". */
+  dietPattern?: DietPattern;
+  /** Free-text dietary restrictions (AI constraint only, never a calc input), or null. */
+  restrictions?: string | null;
+  /** Training style; default "None". */
+  trainingType?: TrainingType;
+  /** Protein anchoring basis; default "PerBodyweight". */
+  proteinBasis?: ProteinBasis;
+  /** Life stage; default "None". */
+  lifeStage?: LifeStage;
+  /** Pregnancy trimester (1..3), only meaningful when lifeStage = "Pregnant". */
+  trimester?: number;
+  /** Preferred meals per day (1..8); AI cadence hint. */
+  mealsPerDay?: number;
+  /** Eating window / fasting cadence; default "None". */
+  eatingWindow?: EatingWindow;
+  /** The weight the saved goal was computed against (check-in drift basis), or null. */
+  goalBasisWeightKg?: number;
+  /** ISO-8601 UTC timestamp of the last recompute-and-save (check-in staleness basis), or null. */
+  baselineReviewedUtc?: string | null;
 }
 
 /**
@@ -1574,12 +1629,21 @@ export interface EstimateMacrosResponse {
   note?: string | null;
 }
 
-/** A suggested daily target from the caller's own profile (POST /api/ai/suggest-goal). Mirrors SuggestGoalResponse. */
+/**
+ * A suggested daily target from the caller's own profile (POST /api/ai/suggest-goal). Mirrors
+ * SuggestGoalResponse. `source` is "ai" (model, server-validated) or "formula" (deterministic
+ * TrackerStats fallback when Gemini is unconfigured / errors / fails validation — always usable).
+ */
 export interface SuggestGoalResponse {
   calorieTarget: number;
   proteinG: number;
   carbsG: number;
   fatG: number;
+  calorieMin: number;
+  calorieMax: number;
+  confidence?: string | null;
+  safetyNote?: string | null;
+  source: string;
   rationale?: string | null;
 }
 
@@ -1808,6 +1872,11 @@ export interface NaturalGoalResponse {
   fatG: number;
   timeline?: string | null;
   realistic: boolean;
+  calorieMin: number;
+  calorieMax: number;
+  confidence?: string | null;
+  safetyNote?: string | null;
+  source: string;
   rationale?: string | null;
 }
 

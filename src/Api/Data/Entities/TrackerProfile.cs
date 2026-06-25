@@ -32,6 +32,53 @@ public class TrackerProfile
     /// <summary>Target body weight in kilograms, for the weight-trend goal line + progress.</summary>
     public double? GoalWeightKg { get; set; }
 
+    // --- optional goal-builder refinements (all nullable / neutral-default; never required) ---
+
+    /// <summary>Signed desired pace in kg/week (− = lose, + = gain). Null ⇒ a goal-based default pace.</summary>
+    public double? WeeklyRateKg { get; set; }
+
+    /// <summary>Body-fat % (≈3..60). When present, enables Katch-McArdle BMR + lean-mass protein.</summary>
+    public double? BodyFatPct { get; set; }
+
+    /// <summary>Neck circumference (cm) — a U.S. Navy tape input that can derive <see cref="BodyFatPct"/>.</summary>
+    public double? NeckCm { get; set; }
+
+    /// <summary>Waist circumference (cm) — a U.S. Navy tape input.</summary>
+    public double? WaistCm { get; set; }
+
+    /// <summary>Hip circumference (cm) — the U.S. Navy tape input used for females only.</summary>
+    public double? HipCm { get; set; }
+
+    /// <summary>Coarse dietary style; reshapes the suggested macro split + constrains AI. Default Balanced.</summary>
+    public DietPattern DietPattern { get; set; } = DietPattern.Balanced;
+
+    /// <summary>Free-text / CSV dietary restrictions (allergies, dislikes). An AI constraint only — never a calc input.</summary>
+    public string? Restrictions { get; set; }
+
+    /// <summary>Dominant training style; an input to goal-aware protein selection. Default None.</summary>
+    public TrainingType TrainingType { get; set; } = TrainingType.None;
+
+    /// <summary>Whether protein anchors on bodyweight or lean mass. Auto lean-mass when body-fat known. Default PerBodyweight.</summary>
+    public ProteinBasis ProteinBasis { get; set; } = ProteinBasis.PerBodyweight;
+
+    /// <summary>Life stage that disables a deficit + adds a maintenance increment. Default None.</summary>
+    public LifeStage LifeStage { get; set; } = LifeStage.None;
+
+    /// <summary>Pregnancy trimester (1..3); only meaningful when <see cref="LifeStage"/> is Pregnant.</summary>
+    public int? Trimester { get; set; }
+
+    /// <summary>Preferred meals per day (1..8); an AI cadence hint only.</summary>
+    public int? MealsPerDay { get; set; }
+
+    /// <summary>Optional intermittent-fasting eating window; an AI cadence hint only. Default None.</summary>
+    public EatingWindow EatingWindow { get; set; } = EatingWindow.None;
+
+    /// <summary>The bodyweight (kg) the currently-saved goal was computed against — the check-in drift basis.</summary>
+    public double? GoalBasisWeightKg { get; set; }
+
+    /// <summary>When the goal was last recomputed-and-saved — the check-in staleness basis.</summary>
+    public DateTime? BaselineReviewedUtc { get; set; }
+
     /// <summary>Preferred display units (metric vs imperial). Backend always stores/returns metric.</summary>
     public UnitSystem UnitSystem { get; set; } = UnitSystem.Metric;
 

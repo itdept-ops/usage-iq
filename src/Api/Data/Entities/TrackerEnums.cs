@@ -75,3 +75,65 @@ public enum ActivityCalorieMode
     Add = 0,
     Override = 1,
 }
+
+/// <summary>
+/// A coarse dietary style used (a) as an AI constraint and (b) to deterministically RESHAPE the
+/// suggested macro split (e.g. Keto pulls carbs to a hard floor and pushes the remainder to fat).
+/// <see cref="Balanced"/> (0) is the back-compat/neutral default and passes the split through unchanged.
+/// </summary>
+public enum DietPattern
+{
+    Balanced = 0,
+    HighProtein = 1,
+    LowCarb = 2,
+    Keto = 3,
+    Vegetarian = 4,
+    Vegan = 5,
+    Mediterranean = 6,
+    Paleo = 7,
+}
+
+/// <summary>
+/// The dominant style of training, an input to goal-aware protein selection (Endurance leans lower
+/// per-bodyweight). <see cref="None"/> (0) is the neutral default.
+/// </summary>
+public enum TrainingType
+{
+    None = 0,
+    Strength = 1,
+    Endurance = 2,
+    Hybrid = 3,
+}
+
+/// <summary>
+/// Whether protein is anchored to total bodyweight or to lean body mass. Auto-selected to
+/// <see cref="PerLeanMass"/> when body-fat % is known. <see cref="PerBodyweight"/> (0) is the default.
+/// </summary>
+public enum ProteinBasis
+{
+    PerBodyweight = 0,
+    PerLeanMass = 1,
+}
+
+/// <summary>
+/// A life stage that DISABLES any calorie deficit and adds a standard maintenance increment
+/// (pregnancy by trimester, lactation). <see cref="None"/> (0) is the default.
+/// </summary>
+public enum LifeStage
+{
+    None = 0,
+    Pregnant = 1,
+    Breastfeeding = 2,
+}
+
+/// <summary>
+/// An optional intermittent-fasting eating window — purely an AI cadence hint, never a calc input.
+/// <see cref="None"/> (0) is the default. "W16x8" = 16:8, "W18x6" = 18:6, OMAD = one meal a day.
+/// </summary>
+public enum EatingWindow
+{
+    None = 0,
+    W16x8 = 1,
+    W18x6 = 2,
+    OMAD = 3,
+}

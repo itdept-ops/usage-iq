@@ -95,34 +95,31 @@
       </mat-form-field>
     </div>
 
-    <!-- ── Live stats preview ── -->
+    <!-- ── Live reward meter: Estimated TDEE + confidence (updates as you type) ── -->
     @if (preview(); as s) {
-      @if (s.bmi != null || s.bmr != null || s.tdee != null || s.suggestedCalorieGoal != null) {
-        <div class="ob__preview" role="group" aria-label="Estimated stats">
-          <div class="ob__preview-grid">
-            @if (s.bmi != null) {
-              <div class="ob__stat"><span class="ob__stat-l">BMI</span>
-                <span class="ob__stat-v mono-num">{{ s.bmi }}</span>
-                <span class="ob__stat-x">{{ s.bmiCategory }}</span></div>
-            }
-            @if (s.bmr != null) {
-              <div class="ob__stat"><span class="ob__stat-l">BMR</span>
-                <span class="ob__stat-v mono-num">{{ s.bmr }}</span><span class="ob__stat-x">kcal/day</span></div>
-            }
-            @if (s.tdee != null) {
-              <div class="ob__stat"><span class="ob__stat-l">TDEE</span>
-                <span class="ob__stat-v mono-num">{{ s.tdee }}</span><span class="ob__stat-x">kcal/day</span></div>
-            }
-            @if (s.suggestedCalorieGoal != null) {
-              <div class="ob__stat"><span class="ob__stat-l">Suggested</span>
-                <span class="ob__stat-v mono-num">{{ s.suggestedCalorieGoal }}</span><span class="ob__stat-x">kcal/day</span></div>
-            }
+      @if (s.tdee != null) {
+        <div class="ob__meter" role="group" aria-label="Estimated daily energy">
+          <div class="ob__meter-head">
+            <span class="ob__meter-label">Estimated TDEE</span>
+            <span class="ob__meter-conf" [class.is-high]="confidence() === 'high'"
+                  [class.is-med]="confidence() === 'med'">
+              <mat-icon aria-hidden="true">{{ confidence() === 'high' ? 'verified' : 'insights' }}</mat-icon>
+              {{ confidenceLabel() }}
+            </span>
           </div>
-          @if (hasSuggestion()) {
-            <button mat-stroked-button type="button" class="ob__usesuggested" (click)="useSuggested()">
-              <mat-icon>auto_fix_high</mat-icon> Use suggested targets
-            </button>
+          <div class="ob__meter-value">
+            ~<span class="mono-num">{{ s.tdee }}</span> kcal<span class="ob__meter-unit">/day</span>
+          </div>
+          @if (s.suggestedCalorieGoal != null) {
+            <p class="ob__meter-sub">
+              Target for your goal: <strong class="mono-num">{{ s.suggestedCalorieGoal }}</strong> kcal/day
+              @if (caloriesAutoTagged()) { <span class="ob__autotag">Auto-tagged</span> }
+            </p>
           }
+        </div>
+      } @else if (s.bmi != null) {
+        <div class="ob__meter ob__meter--light" role="group" aria-label="Estimated stats">
+          <p class="ob__meter-sub">BMI <strong class="mono-num">{{ s.bmi }}</strong> · {{ s.bmiCategory }} — add the rest to estimate your daily calories.</p>
         </div>
       }
     }
@@ -130,28 +127,193 @@
     <mat-form-field appearance="outline" class="ob__field">
       <mat-label>Daily calorie goal (optional)</mat-label>
       <input matInput type="number" min="0" inputmode="numeric"
-             [ngModel]="dailyCalorieGoal()" (ngModelChange)="dailyCalorieGoal.set($event)" />
+             [ngModel]="dailyCalorieGoal()" (ngModelChange)="onCaloriesEdited($event)" />
       <span matTextSuffix>kcal</span>
+      @if (caloriesAutoTagged()) { <mat-hint>Auto-tagged from your estimate — edit to override.</mat-hint> }
     </mat-form-field>
 
-    <span class="micro-label ob__section">Macro targets (optional)</span>
+    <span class="micro-label ob__section">
+      Macro targets (optional)
+      @if (macrosAutoTagged()) { <span class="ob__autotag">Auto-tagged</span> }
+    </span>
     <div class="ob__macgrid">
       <mat-form-field appearance="outline">
         <mat-label>Protein</mat-label>
-        <input matInput type="number" min="0" [ngModel]="proteinGoalG()" (ngModelChange)="proteinGoalG.set($event)" />
+        <input matInput type="number" min="0" [ngModel]="proteinGoalG()" (ngModelChange)="onMacroEdited('protein', $event)" />
         <span matTextSuffix>g</span>
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Carbs</mat-label>
-        <input matInput type="number" min="0" [ngModel]="carbGoalG()" (ngModelChange)="carbGoalG.set($event)" />
+        <input matInput type="number" min="0" [ngModel]="carbGoalG()" (ngModelChange)="onMacroEdited('carb', $event)" />
         <span matTextSuffix>g</span>
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Fat</mat-label>
-        <input matInput type="number" min="0" [ngModel]="fatGoalG()" (ngModelChange)="fatGoalG.set($event)" />
+        <input matInput type="number" min="0" [ngModel]="fatGoalG()" (ngModelChange)="onMacroEdited('fat', $event)" />
         <span matTextSuffix>g</span>
       </mat-form-field>
     </div>
+
+    <!-- ══ Dial it in (fully optional; everything below is skippable) ══ -->
+    <section class="ob__dial">
+      <button type="button" class="ob__dial-toggle" (click)="dialOpen.set(!dialOpen())"
+              [attr.aria-expanded]="dialOpen()">
+        <mat-icon aria-hidden="true">tune</mat-icon>
+        <span class="ob__dial-toggle-copy">
+          <span class="ob__dial-toggle-title">Dial it in</span>
+          <span class="ob__dial-toggle-sub">Optional — refine your target. You can skip all of this.</span>
+        </span>
+        <mat-icon class="ob__dial-chev" aria-hidden="true">{{ dialOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </button>
+
+      @if (dialOpen()) {
+        <div class="ob__dial-body">
+          <!-- Goal-pace slider (Lose/Gain only). -->
+          @if (showRateSlider()) {
+            <div class="ob__dial-block">
+              <div class="ob__dial-block-head">
+                <span class="micro-label">How fast?</span>
+                <span class="ob__rate-val">{{ rateLabel() }}</span>
+              </div>
+              <mat-slider class="ob__rate-slider" [min]="rateMin()" [max]="rateMax()" step="0.05" discrete>
+                <input matSliderThumb [ngModel]="effectiveWeeklyRateKg()"
+                       (ngModelChange)="weeklyRateKg.set($event)" />
+              </mat-slider>
+              <p class="ob__note">Faster isn’t always better — a steady pace is easier to hold.</p>
+            </div>
+          }
+
+          <!-- Friendlier activity input. -->
+          <div class="ob__dial-block">
+            <span class="micro-label">How active are you?</span>
+            <div class="ob__chips" role="group" aria-label="Activity level">
+              @for (a of activityChips; track a.value) {
+                <button type="button" class="ob__chip" [class.is-on]="activityLevel() === a.value"
+                        (click)="activityLevel.set(a.value)">
+                  <span class="ob__chip-t">{{ a.label }}</span>
+                  <span class="ob__chip-h">{{ a.hint }}</span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- Advanced: body fat (silhouette / exact % / Navy tape). -->
+          <div class="ob__dial-block">
+            <button type="button" class="ob__adv-toggle" (click)="advancedOpen.set(!advancedOpen())"
+                    [attr.aria-expanded]="advancedOpen()">
+              <mat-icon aria-hidden="true">science</mat-icon>
+              Advanced: body composition
+              <mat-icon class="ob__dial-chev" aria-hidden="true">{{ advancedOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </button>
+            @if (advancedOpen()) {
+              <p class="ob__note">Optional — a body-fat % unlocks a more precise estimate. Pick any one method.</p>
+              <mat-button-toggle-group class="ob__bf-mode" [value]="bodyFatMode()"
+                                       (change)="bodyFatMode.set($event.value)" aria-label="Body-fat method">
+                <mat-button-toggle value="silhouette">Pick a look</mat-button-toggle>
+                <mat-button-toggle value="percent">Exact %</mat-button-toggle>
+                <mat-button-toggle value="navy">Tape</mat-button-toggle>
+              </mat-button-toggle-group>
+
+              @switch (bodyFatMode()) {
+                @case ('silhouette') {
+                  <div class="ob__chips" role="group" aria-label="Body-fat silhouette">
+                    @for (sil of silhouettes(); track sil.pct) {
+                      <button type="button" class="ob__chip" [class.is-on]="bodyFatPct() === sil.pct"
+                              (click)="pickSilhouette(sil.pct)">
+                        <span class="ob__chip-t">{{ sil.label }}</span>
+                        <span class="ob__chip-h">~{{ sil.pct }}%</span>
+                      </button>
+                    }
+                  </div>
+                }
+                @case ('percent') {
+                  <mat-form-field appearance="outline" class="ob__field">
+                    <mat-label>Body fat</mat-label>
+                    <input matInput type="number" min="3" max="60" step="0.5" inputmode="decimal"
+                           [ngModel]="bodyFatPct()" (ngModelChange)="bodyFatPct.set($event)" />
+                    <span matTextSuffix>%</span>
+                  </mat-form-field>
+                }
+                @case ('navy') {
+                  <div class="ob__navy">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Neck</mat-label>
+                      <input matInput type="number" min="0" step="0.1" inputmode="decimal"
+                             [ngModel]="neckDisp()" (ngModelChange)="neckDisp.set($event)" />
+                      <span matTextSuffix>{{ lengthUnit() }}</span>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Waist</mat-label>
+                      <input matInput type="number" min="0" step="0.1" inputmode="decimal"
+                             [ngModel]="waistDisp()" (ngModelChange)="waistDisp.set($event)" />
+                      <span matTextSuffix>{{ lengthUnit() }}</span>
+                    </mat-form-field>
+                    @if (sex() === 'Female') {
+                      <mat-form-field appearance="outline">
+                        <mat-label>Hip</mat-label>
+                        <input matInput type="number" min="0" step="0.1" inputmode="decimal"
+                               [ngModel]="hipDisp()" (ngModelChange)="hipDisp.set($event)" />
+                        <span matTextSuffix>{{ lengthUnit() }}</span>
+                      </mat-form-field>
+                    }
+                  </div>
+                  @if (effectiveBodyFatPct(); as bf) {
+                    <p class="ob__note">Estimated body fat: <strong class="mono-num">{{ bf }}%</strong></p>
+                  }
+                }
+              }
+            }
+          </div>
+
+          <!-- Diet pattern chips. -->
+          <div class="ob__dial-block">
+            <span class="micro-label">Eating style</span>
+            <div class="ob__chips" role="group" aria-label="Diet pattern">
+              @for (d of dietPatterns; track d.value) {
+                <button type="button" class="ob__chip ob__chip--pill" [class.is-on]="dietPattern() === d.value"
+                        (click)="dietPattern.set(d.value)">{{ d.label }}</button>
+              }
+            </div>
+          </div>
+
+          <!-- Restriction chips. -->
+          <div class="ob__dial-block">
+            <span class="micro-label">Restrictions (optional)</span>
+            <div class="ob__chips" role="group" aria-label="Dietary restrictions">
+              @for (r of restrictionTags; track r) {
+                <button type="button" class="ob__chip ob__chip--pill" [class.is-on]="hasRestriction(r)"
+                        (click)="toggleRestriction(r)">{{ r }}</button>
+              }
+            </div>
+          </div>
+
+          <!-- Training type + meal cadence + eating window. -->
+          <div class="ob__dial-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Training</mat-label>
+              <mat-select [ngModel]="trainingType()" (ngModelChange)="trainingType.set($event)">
+                @for (t of trainingTypes; track t.value) {
+                  <mat-option [value]="t.value">{{ t.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Meals / day</mat-label>
+              <input matInput type="number" min="1" max="8" inputmode="numeric"
+                     [ngModel]="mealsPerDay()" (ngModelChange)="mealsPerDay.set($event)" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Eating window</mat-label>
+              <mat-select [ngModel]="eatingWindow()" (ngModelChange)="eatingWindow.set($event)">
+                @for (w of eatingWindows; track w.value) {
+                  <mat-option [value]="w.value">{{ w.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </div>
+      }
+    </section>
   </div>
 
   <footer class="ob__actions">

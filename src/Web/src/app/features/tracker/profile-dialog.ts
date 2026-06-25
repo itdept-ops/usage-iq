@@ -18,10 +18,15 @@ import { AuthService } from '../../core/auth';
 import { UnitService } from '../../core/unit.service';
 import {
   ActivityLevel,
+  DietPattern,
+  EatingWindow,
+  LifeStage,
   PERM,
+  ProteinBasis,
   Sex,
   TrackerGoal,
   TrackerProfileDto,
+  TrainingType,
   UnitSystem,
 } from '../../core/models';
 import { StatsInputs, ageFrom, computeStats } from './units';
@@ -51,6 +56,36 @@ const ACTIVITY_LEVELS: { value: ActivityLevel; label: string }[] = [
   { value: 'Active', label: 'Active (6–7 days/week)' },
   { value: 'VeryActive', label: 'Very active (hard daily / physical job)' },
 ];
+
+const DIET_PATTERNS: { value: DietPattern; label: string }[] = [
+  { value: 'Balanced', label: 'Balanced' },
+  { value: 'HighProtein', label: 'High protein' },
+  { value: 'LowCarb', label: 'Low carb' },
+  { value: 'Keto', label: 'Keto' },
+  { value: 'Vegetarian', label: 'Vegetarian' },
+  { value: 'Vegan', label: 'Vegan' },
+  { value: 'Mediterranean', label: 'Mediterranean' },
+  { value: 'Paleo', label: 'Paleo' },
+];
+
+const TRAINING_TYPES: { value: TrainingType; label: string }[] = [
+  { value: 'None', label: 'None' },
+  { value: 'Strength', label: 'Strength' },
+  { value: 'Endurance', label: 'Endurance' },
+  { value: 'Hybrid', label: 'Hybrid' },
+];
+
+const EATING_WINDOWS: { value: EatingWindow; label: string }[] = [
+  { value: 'None', label: 'No fasting' },
+  { value: 'W16x8', label: '16:8' },
+  { value: 'W18x6', label: '18:6' },
+  { value: 'OMAD', label: 'OMAD' },
+];
+
+/** Weight drift (kg) past which the check-in banner suggests a recompute. */
+const CHECKIN_DRIFT_KG = 1.5;
+/** Baseline staleness (days) past which the check-in banner suggests a recompute. */
+const CHECKIN_STALE_DAYS = 90;
 
 /**
  * Profile / goal dialog. Sets the training goal, full body profile (DOB, height, current + goal weight,
@@ -91,6 +126,9 @@ export class ProfileDialog {
   readonly goals = GOALS;
   readonly sexes = SEXES;
   readonly activityLevels = ACTIVITY_LEVELS;
+  readonly dietPatterns = DIET_PATTERNS;
+  readonly trainingTypes = TRAINING_TYPES;
+  readonly eatingWindows = EATING_WINDOWS;
 
   // ---- core goal/macro fields (unchanged from before) ----
   readonly goal = signal<string>(this.data.profile.goal || 'Maintain');
@@ -107,6 +145,18 @@ export class ProfileDialog {
   readonly dateOfBirth = signal<string | null>(this.data.profile.dateOfBirth ?? null);
   readonly sex = signal<Sex>(this.data.profile.sex ?? 'Unspecified');
   readonly activityLevel = signal<ActivityLevel>(this.data.profile.activityLevel ?? 'Sedentary');
+
+  // ---- optional goal-builder refinements (all skippable; mirror TrackerProfile) ----
+  readonly weeklyRateKg = signal<number | null>(this.data.profile.weeklyRateKg ?? null);
+  readonly bodyFatPct = signal<number | null>(this.data.profile.bodyFatPct ?? null);
+  readonly dietPattern = signal<DietPattern>(this.data.profile.dietPattern ?? 'Balanced');
+  readonly trainingType = signal<TrainingType>(this.data.profile.trainingType ?? 'None');
+  readonly proteinBasis = signal<ProteinBasis>(this.data.profile.proteinBasis ?? 'PerBodyweight');
+  readonly lifeStage = signal<LifeStage>(this.data.profile.lifeStage ?? 'None');
+  readonly mealsPerDay = signal<number | null>(this.data.profile.mealsPerDay ?? null);
+  readonly eatingWindow = signal<EatingWindow>(this.data.profile.eatingWindow ?? 'None');
+  /** Whether the optional "Fine-tune" panel is expanded. */
+  readonly refineOpen = signal(false);
 
   // The dialog's Metric|Imperial toggle edits the central UnitService signal in-flight (seeded below
   // from the loaded profile; converted to canonical metric on save — the store never changes). All unit
@@ -233,11 +283,57 @@ export class ProfileDialog {
     activityLevel: this.activityLevel(),
     goal: this.goal(),
     dailyCalorieGoal: this.dailyCalorieGoal(),
+    weeklyRateKg: this.weeklyRateKg(),
+    bodyFatPct: this.bodyFatPct(),
+    dietPattern: this.dietPattern(),
+    trainingType: this.trainingType(),
+    proteinBasis: this.proteinBasis(),
+    lifeStage: this.lifeStage(),
+    trimester: this.data.profile.trimester ?? null,
   }));
 
   readonly preview = computed(() => computeStats(this.statsInputs()));
 
   readonly hasSuggestion = computed(() => this.preview().suggestedCalorieGoal != null);
+
+  // ---- non-blocking check-in banner (weight drift vs the goal basis, or a stale baseline) ----
+  /** Dismissed for this dialog session (the banner is informational, never blocking). */
+  readonly checkInDismissed = signal(false);
+
+  /**
+   * Surfaces a one-tap recompute when the saved goal looks out of date: the latest weight has drifted
+   * past ~1.5 kg from the basis the goal was computed against, OR the baseline hasn't been reviewed in
+   * ~90 days. Reads only the LOADED profile (data.profile); null when there's nothing to flag.
+   */
+  readonly checkIn = computed<{ reason: string } | null>(() => {
+    if (this.checkInDismissed()) return null;
+    const p = this.data.profile;
+    const latestKg = p.weightKg;
+
+    if (p.goalBasisWeightKg != null && latestKg != null) {
+      const drift = Math.abs(latestKg - p.goalBasisWeightKg);
+      if (drift >= CHECKIN_DRIFT_KG) {
+        return { reason: `Your weight has moved ${this.units.formatWeight(drift, 1)} since your last target.` };
+      }
+    }
+    if (p.baselineReviewedUtc) {
+      const reviewed = new Date(p.baselineReviewedUtc).getTime();
+      if (Number.isFinite(reviewed)) {
+        const days = (Date.now() - reviewed) / 86_400_000;
+        if (days >= CHECKIN_STALE_DAYS) {
+          return { reason: `It's been over ${Math.round(days)} days since you last reviewed your target.` };
+        }
+      }
+    }
+    return null;
+  });
+
+  /** One-tap recompute: fill the goals from the live deterministic estimate and re-anchor the check-in basis. */
+  recomputeFromCheckIn(): void {
+    this.useSuggested();
+    this.checkInDismissed.set(true);
+    this.snack.open('Targets recomputed — review and Save to keep them.', 'OK', { duration: 4000 });
+  }
 
   /** Fill the daily calorie goal + macro targets from the live suggestion. */
   useSuggested(): void {
@@ -255,6 +351,22 @@ export class ProfileDialog {
   readonly aiRationale = signal<string | null>(null);
   /** Polite sr-only announcement of the AI suggestion (or its unavailability). */
   readonly aiAnnounce = signal('');
+  /** Provenance of the last suggestion: "ai" (model, validated) or "formula" (deterministic). Null until one runs. */
+  readonly aiSource = signal<'ai' | 'formula' | null>(null);
+  /** Result confidence from the last suggestion ("low" | "med" | "high"), or null. */
+  readonly aiConfidence = signal<string | null>(null);
+  /** Suggested daily-calorie band [min, max] from the last suggestion, or null. */
+  readonly aiBand = signal<{ min: number; max: number } | null>(null);
+  /** A short safety caveat from the last suggestion (e.g. aggressive deficit), or null. */
+  readonly aiSafety = signal<string | null>(null);
+
+  /** Human label for the provenance chip: AI vs the deterministic formula fallback. */
+  readonly aiSourceLabel = computed(() => {
+    const src = this.aiSource();
+    if (src === 'ai') return 'AI-tailored';
+    if (src === 'formula') return 'Calculated default';
+    return null;
+  });
 
   /**
    * Ask Gemini to suggest a daily calorie + macro goal (it reads the caller's saved profile server-side,
@@ -267,21 +379,38 @@ export class ProfileDialog {
     this.aiAnnounce.set('Suggesting a goal with AI…');
     try {
       const res = await firstValueFrom(this.api.suggestGoal());
-      // Prefill the editable fields — a suggestion the user can adjust before saving.
+      // Prefill the editable fields — a suggestion the user can adjust before saving. The endpoint always
+      // returns a usable result: a model suggestion (source "ai") or the deterministic TrackerStats
+      // fallback (source "formula") when Gemini is unconfigured / fails validation — never a dead-end.
       this.dailyCalorieGoal.set(res.calorieTarget);
       this.proteinGoalG.set(res.proteinG);
       this.carbGoalG.set(res.carbsG);
       this.fatGoalG.set(res.fatG);
       this.aiRationale.set(res.rationale ?? null);
+      this.aiSource.set(res.source === 'ai' ? 'ai' : 'formula');
+      this.aiConfidence.set(res.confidence ?? null);
+      this.aiBand.set(
+        res.calorieMin && res.calorieMax ? { min: res.calorieMin, max: res.calorieMax } : null,
+      );
+      this.aiSafety.set(res.safetyNote ?? null);
+      const lead = res.source === 'ai' ? 'AI suggested' : 'Calculated a';
       this.aiAnnounce.set(
-        `AI suggested ${res.calorieTarget} calories per day: ${res.proteinG} grams protein, ` +
+        `${lead} ${res.calorieTarget} calories per day: ${res.proteinG} grams protein, ` +
           `${res.carbsG} grams carbs, ${res.fatG} grams fat.` +
+          (res.safetyNote ? ` ${res.safetyNote}` : '') +
           (res.rationale ? ` ${res.rationale}` : ''),
       );
     } catch {
+      // A normal response always carries prefillable numbers; this only fires on a true network failure.
+      // Fall back to the local deterministic estimate so the user is never dead-ended.
+      this.useSuggested();
       this.aiRationale.set(null);
-      this.aiAnnounce.set('AI suggestion unavailable. Set your goal manually.');
-      this.snack.open('AI suggestion unavailable — set your goal manually', 'OK', {
+      this.aiSource.set('formula');
+      this.aiConfidence.set(null);
+      this.aiBand.set(null);
+      this.aiSafety.set(null);
+      this.aiAnnounce.set('Used a calculated estimate (AI offline). Adjust as you like.');
+      this.snack.open('AI offline — filled a calculated estimate you can adjust', 'OK', {
         duration: 4000,
       });
     } finally {
@@ -318,7 +447,9 @@ export class ProfileDialog {
     this.aiAnnounce.set('Reading your goal with AI…');
     try {
       const res = await firstValueFrom(this.api.naturalGoal({ text }));
-      // Prefill the editable fields — a suggestion the user can adjust before saving.
+      // Prefill the editable fields — a suggestion the user can adjust before saving. Always usable:
+      // a parsed plan (source "ai") or the deterministic baseline (source "formula") when the model is
+      // unconfigured / fails validation. `realistic` is forced false for an over-aggressive implied pace.
       this.dailyCalorieGoal.set(res.calorieTarget);
       this.proteinGoalG.set(res.proteinG);
       this.carbGoalG.set(res.carbsG);
@@ -326,22 +457,38 @@ export class ProfileDialog {
       this.goalTimeline.set(res.timeline ?? null);
       this.goalRealistic.set(res.realistic);
       this.goalRationale.set(res.rationale ?? null);
+      this.aiSource.set(res.source === 'ai' ? 'ai' : 'formula');
+      this.aiConfidence.set(res.confidence ?? null);
+      this.aiBand.set(
+        res.calorieMin && res.calorieMax ? { min: res.calorieMin, max: res.calorieMax } : null,
+      );
+      this.aiSafety.set(res.safetyNote ?? null);
       const verdict = res.realistic
         ? 'This timeline looks realistic.'
         : 'This timeline may be aggressive.';
+      const lead = res.source === 'ai' ? 'AI set a goal of' : 'Calculated a goal of';
       this.aiAnnounce.set(
-        `AI set a goal of ${res.calorieTarget} calories per day: ${res.proteinG} grams protein, ` +
+        `${lead} ${res.calorieTarget} calories per day: ${res.proteinG} grams protein, ` +
           `${res.carbsG} grams carbs, ${res.fatG} grams fat.` +
           (res.timeline ? ` Timeline: ${res.timeline}.` : '') +
           ` ${verdict}` +
+          (res.safetyNote ? ` ${res.safetyNote}` : '') +
           (res.rationale ? ` ${res.rationale}` : ''),
       );
     } catch {
+      // Only a true network failure reaches here; fall back to the local deterministic estimate.
+      this.useSuggested();
       this.goalTimeline.set(null);
       this.goalRealistic.set(null);
       this.goalRationale.set(null);
-      this.aiAnnounce.set('AI could not read your goal. Set your goal manually.');
-      this.snack.open('AI unavailable — set your goal manually', 'OK', { duration: 4000 });
+      this.aiSource.set('formula');
+      this.aiConfidence.set(null);
+      this.aiBand.set(null);
+      this.aiSafety.set(null);
+      this.aiAnnounce.set('Used a calculated estimate (AI offline). Adjust as you like.');
+      this.snack.open('AI offline — filled a calculated estimate you can adjust', 'OK', {
+        duration: 4000,
+      });
     } finally {
       this.goalLoading.set(false);
     }
@@ -357,9 +504,14 @@ export class ProfileDialog {
     const goalWeightKg = this.currentWeightKg(this.goalWeightDisp());
     const hydrationGoalMl = this.currentHydrationGoalMl(this.hydrationGoalDisp());
 
+    const roundedWeight = weightKg != null ? Math.round(weightKg * 100) / 100 : undefined;
+    // Re-anchor the check-in basis when the user acted on the banner (recompute) so drift resets cleanly;
+    // otherwise carry the existing basis forward untouched.
+    const reAnchor = this.checkInDismissed();
+
     const body: TrackerProfileDto = {
       goal: this.goal(),
-      weightKg: weightKg != null ? Math.round(weightKg * 100) / 100 : undefined,
+      weightKg: roundedWeight,
       dailyCalorieGoal: this.num(this.dailyCalorieGoal()),
       proteinGoalG: this.num(this.proteinGoalG()),
       carbGoalG: this.num(this.carbGoalG()),
@@ -374,6 +526,20 @@ export class ProfileDialog {
       hydrationGoalMl: hydrationGoalMl ?? undefined,
       stepGoal: this.num(this.stepGoal()),
       coffeeGoalCups: this.num(this.coffeeGoalCups()),
+      // ---- optional goal-builder refinements (all skippable) ----
+      weeklyRateKg: this.weeklyRateKg() ?? undefined,
+      bodyFatPct: this.num(this.bodyFatPct()),
+      dietPattern: this.dietPattern(),
+      trainingType: this.trainingType(),
+      proteinBasis: this.proteinBasis(),
+      lifeStage: this.lifeStage(),
+      mealsPerDay: this.num(this.mealsPerDay()),
+      eatingWindow: this.eatingWindow(),
+      // Check-in bookkeeping: on a recompute, re-anchor to the current weight + now; else preserve.
+      goalBasisWeightKg: reAnchor ? roundedWeight : (this.data.profile.goalBasisWeightKg ?? undefined),
+      baselineReviewedUtc: reAnchor
+        ? new Date().toISOString()
+        : (this.data.profile.baselineReviewedUtc ?? undefined),
     };
     this.ref.close(body);
   }

@@ -5,7 +5,7 @@ import { Api } from './api';
 import { TrackerProfileDto } from './models';
 import {
   UnitSystem, isImperial,
-  kgToLb, lbToKg, cmToFtIn, ftInToCm,
+  kgToLb, lbToKg, cmToFtIn, ftInToCm, cmToIn, inToCm,
   kmToMi, miToKm, metersToFeet, mlToFloz, flozToMl, litersToGallons, gallonsToLiters,
 } from './units';
 
@@ -120,6 +120,19 @@ export class UnitService {
 
   /** Feet+inches back to canonical cm for storage. */
   heightFromFtIn(ft: number, inches: number): number { return ftInToCm(ft, inches); }
+
+  /** Short label for a body-circumference field (neck/waist/hip): 'in' | 'cm'. */
+  lengthUnit(): string { return this.imperial() ? 'in' : 'cm'; }
+
+  /** A canonical cm circumference as the numeric value in the user's unit (in or cm). */
+  lengthToDisplay(cm: number): number {
+    return this.imperial() ? cmToIn(cm) : cm;
+  }
+
+  /** A user-entered circumference (in or cm) back to canonical cm for storage. */
+  lengthToCanonical(value: number): number {
+    return this.imperial() ? inToCm(value) : value;
+  }
 
   /** Format a canonical cm height, e.g. "180 cm" / "5'11"". */
   formatHeight(cm: number | null | undefined): string | null {

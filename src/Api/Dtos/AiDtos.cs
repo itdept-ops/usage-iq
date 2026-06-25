@@ -52,7 +52,9 @@ public sealed class SuggestGoalRequest
 
 /// <summary>
 /// A suggested daily target. Numbers are model output CLAMPED to sane ranges (calories 0..5000, macros
-/// 0..500 g).
+/// 0..500 g) and SERVER-VALIDATED for macro coherence + a TDEE band; on any breach (or when Gemini is
+/// unconfigured / errors) the deterministic <c>TrackerStats.Compute</c> result is substituted and
+/// <see cref="Source"/> is <c>"formula"</c>.
 /// </summary>
 public sealed class SuggestGoalResponse
 {
@@ -60,6 +62,20 @@ public sealed class SuggestGoalResponse
     public double ProteinG { get; set; }
     public double CarbsG { get; set; }
     public double FatG { get; set; }
+
+    /// <summary>Suggested sensible LOW end of a daily-calorie band (clamped).</summary>
+    public int CalorieMin { get; set; }
+    /// <summary>Suggested sensible HIGH end of a daily-calorie band (clamped).</summary>
+    public int CalorieMax { get; set; }
+
+    /// <summary>Model/result confidence: "low" | "med" | "high"; null when unknown.</summary>
+    public string? Confidence { get; set; }
+
+    /// <summary>A short safety caveat (e.g. very aggressive deficit); null when none.</summary>
+    public string? SafetyNote { get; set; }
+
+    /// <summary>Provenance of the returned numbers: "ai" (model, validated) or "formula" (deterministic).</summary>
+    public string Source { get; set; } = "formula";
 
     /// <summary>One short sentence explaining the suggestion; null when the model gave none.</summary>
     public string? Rationale { get; set; }
@@ -640,7 +656,10 @@ public sealed class NaturalGoalRequest
 
 /// <summary>
 /// A structured goal parsed from free text. Calorie/macro numbers are CLAMPED (calories 0..5000, macros
-/// 0..500 g); <see cref="Realistic"/> flags whether the model judged the timeline sensible.
+/// 0..500 g) and SERVER-VALIDATED for macro coherence + a TDEE band against the caller's profile baseline;
+/// <see cref="Realistic"/> flags whether the implied weekly rate is safe/achievable (forced false when the
+/// implied pace exceeds ~1%/bodyweight/wk). On any breach (or when Gemini is unconfigured / errors) the
+/// deterministic <c>TrackerStats.Compute</c> result is substituted and <see cref="Source"/> is <c>"formula"</c>.
 /// </summary>
 public sealed class NaturalGoalResponse
 {
@@ -650,6 +669,21 @@ public sealed class NaturalGoalResponse
     public double FatG { get; set; }
     public string? Timeline { get; set; }
     public bool Realistic { get; set; }
+
+    /// <summary>Suggested sensible LOW end of a daily-calorie band (clamped).</summary>
+    public int CalorieMin { get; set; }
+    /// <summary>Suggested sensible HIGH end of a daily-calorie band (clamped).</summary>
+    public int CalorieMax { get; set; }
+
+    /// <summary>Result confidence: "low" | "med" | "high"; null when unknown.</summary>
+    public string? Confidence { get; set; }
+
+    /// <summary>A short safety caveat (e.g. an unrealistic pace); null when none.</summary>
+    public string? SafetyNote { get; set; }
+
+    /// <summary>Provenance of the returned numbers: "ai" (model, validated) or "formula" (deterministic).</summary>
+    public string Source { get; set; } = "formula";
+
     public string? Rationale { get; set; }
 }
 

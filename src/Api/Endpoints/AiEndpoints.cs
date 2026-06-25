@@ -361,28 +361,37 @@ public static class AiEndpoints
         // ============================ Goal / profile ============================
 
         // ---- Suggest a daily goal from the caller's OWN profile (read server-side) ----
+        // ALWAYS-ON: SuggestGoalAsync never returns null — when Gemini is unconfigured / errors / fails
+        // server-side validation it returns the deterministic TrackerStats.Compute result (source="formula").
         g.MapPost("/suggest-goal", async (
             SuggestGoalRequest _, CurrentUserAccessor me, GeminiService gemini, UsageDbContext db,
             CancellationToken ct) =>
         {
-            if (!gemini.IsConfigured) return Unconfigured();
-
             var caller = (await me.GetUserAsync(ct))!;
             var profile = await db.TrackerProfiles.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.UserEmail == caller.Email, ct)
                 ?? new TrackerProfile { UserEmail = caller.Email };
 
-            var result = await gemini.SuggestGoalAsync(profile, ct);
-            return result is null ? Unavailable() : Results.Ok(result);
+            var today = await TodayAsync(db, ct);
+            var result = await gemini.SuggestGoalAsync(profile, today, ct);
+            return Results.Ok(result);
         });
 
         // ---- Turn a free-text goal into a structured plan ("lose 10 lbs in 3 months") ----
+        // The caller's profile is loaded server-side so the parse is anchored to the deterministic baseline;
+        // ALWAYS-ON: NaturalGoalAsync substitutes the formula result on unconfigured / error / validation breach.
         g.MapPost("/natural-goal", async (
-            NaturalGoalRequest body, GeminiService gemini, CancellationToken ct) =>
+            NaturalGoalRequest body, CurrentUserAccessor me, GeminiService gemini, UsageDbContext db,
+            CancellationToken ct) =>
         {
-            if (!gemini.IsConfigured) return Unconfigured();
-            var result = await gemini.NaturalGoalAsync(body?.Text, ct);
-            return result is null ? Unavailable() : Results.Ok(result);
+            var caller = (await me.GetUserAsync(ct))!;
+            var profile = await db.TrackerProfiles.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserEmail == caller.Email, ct)
+                ?? new TrackerProfile { UserEmail = caller.Email };
+
+            var today = await TodayAsync(db, ct);
+            var result = await gemini.NaturalGoalAsync(body?.Text, profile, today, ct);
+            return Results.Ok(result);
         });
 
         // ============================ Coaching (GET, cached) ============================

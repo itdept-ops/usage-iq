@@ -141,7 +141,11 @@ function roundHalfEven(x: number): number {
   return floor % 2 === 0 ? floor : floor + 1;
 }
 
-/** Inputs to the live preview — metric, as the backend stores them. */
+/**
+ * Inputs to the live preview — metric, as the backend stores them. The first seven are the original gate;
+ * everything below is an OPTIONAL goal-builder refinement (nullable / neutral-default) that mirrors a
+ * column on TrackerProfile. Leaving them unset collapses to the same goal-based defaults the server uses.
+ */
 export interface StatsInputs {
   weightKg: number | null;
   heightCm: number | null;
@@ -150,12 +154,52 @@ export interface StatsInputs {
   activityLevel: ActivityLevel;
   goal: string;
   dailyCalorieGoal: number | null;
+  // ---- optional refinements (mirror TrackerProfile; default to neutral when omitted) ----
+  weeklyRateKg?: number | null;
+  bodyFatPct?: number | null;
+  dietPattern?: string;
+  trainingType?: string;
+  proteinBasis?: string;
+  lifeStage?: string;
+  trimester?: number | null;
+}
+
+/**
+ * Deterministically reshape a (protein, fat, carb) gram split for a DietPattern — the TS twin of
+ * TrackerStats.ReshapeForDiet. Protein is preserved; carbs are clamped to a pattern-specific cap (Keto
+ * pins them at a ~25 g hard floor) and any freed carb calories are moved to fat (4 → 9 kcal/g). All other
+ * patterns pass through unchanged.
+ */
+function reshapeForDiet(
+  pattern: string | undefined,
+  protein: number,
+  fat: number,
+  carbs: number,
+): { protein: number; fat: number; carbs: number } {
+  let carbCap: number | null;
+  switch (pattern) {
+    case 'Keto': carbCap = 25; break; // hard ketogenic floor/cap
+    case 'LowCarb': carbCap = 100; break; // a reduced carb cap
+    default: carbCap = null;
+  }
+  if (carbCap == null || carbs <= carbCap) return { protein, fat, carbs };
+
+  const freedCarbGrams = carbs - carbCap;
+  carbs = carbCap;
+  fat += roundHalfEven((freedCarbGrams * 4) / 9);
+  if (carbs < 0) carbs = 0;
+  return { protein, fat, carbs };
 }
 
 /**
  * Pure client mirror of the backend stats helper for the LIVE dialog preview. Any field whose inputs
  * are missing stays null (partial stats are fine). The dashboard panel reads day.stats from the server;
  * this exists only so the profile dialog can preview as the user types.
+ *
+ * This MUST stay numerically identical to TrackerStats.Compute (src/Api/Services/TrackerStats.cs):
+ * same constants (7700 kcal/kg, −0.5/+0.25 goal-default pace, −25%/−1100 deficit cap, lean-mass + fat-floor
+ * macros, DietPattern reshape), the same guardrail ORDER, and banker's rounding everywhere a .NET
+ * Math.Round runs.
  */
 export function computeStats(i: StatsInputs): TrackerStatsDto {
   const out: TrackerStatsDto = {
@@ -165,6 +209,8 @@ export function computeStats(i: StatsInputs): TrackerStatsDto {
   };
 
   const w = i.weightKg, h = i.heightCm;
+  const bf = i.bodyFatPct;
+  const endurance = i.trainingType === 'Endurance' || i.goal === 'Endurance';
 
   // BMI (weight + height).
   if (w != null && w > 0 && h != null && h > 0) {
@@ -174,9 +220,17 @@ export function computeStats(i: StatsInputs): TrackerStatsDto {
     out.bmiCategory = bmiCategory(bmi);
   }
 
-  // BMR (weight + height + age + sex != Unspecified).
+  // BMR — Katch-McArdle when body-fat % is known, else Mifflin-St Jeor.
   let bmr: number | null = null;
-  if (w != null && w > 0 && h != null && h > 0 && i.age != null && i.sex !== 'Unspecified') {
+  if (w != null && w > 0 && bf != null && bf > 0 && bf < 100) {
+    // Katch-McArdle: BMR = 370 + 21.6·LBM, LBM = kg·(1 − bf/100). Needs only weight + body-fat.
+    const lbm = w * (1 - bf / 100);
+    bmr = roundHalfEven(370 + 21.6 * lbm);
+    out.bmr = bmr;
+  } else if (
+    w != null && w > 0 && h != null && h > 0 && i.age != null && i.sex !== 'Unspecified'
+  ) {
+    // Mifflin-St Jeor: needs weight + height + age + a known sex.
     const base = 10 * w + 6.25 * h - 5 * i.age;
     bmr = roundHalfEven(i.sex === 'Male' ? base + 5 : base - 161);
     out.bmr = bmr;
@@ -189,26 +243,92 @@ export function computeStats(i: StatsInputs): TrackerStatsDto {
     out.tdee = tdee;
   }
 
-  // Suggested calorie goal from TDEE + goal.
+  // Suggested calorie goal (rate-based; needs TDEE + BMR).
   let suggested: number | null = null;
-  if (tdee != null) {
+  if (tdee != null && bmr != null) {
+    // Effective signed pace: the user's weeklyRateKg, else a goal-based default.
+    let goalDefault: number;
     switch (i.goal) {
-      case 'LoseWeight': suggested = tdee - 500; break;
-      case 'GainMuscle': suggested = tdee + 300; break;
-      default: suggested = tdee; break; // Maintain, Endurance
+      case 'LoseWeight': goalDefault = -0.5; break;
+      case 'GainMuscle': goalDefault = 0.25; break;
+      default: goalDefault = 0; // Maintain + Endurance
     }
+    const weeklyRateKg = i.weeklyRateKg ?? goalDefault;
+
+    // ~7700 kcal per kg of body mass; daily delta from the weekly pace.
+    let dailyDelta = (weeklyRateKg * 7700) / 7;
+
+    // (a) Pregnant / Breastfeeding: never a deficit; add the standard maintenance increment.
+    if (i.lifeStage === 'Pregnant') {
+      if (dailyDelta < 0) dailyDelta = 0;
+      // T1 ≈ +0; T2 ≈ +340; T3 ≈ +450. Unknown trimester ⇒ the 2nd-trimester figure.
+      let increment: number;
+      switch (i.trimester) {
+        case 1: increment = 0; break;
+        case 3: increment = 450; break;
+        default: increment = 340;
+      }
+      dailyDelta += increment;
+    } else if (i.lifeStage === 'Breastfeeding') {
+      if (dailyDelta < 0) dailyDelta = 0;
+      dailyDelta += 400;
+    } else if (dailyDelta < 0) {
+      // (b) Deficit cap: the more conservative (smaller magnitude) of −25%·TDEE and −1.0 kg/wk.
+      const capByPct = -0.25 * tdee;
+      const capByRate = -1100; // ≈ −1.0 kg/wk
+      const floorDelta = Math.max(capByPct, capByRate); // the less-negative of the two
+      if (dailyDelta < floorDelta) dailyDelta = floorDelta;
+    }
+
+    const raw = roundHalfEven(tdee + dailyDelta);
+    // (c) Never below BMR.
+    suggested = Math.max(raw, bmr);
     out.suggestedCalorieGoal = suggested;
   }
 
-  // Suggested macros (weight + a calorie target: suggested else current daily goal).
+  // Suggested macros (needs weight + a calorie target: the suggestion, else the set goal).
   const calTarget = suggested ?? i.dailyCalorieGoal ?? null;
   if (w != null && w > 0 && calTarget != null && calTarget > 0) {
-    const protein = roundHalfEven(1.8 * w);
-    const fat = roundHalfEven(0.8 * w);
-    const carbs = Math.max(0, roundHalfEven((calTarget - protein * 4 - fat * 9) / 4));
-    out.suggestedProteinG = protein;
+    // PROTEIN: lean-mass-anchored when body-fat is known or PerLeanMass is requested; else per-bodyweight.
+    const hasBf = bf != null && bf > 0 && bf < 100;
+    const useLeanMass = hasBf || i.proteinBasis === 'PerLeanMass';
+    let proteinG: number;
+    if (useLeanMass && hasBf) {
+      const lbm = w * (1 - (bf as number) / 100);
+      // ~2.2 g/kg LBM on a cut, ~1.8 to gain, ~1.6 maintain; endurance trims to ~1.5.
+      let perLbm: number;
+      if (endurance) perLbm = 1.5;
+      else if (i.goal === 'LoseWeight') perLbm = 2.2;
+      else if (i.goal === 'GainMuscle') perLbm = 1.8;
+      else perLbm = 1.6;
+      proteinG = perLbm * lbm;
+    } else {
+      // Goal-varying per-bodyweight; endurance leans lowest.
+      let perKg: number;
+      if (endurance) perKg = 1.4;
+      else if (i.goal === 'LoseWeight') perKg = 2.0;
+      else if (i.goal === 'GainMuscle') perKg = 1.8;
+      else perKg = 1.6;
+      proteinG = perKg * w;
+    }
+    const protein = roundHalfEven(proteinG);
+
+    // FAT FLOOR (computed BEFORE carbs): the larger of 0.6 g/kg and 20% of calories.
+    const fatFloor = Math.max(0.6 * w, (0.2 * calTarget) / 9);
+    let fat = roundHalfEven(fatFloor);
+
+    // CARBS = remainder, never negative.
+    let carbs = roundHalfEven((calTarget - protein * 4 - fat * 9) / 4);
+    if (carbs < 0) carbs = 0;
+
+    // DietPattern reshaping (deterministic).
+    const shaped = reshapeForDiet(i.dietPattern, protein, fat, carbs);
+    fat = shaped.fat;
+    carbs = shaped.carbs;
+
+    out.suggestedProteinG = shaped.protein;
     out.suggestedFatG = fat;
-    out.suggestedCarbG = carbs;
+    out.suggestedCarbG = Math.max(0, carbs);
   }
 
   return out;

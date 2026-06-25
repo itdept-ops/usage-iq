@@ -610,6 +610,24 @@ public static class TrackerEndpoints
             profile.HydrationGoalMl = Positive(req.HydrationGoalMl);
             profile.CoffeeGoalCups = Positive(req.CoffeeGoalCups);
             profile.StepGoal = Positive(req.StepGoal);
+
+            // --- optional goal-builder refinements (all nullable / neutral-default; never required) ---
+            profile.WeeklyRateKg = req.WeeklyRateKg is { } wr && double.IsFinite(wr) ? Math.Clamp(wr, -2, 2) : null;
+            profile.BodyFatPct = req.BodyFatPct is { } bf && double.IsFinite(bf) && bf >= 0 && bf <= 75 ? bf : null;
+            profile.NeckCm = Positive(req.NeckCm);
+            profile.WaistCm = Positive(req.WaistCm);
+            profile.HipCm = Positive(req.HipCm);
+            profile.DietPattern = Enum.TryParse<DietPattern>(req.DietPattern, ignoreCase: true, out var diet) ? diet : DietPattern.Balanced;
+            profile.Restrictions = Trunc(string.IsNullOrWhiteSpace(req.Restrictions) ? null : req.Restrictions.Trim(), 500);
+            profile.TrainingType = Enum.TryParse<TrainingType>(req.TrainingType, ignoreCase: true, out var tt) ? tt : TrainingType.None;
+            profile.ProteinBasis = Enum.TryParse<ProteinBasis>(req.ProteinBasis, ignoreCase: true, out var pb) ? pb : ProteinBasis.PerBodyweight;
+            profile.LifeStage = Enum.TryParse<LifeStage>(req.LifeStage, ignoreCase: true, out var ls) ? ls : LifeStage.None;
+            profile.Trimester = req.Trimester is { } tr && tr >= 1 && tr <= 3 ? tr : null;
+            profile.MealsPerDay = req.MealsPerDay is { } mpd && mpd >= 1 && mpd <= 12 ? mpd : null;
+            profile.EatingWindow = Enum.TryParse<EatingWindow>(req.EatingWindow, ignoreCase: true, out var ew) ? ew : EatingWindow.None;
+            profile.GoalBasisWeightKg = Positive(req.GoalBasisWeightKg);
+            profile.BaselineReviewedUtc = TryParseUtc(req.BaselineReviewedUtc, out var reviewed) ? reviewed : null;
+
             profile.UpdatedUtc = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToProfileDto(profile));
@@ -1976,6 +1994,13 @@ public static class TrackerEndpoints
             System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out result);
 
+    /// <summary>Parse an ISO-8601 UTC timestamp (round-trip "o" form) into a normalized-UTC DateTime.</summary>
+    private static bool TryParseUtc(string? value, out DateTime result) =>
+        DateTime.TryParse((value ?? "").Trim(),
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.RoundtripKind | System.Globalization.DateTimeStyles.AdjustToUniversal,
+            out result);
+
     /// <summary>The app's display timezone, mirroring UsageQueries (UTC fallback on a bad/blank id).</summary>
     private static Task<TimeZoneInfo> DisplayTzAsync(UsageDbContext db, CancellationToken ct)
         // Single source of truth — shared with the 75 Hard feature (HardChallengeEndpoints).
@@ -2092,6 +2117,21 @@ public static class TrackerEndpoints
         HydrationGoalMl = p.HydrationGoalMl,
         CoffeeGoalCups = p.CoffeeGoalCups,
         StepGoal = p.StepGoal,
+        WeeklyRateKg = p.WeeklyRateKg,
+        BodyFatPct = p.BodyFatPct,
+        NeckCm = p.NeckCm,
+        WaistCm = p.WaistCm,
+        HipCm = p.HipCm,
+        DietPattern = p.DietPattern.ToString(),
+        Restrictions = p.Restrictions,
+        TrainingType = p.TrainingType.ToString(),
+        ProteinBasis = p.ProteinBasis.ToString(),
+        LifeStage = p.LifeStage.ToString(),
+        Trimester = p.Trimester,
+        MealsPerDay = p.MealsPerDay,
+        EatingWindow = p.EatingWindow.ToString(),
+        GoalBasisWeightKg = p.GoalBasisWeightKg,
+        BaselineReviewedUtc = p.BaselineReviewedUtc?.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
     };
 
     private static HydrationEntryDto ToHydrationDto(HydrationEntry h) => new()
