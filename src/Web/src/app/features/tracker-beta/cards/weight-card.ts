@@ -7,7 +7,7 @@ import { TrackerStore } from '../../../core/tracker-store';
 import { WeightPointDto, WeightStatsDto } from '../../../core/models';
 import { ChartComponent } from '../../../shared/chart';
 import { OptimisticTracker } from '../state/optimistic-tracker';
-import { kgToLb, weightUnit } from '../util/units';
+import { UnitService } from '../../../core/unit.service';
 
 /**
  * Strata WEIGHT sediment card. Glanceable: latest weight + a 7-day "down/up X/wk" delta, with a smoothed
@@ -190,10 +190,12 @@ import { kgToLb, weightUnit } from '../util/units';
   `],
 })
 export class WeightCard {
-  /** The optimistic wrapper — used here only for read signals (profile/imperial/readOnly). */
+  /** The optimistic wrapper — used here only for read signals (profile/readOnly). */
   protected readonly opt = inject(OptimisticTracker);
   /** The root store — the weight history/stats endpoints live here (owner-private, not on the day DTO). */
   private readonly store = inject(TrackerStore);
+  /** Central display-preference seam — formats/converts canonical kg as the user's weight unit (lb / kg). */
+  private readonly units = inject(UnitService);
 
   /** Asked-to-log: the PAGE owns the weight sheet; this card only requests it. */
   readonly weigh = output<void>();
@@ -207,8 +209,7 @@ export class WeightCard {
   /** Whether the recent-history list is shown. */
   protected readonly expanded = signal(false);
 
-  protected readonly imperial = computed(() => this.opt.imperial());
-  protected readonly unit = computed(() => weightUnit(this.imperial()));
+  protected readonly unit = computed(() => this.units.weightUnit());
 
   /** Honor the OS reduce-motion setting — disables echarts animation + smoothing. */
   private readonly reduceMotion =
@@ -277,7 +278,8 @@ export class WeightCard {
   /** "0.4/wk" in the display unit, or null when the change rounds to zero (hide the clause). */
   protected readonly deltaText = computed<string | null>(() => {
     if (this.points().length < 2) return null;
-    const dispDelta = this.imperial() ? kgToLb(this.deltaKg()) : this.deltaKg();
+    // The delta is a kg difference; weightToDisplay is linear so it converts the rate too (kg/wk → lb/wk).
+    const dispDelta = this.units.weightToDisplay(this.deltaKg());
     const mag = Math.abs(dispDelta);
     if (mag < 0.05) return 'steady';
     return `${mag.toFixed(1)}/wk`;
@@ -314,9 +316,8 @@ export class WeightCard {
 
   /** The smoothed mini sparkline option — trend line emphasized, raw dots faded, no axes/grid chrome. */
   protected readonly sparkOption = computed<EChartsOption>(() => {
-    const imperial = this.imperial();
     const reduce = this.reduceMotion;
-    const data = this.points().map(p => Math.round((imperial ? kgToLb(p.weightKg) : p.weightKg) * 10) / 10);
+    const data = this.points().map(p => Math.round(this.units.weightToDisplay(p.weightKg) * 10) / 10);
 
     return {
       animation: !reduce,
@@ -352,7 +353,7 @@ export class WeightCard {
 
   /** kg → display-unit number, 1 dp. */
   protected disp(kg: number): string {
-    const v = this.imperial() ? kgToLb(kg) : kg;
+    const v = this.units.weightToDisplay(kg);
     return (Math.round(v * 10) / 10).toFixed(1);
   }
 

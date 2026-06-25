@@ -31,6 +31,22 @@
         <p class="card__hint">Currently showing the {{ theme.resolved() }} theme (matching your device).</p>
       }
     </div>
+
+    <div class="group">
+      <div class="group__label">Units</div>
+      <div class="theme-seg" role="radiogroup" aria-label="Unit system">
+        @for (u of unitOptions; track u.value) {
+          <button type="button" class="theme-seg__opt" role="radio"
+                  [class.theme-seg__opt--on]="units.unitSystem() === u.value"
+                  [attr.aria-checked]="units.unitSystem() === u.value"
+                  (click)="setUnits(u.value)">
+            <mat-icon class="theme-seg__icon" aria-hidden="true">{{ u.icon }}</mat-icon>
+            <span class="theme-seg__label">{{ u.label }}</span>
+          </button>
+        }
+      </div>
+      <p class="card__hint">Controls how weights, heights, distances and volumes display across the app. Your data is always stored in metric.</p>
+    </div>
   </article>
 
   <!-- ============================ (A) NOTIFICATIONS ============================ -->

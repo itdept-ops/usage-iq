@@ -4,6 +4,7 @@ import {
   ElementRef,
   OnInit,
   computed,
+  inject,
   input,
   output,
   signal,
@@ -19,8 +20,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 
+import { UnitService } from '../../core/unit.service';
 import { ActivityLevel, Sex, TrackerGoal, TrackerProfileDto, UnitSystem } from '../../core/models';
-import { StatsInputs, ageFrom, cmToFtIn, computeStats, ftInToCm, kgToLb, lbToKg } from './units';
+import { StatsInputs, ageFrom, computeStats } from './units';
 
 /** Emitted when the user completes the baseline. Metric profile + the entered current weight (kg). */
 export interface OnboardingResult {
@@ -74,6 +76,8 @@ const ACTIVITY_LEVELS: { value: ActivityLevel; label: string }[] = [
   styleUrl: './onboarding-card.scss',
 })
 export class OnboardingCard implements OnInit, AfterViewInit {
+  private readonly units = inject(UnitService);
+
   /** Seed profile (existing defaults / partial profile) to prefill the form. */
   readonly profile = input<TrackerProfileDto | null>(null);
 
@@ -100,7 +104,6 @@ export class OnboardingCard implements OnInit, AfterViewInit {
   readonly dateOfBirth = signal<string | null>(null);
   readonly sex = signal<Sex | null>(null);
   readonly activityLevel = signal<ActivityLevel>('Sedentary');
-  readonly unitSystem = signal<UnitSystem>('Imperial');
 
   readonly heightCm = signal<number | null>(null);
   readonly heightFt = signal<number | null>(null);
@@ -108,7 +111,13 @@ export class OnboardingCard implements OnInit, AfterViewInit {
   readonly weightDisp = signal<number | null>(null);
   readonly goalWeightDisp = signal<number | null>(null);
 
-  readonly imperial = computed(() => this.unitSystem() === 'Imperial');
+  // Display preference is the app-wide UnitService signal (seeded from the profile / toggle below),
+  // so the canonical-metric form values render in the user's chosen units everywhere consistently.
+  readonly unitSystem = this.units.unitSystem;
+  readonly imperial = this.units.imperial;
+
+  /** Weight-field suffix ('lb'/'kg') from the central service for the current/goal weight inputs. */
+  readonly weightUnit = computed(() => this.units.weightUnit());
 
   /** Today as `yyyy-MM-dd` (local) — upper bound for the DOB picker so future dates can't be chosen. */
   readonly todayIso = (() => {
@@ -132,15 +141,21 @@ export class OnboardingCard implements OnInit, AfterViewInit {
       // Only seed sex when it's an explicit choice; "Unspecified" must be re-picked.
       if (p.sex && p.sex !== 'Unspecified') this.sex.set(p.sex);
       if (p.activityLevel) this.activityLevel.set(p.activityLevel);
-      if (p.unitSystem) this.unitSystem.set(p.unitSystem);
+      // Seed the app-wide unit preference from the partial profile (display only; never persists here).
+      if (p.unitSystem) this.units.setLocal(p.unitSystem);
       this.heightCm.set(p.heightCm ?? null);
       if (p.heightCm != null) {
-        const { ft, in: inches } = cmToFtIn(p.heightCm);
+        const { ft, in: inches } = this.units.heightToFtIn(p.heightCm);
         this.heightFt.set(ft);
         this.heightIn.set(inches);
       }
       this.weightDisp.set(this.toDisp(p.weightKg));
       this.goalWeightDisp.set(this.toDisp(p.goalWeightKg));
+    } else {
+      // Brand-new user (no profile yet): this app/user base is US-based and historically defaulted to
+      // Imperial, but the shared UnitService defaults to Metric. Seed Imperial explicitly so the
+      // onboarding form opens in the expected units. Existing users seed from profile.unitSystem above.
+      this.units.setLocal('Imperial');
     }
   }
 
@@ -154,7 +169,8 @@ export class OnboardingCard implements OnInit, AfterViewInit {
 
   private toDisp(kg: number | null | undefined): number | null {
     if (kg == null) return null;
-    return this.unitSystem() === 'Imperial' ? Math.round(kgToLb(kg) * 10) / 10 : kg;
+    // weightToDisplay returns kg as-is in metric and lb in imperial; round the editor value to 1 dp.
+    return Math.round(this.units.weightToDisplay(kg) * 10) / 10;
   }
 
   /** Switch units — convert the in-flight values so the user sees the same body in new units. */
@@ -162,27 +178,26 @@ export class OnboardingCard implements OnInit, AfterViewInit {
     if (sys === this.unitSystem()) return;
     const toImperial = sys === 'Imperial';
 
+    // Capture the canonical-metric values from the OLD unit before flipping the display preference.
     const cm = this.currentHeightCm();
     const wKg = this.currentWeightKg(this.weightDisp());
     const gKg = this.currentWeightKg(this.goalWeightDisp());
 
-    this.unitSystem.set(sys);
+    // Drive the app-wide preference (display only here; persisted later on save via profile.unitSystem).
+    this.units.setLocal(sys);
 
     if (cm != null) {
       if (toImperial) {
-        const { ft, in: inches } = cmToFtIn(cm);
+        const { ft, in: inches } = this.units.heightToFtIn(cm);
         this.heightFt.set(ft);
         this.heightIn.set(inches);
       } else {
         this.heightCm.set(Math.round(cm));
       }
     }
-    this.weightDisp.set(
-      toImperial ? (wKg != null ? Math.round(kgToLb(wKg) * 10) / 10 : null) : wKg,
-    );
-    this.goalWeightDisp.set(
-      toImperial ? (gKg != null ? Math.round(kgToLb(gKg) * 10) / 10 : null) : gKg,
-    );
+    // toDisp now reads the freshly-set preference, so it renders the captured kg in the new unit.
+    this.weightDisp.set(this.toDisp(wKg));
+    this.goalWeightDisp.set(this.toDisp(gKg));
   }
 
   /** The current height in cm from whichever unit fields are active. */
@@ -191,16 +206,16 @@ export class OnboardingCard implements OnInit, AfterViewInit {
       const ft = this.heightFt(),
         inches = this.heightIn();
       if ((ft == null || ft <= 0) && (inches == null || inches <= 0)) return null;
-      return ftInToCm(ft ?? 0, inches ?? 0);
+      return this.units.heightFromFtIn(ft ?? 0, inches ?? 0);
     }
     const cm = this.heightCm();
     return cm != null && cm > 0 ? cm : null;
   }
 
-  /** Convert a display weight value to metric kg (or null). */
+  /** Convert a display weight value (in the user's unit) to canonical metric kg (or null). */
   private currentWeightKg(disp: number | null): number | null {
     if (disp == null || disp <= 0) return null;
-    return this.imperial() ? lbToKg(disp) : disp;
+    return this.units.weightToCanonical(disp);
   }
 
   // ---- live stats preview (mirrors the backend helper) ----

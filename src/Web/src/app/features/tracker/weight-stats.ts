@@ -1,8 +1,8 @@
-import { Component, computed, input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, input, ChangeDetectionStrategy } from '@angular/core';
 
 import { WeightSlot, WeightStatsDto } from '../../core/models';
 import { MatIconModule } from '@angular/material/icon';
-import { formatWeight } from './units';
+import { UnitService } from '../../core/unit.service';
 
 /** One per-slot row for the template (already formatted into the user's display units). */
 interface SlotRow {
@@ -104,19 +104,26 @@ const SLOT_LABELS: { slot: WeightSlot; label: string }[] = [
   `,
 })
 export class WeightStats {
+  readonly units = inject(UnitService);
+
   readonly stats = input.required<WeightStatsDto | null>();
+  /**
+   * The page's display preference, still bound by the parent for clarity. NOTE: this component no longer
+   * writes the global preference itself — the parent tracker page seeds the shared UnitService from the
+   * profile, and all formatting below reads that single shared signal. Kept as an input so the existing
+   * [imperial] binding stays valid.
+   */
   readonly imperial = input<boolean>(false);
 
   /** Per-slot rows in display order, formatted into the user's units. Unspecified is only shown if present. */
   readonly rows = computed<SlotRow[]>(() => {
     const s = this.stats();
     if (!s) return [];
-    const imp = this.imperial();
     const out: SlotRow[] = [];
     for (const { slot, label } of SLOT_LABELS) {
       const row = s.bySlot.find((b) => b.slot === slot);
       if (!row || row.count === 0) continue;
-      out.push({ slot, label, avg: formatWeight(row.avgKg, imp) ?? '—', count: row.count });
+      out.push({ slot, label, avg: this.units.formatWeight(row.avgKg) ?? '—', count: row.count });
     }
     return out;
   });
@@ -129,8 +136,7 @@ export class WeightStats {
     const s = this.stats();
     const d = s?.morningEveningDeltaKg;
     if (s == null || d == null) return null;
-    const imp = this.imperial();
-    const mag = formatWeight(Math.abs(d), imp) ?? '—';
+    const mag = this.units.formatWeight(Math.abs(d)) ?? '—';
     if (Math.abs(d) < 0.05)
       return {
         text: 'Morning and evening weights are about the same on average.',

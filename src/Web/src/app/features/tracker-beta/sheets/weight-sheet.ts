@@ -5,8 +5,8 @@ import {
 
 import { BottomSheet } from '../ui/bottom-sheet';
 import { OptimisticTracker } from '../state/optimistic-tracker';
+import { UnitService } from '../../../core/unit.service';
 import { TrackerProfileDto, WeightSlot } from '../../../core/models';
-import { weightFromKg, weightToKg, weightUnit } from '../util/units';
 
 /**
  * Strata weight-log sheet — a tactile scroll-snap "number wheel" weigh-in.
@@ -15,8 +15,8 @@ import { weightFromKg, weightToKg, weightUnit } from '../util/units';
  * (0–9), so a thumb-flick spins to e.g. `181 . 2`. Each column is its own snap scroller; the selected
  * value is whichever cell is centred under the fixed selection band — read back from `scrollTop` on a
  * debounced scroll (no JS-driven kinetic loop, the browser's native momentum + snap does the physics).
- * It is fully unit-aware: the range, suffix, and the value↔kg conversion all route through util/units
- * (the wire stays metric kg). Logging goes through the optimistic wrapper's `logWeight`, which patches
+ * It is fully unit-aware: the range, suffix, and the value↔kg conversion all route through the central
+ * UnitService (the wire stays metric kg). Logging goes through the optimistic wrapper's `logWeight`, which patches
  * `profile.weightKg` instantly; the weight card pulls fresh history and animates the new point in.
  *
  * Contract:
@@ -217,6 +217,8 @@ import { weightFromKg, weightToKg, weightUnit } from '../util/units';
 })
 export class WeightSheet implements AfterViewInit {
   protected readonly optimistic = inject(OptimisticTracker);
+  /** Central display-preference seam — drives the wheel's unit, range, seed and the value↔kg conversion. */
+  private readonly units = inject(UnitService);
 
   /** Two-way open state forwarded to the bottom-sheet shell. */
   readonly open = model<boolean>(false);
@@ -234,8 +236,8 @@ export class WeightSheet implements AfterViewInit {
   protected readonly TENTHS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
   /** True when the active profile prefers imperial (the wheel shows lb; the wire stays kg). */
-  protected readonly imperial = this.optimistic.imperial;
-  protected readonly unit = computed(() => weightUnit(this.imperial()));
+  protected readonly imperial = this.units.imperial;
+  protected readonly unit = computed(() => this.units.weightUnit());
 
   /** Sane wheel range in the DISPLAYED unit. lb: 50–500, kg: 25–250. */
   protected readonly min = computed(() => (this.imperial() ? 50 : 25));
@@ -288,7 +290,7 @@ export class WeightSheet implements AfterViewInit {
   /** Pull the profile weight (kg) into the displayed unit, split to whole + tenth, clamped to range. */
   private seedFromProfile(): void {
     const kg = this.optimistic.profile()?.weightKg;
-    const disp = kg != null ? weightFromKg(kg, this.imperial()) : (this.imperial() ? 165 : 75);
+    const disp = kg != null ? this.units.weightToDisplay(kg) : (this.imperial() ? 165 : 75);
     const clamped = Math.min(this.max(), Math.max(this.min(), disp));
     this.whole.set(Math.floor(clamped));
     this.tenth.set(Math.round((clamped - Math.floor(clamped)) * 10) % 10);
@@ -355,7 +357,7 @@ export class WeightSheet implements AfterViewInit {
     if (!this.canSave()) return;
     this.saving.set(true);
     const display = this.whole() + this.tenth() / 10;
-    const kg = Math.round(weightToKg(display, this.imperial()) * 100) / 100;
+    const kg = Math.round(this.units.weightToCanonical(display) * 100) / 100;
     try {
       const profile = await this.optimistic.logWeight({
         date: this.optimistic.date(), weightKg: kg, slot: this.slot(),

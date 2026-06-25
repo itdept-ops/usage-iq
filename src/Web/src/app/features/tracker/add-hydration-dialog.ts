@@ -12,8 +12,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
+import { UnitService } from '../../core/unit.service';
 import { AddHydrationRequest, PERM, UnitSystem } from '../../core/models';
-import { mlToOz, ozToMl } from './units';
 
 /** Opens with the active date and the user's unit preference (oz for Imperial, ml for Metric). */
 export interface AddHydrationData {
@@ -111,7 +111,7 @@ export type AddHydrationResult =
                     (ngModelChange)="setParsedAmount($index, $event)"
                     [attr.aria-label]="'Amount for ' + d.label"
                   />
-                  <span matTextSuffix>{{ imperial ? 'oz' : 'ml' }}</span>
+                  <span matTextSuffix>{{ volumeUnit }}</span>
                 </mat-form-field>
                 <button
                   mat-icon-button
@@ -145,7 +145,7 @@ export type AddHydrationResult =
               <p class="hy-suggest-head">
                 <mat-icon aria-hidden="true">water_drop</mat-icon>
                 Suggested goal:
-                <strong>{{ goalDisp(s.targetMl) }} {{ imperial ? 'oz' : 'ml' }}/day</strong>
+                <strong>{{ goalDisp(s.targetMl) }} {{ volumeUnit }}/day</strong>
               </p>
               @if (s.rationale) {
                 <p class="hy-suggest-why">{{ s.rationale }}</p>
@@ -198,7 +198,7 @@ export type AddHydrationResult =
           [ngModel]="amountDisp()"
           (ngModelChange)="amountDisp.set($event)"
         />
-        <span matTextSuffix>{{ imperial ? 'oz' : 'ml' }}</span>
+        <span matTextSuffix>{{ volumeUnit }}</span>
         <mat-hint>Logged for {{ data.date }}.</mat-hint>
       </mat-form-field>
 
@@ -383,9 +383,23 @@ export class AddHydrationDialog {
   private api = inject(Api);
   private auth = inject(AuthService);
   private snack = inject(MatSnackBar);
+  private units = inject(UnitService);
   readonly data = inject<AddHydrationData>(MAT_DIALOG_DATA);
 
-  readonly imperial = this.data.unitSystem === 'Imperial';
+  constructor() {
+    // Seed the central unit pref from the date's profile so display/parse honor the user's choice.
+    this.units.setLocal(this.data.unitSystem);
+  }
+
+  /** True when the user's display unit is imperial (fl oz). */
+  get imperial(): boolean {
+    return this.units.imperial();
+  }
+
+  /** Volume suffix for the amount fields + goal card ('fl oz' | 'ml'). */
+  get volumeUnit(): string {
+    return this.units.volumeUnit();
+  }
 
   /** Gate: every AI affordance is hidden unless the user holds tracker.ai. */
   readonly showAi = this.auth.hasPermission(PERM.trackerAi);
@@ -393,16 +407,16 @@ export class AddHydrationDialog {
   readonly amountDisp = signal<number | null>(null);
   readonly label = signal<string>('');
 
-  /** Metric ml from a display value (oz/ml), clamped to the server's 1..5000 ml range, else null. */
+  /** Metric ml from a display value (fl oz/ml), clamped to the server's 1..5000 ml range, else null. */
   private mlOf(disp: number | null): number | null {
     if (disp == null || disp <= 0) return null;
-    const m = Math.round(this.imperial ? ozToMl(disp) : disp);
+    const m = Math.round(this.units.volumeToCanonical(disp));
     return m >= 1 && m <= 5000 ? m : null;
   }
 
-  /** A display value (oz/ml) from a metric ml amount — used to seed editable parsed rows + the goal card. */
+  /** A display value (fl oz/ml) from a metric ml amount — used to seed editable parsed rows + the goal card. */
   private dispOf(ml: number): number {
-    return this.imperial ? Math.round(mlToOz(ml)) : Math.round(ml);
+    return Math.round(this.units.volumeToDisplay(ml));
   }
 
   /** Metric ml from the single-drink amount field (1..5000 ml server-validated range). */
@@ -489,7 +503,7 @@ export class AddHydrationDialog {
       const res = await firstValueFrom(this.api.hydrationSuggest());
       this.suggestion.set({ targetMl: res.targetMl, rationale: res.rationale ?? null });
       this.aiAnnounce.set(
-        `AI suggests a daily goal of ${this.dispOf(res.targetMl)} ${this.imperial ? 'ounces' : 'millilitres'}.` +
+        `AI suggests a daily goal of ${this.dispOf(res.targetMl)} ${this.imperial ? 'fluid ounces' : 'millilitres'}.` +
           (res.rationale ? ` ${res.rationale}` : '') +
           ' Set it as your goal, or close to keep your current goal.',
       );

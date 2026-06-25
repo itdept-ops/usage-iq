@@ -3,10 +3,9 @@ import {
 } from '@angular/core';
 
 import { OptimisticTracker } from '../state/optimistic-tracker';
+import { UnitService } from '../../../core/unit.service';
 import { SwipeRow } from '../ui/swipe-row';
-import {
-  ML_PER_GLASS, formatVolume, glasses, hydrationStep,
-} from '../util/units';
+import { ML_PER_GLASS, glasses } from '../util/units';
 
 /**
  * Strata WATER card — the signature one-tap hydration beat.
@@ -18,7 +17,7 @@ import {
  * overshoot-settle spring so it "feels like real liquid"; under prefers-reduced-motion the page-host
  * killswitch collapses every transition/animation to instant.
  *
- * Unit-aware via {@link OptimisticTracker.imperial}: the numeral + stepper labels read oz in Imperial while
+ * Unit-aware via the central {@link UnitService}: the numeral + stepper labels read fl oz in Imperial while
  * the wire stays metric ml (250 / 500 / one 250 ml glass). Logged drinks list below, each swipe-left to
  * delete (optimistic remove + undo snackbar via the wrapper). Read-only / shared views disable the steppers
  * and swipe.
@@ -57,18 +56,18 @@ import {
         <button type="button" class="wc-step"
                 [class.wc-pressed]="pressed() === 's250'"
                 [disabled]="opt.readOnly()"
-                [attr.aria-label]="step250().label + ' of water'"
+                [attr.aria-label]="step250() + ' of water'"
                 (pointerdown)="press('s250')" (pointerup)="release()" (pointercancel)="release()"
                 (click)="add(250, 's250')">
-          {{ step250().label }}
+          {{ step250() }}
         </button>
         <button type="button" class="wc-step"
                 [class.wc-pressed]="pressed() === 's500'"
                 [disabled]="opt.readOnly()"
-                [attr.aria-label]="step500().label + ' of water'"
+                [attr.aria-label]="step500() + ' of water'"
                 (pointerdown)="press('s500')" (pointerup)="release()" (pointercancel)="release()"
                 (click)="add(500, 's500')">
-          {{ step500().label }}
+          {{ step500() }}
         </button>
         <button type="button" class="wc-step wc-step-glass"
                 [class.wc-pressed]="pressed() === 'glass'"
@@ -207,6 +206,8 @@ import {
 })
 export class WaterCard {
   protected readonly opt = inject(OptimisticTracker);
+  /** Central display-preference seam — formats canonical ml as the user's small-volume unit (fl oz / ml). */
+  private readonly units = inject(UnitService);
 
   /** One 250 ml "glass" — the wire amount the glass stepper sends. */
   protected readonly glassMl = ML_PER_GLASS;
@@ -215,8 +216,6 @@ export class WaterCard {
   protected readonly pressed = signal<'s250' | 's500' | 'glass' | null>(null);
 
   // ── derived state off the optimistic day() signal ──
-  protected readonly imperial = this.opt.imperial;
-
   private readonly day = this.opt.day;
 
   protected readonly currentMl = computed(() => this.day()?.hydrationMl ?? 0);
@@ -231,13 +230,13 @@ export class WaterCard {
   });
   protected readonly overGoal = computed(() => this.goalMl() > 0 && this.currentMl() > this.goalMl());
 
-  /** Unit-aware stepper labels (the wire ml is fixed; the label reads oz in Imperial). */
-  protected readonly step250 = computed(() => hydrationStep(250, this.imperial()));
-  protected readonly step500 = computed(() => hydrationStep(500, this.imperial()));
+  /** Unit-aware stepper labels (the wire ml is fixed; the label reads fl oz in Imperial). */
+  protected readonly step250 = computed(() => `+${this.units.formatVolume(250)}`);
+  protected readonly step500 = computed(() => `+${this.units.formatVolume(500)}`);
 
   /** Numeral halves of the capsule readout, unit-aware. */
-  protected readonly nowLabel = computed(() => formatVolume(this.currentMl(), this.imperial()) ?? '0');
-  protected readonly goalLabel = computed(() => formatVolume(this.goalMl(), this.imperial()) ?? '—');
+  protected readonly nowLabel = computed(() => this.units.formatVolume(this.currentMl()) ?? '0');
+  protected readonly goalLabel = computed(() => this.units.formatVolume(this.goalMl()) ?? '—');
 
   protected readonly glassesNow = computed(() => glasses(this.currentMl()));
   protected readonly glassesGoal = computed(() => glasses(this.goalMl()));
@@ -252,7 +251,7 @@ export class WaterCard {
 
   /** Per-entry amount label (unit-aware). */
   protected entryLabel(ml: number): string {
-    return formatVolume(ml, this.imperial()) ?? `${ml} ml`;
+    return this.units.formatVolume(ml) ?? `${ml} ml`;
   }
 
   /** Begin the held-press visual (paired with the click that actually logs). */

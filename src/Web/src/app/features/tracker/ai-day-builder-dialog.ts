@@ -32,7 +32,7 @@ import {
   UnitSystem,
 } from '../../core/models';
 import { captureImage, pickImage, confirmPhotoNotice } from './ai-image';
-import { mlToOz, ozToMl, kgToLb, lbToKg, metersToMiles, milesToMeters } from './units';
+import { UnitService } from '../../core/unit.service';
 
 /**
  * Opened from the tracker with the active date + the user's unit preference, plus an optional compact brief
@@ -116,13 +116,19 @@ export class AiDayBuilderDialog {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
   private auth = inject(AuthService);
+  readonly units = inject(UnitService);
   readonly data = inject<AiDayBuilderData>(MAT_DIALOG_DATA);
 
   /** Multimodal (image) AI is a SEPARATE, off-by-default permission from the tracker.ai group gate. The
    *  photo buttons are hidden unless held, so we never offer a vision action the build-day endpoint 403s. */
   readonly canUseVision = this.auth.hasPermission(PERM.aiVision);
 
-  readonly imperial = this.data.unitSystem === 'Imperial';
+  constructor() {
+    // Seed the central UnitService from the unit preference the page passed in (already-loaded profile),
+    // so every display/input boundary below honours it without re-fetching.
+    this.units.setLocal(this.data.unitSystem);
+  }
+
   readonly reviewMeals = REVIEW_MEALS;
   readonly weightSlots = WEIGHT_SLOTS;
   readonly maxPhotos = MAX_PHOTOS;
@@ -419,14 +425,14 @@ export class AiDayBuilderDialog {
   // -- hydration edits (amounts shown + edited in the user's unit) --
   readonly drinks = computed<DraftDrink[]>(() => this.draft()?.hydration ?? []);
 
-  /** A drink's display amount (oz/ml) from its stored ml. */
+  /** A drink's display amount (fl oz/ml) from its stored ml. */
   drinkDisp(d: DraftDrink): number {
-    return this.imperial ? Math.round(mlToOz(d.ml)) : Math.round(d.ml);
+    return Math.round(this.units.volumeToDisplay(d.ml));
   }
 
-  /** Set a drink's amount from a display value (oz/ml), clamping to the server's 1..5000 ml range. */
+  /** Set a drink's amount from a display value (fl oz/ml), clamping to the server's 1..5000 ml range. */
   setDrinkAmount(index: number, disp: number | null): void {
-    const ml = disp == null || disp <= 0 ? 0 : Math.round(this.imperial ? ozToMl(disp) : disp);
+    const ml = disp == null || disp <= 0 ? 0 : Math.round(this.units.volumeToCanonical(disp));
     this.patchDraft((d) => {
       if (d.hydration[index]) d.hydration[index].ml = Math.min(5000, Math.max(0, ml));
     });
@@ -441,7 +447,8 @@ export class AiDayBuilderDialog {
   addDrink(): void {
     this.patchDraft((d) => {
       if (d.hydration.length >= MAX_DRINKS) return;
-      d.hydration.push({ label: 'Water', ml: this.imperial ? Math.round(ozToMl(8)) : 250 });
+      const ml = this.units.imperial() ? Math.round(this.units.volumeToCanonical(8)) : 250;
+      d.hydration.push({ label: 'Water', ml });
     });
   }
 
@@ -460,14 +467,12 @@ export class AiDayBuilderDialog {
   weightDisp(): number | null {
     const w = this.weight();
     if (!w) return null;
-    return this.imperial
-      ? Math.round(kgToLb(w.weightKg) * 10) / 10
-      : Math.round(w.weightKg * 10) / 10;
+    return Math.round(this.units.weightToDisplay(w.weightKg) * 10) / 10;
   }
 
   setWeightDisp(disp: number | null): void {
     if (disp == null || disp <= 0) return;
-    const kg = this.imperial ? lbToKg(disp) : disp;
+    const kg = this.units.weightToCanonical(disp);
     this.patchDraft((d) => {
       const clamped = Math.min(1000, Math.max(1, Math.round(kg * 100) / 100));
       d.weight = { weightKg: clamped, slot: d.weight?.slot ?? 'unspecified' };
@@ -483,7 +488,7 @@ export class AiDayBuilderDialog {
   addWeight(): void {
     this.patchDraft((d) => {
       d.weight = {
-        weightKg: this.imperial ? Math.round(lbToKg(150) * 100) / 100 : 70,
+        weightKg: this.units.imperial() ? Math.round(this.units.weightToCanonical(150) * 100) / 100 : 70,
         slot: 'unspecified',
       };
     });
@@ -502,9 +507,7 @@ export class AiDayBuilderDialog {
   activityDistanceDisp(): number | null {
     const a = this.activity();
     if (!a || a.distanceMeters == null) return null;
-    return this.imperial
-      ? Math.round(metersToMiles(a.distanceMeters) * 10) / 10
-      : Math.round((a.distanceMeters / 1000) * 10) / 10;
+    return Math.round(this.units.distanceToDisplay(a.distanceMeters / 1000) * 10) / 10;
   }
 
   setActivityField(patch: Partial<DraftActivity>): void {
@@ -524,7 +527,7 @@ export class AiDayBuilderDialog {
     const meters =
       disp == null || disp < 0
         ? null
-        : Math.round(this.imperial ? milesToMeters(disp) : disp * 1000);
+        : Math.round(this.units.distanceToCanonical(disp) * 1000);
     this.setActivityField({ distanceMeters: meters });
   }
 

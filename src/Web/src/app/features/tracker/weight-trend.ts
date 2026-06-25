@@ -1,4 +1,11 @@
-import { Component, computed, inject, input, signal, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  input,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { EChartsOption } from 'echarts';
 import { firstValueFrom } from 'rxjs';
 
@@ -11,7 +18,7 @@ import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { PERM, WeightPointDto } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
-import { kgToLb, weightUnit } from './units';
+import { UnitService } from '../../core/unit.service';
 
 /**
  * Weight-over-time trend (ECharts line) for the tracker dashboard. Points come from
@@ -174,10 +181,17 @@ export class WeightTrend {
   private api = inject(Api);
   private auth = inject(AuthService);
   private snack = inject(MatSnackBar);
+  readonly units = inject(UnitService);
 
   readonly points = input.required<WeightPointDto[]>();
   /** Goal weight in kg (metric), or null for no reference line. */
   readonly goalWeightKg = input<number | null | undefined>(null);
+  /**
+   * The page's display preference, still bound by the parent for clarity. NOTE: this component no longer
+   * writes the global preference itself — the parent tracker page seeds the shared UnitService from the
+   * profile, and all formatting below reads that single shared signal. Kept as an input so the existing
+   * [imperial] binding stays valid.
+   */
   readonly imperial = input<boolean>(false);
 
   /** Gate: the AI weight-insight affordance is hidden unless the user holds tracker.ai. */
@@ -221,7 +235,7 @@ export class WeightTrend {
     }
   }
 
-  private readonly unit = computed(() => (this.imperial() ? 'lb' : 'kg'));
+  private readonly unit = computed(() => this.units.weightUnit());
 
   /** Honor the OS "reduce motion" setting — disable chart animation/curve easing when set. */
   private readonly reduceMotion =
@@ -229,7 +243,7 @@ export class WeightTrend {
     !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   private toDisp(kg: number): number {
-    return this.imperial() ? Math.round(kgToLb(kg) * 10) / 10 : Math.round(kg * 10) / 10;
+    return Math.round(this.units.weightToDisplay(kg) * 10) / 10;
   }
 
   /**
@@ -239,7 +253,7 @@ export class WeightTrend {
    */
   readonly ariaLabel = computed(() => {
     const pts = this.points();
-    const unit = weightUnit(this.imperial());
+    const unit = this.units.weightUnit();
     const n = pts.length;
     const latest = this.toDisp(pts[n - 1].weightKg);
     const first = this.toDisp(pts[0].weightKg);

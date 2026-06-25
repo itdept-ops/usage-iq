@@ -266,7 +266,7 @@
           <input class="db-desc" type="text" maxlength="64" placeholder="Drink"
                  [ngModel]="h.label" (ngModelChange)="setDrinkLabel($index, $event)"
                  [attr.aria-label]="'Drink label'" />
-          <label class="db-num db-num--wide"><span>{{ imperial ? 'oz' : 'ml' }}</span>
+          <label class="db-num db-num--wide"><span>{{ units.volumeUnit() }}</span>
             <input type="number" min="0" step="1" inputmode="numeric" class="mono-num"
                    [ngModel]="drinkDisp(h)" (ngModelChange)="setDrinkAmount($index, $event === '' ? null : +$event)"
                    [attr.aria-label]="'Amount for ' + (h.label || 'drink')" /></label>
@@ -292,7 +292,7 @@
       </div>
       @if (weight()) {
         <div class="db-drinkrow">
-          <label class="db-num db-num--wide"><span>{{ imperial ? 'lb' : 'kg' }}</span>
+          <label class="db-num db-num--wide"><span>{{ units.weightUnit() }}</span>
             <input type="number" min="0" step="0.1" inputmode="decimal" class="mono-num"
                    [ngModel]="weightDisp()" (ngModelChange)="setWeightDisp($event === '' ? null : +$event)"
                    aria-label="Body weight" /></label>
@@ -324,7 +324,7 @@
             <input type="number" min="0" step="1" inputmode="numeric" class="mono-num"
                    [ngModel]="a.steps" (ngModelChange)="setActivityField({ steps: $event === '' || $event == null ? null : (+$event || 0) })"
                    aria-label="Steps" /></label>
-          <label class="db-num db-num--wide"><span>{{ imperial ? 'mi' : 'km' }}</span>
+          <label class="db-num db-num--wide"><span>{{ units.distanceUnit() }}</span>
             <input type="number" min="0" step="0.1" inputmode="decimal" class="mono-num"
                    [ngModel]="activityDistanceDisp()" (ngModelChange)="setActivityDistance($event === '' ? null : +$event)"
                    aria-label="Distance" /></label>

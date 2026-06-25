@@ -256,11 +256,11 @@
                       @if (locationLabel(m)) { <span>{{ locationLabel(m) }}</span> }
                       @if (hasCoords(m)) {
                         <a class="geo-link mono-num" [href]="mapUrl(m)" target="_blank" rel="noopener noreferrer"
-                           [title]="'Open map · ' + (m.accuracyM != null ? '±' + (m.accuracyM | number: '1.0-0') + ' m' : 'coarse')">
+                           [title]="'Open map · ' + (m.accuracyM != null ? '±' + units.formatSmallDistance(m.accuracyM) : 'coarse')">
                           {{ m.lat | number: '1.4-4' }}, {{ m.lng | number: '1.4-4' }}
                           <mat-icon aria-hidden="true">open_in_new</mat-icon>
                         </a>
-                        @if (m.accuracyM != null) { <span class="meta-sub">· ±{{ m.accuracyM | number: '1.0-0' }} m</span> }
+                        @if (m.accuracyM != null) { <span class="meta-sub">· ±{{ units.formatSmallDistance(m.accuracyM) }}</span> }
                       }
                     </dd>
                   </div>

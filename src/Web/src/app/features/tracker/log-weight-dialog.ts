@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 import { LogWeightRequest, UnitSystem, WeightSlot } from '../../core/models';
-import { kgToLb, lbToKg } from './units';
+import { UnitService } from '../../core/unit.service';
 
 /** Opens with the active date, the user's unit preference, and (optionally) the current weight to prefill. */
 export interface LogWeightData {
@@ -83,7 +83,7 @@ function currentSlot(now = new Date()): WeightSlot {
           [ngModel]="weightDisp()"
           (ngModelChange)="weightDisp.set($event)"
         />
-        <span matTextSuffix>{{ imperial ? 'lb' : 'kg' }}</span>
+        <span matTextSuffix>{{ units.weightUnit() }}</span>
         <mat-hint
           >Recorded for {{ data.date }} ({{ slot() | lowercase }}). One entry per slot.</mat-hint
         >
@@ -148,8 +148,13 @@ function currentSlot(now = new Date()): WeightSlot {
 export class LogWeightDialog {
   private ref = inject(MatDialogRef<LogWeightDialog, LogWeightRequest>);
   readonly data = inject<LogWeightData>(MAT_DIALOG_DATA);
+  readonly units = inject(UnitService);
 
-  readonly imperial = this.data.unitSystem === 'Imperial';
+  // Seed the display preference from the unit system the dialog was opened with. This MUST be a field
+  // initializer declared ABOVE the display fields below: initializers run top-to-bottom before the
+  // constructor body, and `weightDisp` reads `units.imperial()` — so the seed has to land first.
+  private readonly _seed = (this.units.setLocal(this.data.unitSystem), true);
+
   readonly slots = SLOTS;
 
   /** Defaults to the current part of the day (Morning / Afternoon / Evening). */
@@ -157,9 +162,7 @@ export class LogWeightDialog {
 
   readonly weightDisp = signal<number | null>(
     this.data.currentKg != null
-      ? this.imperial
-        ? Math.round(kgToLb(this.data.currentKg) * 10) / 10
-        : Math.round(this.data.currentKg * 10) / 10
+      ? Math.round(this.units.weightToDisplay(this.data.currentKg) * 10) / 10
       : null,
   );
 
@@ -167,7 +170,7 @@ export class LogWeightDialog {
   private readonly kg = computed<number | null>(() => {
     const d = this.weightDisp();
     if (d == null || d <= 0) return null;
-    const k = this.imperial ? lbToKg(d) : d;
+    const k = this.units.weightToCanonical(d);
     return k >= 1 && k <= 1000 ? Math.round(k * 100) / 100 : null;
   });
 

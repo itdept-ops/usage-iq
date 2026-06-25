@@ -1,4 +1,4 @@
-import { Injectable, Signal, computed, inject } from '@angular/core';
+import { Injectable, Signal, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
@@ -31,7 +31,6 @@ import {
  *     loading:    Signal<boolean>
  *     readOnly:   Signal<boolean>
  *     date:       Signal<string>           // YYYY-MM-DD
- *     imperial:   Signal<boolean>          // derived from profile.unitSystem
  *   writes (all return Promise<void>; optimistic + undo built in):
  *     addFood(body: AddFoodRequest): Promise<void>
  *     addFoods(bodies: AddFoodRequest[]): Promise<{ added: number; failed: number }>
@@ -60,8 +59,6 @@ export class OptimisticTracker {
   readonly loading: Signal<boolean> = this.store.loading;
   readonly readOnly: Signal<boolean> = this.store.readOnly;
   readonly date: Signal<string> = this.store.date;
-  /** True when the active profile prefers imperial units (kg/ml/m still travel the wire). */
-  readonly imperial = computed(() => this.store.profile()?.unitSystem === 'Imperial');
 
   /** Monotonic source of provisional ids — negative so they never collide with real server ids. */
   private tempSeq = -1;

@@ -13,7 +13,7 @@ import {
   UpsertActivityRequest,
   WatchActivityDto,
 } from '../../core/models';
-import { metersToMiles, milesToMeters } from './units';
+import { UnitService } from '../../core/unit.service';
 
 /** Opens with the active date, the user's unit preference, and any existing watch stats to prefill. */
 export interface AddActivityData {
@@ -68,7 +68,7 @@ export interface AddActivityData {
           [ngModel]="distanceDisp()"
           (ngModelChange)="distanceDisp.set($event)"
         />
-        <span matTextSuffix>{{ imperial ? 'mi' : 'km' }}</span>
+        <span matTextSuffix>{{ units.distanceUnit() }}</span>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="ac-field">
@@ -164,8 +164,13 @@ export interface AddActivityData {
 export class AddActivityDialog {
   private ref = inject(MatDialogRef<AddActivityDialog, UpsertActivityRequest | 'clear'>);
   readonly data = inject<AddActivityData>(MAT_DIALOG_DATA);
+  readonly units = inject(UnitService);
 
-  readonly imperial = this.data.unitSystem === 'Imperial';
+  // Seed the display preference from the unit system the dialog was opened with. This MUST be a field
+  // initializer declared ABOVE the display fields below: initializers run top-to-bottom before the
+  // constructor body, and `distanceDisp` reads `units.imperial()` (via toDistDisp) — so the seed
+  // has to land first.
+  private readonly _seed = (this.units.setLocal(this.data.unitSystem), true);
 
   readonly steps = signal<number | null>(this.data.activity?.steps ?? null);
   readonly distanceDisp = signal<number | null>(
@@ -177,16 +182,14 @@ export class AddActivityDialog {
   /** A metric distance (metres) as a rounded DISPLAY value in the current units (mi for Imperial, km for Metric). */
   private toDistDisp(m: number | null | undefined): number | null {
     if (m == null) return null;
-    return this.imperial
-      ? Math.round(metersToMiles(m) * 10) / 10
-      : Math.round((m / 1000) * 10) / 10;
+    return Math.round(this.units.distanceToDisplay(m / 1000) * 10) / 10;
   }
 
-  /** Display distance back to metric metres (or null when empty/non-positive). */
+  /** Display distance back to canonical metric metres (or null when empty/non-positive). */
   private readonly distanceMeters = computed<number | null>(() => {
     const d = this.distanceDisp();
     if (d == null || d <= 0) return null;
-    return Math.round(this.imperial ? milesToMeters(d) : d * 1000);
+    return Math.round(this.units.distanceToCanonical(d) * 1000);
   });
 
   /** Clamp a count to a non-negative integer within `max`, or null when empty/invalid. */

@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 
 import { FamilyWeather } from '../../../core/models';
+import { UnitService } from '../../../core/unit.service';
 
 /**
  * Hearth "Weather" glance card — current conditions, rendered ONLY when the page-owned snapshot returned a
@@ -16,9 +17,9 @@ import { FamilyWeather } from '../../../core/models';
     <section class="wx">
       <img class="wx__icon" [src]="iconUrl()" [alt]="weather().description" referrerpolicy="no-referrer" />
       <div class="wx__text">
-        <span class="wx__temp">{{ round(weather().tempF) }}°</span>
+        <span class="wx__temp">{{ temp() }}°{{ unit() }}</span>
         <span class="wx__desc">{{ weather().description }}</span>
-        <span class="wx__loc">{{ weather().location }} · feels {{ round(weather().feelsLikeF) }}°</span>
+        <span class="wx__loc">{{ weather().location }} · feels {{ feels() }}°{{ unit() }}</span>
       </div>
     </section>
   `,
@@ -37,11 +38,23 @@ import { FamilyWeather } from '../../../core/models';
   `],
 })
 export class WeatherCard {
+  private readonly units = inject(UnitService);
+
   readonly weather = input.required<FamilyWeather>();
 
   readonly iconUrl = computed(() => `https://openweathermap.org/img/wn/${this.weather().icon}@2x.png`);
 
-  round(f: number): number {
+  /** °C in Metric, °F in Imperial — the wire only carries Fahrenheit, so convert client-side. */
+  readonly unit = computed(() => (this.units.imperial() ? 'F' : 'C'));
+  readonly temp = computed(() => this.round(this.display(this.weather().tempF)));
+  readonly feels = computed(() => this.round(this.display(this.weather().feelsLikeF)));
+
+  /** Wire is Fahrenheit; show as-is in Imperial, convert F->C in Metric. */
+  private display(f: number): number {
+    return this.units.imperial() ? f : (f - 32) * (5 / 9);
+  }
+
+  private round(f: number): number {
     return Math.round(f);
   }
 }

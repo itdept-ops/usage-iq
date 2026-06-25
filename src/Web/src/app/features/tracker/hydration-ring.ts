@@ -1,6 +1,7 @@
-import { Component, computed, input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, input, ChangeDetectionStrategy } from '@angular/core';
 
-import { formatVolume, glasses } from './units';
+import { UnitService } from '../../core/unit.service';
+import { glasses } from './units';
 
 /**
  * A lightweight SVG hydration ring — the fluid-intake twin of {@link CalorieRing}. Shows progress of
@@ -35,11 +36,13 @@ import { formatVolume, glasses } from './units';
   styleUrl: './hydration-ring.scss',
 })
 export class HydrationRing {
+  private readonly units = inject(UnitService);
+
   /** Total fluid intake logged for the day, in millilitres. */
   readonly hydrationMl = input.required<number>();
   /** The resolved daily hydration goal, in millilitres (> 0). */
   readonly goalMl = input.required<number>();
-  /** True when displaying in imperial (oz) units. */
+  /** Retained for caller compatibility; display unit now comes from {@link UnitService}. */
   readonly imperial = input<boolean>(false);
 
   readonly radius = 52;
@@ -64,8 +67,8 @@ export class HydrationRing {
     return this.circumference * (1 - Math.min(1, this.progress()));
   });
 
-  /** The big centre number: the amount logged, in the user's units (e.g. "48 oz" / "1200 ml"). */
-  readonly headline = computed(() => formatVolume(this.hydrationMl(), this.imperial()) ?? '0');
+  /** The big centre number: the amount logged, in the user's units (e.g. "48 fl oz" / "1200 ml"). */
+  readonly headline = computed(() => this.units.formatVolume(this.hydrationMl()) ?? '0');
 
   /** Sub-caption: "x of y glasses", or a celebratory note once the goal is met. */
   readonly caption = computed(() => {
@@ -76,8 +79,8 @@ export class HydrationRing {
   });
 
   readonly ariaLabel = computed(() => {
-    const have = formatVolume(this.hydrationMl(), this.imperial());
-    const want = formatVolume(this.goalMl(), this.imperial());
+    const have = this.units.formatVolume(this.hydrationMl());
+    const want = this.units.formatVolume(this.goalMl());
     if (this.met()) {
       return `Hydration goal met: ${have} of a ${want} goal (${glasses(this.hydrationMl())} glasses).`;
     }

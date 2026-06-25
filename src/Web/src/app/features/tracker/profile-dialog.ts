@@ -15,6 +15,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
+import { UnitService } from '../../core/unit.service';
 import {
   ActivityLevel,
   PERM,
@@ -23,17 +24,7 @@ import {
   TrackerProfileDto,
   UnitSystem,
 } from '../../core/models';
-import {
-  StatsInputs,
-  ageFrom,
-  cmToFtIn,
-  computeStats,
-  ftInToCm,
-  kgToLb,
-  lbToKg,
-  mlToOz,
-  ozToMl,
-} from './units';
+import { StatsInputs, ageFrom, computeStats } from './units';
 
 /** Opens with the current profile (or sensible defaults for a first-time user). */
 export interface ProfileData {
@@ -91,6 +82,7 @@ export class ProfileDialog {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
   private auth = inject(AuthService);
+  private units = inject(UnitService);
   readonly data = inject<ProfileData>(MAT_DIALOG_DATA);
 
   /** Master gate: every AI affordance in this dialog is hidden unless the user holds tracker.ai. */
@@ -115,9 +107,28 @@ export class ProfileDialog {
   readonly dateOfBirth = signal<string | null>(this.data.profile.dateOfBirth ?? null);
   readonly sex = signal<Sex>(this.data.profile.sex ?? 'Unspecified');
   readonly activityLevel = signal<ActivityLevel>(this.data.profile.activityLevel ?? 'Sedentary');
-  readonly unitSystem = signal<UnitSystem>(this.data.profile.unitSystem ?? 'Imperial');
 
-  readonly imperial = computed(() => this.unitSystem() === 'Imperial');
+  // The dialog's Metric|Imperial toggle edits the central UnitService signal in-flight (seeded below
+  // from the loaded profile; converted to canonical metric on save — the store never changes). All unit
+  // display/parse below reads this one signal so kg/cm/ml render + parse in the user's chosen unit.
+  private readonly _seed = this.units.setLocal(this.data.profile.unitSystem ?? 'Imperial');
+  readonly unitSystem = this.units.unitSystem;
+  readonly imperial = this.units.imperial;
+
+  /** Weight suffix for the current/goal weight fields ('lb' | 'kg'). */
+  get weightUnit(): string {
+    return this.units.weightUnit();
+  }
+
+  /** Volume suffix for the hydration-goal field ('fl oz' | 'ml'). */
+  get volumeUnit(): string {
+    return this.units.volumeUnit();
+  }
+
+  /** Localized hydration-goal default for the hint, e.g. "~64 fl oz" / "~2000 ml" (canonical 2000 ml). */
+  get hydrationDefaultHint(): string {
+    return `~${this.units.formatVolume(2000)}`;
+  }
 
   /** Today as `yyyy-MM-dd` (local) — upper bound for the DOB picker so future dates can't be chosen. */
   readonly todayIso = (() => {
@@ -143,28 +154,28 @@ export class ProfileDialog {
   constructor() {
     // Seed the imperial height fields from the stored cm.
     if (this.data.profile.heightCm != null) {
-      const { ft, in: inches } = cmToFtIn(this.data.profile.heightCm);
+      const { ft, in: inches } = this.units.heightToFtIn(this.data.profile.heightCm);
       this.heightFt.set(ft);
       this.heightIn.set(inches);
     }
   }
 
+  /** A canonical kg weight as a DISPLAY value (kg or lb, 1dp) in the user's units. */
   private toDisp(kg: number | null | undefined): number | null {
     if (kg == null) return null;
-    return this.unitSystem() === 'Imperial' ? Math.round(kgToLb(kg) * 10) / 10 : kg;
+    return Math.round(this.units.weightToDisplay(kg) * 10) / 10;
   }
 
-  /** A metric volume (ml) as a whole DISPLAY value in the current units (oz for Imperial, ml for Metric). */
+  /** A metric volume (ml) as a whole DISPLAY value in the current units (fl oz for Imperial, ml for Metric). */
   private toVolDisp(ml: number | null | undefined): number | null {
     if (ml == null) return null;
-    return this.unitSystem() === 'Imperial' ? Math.round(mlToOz(ml)) : Math.round(ml);
+    return Math.round(this.units.volumeToDisplay(ml));
   }
 
   /** Convert the display hydration-goal value back to metric ml (or null when empty/non-positive). */
   private currentHydrationGoalMl(disp: number | null): number | null {
     if (disp == null || disp <= 0) return null;
-    const ml = this.imperial() ? ozToMl(disp) : disp;
-    return Math.round(ml);
+    return Math.round(this.units.volumeToCanonical(disp));
   }
 
   /** Switch units — convert the in-flight display values so the user sees the same body in new units. */
@@ -172,34 +183,27 @@ export class ProfileDialog {
     if (sys === this.unitSystem()) return;
     const toImperial = sys === 'Imperial';
 
-    // height
+    // Read every in-flight value back to canonical metric WHILE the service still reflects the OLD unit…
     const cm = this.currentHeightCm();
-    // weights: read metric first, then re-emit in the new units
     const wKg = this.currentWeightKg(this.weightDisp());
     const gKg = this.currentWeightKg(this.goalWeightDisp());
-    // hydration goal: read metric ml first, then re-emit in the new units
     const hydMl = this.currentHydrationGoalMl(this.hydrationGoalDisp());
 
-    this.unitSystem.set(sys);
+    // …flip the central unit signal, then re-emit each value as a DISPLAY value in the NEW unit.
+    this.units.setLocal(sys);
 
     if (cm != null) {
       if (toImperial) {
-        const { ft, in: inches } = cmToFtIn(cm);
+        const { ft, in: inches } = this.units.heightToFtIn(cm);
         this.heightFt.set(ft);
         this.heightIn.set(inches);
       } else {
         this.heightCm.set(Math.round(cm));
       }
     }
-    this.weightDisp.set(
-      toImperial ? (wKg != null ? Math.round(kgToLb(wKg) * 10) / 10 : null) : wKg,
-    );
-    this.goalWeightDisp.set(
-      toImperial ? (gKg != null ? Math.round(kgToLb(gKg) * 10) / 10 : null) : gKg,
-    );
-    this.hydrationGoalDisp.set(
-      hydMl != null ? (toImperial ? Math.round(mlToOz(hydMl)) : Math.round(hydMl)) : null,
-    );
+    this.weightDisp.set(this.toDisp(wKg));
+    this.goalWeightDisp.set(this.toDisp(gKg));
+    this.hydrationGoalDisp.set(this.toVolDisp(hydMl));
   }
 
   /** The current height in cm from whichever unit fields are active. */
@@ -208,7 +212,7 @@ export class ProfileDialog {
       const ft = this.heightFt(),
         inches = this.heightIn();
       if ((ft == null || ft <= 0) && (inches == null || inches <= 0)) return null;
-      return ftInToCm(ft ?? 0, inches ?? 0);
+      return this.units.heightFromFtIn(ft ?? 0, inches ?? 0);
     }
     const cm = this.heightCm();
     return cm != null && cm > 0 ? cm : null;
@@ -217,7 +221,7 @@ export class ProfileDialog {
   /** Convert a display weight value to metric kg (or null). */
   private currentWeightKg(disp: number | null): number | null {
     if (disp == null || disp <= 0) return null;
-    return this.imperial() ? lbToKg(disp) : disp;
+    return this.units.weightToCanonical(disp);
   }
 
   // ---- live stats preview (mirrors the backend helper) ----

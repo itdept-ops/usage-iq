@@ -81,7 +81,7 @@ import { VoiceCaptureDialog, VoiceCaptureData, VoiceCaptureResult } from './voic
 import { WhatToEatDialog, WhatToEatData } from './what-to-eat-dialog';
 import { WeightTrend } from './weight-trend';
 import { WeightStats } from './weight-stats';
-import { formatDistance, formatVolume, formatWeight, kgToLb } from './units';
+import { UnitService } from '../../core/unit.service';
 
 /** localStorage key gating the dismissable "Build my day" hero hint (per the photo-notice pattern). */
 const DAYBUILDER_HINT_KEY = 'usage_iq_daybuilder_hint';
@@ -232,6 +232,7 @@ const QUICK_FOOD_TILES: QuickFoodTile[] = [
 export class Tracker {
   readonly store = inject(TrackerStore);
   readonly auth = inject(AuthService);
+  readonly units = inject(UnitService);
   private api = inject(Api);
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
@@ -350,6 +351,14 @@ export class Tracker {
   constructor() {
     void this.store.load();
     void this.store.loadShared();
+
+    // Seed the central UnitService from the loaded profile's preference so every unit DISPLAY below
+    // (weight / volume / distance) honours the user's metric/imperial choice. setLocal only mirrors the
+    // signal — it never persists, so this is a pure display seam (storage/wire stay canonical metric).
+    effect(() => {
+      const system = this.store.profile()?.unitSystem;
+      if (system) this.units.setLocal(system);
+    });
 
     // Announce day reloads (date change / viewing another user) to assistive tech.
     effect(() => {
@@ -530,7 +539,7 @@ export class Tracker {
 
   /** Format a metric kg weight in the user's chosen units (or '—' when null). */
   weightLabel(kg: number | null | undefined, dp = 1): string {
-    return formatWeight(kg, this.imperial(), dp) ?? '—';
+    return this.units.formatWeight(kg, dp) ?? '—';
   }
 
   /** Progress toward goal weight as 0..100 (relative to current vs goal, monotonic toward goal). */
@@ -554,10 +563,9 @@ export class Tracker {
     if (w == null || g == null || g <= 0 || w <= 0) return null;
     const diffKg = w - g;
     if (Math.abs(diffKg) < 0.05) return { text: 'at goal', toLose: false };
-    const mag = this.imperial() ? Math.abs(kgToLb(diffKg)) : Math.abs(diffKg);
-    const unit = this.imperial() ? 'lb' : 'kg';
+    const mag = this.units.weightToDisplay(Math.abs(diffKg));
     return {
-      text: `${mag.toFixed(1)} ${unit} to ${diffKg > 0 ? 'lose' : 'gain'}`,
+      text: `${mag.toFixed(1)} ${this.units.weightUnit()} to ${diffKg > 0 ? 'lose' : 'gain'}`,
       toLose: diffKg > 0,
     };
   }
@@ -910,7 +918,7 @@ export class Tracker {
 
   /** Format a metric volume (ml) in the user's chosen units (or '—' when null). */
   volumeLabel(ml: number | null | undefined): string {
-    return formatVolume(ml, this.imperial()) ?? '—';
+    return this.units.formatVolume(ml) ?? '—';
   }
 
   /** Quick-add a fixed amount (Glass/Bottle/Large/Seltzer) to today's hydration, with an optional drink label. */
@@ -1243,7 +1251,7 @@ export class Tracker {
 
   /** Format a metric distance (metres) in the user's chosen units (or '—' when null). */
   distanceLabel(meters: number | null | undefined): string {
-    return formatDistance(meters, this.imperial()) ?? '—';
+    return this.units.formatDistanceMeters(meters) ?? '—';
   }
 
   /**

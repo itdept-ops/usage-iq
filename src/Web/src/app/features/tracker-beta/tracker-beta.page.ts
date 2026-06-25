@@ -7,6 +7,7 @@ import { Router } from '@angular/router';
 
 import { TrackerStore, toLocalDate } from '../../core/tracker-store';
 import { Meal } from '../../core/models';
+import { UnitService } from '../../core/unit.service';
 
 import { OptimisticTracker } from './state/optimistic-tracker';
 import { HeroRing, HeroFace } from './hero/hero-ring';
@@ -204,12 +205,12 @@ export class TrackerBetaPage {
   protected readonly store = inject(TrackerStore);
   protected readonly opt = inject(OptimisticTracker);
   protected readonly router = inject(Router);
+  protected readonly units = inject(UnitService);
 
   // ── read surface (off the shared day() signal) ──
   protected readonly day = this.opt.day;
   protected readonly loading = this.opt.loading;
   protected readonly readOnly = this.opt.readOnly;
-  protected readonly imperial = this.opt.imperial;
 
   // ── hero face (two-way with the hero-ring) ──
   protected readonly heroFace = signal<HeroFace>('rings');
@@ -246,9 +247,10 @@ export class TrackerBetaPage {
 
   /** Quick-rail tiles, highest-frequency first (water leftmost in the thumb arc). */
   protected readonly railTiles = computed<QuickTile[]>(() => {
-    const oz = this.imperial();
+    // Wire stays 250 ml; the label reads the user's small-volume unit ("+8 fl oz" / "+250 ml").
+    const waterLabel = `+${this.units.formatVolume(250)}`;
     return [
-      { key: 'water', icon: 'water_drop', label: oz ? '+8 oz' : '+250 ml', accentA: 'var(--water-a)', accentB: 'var(--water-b)' },
+      { key: 'water', icon: 'water_drop', label: waterLabel, accentA: 'var(--water-a)', accentB: 'var(--water-b)' },
       { key: 'coffee', icon: 'local_cafe', label: 'Coffee', accentA: 'var(--coffee-a)', accentB: 'var(--coffee-b)' },
       { key: 'weigh', icon: 'monitor_weight', label: 'Weigh', accentA: 'var(--pro-a)', accentB: 'var(--pro-b)' },
       { key: 'meal', icon: 'restaurant', label: 'Meal +', accentA: 'var(--cal-a)', accentB: 'var(--cal-b)' },
@@ -267,6 +269,14 @@ export class TrackerBetaPage {
     // First paint + shared-user list (matches the existing /tracker route's init).
     void this.store.load();
     void this.store.loadShared();
+
+    // Seed the central UnitService from the loaded profile's preference so every unit DISPLAY/INPUT in
+    // this surface (weight / volume / distance) honours the user's metric/imperial choice. setLocal only
+    // mirrors the signal — it never persists, so this is a pure display seam (storage/wire stay metric).
+    effect(() => {
+      const system = this.store.profile()?.unitSystem;
+      if (system) this.units.setLocal(system);
+    });
 
     // Accumulate the streak set as days load (today is a grace day inside currentStreak()).
     effect(() => {

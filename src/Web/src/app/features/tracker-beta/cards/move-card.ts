@@ -3,8 +3,9 @@ import {
 } from '@angular/core';
 
 import { OptimisticTracker } from '../state/optimistic-tracker';
+import { UnitService } from '../../../core/unit.service';
 import { SwipeRow } from '../ui/swipe-row';
-import { formatDistance, group } from '../util/units';
+import { group } from '../util/units';
 
 /**
  * Strata MOVE card (sediment, --lift-2, matte — NOT one of the 3 blurred surfaces).
@@ -228,6 +229,8 @@ import { formatDistance, group } from '../util/units';
 })
 export class MoveCard {
   private opt = inject(OptimisticTracker);
+  /** Central display-preference seam — formats the canonical metres distance as mi / km. */
+  private units = inject(UnitService);
 
   /** The page opens the exercise quick-sheet in response. */
   readonly addExercise = output<void>();
@@ -251,7 +254,7 @@ export class MoveCard {
     () => this.day()?.activity?.activeCalories ?? null,
   );
   protected readonly distance = computed(() =>
-    formatDistance(this.day()?.activity?.distanceMeters, this.opt.imperial()),
+    this.units.formatDistanceMeters(this.day()?.activity?.distanceMeters),
   );
 
   /** Fraction of the step goal met (0..1), clamped; 0 when no goal so the arc reads empty. */

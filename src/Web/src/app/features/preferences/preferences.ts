@@ -14,6 +14,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { ThemeService, ThemeMode } from '../../core/theme';
+import { UnitService, UnitSystem } from '../../core/unit.service';
 import { PushNotifications } from '../../core/push-notifications';
 import { SwUpdateService, OFFLINE_DISABLED_KEY } from '../../core/sw-update';
 import {
@@ -61,12 +62,19 @@ export class Preferences {
   private sw = inject(SwUpdateService);
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
+  readonly units = inject(UnitService);
 
   /** Display / theme segmented options (System follows the OS preference). */
   readonly themeModes: readonly { value: ThemeMode; label: string; icon: string }[] = [
     { value: 'system', label: 'System', icon: 'brightness_auto' },
     { value: 'light', label: 'Light', icon: 'light_mode' },
     { value: 'dark', label: 'Dark', icon: 'dark_mode' },
+  ];
+
+  /** Metric / Imperial segmented options for the global unit selector. */
+  readonly unitOptions: readonly { value: UnitSystem; label: string; icon: string }[] = [
+    { value: 'Metric', label: 'Metric', icon: 'straighten' },
+    { value: 'Imperial', label: 'Imperial', icon: 'square_foot' },
   ];
 
   // ---- Permission gates (each section/card hides when the caller can't use it) --------------------
@@ -127,6 +135,21 @@ export class Preferences {
 
   constructor() {
     this.load();
+    // Ensure the global unit signal reflects the persisted preference when this page is the entry point.
+    void this.units.load();
+  }
+
+  /**
+   * Set the global metric/imperial preference. The {@link UnitService} flips its signal optimistically
+   * (so every surface reacts at once) then persists via the existing tracker-profile endpoint; on a
+   * persist failure the choice still applies for the session and we surface a soft note.
+   */
+  async setUnits(system: UnitSystem): Promise<void> {
+    if (system === this.units.unitSystem()) return;
+    const persisted = await this.units.setUnitSystem(system);
+    if (!persisted) {
+      this.snack.open('Units updated for this session (could not save to your profile).', 'OK', { duration: 4000 });
+    }
   }
 
   private load(): void {

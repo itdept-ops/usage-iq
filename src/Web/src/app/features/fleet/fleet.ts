@@ -16,6 +16,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
+import { UnitService } from '../../core/unit.service';
 import {
   Fleet as FleetModel,
   FleetDimension,
@@ -66,6 +67,8 @@ export class Fleet {
   private snack = inject(MatSnackBar);
   private dialog = inject(MatDialog);
   readonly auth = inject(AuthService);
+  /** Metric/imperial display preference — used to format GPS-fix accuracy (canonical metres). */
+  readonly units = inject(UnitService);
 
   /** Row-level management (combine/move, delete, revoke). The board is read-only without it. */
   readonly canManage = computed(() => this.auth.hasPermission(PERM.reporterManage));

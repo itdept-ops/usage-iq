@@ -1,68 +1,22 @@
 // ============================================================================
-// Tracker Beta — UI-edge metric<->imperial conversion.
+// Tracker Beta — small display helpers.
 //
-// The WIRE STAYS METRIC: every request/response in core/models.ts is kg / ml / m.
-// These helpers exist ONLY to render and to read user-entered imperial values back
-// into metric before a mutation. They re-export the proven conversions from the
-// existing tracker so the two surfaces never drift, and add a couple of beta-only
-// display formatters (compact, unit-aware) the Strata cards need.
+// Unit-aware DISPLAY/INPUT (weight / volume / distance, metric<->imperial) now
+// routes through the central injectable UnitService (core/unit.service.ts), which
+// reads the user's unitSystem signal so callers no longer thread an `imperial`
+// boolean. This file keeps only the unit-AGNOSTIC bits the Strata cards still need:
+// the thousands-grouping numeral, the "X left" abundance figure, and the fixed
+// 250 ml "glass" (a glass is 250 ml regardless of the display unit system).
+//
+// THE WIRE STAYS METRIC everywhere: kg / ml / m on every request/response.
 // ============================================================================
 
-import {
-  LB_PER_KG, ML_PER_OZ, ML_PER_GLASS, M_PER_MI,
-  kgToLb, lbToKg, mlToOz, ozToMl, metersToMiles, milesToMeters,
-  cmToFtIn, ftInToCm, glasses, formatVolume, formatDistance, formatWeight, weightUnit,
-} from '../../tracker/units';
+/** A "glass" of water in ml (~8 fl oz) — the fixed wire amount the glass stepper sends. */
+export const ML_PER_GLASS = 250;
 
-// Re-export the canonical conversions so beta code imports from one place.
-export {
-  LB_PER_KG, ML_PER_OZ, ML_PER_GLASS, M_PER_MI,
-  kgToLb, lbToKg, mlToOz, ozToMl, metersToMiles, milesToMeters,
-  cmToFtIn, ftInToCm, glasses, formatVolume, formatDistance, formatWeight, weightUnit,
-};
-
-/** True when the profile's unitSystem is imperial. Centralizes the string compare. */
-export function isImperial(unitSystem: string | null | undefined): boolean {
-  return unitSystem === 'Imperial';
-}
-
-/**
- * The hydration quick-add step expressed in the user's unit. We always SEND metric ml (250/500), but the
- * tile LABEL reads "+8 oz" / "+250 ml" depending on the unit system. Returns both the wire ml and the label.
- */
-export function hydrationStep(ml: number, imperial: boolean): { ml: number; label: string } {
-  return { ml, label: imperial ? `+${Math.round(mlToOz(ml))} oz` : `+${ml} ml` };
-}
-
-/** Volume unit label for the active system ("oz" | "ml"). */
-export function volumeUnit(imperial: boolean): string {
-  return imperial ? 'oz' : 'ml';
-}
-
-/** Distance unit label for the active system ("mi" | "km"). */
-export function distanceUnit(imperial: boolean): string {
-  return imperial ? 'mi' : 'km';
-}
-
-/**
- * Convert a user-entered weight (in the displayed unit) back to METRIC kg for the wire. The weight wheel
- * shows lb in Imperial; logWeight() always wants kg.
- */
-export function weightToKg(value: number, imperial: boolean): number {
-  return imperial ? lbToKg(value) : value;
-}
-
-/** Convert a metric kg weight into the displayed unit's numeric value (no suffix) — for the wheel. */
-export function weightFromKg(kg: number, imperial: boolean): number {
-  return imperial ? kgToLb(kg) : kg;
-}
-
-/**
- * Convert a user-entered volume (in the displayed unit) back to METRIC ml for the wire. The adjust-amount
- * sheet shows oz in Imperial; addHydration() always wants ml.
- */
-export function volumeToMl(value: number, imperial: boolean): number {
-  return imperial ? ozToMl(value) : value;
+/** A whole-glass count for a volume (ml / 250), used in the "x of y glasses" subtitle. */
+export function glasses(ml: number): number {
+  return Math.round(ml / ML_PER_GLASS);
 }
 
 /**
