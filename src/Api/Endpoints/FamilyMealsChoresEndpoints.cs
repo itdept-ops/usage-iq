@@ -492,7 +492,20 @@ public static class FamilyMealsChoresEndpoints
                 .Select(m => m.Title)
                 .ToListAsync(ct);
 
-            var result = await gemini.PlanWeekAsync(req?.Constraints, slotDates, recentTitles, ct);
+            // Food-safety: a shared family dinner must ALWAYS honour every member's STANDING allergies/avoids,
+            // not just the free-text box. Load the UNION of all household members' saved tracker restrictions
+            // (TrackerProfile is keyed by lower-cased UserEmail; HouseholdMembers references the AppUser id).
+            var memberEmails = await db.HouseholdMembers.AsNoTracking()
+                .Where(hm => hm.HouseholdId == household.Id)
+                .Join(db.Users.AsNoTracking(), hm => hm.UserId, u => u.Id, (hm, u) => u.Email)
+                .ToListAsync(ct);
+            var restrictionParts = await db.TrackerProfiles.AsNoTracking()
+                .Where(p => memberEmails.Contains(p.UserEmail) && p.Restrictions != null && p.Restrictions != "")
+                .Select(p => p.Restrictions!)
+                .ToListAsync(ct);
+            var householdRestrictions = MergeRestrictions(restrictionParts);
+
+            var result = await gemini.PlanWeekAsync(req?.Constraints, slotDates, recentTitles, householdRestrictions, ct);
             if (result is null) return AiUnavailable();
 
             var meals = result.Meals
@@ -523,13 +536,29 @@ public static class FamilyMealsChoresEndpoints
         // through the existing POST /meals on confirm (the editor is prefilled). Saves NOTHING. Rate-limited;
         // 400 on empty ingredients; graceful 503 when Gemini is unavailable.
         g.MapPost("/meals/ai/what-can-i-make", async (
-            WhatCanIMakeAiRequest req, GeminiService gemini, CancellationToken ct) =>
+            WhatCanIMakeAiRequest req, CurrentUserAccessor me, CurrentHouseholdAccessor households,
+            GeminiService gemini, UsageDbContext db, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(req?.Ingredients))
                 return Results.BadRequest(new { message = "List a few ingredients you have on hand." });
             if (!gemini.IsConfigured) return AiUnavailable();
 
-            var result = await gemini.WhatCanIMakeAsync(req.Ingredients, req.Constraints, ct);
+            var caller = (await me.GetUserAsync(ct))!;
+            var household = (await households.GetOrCreateForCallerAsync(caller, ct))!;
+
+            // Food-safety: the same shared-meal allergy union the week planner enforces — every household
+            // member's STANDING tracker restrictions, not just the free-text constraints box.
+            var memberEmails = await db.HouseholdMembers.AsNoTracking()
+                .Where(hm => hm.HouseholdId == household.Id)
+                .Join(db.Users.AsNoTracking(), hm => hm.UserId, u => u.Id, (hm, u) => u.Email)
+                .ToListAsync(ct);
+            var restrictionParts = await db.TrackerProfiles.AsNoTracking()
+                .Where(p => memberEmails.Contains(p.UserEmail) && p.Restrictions != null && p.Restrictions != "")
+                .Select(p => p.Restrictions!)
+                .ToListAsync(ct);
+            var householdRestrictions = MergeRestrictions(restrictionParts);
+
+            var result = await gemini.WhatCanIMakeAsync(req.Ingredients, req.Constraints, householdRestrictions, ct);
             if (result is null) return AiUnavailable();
 
             var ideas = result.Ideas
@@ -1764,6 +1793,40 @@ public static class FamilyMealsChoresEndpoints
             .Split('\n')
             .Select(s => s.Trim())
             .Where(s => s.Length > 0);
+
+    /// <summary>Max distinct restriction TERMS the merged household allergy/avoid string may carry.</summary>
+    private const int MaxMergedRestrictionTerms = 24;
+    /// <summary>Max length of the merged household allergy/avoid string passed to the AI meal builders.</summary>
+    private const int MaxMergedRestrictionLen = 300;
+
+    /// <summary>
+    /// Merge every household member's free-text/CSV <see cref="TrackerProfile.Restrictions"/> into a single
+    /// allergy/avoid string for a SHARED family meal: split each on commas, trim, drop blanks, take the
+    /// case-insensitive DISTINCT terms (first spelling wins), cap to <see cref="MaxMergedRestrictionTerms"/>
+    /// terms and <see cref="MaxMergedRestrictionLen"/> chars, and re-join with ", ". Returns "" when no member
+    /// has any restriction (so the AI prompt stays byte-for-byte unchanged).
+    /// </summary>
+    private static string MergeRestrictions(IEnumerable<string> parts)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var terms = new List<string>();
+        var len = 0;
+        foreach (var part in parts)
+        {
+            foreach (var raw in (part ?? "").Split(','))
+            {
+                var term = raw.Trim();
+                if (term.Length == 0) continue;
+                if (!seen.Add(term)) continue; // case-insensitive dedupe; first spelling wins
+                var add = (terms.Count == 0 ? 0 : 2) + term.Length; // ", " separator + the term
+                if (len + add > MaxMergedRestrictionLen) return string.Join(", ", terms);
+                terms.Add(term);
+                len += add;
+                if (terms.Count >= MaxMergedRestrictionTerms) return string.Join(", ", terms);
+            }
+        }
+        return string.Join(", ", terms);
+    }
 
     // =====================================================================================
     // HELPERS
