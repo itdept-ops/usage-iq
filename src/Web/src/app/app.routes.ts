@@ -123,6 +123,16 @@ export const routes: Routes = [
     title: 'Usage IQ · Tracker',
   },
   {
+    // Unified "My Profile & Goal" page — the canonical surface for the caller's own tracker profile +
+    // goal: folds in the first-run baseline onboarding gate, the full profile + goal-builder editor with
+    // the live Estimated-TDEE preview, and the dated Plan History (GET /api/tracker/goal-plans). The
+    // ProfileDialog quick-edit deep-links here. Same tracker.self guard as the tracker route.
+    path: 'tracker/profile',
+    canActivate: [permissionGuard(PERM.trackerSelf)],
+    loadComponent: () => import('./features/tracker/profile-page').then(m => m.ProfilePage),
+    title: 'Usage IQ · My Profile & Goal',
+  },
+  {
     // "Ask my life" — grounded, cross-domain Q&A over the caller's OWN tracked data (read-only; the page
     // proposes/writes nothing). Gated by tracker.ai (the OFF-by-default text-AI permission), matching the
     // POST /api/ai/ask route guard. The endpoint always returns 200 (it floors to a plain summary when AI

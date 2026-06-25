@@ -808,11 +808,24 @@ public static class AiEndpoints
             .Select(w => new { w.LocalDate, w.WeightKg })
             .ToListAsync(ct);
 
-        // Goals (null when unset — the floor/model handles "no goal" gracefully).
-        var calGoal = profile?.DailyCalorieGoal;
-        var proteinGoal = profile?.ProteinGoalG;
-        var carbGoal = profile?.CarbGoalG;
-        var fatGoal = profile?.FatGoalG;
+        // HISTORY-CORRECT goals: load the user's plans in/before this window once, then resolve the target
+        // ACTIVE on each logged day (greatest EffectiveFrom <= that day) for the per-day goal-met counts.
+        // The HEADLINE goal fields (the "(goal …)" display) use the week-END (latest) plan, falling back to
+        // the live profile when the user has no plan at all (preserves today's "unset" rendering).
+        var plans = await db.GoalPlans.AsNoTracking()
+            .Where(p => p.UserEmail == email && p.EffectiveFrom <= today)
+            .OrderByDescending(p => p.EffectiveFrom)
+            .ToListAsync(ct);
+        TrackerStats.GoalTargets TargetsForDay(DateOnly d)
+        {
+            var plan = plans.FirstOrDefault(p => p.EffectiveFrom <= d); // plans are newest-first
+            return plan is null ? TrackerStats.TargetsFromProfile(profile) : TrackerStats.TargetsFromPlan(plan);
+        }
+        var headline = TargetsForDay(today);
+        var calGoal = headline.DailyCalorieGoal;
+        var proteinGoal = headline.ProteinGoalG;
+        var carbGoal = headline.CarbGoalG;
+        var fatGoal = headline.FatGoalG;
 
         // Per-day macro/calorie roll-ups (only days that have food entries contribute to the averages).
         var foodDays = foods.GroupBy(f => f.LocalDate).Select(grp => new
@@ -840,10 +853,11 @@ public static class AiEndpoints
         var avgCarbs = AvgOverD(foodDays.Select(d => d.Carbs));
         var avgFat = AvgOverD(foodDays.Select(d => d.Fat));
 
-        // How many of the logged-food days met each macro goal (only meaningful when a goal is set).
-        var proteinMet = proteinGoal is int pg && pg > 0 ? foodDays.Count(d => d.Protein >= pg) : 0;
-        var carbMet = carbGoal is int cg && cg > 0 ? foodDays.Count(d => d.Carbs >= cg) : 0;
-        var fatMet = fatGoal is int fg && fg > 0 ? foodDays.Count(d => d.Fat >= fg) : 0;
+        // How many of the logged-food days met each macro goal — each day scored against ITS OWN active
+        // plan's target (history-correct), so a mid-week goal change scores each side against its own goal.
+        var proteinMet = foodDays.Count(d => TargetsForDay(d.Date).ProteinGoalG is int pg && pg > 0 && d.Protein >= pg);
+        var carbMet = foodDays.Count(d => TargetsForDay(d.Date).CarbGoalG is int cg && cg > 0 && d.Carbs >= cg);
+        var fatMet = foodDays.Count(d => TargetsForDay(d.Date).FatGoalG is int fg && fg > 0 && d.Fat >= fg);
 
         // Steps / active calories: average over the days that recorded each (not the whole window).
         var avgSteps = AvgOver(activities.Where(a => a.Steps is not null).Select(a => a.Steps!.Value));
@@ -1225,11 +1239,14 @@ public static class AiEndpoints
         var carbs = foods.Sum(f => f.CarbG);
         var fat = foods.Sum(f => f.FatG);
 
-        var calGoal = profile?.DailyCalorieGoal ?? 2000;
+        // Score against TODAY's active plan (the latest plan with EffectiveFrom <= today), not the live
+        // profile — correct even if the user back-dated a plan. Falls back to the profile targets when none.
+        var targets = await ResolveGoalTargetsAsync(db, email, today, profile, ct);
+        var calGoal = targets.DailyCalorieGoal ?? 2000;
         var remCal = Math.Max(0, calGoal - calIn + burned);
-        var remP = Math.Max(0, (profile?.ProteinGoalG ?? 0) - protein);
-        var remC = Math.Max(0, (profile?.CarbGoalG ?? 0) - carbs);
-        var remF = Math.Max(0, (profile?.FatGoalG ?? 0) - fat);
+        var remP = Math.Max(0, (targets.ProteinGoalG ?? 0) - protein);
+        var remC = Math.Max(0, (targets.CarbGoalG ?? 0) - carbs);
+        var remF = Math.Max(0, (targets.FatGoalG ?? 0) - fat);
         return (remCal, Math.Round(remP, 1), Math.Round(remC, 1), Math.Round(remF, 1));
     }
 
@@ -1717,6 +1734,21 @@ public static class AiEndpoints
         sb.Append("first_kg: ").Append(rows[0].WeightKg).Append(" last_kg: ").Append(rows[^1].WeightKg).Append('\n');
         sb.Append("change_kg: ").Append(Math.Round(rows[^1].WeightKg - rows[0].WeightKg, 2)).Append('\n');
         return sb.ToString();
+    }
+
+    /// <summary>Resolve the calorie/macro targets to score a date against: the user's plan active on that
+    /// date (greatest EffectiveFrom &lt;= date), else the live profile targets. Mirrors TrackerEndpoints'
+    /// ResolveTargetsAsync so the AI recap/remaining reads score history-correctly against dated plans.</summary>
+    private static async Task<TrackerStats.GoalTargets> ResolveGoalTargetsAsync(
+        UsageDbContext db, string email, DateOnly date, TrackerProfile? profile, CancellationToken ct)
+    {
+        var plan = await db.GoalPlans.AsNoTracking()
+            .Where(p => p.UserEmail == email && p.EffectiveFrom <= date)
+            .OrderByDescending(p => p.EffectiveFrom)
+            .FirstOrDefaultAsync(ct);
+        return plan is null
+            ? TrackerStats.TargetsFromProfile(profile)
+            : TrackerStats.TargetsFromPlan(plan);
     }
 
     /// <summary>"Today" in the app's display timezone (UTC fallback on a bad/blank id), mirroring TrackerEndpoints.</summary>

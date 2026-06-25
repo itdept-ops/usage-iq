@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { MatIconModule } from '@angular/material/icon';
@@ -236,6 +237,7 @@ export class Tracker {
   private api = inject(Api);
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
+  private router = inject(Router);
   private destroyRef = inject(DestroyRef);
 
   readonly mealSections = MEAL_SECTIONS;
@@ -757,6 +759,16 @@ export class Tracker {
           .then(() => this.snack.open('Exercise logged', 'OK', { duration: 2000 }))
           .catch(() => this.snack.open('Could not log exercise', 'Dismiss', { duration: 4000 }));
       });
+  }
+
+  /**
+   * Navigate to the full "My Profile & Goal" page (own tracker only). The canonical editing surface —
+   * the same baseline gate + full editor + plan history. {@link openProfile} stays as the quick-edit
+   * dialog (which itself deep-links here via its "Full editor & history" action).
+   */
+  goToProfile(): void {
+    if (this.store.readOnly()) return;
+    void this.router.navigate(['/tracker/profile']);
   }
 
   openProfile(): void {

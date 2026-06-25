@@ -37,6 +37,20 @@ namespace Ccusage.Api.Services;
 /// </summary>
 public static class TrackerStats
 {
+    /// <summary>The calorie/macro targets a day is SCORED against — the active plan's, else the profile fallback.</summary>
+    public readonly record struct GoalTargets(
+        TrackerGoal Goal, int? DailyCalorieGoal, int? ProteinGoalG, int? CarbGoalG, int? FatGoalG);
+
+    /// <summary>The graceful fallback when no GoalPlan exists for the date: the live profile's current targets
+    /// (exactly the behavior before dated plans existed). A null profile reads as Maintain / no goals.</summary>
+    public static GoalTargets TargetsFromProfile(TrackerProfile? p) => new(
+        p?.Goal ?? TrackerGoal.Maintain,
+        p?.DailyCalorieGoal, p?.ProteinGoalG, p?.CarbGoalG, p?.FatGoalG);
+
+    /// <summary>The targets to score a day against when a plan IS active on that date — the plan's snapshot.</summary>
+    public static GoalTargets TargetsFromPlan(GoalPlan plan) => new(
+        plan.Goal, plan.DailyCalorieGoal, plan.ProteinGoalG, plan.CarbGoalG, plan.FatGoalG);
+
     /// <summary>Activity multiplier applied to BMR to get TDEE.</summary>
     public static double ActivityFactor(ActivityLevel level) => level switch
     {

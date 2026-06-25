@@ -1434,6 +1434,36 @@ export interface TrackerProfileDto {
 }
 
 /**
+ * One dated entry in the caller's goal-plan history (GET /api/tracker/goal-plans, newest-first). A new
+ * plan is versioned server-side whenever a profile save changes any target field (goal direction, weekly
+ * rate, daily calories, or P/C/F). `effectiveFrom` "0001-01-01" marks the initial backfilled plan that
+ * covers all historical days. Targets are canonical (kg/wk, kcal, grams); the snapshot fields capture the
+ * key body inputs at save time for display only. Mirrors TrackerGoalPlanDto. */
+export interface GoalPlanDto {
+  /** Effective-from date as `yyyy-MM-dd` local ("0001-01-01" = the initial/backfilled plan). */
+  effectiveFrom: string;
+  /** Goal direction (TrackerGoal name): "LoseWeight" | "Maintain" | "GainMuscle" | "Endurance". */
+  goal: string;
+  /** Signed canonical kg/wk pace (UI renders via rateToDisplay/rateUnit), or null. */
+  weeklyRateKg?: number;
+  dailyCalorieGoal?: number;
+  proteinGoalG?: number;
+  carbGoalG?: number;
+  fatGoalG?: number;
+  // ---- snapshot of key inputs at save time (display only) ----
+  /** Current weight (kg) snapshot when the plan was saved, or null. */
+  weightKg?: number;
+  /** Body-fat % snapshot, or null. */
+  bodyFatPct?: number;
+  /** Activity level snapshot (ActivityLevel name). */
+  activityLevel?: ActivityLevel;
+  /** Diet pattern snapshot (DietPattern name). */
+  dietPattern?: DietPattern;
+  /** ISO-8601 UTC timestamp the plan row was created. */
+  createdUtc?: string;
+}
+
+/**
  * Computed body/metabolic stats for the CURRENT profile (server-computed from the profile). Any field
  * whose inputs are missing comes back null (partial stats are fine — e.g. BMI without BMR). The WHOLE
  * object is null in the readOnly/viewer branch (body metrics must not leak). Mirrors TrackerStatsDto.

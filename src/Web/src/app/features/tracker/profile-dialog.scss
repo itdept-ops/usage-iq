@@ -188,6 +188,20 @@
   button { border-radius: var(--tech-r-control); font-weight: 600; min-height: 44px; }
 }
 
+/* Pushes the Cancel/Save pair to the right, leaving the "Full editor" link left-aligned. */
+.pf-actions-spacer { flex: 1 1 auto; }
+
+.pf-fulleditor {
+  color: var(--tech-accent);
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+}
+
+@media (max-width: 480px) {
+  .pf-actions { flex-wrap: wrap; }
+  .pf-actions-spacer { display: none; }
+  .pf-fulleditor { width: 100%; justify-content: center; }
+}
+
 /* ── Check-in banner (non-blocking) ── */
 .pf-checkin {
   display: flex;

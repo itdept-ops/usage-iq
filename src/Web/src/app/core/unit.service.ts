@@ -113,6 +113,18 @@ export class UnitService {
     return `${this.weightToDisplay(kg).toFixed(dp)} ${this.weightUnit()}`;
   }
 
+  // ── weekly rate (a weight delta): canonical kg/wk, displayed lb/wk or kg/wk ──
+  // A per-week pace is just a weight delta, so it reuses the exact kg↔lb factor — no new constant.
+
+  /** Per-week rate unit label, e.g. 'lb/wk' | 'kg/wk'. */
+  rateUnit(): string { return `${this.weightUnit()}/wk`; }
+
+  /** A canonical kg/wk pace as a DISPLAY value (lb/wk or kg/wk); reuses the weight conversion. */
+  rateToDisplay(kgPerWk: number): number { return this.weightToDisplay(kgPerWk); }
+
+  /** A user-entered pace (lb/wk or kg/wk) back to canonical kg/wk. */
+  rateToCanonical(value: number): number { return this.weightToCanonical(value); }
+
   // ── height: canonical cm ────────────────────────────────────────────────────
 
   /** A canonical cm height as feet+inches (for the imperial editor). */

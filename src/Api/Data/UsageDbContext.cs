@@ -37,6 +37,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<NudgeEvent> NudgeEvents => Set<NudgeEvent>();
     public DbSet<TrackerProfile> TrackerProfiles => Set<TrackerProfile>();
+    public DbSet<GoalPlan> GoalPlans => Set<GoalPlan>();
     public DbSet<FoodEntry> FoodEntries => Set<FoodEntry>();
     public DbSet<ExerciseEntry> ExerciseEntries => Set<ExerciseEntry>();
     public DbSet<ExerciseLibrary> ExerciseLibrary => Set<ExerciseLibrary>();
@@ -587,6 +588,19 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
             // One profile row per user; also the lookup for "this caller's profile".
             e.HasIndex(x => x.UserEmail).IsUnique();
+        });
+
+        b.Entity<GoalPlan>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Goal).HasConversion<int>();
+            e.Property(x => x.ActivityLevel).HasConversion<int>();
+            e.Property(x => x.DietPattern).HasConversion<int>();
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // One plan per user per effective date (a same-day re-save upserts this row, never piles up); the
+            // (UserEmail, EffectiveFrom DESC) order also serves the "active plan for date D" resolver
+            // (greatest EffectiveFrom <= D) and the newest-first plan-history list.
+            e.HasIndex(x => new { x.UserEmail, x.EffectiveFrom }).IsUnique().IsDescending(false, true);
         });
 
         b.Entity<FoodEntry>(e =>

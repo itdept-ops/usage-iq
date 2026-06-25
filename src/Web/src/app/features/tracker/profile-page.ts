@@ -1,9 +1,8 @@
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -12,15 +11,18 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { UnitService } from '../../core/unit.service';
+import { TrackerStore } from '../../core/tracker-store';
 import {
   ActivityLevel,
   DietPattern,
   EatingWindow,
+  GoalPlanDto,
   LifeStage,
   PERM,
   ProteinBasis,
@@ -31,11 +33,7 @@ import {
   UnitSystem,
 } from '../../core/models';
 import { StatsInputs, ageFrom, computeStats } from './units';
-
-/** Opens with the current profile (or sensible defaults for a first-time user). */
-export interface ProfileData {
-  profile: TrackerProfileDto;
-}
+import { OnboardingCard, OnboardingResult } from './onboarding-card';
 
 const GOALS: { value: TrackerGoal; label: string }[] = [
   { value: 'LoseWeight', label: 'Lose weight' },
@@ -89,17 +87,27 @@ const CHECKIN_DRIFT_KG = 1.5;
 const CHECKIN_STALE_DAYS = 90;
 
 /**
- * Profile / goal dialog. Sets the training goal, full body profile (DOB, height, current + goal weight,
- * biological sex, activity level), an optional daily calorie goal + macro targets, a unit toggle
- * (Metric kg/cm vs Imperial lb + ft/in — converted to metric on save), and the share toggle. Shows a
- * LIVE stats preview (BMI/BMR/TDEE/suggested calories) using the same formulas as the backend, with a
- * "Use suggested" button. Resolves with the {@link TrackerProfileDto} (metric) for the page to persist.
+ * Unified "My Profile & Goal" page (route: tracker/profile). The CANONICAL surface for editing the
+ * caller's tracker profile + goal, folding three things into one screen:
+ *
+ *  1. First-run ONBOARDING gate — when the baseline is incomplete (current weight, height, DOB, explicit
+ *     sex) the page renders the same blocking {@link OnboardingCard} the tracker uses inline. Same
+ *     verbatim 4-field gate (OnboardingCard.canSave); on save it persists + seeds today's weigh-in.
+ *  2. Full profile + all optional goal-builder fields — the entire {@link ProfileDialog} field set
+ *     (goal, body profile, calorie + macro targets, hydration/step/coffee, the Fine-tune panel) with the
+ *     live Estimated-TDEE preview (the same {@link computeStats}) and the AI affordances (gated by
+ *     tracker.ai), all unit-aware through the central {@link UnitService} (weight/height/length/volume +
+ *     the new weekly-rate seam).
+ *  3. PLAN HISTORY — the dated, read-only list of past {@link GoalPlanDto}s (newest-first, the top one
+ *     badged "Active today") from GET /api/tracker/goal-plans, rendered through the unit-aware rate seam.
+ *
+ * The existing {@link ProfileDialog} stays as a quick-edit (it deep-links here via a "Full editor" link).
  */
 @Component({
-  selector: 'app-tracker-profile-dialog',
+  selector: 'app-tracker-profile-page',
   imports: [
     FormsModule,
-    MatDialogModule,
+    RouterLink,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -108,21 +116,22 @@ const CHECKIN_STALE_DAYS = 90;
     MatCheckboxModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    MatProgressBarModule,
+    OnboardingCard,
   ],
-  templateUrl: './profile-dialog.html',
+  templateUrl: './profile-page.html',
   changeDetection: ChangeDetectionStrategy.Eager,
-  styleUrl: './profile-dialog.scss',
+  styleUrls: ['./profile-dialog.scss', './profile-page.scss'],
 })
-export class ProfileDialog {
-  private ref = inject(MatDialogRef<ProfileDialog, TrackerProfileDto>);
+export class ProfilePage {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
   private auth = inject(AuthService);
   private units = inject(UnitService);
   private router = inject(Router);
-  readonly data = inject<ProfileData>(MAT_DIALOG_DATA);
+  private store = inject(TrackerStore);
 
-  /** Master gate: every AI affordance in this dialog is hidden unless the user holds tracker.ai. */
+  /** Master gate: every AI affordance is hidden unless the user holds tracker.ai. */
   readonly showAi = this.auth.hasPermission(PERM.trackerAi);
 
   readonly goals = GOALS;
@@ -132,89 +141,200 @@ export class ProfileDialog {
   readonly trainingTypes = TRAINING_TYPES;
   readonly eatingWindows = EATING_WINDOWS;
 
-  // ---- core goal/macro fields (unchanged from before) ----
-  readonly goal = signal<string>(this.data.profile.goal || 'Maintain');
-  readonly dailyCalorieGoal = signal<number | null>(this.data.profile.dailyCalorieGoal ?? null);
-  readonly proteinGoalG = signal<number | null>(this.data.profile.proteinGoalG ?? null);
-  readonly carbGoalG = signal<number | null>(this.data.profile.carbGoalG ?? null);
-  readonly fatGoalG = signal<number | null>(this.data.profile.fatGoalG ?? null);
-  readonly stepGoal = signal<number | null>(this.data.profile.stepGoal ?? null);
-  /** Daily coffee cap (cups). null = use the default; the tracker ring warns when the day exceeds it. */
-  readonly coffeeGoalCups = signal<number | null>(this.data.profile.coffeeGoalCups ?? null);
-  readonly shareWithContacts = signal<boolean>(this.data.profile.shareWithContacts ?? false);
+  /** The loaded profile, or null until the first load. Drives the onboarding gate + form seeding. */
+  private readonly profile = signal<TrackerProfileDto | null>(null);
+  readonly loading = signal(true);
+  readonly saving = signal(false);
+  /** True while the blocking onboarding result is being persisted (own onboarding host). */
+  readonly savingBaseline = signal(false);
+
+  /** Plan history (newest-first), or empty before/without history. */
+  readonly plans = signal<GoalPlanDto[]>([]);
+  readonly plansLoading = signal(false);
+
+  // ---- core goal/macro fields ----
+  readonly goal = signal<string>('Maintain');
+  readonly dailyCalorieGoal = signal<number | null>(null);
+  readonly proteinGoalG = signal<number | null>(null);
+  readonly carbGoalG = signal<number | null>(null);
+  readonly fatGoalG = signal<number | null>(null);
+  readonly stepGoal = signal<number | null>(null);
+  readonly coffeeGoalCups = signal<number | null>(null);
+  readonly shareWithContacts = signal<boolean>(false);
 
   // ---- body profile ----
-  readonly dateOfBirth = signal<string | null>(this.data.profile.dateOfBirth ?? null);
-  readonly sex = signal<Sex>(this.data.profile.sex ?? 'Unspecified');
-  readonly activityLevel = signal<ActivityLevel>(this.data.profile.activityLevel ?? 'Sedentary');
+  readonly dateOfBirth = signal<string | null>(null);
+  readonly sex = signal<Sex>('Unspecified');
+  readonly activityLevel = signal<ActivityLevel>('Sedentary');
 
-  // ---- optional goal-builder refinements (all skippable; mirror TrackerProfile) ----
-  // Weekly pace is held in the DISPLAYED rate unit (lb/wk or kg/wk) — like weightDisp — and converted
-  // to canonical kg/wk on save. UnitService.rate* reuses the exact kg↔lb factor (a pace is a weight delta).
-  readonly weeklyRateDisp = signal<number | null>(this.toRateDisp(this.data.profile.weeklyRateKg));
-  readonly bodyFatPct = signal<number | null>(this.data.profile.bodyFatPct ?? null);
-  readonly dietPattern = signal<DietPattern>(this.data.profile.dietPattern ?? 'Balanced');
-  readonly trainingType = signal<TrainingType>(this.data.profile.trainingType ?? 'None');
-  readonly proteinBasis = signal<ProteinBasis>(this.data.profile.proteinBasis ?? 'PerBodyweight');
-  readonly lifeStage = signal<LifeStage>(this.data.profile.lifeStage ?? 'None');
-  /** Pregnancy trimester (1..3) — editable only when lifeStage = "Pregnant"; else carried through. */
-  readonly trimester = signal<number | null>(this.data.profile.trimester ?? null);
-  readonly mealsPerDay = signal<number | null>(this.data.profile.mealsPerDay ?? null);
-  readonly eatingWindow = signal<EatingWindow>(this.data.profile.eatingWindow ?? 'None');
-  /**
-   * Free-text dietary restrictions (allergies / foods to avoid). A HARD exclusion for the meal
-   * recommenders — round-tripped as the comma-joined CSV the onboarding card stores. Editable here so a
-   * returning user can review/clear an allergy (previously uneditable on the main edit surface).
-   */
-  readonly restrictions = signal<string | null>(this.data.profile.restrictions ?? null);
-  // ---- Navy-tape circumferences, held in the DISPLAYED unit (in or cm); converted to cm on save ----
-  readonly neckDisp = signal<number | null>(this.toLenDisp(this.data.profile.neckCm));
-  readonly waistDisp = signal<number | null>(this.toLenDisp(this.data.profile.waistCm));
-  readonly hipDisp = signal<number | null>(this.toLenDisp(this.data.profile.hipCm));
+  // ---- optional goal-builder refinements ----
+  /** Weekly pace held in the DISPLAYED rate unit (lb/wk or kg/wk); converted to canonical kg/wk on save. */
+  readonly weeklyRateDisp = signal<number | null>(null);
+  readonly bodyFatPct = signal<number | null>(null);
+  readonly dietPattern = signal<DietPattern>('Balanced');
+  readonly trainingType = signal<TrainingType>('None');
+  readonly proteinBasis = signal<ProteinBasis>('PerBodyweight');
+  readonly lifeStage = signal<LifeStage>('None');
+  readonly trimester = signal<number | null>(null);
+  readonly mealsPerDay = signal<number | null>(null);
+  readonly eatingWindow = signal<EatingWindow>('None');
+  readonly restrictions = signal<string | null>(null);
+
+  // ---- Navy-tape circumferences, held in the DISPLAYED unit (in or cm) ----
+  readonly neckDisp = signal<number | null>(null);
+  readonly waistDisp = signal<number | null>(null);
+  readonly hipDisp = signal<number | null>(null);
   /** Whether the optional "Fine-tune" panel is expanded. */
   readonly refineOpen = signal(false);
 
-  // The dialog's Metric|Imperial toggle edits the central UnitService signal in-flight (seeded below
-  // from the loaded profile; converted to canonical metric on save — the store never changes). All unit
-  // display/parse below reads this one signal so kg/cm/ml render + parse in the user's chosen unit.
-  private readonly _seed = this.units.setLocal(this.data.profile.unitSystem ?? 'Imperial');
   readonly unitSystem = this.units.unitSystem;
   readonly imperial = this.units.imperial;
 
-  /** Weight suffix for the current/goal weight fields ('lb' | 'kg'). */
+  // ---- unit-aware body inputs (display units; converted to metric on save) ----
+  readonly heightCm = signal<number | null>(null);
+  readonly heightFt = signal<number | null>(null);
+  readonly heightIn = signal<number | null>(null);
+  readonly weightDisp = signal<number | null>(null);
+  readonly goalWeightDisp = signal<number | null>(null);
+  readonly hydrationGoalDisp = signal<number | null>(null);
+
+  constructor() {
+    void this.reload();
+  }
+
+  /** Load the profile, seed the form + unit preference, and (when the baseline is set) the plan history. */
+  async reload(): Promise<void> {
+    this.loading.set(true);
+    try {
+      const p = await firstValueFrom(this.api.trackerProfile());
+      this.applyProfile(p);
+    } catch {
+      // No tracker permission / offline — leave the gate to show a fresh baseline form.
+      this.applyProfile(null);
+    } finally {
+      this.loading.set(false);
+    }
+    if (!this.needsBaseline()) void this.loadPlans();
+  }
+
+  private async loadPlans(): Promise<void> {
+    this.plansLoading.set(true);
+    try {
+      this.plans.set(await firstValueFrom(this.api.goalPlans()));
+    } catch {
+      this.plans.set([]);
+    } finally {
+      this.plansLoading.set(false);
+    }
+  }
+
+  /** Seed every form signal + the app-wide unit preference from a loaded profile (or sensible defaults). */
+  private applyProfile(p: TrackerProfileDto | null): void {
+    this.profile.set(p);
+    // Seed the unit preference (display only): existing users from profile.unitSystem, new users Imperial.
+    this.units.setLocal(p?.unitSystem ?? 'Imperial');
+
+    this.goal.set(p?.goal || 'Maintain');
+    this.dailyCalorieGoal.set(p?.dailyCalorieGoal ?? null);
+    this.proteinGoalG.set(p?.proteinGoalG ?? null);
+    this.carbGoalG.set(p?.carbGoalG ?? null);
+    this.fatGoalG.set(p?.fatGoalG ?? null);
+    this.stepGoal.set(p?.stepGoal ?? null);
+    this.coffeeGoalCups.set(p?.coffeeGoalCups ?? null);
+    this.shareWithContacts.set(p?.shareWithContacts ?? false);
+
+    this.dateOfBirth.set(p?.dateOfBirth ?? null);
+    this.sex.set(p?.sex ?? 'Unspecified');
+    this.activityLevel.set(p?.activityLevel ?? 'Sedentary');
+
+    this.weeklyRateDisp.set(this.toRateDisp(p?.weeklyRateKg));
+    this.bodyFatPct.set(p?.bodyFatPct ?? null);
+    this.dietPattern.set(p?.dietPattern ?? 'Balanced');
+    this.trainingType.set(p?.trainingType ?? 'None');
+    this.proteinBasis.set(p?.proteinBasis ?? 'PerBodyweight');
+    this.lifeStage.set(p?.lifeStage ?? 'None');
+    this.trimester.set(p?.trimester ?? null);
+    this.mealsPerDay.set(p?.mealsPerDay ?? null);
+    this.eatingWindow.set(p?.eatingWindow ?? 'None');
+    this.restrictions.set(p?.restrictions ?? null);
+
+    this.neckDisp.set(this.toLenDisp(p?.neckCm));
+    this.waistDisp.set(this.toLenDisp(p?.waistCm));
+    this.hipDisp.set(this.toLenDisp(p?.hipCm));
+
+    this.heightCm.set(p?.heightCm ?? null);
+    if (p?.heightCm != null) {
+      const { ft, in: inches } = this.units.heightToFtIn(p.heightCm);
+      this.heightFt.set(ft);
+      this.heightIn.set(inches);
+    } else {
+      this.heightFt.set(null);
+      this.heightIn.set(null);
+    }
+    this.weightDisp.set(this.toDisp(p?.weightKg));
+    this.goalWeightDisp.set(this.toDisp(p?.goalWeightKg));
+    this.hydrationGoalDisp.set(this.toVolDisp(p?.hydrationGoalMl));
+  }
+
+  // ---- onboarding gate (the VERBATIM 4-field predicate from tracker.ts:638-643) ----
+  /**
+   * True when the caller's OWN baseline is incomplete: any of current weight, height, date of birth, or an
+   * explicit biological sex is missing. Renders the blocking onboarding card in place of the full editor.
+   */
+  readonly needsBaseline = computed(() => {
+    const p = this.profile();
+    return p == null || p.weightKg == null || p.heightCm == null || !p.dateOfBirth || p.sex === 'Unspecified';
+  });
+
+  /** The seed profile for the onboarding card (partial profile prefill). */
+  readonly onboardingSeed = computed<TrackerProfileDto | null>(() => this.profile());
+
+  /**
+   * Complete the blocking baseline onboarding: persist the profile and (when today has no weigh-in yet)
+   * seed today's WeightEntry. Then reload so the gate clears and the full editor renders. Mirrors
+   * Tracker.onBaselineComplete.
+   */
+  async onBaselineComplete(result: OnboardingResult): Promise<void> {
+    if (this.savingBaseline()) return;
+    this.savingBaseline.set(true);
+    try {
+      await this.store.saveProfile(result.profile);
+      const today = this.store.date();
+      const history = await this.store.weightHistory(7).catch(() => []);
+      if (!history.some((w) => w.date === today)) {
+        await this.store.logWeight({ date: today, weightKg: result.weightKg });
+      }
+      await this.reload();
+      this.snack.open('Baseline saved', 'OK', { duration: 2000 });
+    } catch {
+      this.snack.open('Could not save your baseline', 'Dismiss', { duration: 4000 });
+    } finally {
+      this.savingBaseline.set(false);
+    }
+  }
+
+  // ── suffixes ──────────────────────────────────────────────────────────────
   get weightUnit(): string {
     return this.units.weightUnit();
   }
-
-  /** Volume suffix for the hydration-goal field ('fl oz' | 'ml'). */
   get volumeUnit(): string {
     return this.units.volumeUnit();
   }
-
-  /** Circumference suffix for the Navy-tape fields ('in' | 'cm'). */
   get lengthUnit(): string {
     return this.units.lengthUnit();
   }
-
-  /** Weekly-pace suffix for the rate field ('lb/wk' | 'kg/wk'). */
+  /** Weekly-pace suffix ('lb/wk' | 'kg/wk'). */
   get rateUnit(): string {
     return this.units.rateUnit();
   }
-
   /** Sensible step for the weekly-pace input in the active unit (0.1 lb/wk, 0.05 kg/wk). */
   get rateStep(): number {
     return this.units.imperial() ? 0.1 : 0.05;
   }
-
-  /** The canonical kg/wk pace from the in-flight display value (or null) — what the calc + save consume. */
-  readonly weeklyRateKg = computed<number | null>(() => this.currentWeeklyRateKg(this.weeklyRateDisp()));
-
-  /** Localized hydration-goal default for the hint, e.g. "~64 fl oz" / "~2000 ml" (canonical 2000 ml). */
   get hydrationDefaultHint(): string {
     return `~${this.units.formatVolume(2000)}`;
   }
 
-  /** Today as `yyyy-MM-dd` (local) — upper bound for the DOB picker so future dates can't be chosen. */
   readonly todayIso = (() => {
     const d = new Date();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -222,77 +342,46 @@ export class ProfileDialog {
     return `${d.getFullYear()}-${mm}-${dd}`;
   })();
 
-  // ---- unit-aware body inputs (held in the DISPLAYED units, converted to metric on save) ----
-  // Metric: heightCm; Imperial: heightFt + heightIn.
-  readonly heightCm = signal<number | null>(this.data.profile.heightCm ?? null);
-  readonly heightFt = signal<number | null>(null);
-  readonly heightIn = signal<number | null>(null);
-  // Weights stored as DISPLAY values (kg or lb) so editing in imperial keeps precision.
-  readonly weightDisp = signal<number | null>(this.toDisp(this.data.profile.weightKg));
-  readonly goalWeightDisp = signal<number | null>(this.toDisp(this.data.profile.goalWeightKg));
-  // Hydration goal as a DISPLAY value (oz or ml). Optional — null uses the server's 2000 ml default.
-  readonly hydrationGoalDisp = signal<number | null>(
-    this.toVolDisp(this.data.profile.hydrationGoalMl),
-  );
-
-  constructor() {
-    // Seed the imperial height fields from the stored cm.
-    if (this.data.profile.heightCm != null) {
-      const { ft, in: inches } = this.units.heightToFtIn(this.data.profile.heightCm);
-      this.heightFt.set(ft);
-      this.heightIn.set(inches);
-    }
-  }
-
-  /** A canonical kg weight as a DISPLAY value (kg or lb, 1dp) in the user's units. */
+  // ── display ↔ canonical helpers (mirror ProfileDialog) ──────────────────────
   private toDisp(kg: number | null | undefined): number | null {
     if (kg == null) return null;
     return Math.round(this.units.weightToDisplay(kg) * 10) / 10;
   }
-
-  /** A canonical kg/wk pace as a DISPLAY value (lb/wk or kg/wk) in the user's units; null passes through. */
+  private toVolDisp(ml: number | null | undefined): number | null {
+    if (ml == null) return null;
+    return Math.round(this.units.volumeToDisplay(ml));
+  }
+  private toLenDisp(cm: number | null | undefined): number | null {
+    if (cm == null) return null;
+    return Math.round(this.units.lengthToDisplay(cm) * 10) / 10;
+  }
+  /** A canonical kg/wk pace as a DISPLAY value (lb/wk or kg/wk); null passes through. */
   private toRateDisp(kgPerWk: number | null | undefined): number | null {
     if (kgPerWk == null) return null;
-    // 2dp keeps clean lb/wk stops (e.g. 1.10 lb) and sub-kg precision (e.g. -0.50 kg).
     return Math.round(this.units.rateToDisplay(kgPerWk) * 100) / 100;
   }
-
-  /** A display pace (lb/wk or kg/wk) back to canonical kg/wk; null/zero pass through (zero = no preference). */
+  private toCm(disp: number | null): number | null {
+    if (disp == null || disp <= 0) return null;
+    return this.units.lengthToCanonical(disp);
+  }
+  private currentHydrationGoalMl(disp: number | null): number | null {
+    if (disp == null || disp <= 0) return null;
+    return Math.round(this.units.volumeToCanonical(disp));
+  }
+  /** A display pace (lb/wk or kg/wk) back to canonical kg/wk; null passes through (0 = no preference). */
   private currentWeeklyRateKg(disp: number | null): number | null {
     if (disp == null) return null;
     return Math.round(this.units.rateToCanonical(disp) * 1000) / 1000;
   }
 
-  /** A metric volume (ml) as a whole DISPLAY value in the current units (fl oz for Imperial, ml for Metric). */
-  private toVolDisp(ml: number | null | undefined): number | null {
-    if (ml == null) return null;
-    return Math.round(this.units.volumeToDisplay(ml));
-  }
-
-  /** A canonical cm circumference as a DISPLAY value (cm or in, 1dp) in the user's units. */
-  private toLenDisp(cm: number | null | undefined): number | null {
-    if (cm == null) return null;
-    return Math.round(this.units.lengthToDisplay(cm) * 10) / 10;
-  }
-
-  /** A display circumference value (in or cm) back to canonical cm (or null when empty/non-positive). */
-  private toCm(disp: number | null): number | null {
-    if (disp == null || disp <= 0) return null;
-    return this.units.lengthToCanonical(disp);
-  }
-
-  /** Convert the display hydration-goal value back to metric ml (or null when empty/non-positive). */
-  private currentHydrationGoalMl(disp: number | null): number | null {
-    if (disp == null || disp <= 0) return null;
-    return Math.round(this.units.volumeToCanonical(disp));
-  }
+  /** The canonical kg/wk pace from the in-flight display value — what the calc + save consume. */
+  readonly weeklyRateKg = computed<number | null>(() => this.currentWeeklyRateKg(this.weeklyRateDisp()));
 
   /** Switch units — convert the in-flight display values so the user sees the same body in new units. */
   onUnitChange(sys: UnitSystem): void {
     if (sys === this.unitSystem()) return;
     const toImperial = sys === 'Imperial';
 
-    // Read every in-flight value back to canonical metric WHILE the service still reflects the OLD unit…
     const cm = this.currentHeightCm();
     const wKg = this.currentWeightKg(this.weightDisp());
     const gKg = this.currentWeightKg(this.goalWeightDisp());
@@ -302,7 +391,6 @@ export class ProfileDialog {
     const hipCm = this.toCm(this.hipDisp());
     const rateKg = this.currentWeeklyRateKg(this.weeklyRateDisp());
 
-    // …flip the central unit signal, then re-emit each value as a DISPLAY value in the NEW unit.
     this.units.setLocal(sys);
 
     if (cm != null) {
@@ -317,15 +405,12 @@ export class ProfileDialog {
     this.weightDisp.set(this.toDisp(wKg));
     this.goalWeightDisp.set(this.toDisp(gKg));
     this.hydrationGoalDisp.set(this.toVolDisp(hydMl));
-    // Re-emit the Navy-tape circumferences in the new unit too.
     this.neckDisp.set(this.toLenDisp(neckCm));
     this.waistDisp.set(this.toLenDisp(waistCm));
     this.hipDisp.set(this.toLenDisp(hipCm));
-    // Re-emit the weekly pace in the new unit (canonical kg/wk preserved across the flip).
     this.weeklyRateDisp.set(this.toRateDisp(rateKg));
   }
 
-  /** The current height in cm from whichever unit fields are active. */
   private currentHeightCm(): number | null {
     if (this.imperial()) {
       const ft = this.heightFt(),
@@ -337,7 +422,6 @@ export class ProfileDialog {
     return cm != null && cm > 0 ? cm : null;
   }
 
-  /** Convert a display weight value to metric kg (or null). */
   private currentWeightKg(disp: number | null): number | null {
     if (disp == null || disp <= 0) return null;
     return this.units.weightToCanonical(disp);
@@ -362,18 +446,27 @@ export class ProfileDialog {
   }));
 
   readonly preview = computed(() => computeStats(this.statsInputs()));
-
   readonly hasSuggestion = computed(() => this.preview().suggestedCalorieGoal != null);
-
-  /** True only while lifeStage = "Pregnant" — gates the trimester select. */
   readonly showTrimester = computed(() => this.lifeStage() === 'Pregnant');
 
-  /**
-   * U.S. Navy body-fat estimate (log10 formula) from the tape measurements + height + sex. All inputs are
-   * converted to canonical cm via the central UnitService. Null when the fields for the user's sex are
-   * missing — echoed live under the tape inputs so the user can sanity-check before saving. Ported from
-   * the onboarding card so the same numbers appear on both surfaces.
-   */
+  /** Estimate confidence (mirrors OnboardingCard): "high" once body-fat is known, "med" with TDEE, else "low". */
+  readonly confidence = computed<'low' | 'med' | 'high'>(() => {
+    const s = this.preview();
+    if (s.tdee == null) return 'low';
+    if (this.bodyFatPct() != null) return 'high';
+    return 'med';
+  });
+  readonly confidenceLabel = computed(() => {
+    switch (this.confidence()) {
+      case 'high':
+        return 'High confidence';
+      case 'med':
+        return 'Good estimate';
+      default:
+        return 'Rough estimate';
+    }
+  });
+
   readonly navyBodyFatPct = computed<number | null>(() => {
     const heightCm = this.currentHeightCm();
     const sex = this.sex();
@@ -399,24 +492,16 @@ export class ProfileDialog {
     return pct > 0 && pct < 100 ? pct : null;
   });
 
-  /** Apply the live Navy estimate into the body-fat % field (one-tap "use this"). */
   applyNavyBodyFat(): void {
     const bf = this.navyBodyFatPct();
     if (bf != null) this.bodyFatPct.set(bf);
   }
 
-  /**
-   * A compact, read-only digest of what the AI meal recommenders are told — eating style + restrictions
-   * (the hard exclusions) + signed pace — so the user can see WHY the AI excluded foods / chose a split.
-   * e.g. "Keto · no peanuts · cutting 0.5 kg/wk". Empty when there's nothing meaningful to show.
-   */
+  /** A compact read-only digest of what the AI meal recommenders are told (eating style · restrictions · pace). */
   readonly dietSummary = computed<string[]>(() => {
     const parts: string[] = [];
-
     const pat = this.dietPattern();
-    if (pat && pat !== 'Balanced') {
-      parts.push(DIET_PATTERNS.find((d) => d.value === pat)?.label ?? pat);
-    }
+    if (pat && pat !== 'Balanced') parts.push(DIET_PATTERNS.find((d) => d.value === pat)?.label ?? pat);
 
     const raw = (this.restrictions() ?? '').trim();
     if (raw) {
@@ -435,25 +520,16 @@ export class ProfileDialog {
     }
 
     const win = this.eatingWindow();
-    if (win && win !== 'None') {
-      parts.push(win === 'OMAD' ? 'OMAD' : win.replace('W', '').replace('x', ':'));
-    }
-
+    if (win && win !== 'None') parts.push(win === 'OMAD' ? 'OMAD' : win.replace('W', '').replace('x', ':'));
     return parts;
   });
 
-  // ---- non-blocking check-in banner (weight drift vs the goal basis, or a stale baseline) ----
-  /** Dismissed for this dialog session (the banner is informational, never blocking). */
+  // ---- non-blocking check-in banner ----
   readonly checkInDismissed = signal(false);
-
-  /**
-   * Surfaces a one-tap recompute when the saved goal looks out of date: the latest weight has drifted
-   * past ~1.5 kg from the basis the goal was computed against, OR the baseline hasn't been reviewed in
-   * ~90 days. Reads only the LOADED profile (data.profile); null when there's nothing to flag.
-   */
   readonly checkIn = computed<{ reason: string } | null>(() => {
     if (this.checkInDismissed()) return null;
-    const p = this.data.profile;
+    const p = this.profile();
+    if (!p) return null;
     const latestKg = p.weightKg;
 
     if (p.goalBasisWeightKg != null && latestKg != null) {
@@ -474,14 +550,12 @@ export class ProfileDialog {
     return null;
   });
 
-  /** One-tap recompute: fill the goals from the live deterministic estimate and re-anchor the check-in basis. */
   recomputeFromCheckIn(): void {
     this.useSuggested();
     this.checkInDismissed.set(true);
     this.snack.open('Targets recomputed — review and Save to keep them.', 'OK', { duration: 4000 });
   }
 
-  /** Fill the daily calorie goal + macro targets from the live suggestion. */
   useSuggested(): void {
     const s = this.preview();
     if (s.suggestedCalorieGoal != null) this.dailyCalorieGoal.set(s.suggestedCalorieGoal);
@@ -490,23 +564,15 @@ export class ProfileDialog {
     if (s.suggestedFatG != null) this.fatGoalG.set(s.suggestedFatG);
   }
 
-  // ---- AI goal suggestion (Gemini-backed; reads the caller's own profile server-side) ----
-  /** True while suggest-goal is in flight. */
+  // ---- AI goal suggestion ----
   readonly aiLoading = signal(false);
-  /** The model's one-sentence rationale, shown as helper text under the goal fields. */
   readonly aiRationale = signal<string | null>(null);
-  /** Polite sr-only announcement of the AI suggestion (or its unavailability). */
   readonly aiAnnounce = signal('');
-  /** Provenance of the last suggestion: "ai" (model, validated) or "formula" (deterministic). Null until one runs. */
   readonly aiSource = signal<'ai' | 'formula' | null>(null);
-  /** Result confidence from the last suggestion ("low" | "med" | "high"), or null. */
   readonly aiConfidence = signal<string | null>(null);
-  /** Suggested daily-calorie band [min, max] from the last suggestion, or null. */
   readonly aiBand = signal<{ min: number; max: number } | null>(null);
-  /** A short safety caveat from the last suggestion (e.g. aggressive deficit), or null. */
   readonly aiSafety = signal<string | null>(null);
 
-  /** Human label for the provenance chip: AI vs the deterministic formula fallback. */
   readonly aiSourceLabel = computed(() => {
     const src = this.aiSource();
     if (src === 'ai') return 'AI-tailored';
@@ -514,20 +580,12 @@ export class ProfileDialog {
     return null;
   });
 
-  /**
-   * Ask Gemini to suggest a daily calorie + macro goal (it reads the caller's saved profile server-side,
-   * NOT the unsaved in-dialog edits), then PREFILL the editable goal fields. The rationale renders as
-   * helper text. A 503/unavailable leaves the fields untouched + editable and shows a snackbar.
-   */
   async suggestWithAi(): Promise<void> {
     if (this.aiLoading()) return;
     this.aiLoading.set(true);
     this.aiAnnounce.set('Suggesting a goal with AI…');
     try {
       const res = await firstValueFrom(this.api.suggestGoal());
-      // Prefill the editable fields — a suggestion the user can adjust before saving. The endpoint always
-      // returns a usable result: a model suggestion (source "ai") or the deterministic TrackerStats
-      // fallback (source "formula") when Gemini is unconfigured / fails validation — never a dead-end.
       this.dailyCalorieGoal.set(res.calorieTarget);
       this.proteinGoalG.set(res.proteinG);
       this.carbGoalG.set(res.carbsG);
@@ -535,9 +593,7 @@ export class ProfileDialog {
       this.aiRationale.set(res.rationale ?? null);
       this.aiSource.set(res.source === 'ai' ? 'ai' : 'formula');
       this.aiConfidence.set(res.confidence ?? null);
-      this.aiBand.set(
-        res.calorieMin && res.calorieMax ? { min: res.calorieMin, max: res.calorieMax } : null,
-      );
+      this.aiBand.set(res.calorieMin && res.calorieMax ? { min: res.calorieMin, max: res.calorieMax } : null);
       this.aiSafety.set(res.safetyNote ?? null);
       const lead = res.source === 'ai' ? 'AI suggested' : 'Calculated a';
       this.aiAnnounce.set(
@@ -547,8 +603,6 @@ export class ProfileDialog {
           (res.rationale ? ` ${res.rationale}` : ''),
       );
     } catch {
-      // A normal response always carries prefillable numbers; this only fires on a true network failure.
-      // Fall back to the local deterministic estimate so the user is never dead-ended.
       this.useSuggested();
       this.aiRationale.set(null);
       this.aiSource.set('formula');
@@ -556,36 +610,21 @@ export class ProfileDialog {
       this.aiBand.set(null);
       this.aiSafety.set(null);
       this.aiAnnounce.set('Used a calculated estimate (AI offline). Adjust as you like.');
-      this.snack.open('AI offline — filled a calculated estimate you can adjust', 'OK', {
-        duration: 4000,
-      });
+      this.snack.open('AI offline — filled a calculated estimate you can adjust', 'OK', { duration: 4000 });
     } finally {
       this.aiLoading.set(false);
     }
   }
 
-  // ---- AI natural-goal ("Describe your goal" → structured plan; Gemini-backed) ----
-  /** The free-text goal the user types ("lose 10 lbs in 3 months"). */
+  // ---- AI natural-goal ----
   readonly goalText = signal('');
-  /** True while natural-goal is in flight. */
   readonly goalLoading = signal(false);
-  /** The parsed plan's timeline (e.g. "~0.8 lb/week over 12 weeks"), shown as helper text. Null when none. */
   readonly goalTimeline = signal<string | null>(null);
-  /** The model's "is this realistic?" verdict for the parsed plan; null until a parse runs. */
   readonly goalRealistic = signal<boolean | null>(null);
-  /** The model's one-line rationale for the parsed plan, shown as helper text. */
   readonly goalRationale = signal<string | null>(null);
 
-  readonly canDescribeGoal = computed(
-    () => this.goalText().trim().length > 0 && !this.goalLoading(),
-  );
+  readonly canDescribeGoal = computed(() => this.goalText().trim().length > 0 && !this.goalLoading());
 
-  /**
-   * Turn the free-text goal into a structured plan (POST /api/ai/natural-goal) and PREFILL the editable
-   * calorie + macro goal fields — never auto-committed; the user adjusts then Saves. The timeline and a
-   * "realistic" check render as helper text. A 503/unavailable leaves the fields untouched + editable and
-   * shows a snackbar so the user can set the goal manually.
-   */
   async describeGoalWithAi(): Promise<void> {
     const text = this.goalText().trim();
     if (!text || this.goalLoading()) return;
@@ -593,9 +632,6 @@ export class ProfileDialog {
     this.aiAnnounce.set('Reading your goal with AI…');
     try {
       const res = await firstValueFrom(this.api.naturalGoal({ text }));
-      // Prefill the editable fields — a suggestion the user can adjust before saving. Always usable:
-      // a parsed plan (source "ai") or the deterministic baseline (source "formula") when the model is
-      // unconfigured / fails validation. `realistic` is forced false for an over-aggressive implied pace.
       this.dailyCalorieGoal.set(res.calorieTarget);
       this.proteinGoalG.set(res.proteinG);
       this.carbGoalG.set(res.carbsG);
@@ -605,13 +641,9 @@ export class ProfileDialog {
       this.goalRationale.set(res.rationale ?? null);
       this.aiSource.set(res.source === 'ai' ? 'ai' : 'formula');
       this.aiConfidence.set(res.confidence ?? null);
-      this.aiBand.set(
-        res.calorieMin && res.calorieMax ? { min: res.calorieMin, max: res.calorieMax } : null,
-      );
+      this.aiBand.set(res.calorieMin && res.calorieMax ? { min: res.calorieMin, max: res.calorieMax } : null);
       this.aiSafety.set(res.safetyNote ?? null);
-      const verdict = res.realistic
-        ? 'This timeline looks realistic.'
-        : 'This timeline may be aggressive.';
+      const verdict = res.realistic ? 'This timeline looks realistic.' : 'This timeline may be aggressive.';
       const lead = res.source === 'ai' ? 'AI set a goal of' : 'Calculated a goal of';
       this.aiAnnounce.set(
         `${lead} ${res.calorieTarget} calories per day: ${res.proteinG} grams protein, ` +
@@ -622,7 +654,6 @@ export class ProfileDialog {
           (res.rationale ? ` ${res.rationale}` : ''),
       );
     } catch {
-      // Only a true network failure reaches here; fall back to the local deterministic estimate.
       this.useSuggested();
       this.goalTimeline.set(null);
       this.goalRealistic.set(null);
@@ -632,42 +663,67 @@ export class ProfileDialog {
       this.aiBand.set(null);
       this.aiSafety.set(null);
       this.aiAnnounce.set('Used a calculated estimate (AI offline). Adjust as you like.');
-      this.snack.open('AI offline — filled a calculated estimate you can adjust', 'OK', {
-        duration: 4000,
-      });
+      this.snack.open('AI offline — filled a calculated estimate you can adjust', 'OK', { duration: 4000 });
     } finally {
       this.goalLoading.set(false);
     }
+  }
+
+  // ---- plan-history rendering helpers (unit-aware) ----
+  readonly goalLabel = (g: string): string => GOALS.find((x) => x.value === g)?.label ?? g;
+  readonly activityLabel = (a: string | undefined): string =>
+    a ? (ACTIVITY_LEVELS.find((x) => x.value === a)?.label ?? a) : '';
+  readonly dietLabel = (d: string | undefined): string =>
+    d ? (DIET_PATTERNS.find((x) => x.value === d)?.label ?? d) : '';
+
+  /** Format a plan's signed pace via the unit-aware rate seam, e.g. "−1.1 lb/wk" / "+0.25 kg/wk". */
+  planRate(kgPerWk: number | null | undefined): string | null {
+    if (kgPerWk == null || kgPerWk === 0) return null;
+    const disp = this.units.rateToDisplay(Math.abs(kgPerWk));
+    const sign = kgPerWk < 0 ? '−' : '+';
+    return `${sign}${disp.toFixed(disp < 1 ? 2 : 1)} ${this.units.rateUnit()}`;
+  }
+
+  /** Format a plan's snapshot weight (kg) via the unit-aware seam, e.g. "165.3 lb". */
+  planWeight(kg: number | null | undefined): string | null {
+    return this.units.formatWeight(kg, 1);
+  }
+
+  /** Friendly effective-from label; the sentinel "0001-01-01" reads as the initial plan. */
+  planEffectiveFrom(date: string): string {
+    if (!date || date.startsWith('0001-01-01')) return 'Initial plan';
+    const d = new Date(date + 'T00:00:00');
+    if (!Number.isFinite(d.getTime())) return date;
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   private num(v: number | null): number | undefined {
     return v != null && v >= 0 ? v : undefined;
   }
 
-  save(): void {
+  /** Persist the full profile (versioning a GoalPlan server-side when targets change), then reload. */
+  async save(): Promise<void> {
+    if (this.saving()) return;
+    this.saving.set(true);
+
     const heightCm = this.currentHeightCm();
     const weightKg = this.currentWeightKg(this.weightDisp());
     const goalWeightKg = this.currentWeightKg(this.goalWeightDisp());
     const hydrationGoalMl = this.currentHydrationGoalMl(this.hydrationGoalDisp());
-
     const roundedWeight = weightKg != null ? Math.round(weightKg * 100) / 100 : undefined;
-    // Re-anchor the check-in basis when the user acted on the banner (recompute) so drift resets cleanly;
-    // otherwise carry the existing basis forward untouched.
     const reAnchor = this.checkInDismissed();
 
-    // Navy-tape circumferences back to canonical cm (1 dp, like onboarding), null when blank.
     const neckCm = this.toCm(this.neckDisp());
     const waistCm = this.toCm(this.waistDisp());
     const hipCm = this.toCm(this.hipDisp());
-    // Restrictions round-trip the comma-joined CSV; normalise to a clean CSV (or null when cleared).
     const restrictionsCsv =
       (this.restrictions() ?? '')
         .split(',')
         .map((t) => t.trim())
         .filter((t) => t.length > 0)
         .join(', ') || null;
-    // Trimester is only meaningful while pregnant; drop it otherwise so switching life stage clears it.
     const trimester = this.lifeStage() === 'Pregnant' ? this.num(this.trimester()) : undefined;
+    const prev = this.profile();
 
     const body: TrackerProfileDto = {
       goal: this.goal(),
@@ -686,7 +742,6 @@ export class ProfileDialog {
       hydrationGoalMl: hydrationGoalMl ?? undefined,
       stepGoal: this.num(this.stepGoal()),
       coffeeGoalCups: this.num(this.coffeeGoalCups()),
-      // ---- optional goal-builder refinements (all skippable) ----
       weeklyRateKg: this.weeklyRateKg() ?? undefined,
       bodyFatPct: this.num(this.bodyFatPct()),
       neckCm: neckCm != null ? Math.round(neckCm * 10) / 10 : undefined,
@@ -700,22 +755,24 @@ export class ProfileDialog {
       trimester,
       mealsPerDay: this.num(this.mealsPerDay()),
       eatingWindow: this.eatingWindow(),
-      // Check-in bookkeeping: on a recompute, re-anchor to the current weight + now; else preserve.
-      goalBasisWeightKg: reAnchor ? roundedWeight : (this.data.profile.goalBasisWeightKg ?? undefined),
-      baselineReviewedUtc: reAnchor
-        ? new Date().toISOString()
-        : (this.data.profile.baselineReviewedUtc ?? undefined),
+      goalBasisWeightKg: reAnchor ? roundedWeight : (prev?.goalBasisWeightKg ?? undefined),
+      baselineReviewedUtc: reAnchor ? new Date().toISOString() : (prev?.baselineReviewedUtc ?? undefined),
     };
-    this.ref.close(body);
+
+    try {
+      // Save through the store so the tracker day/totals also refresh; then reload the page form + history.
+      await this.store.saveProfile(body);
+      await this.reload();
+      this.snack.open('Profile saved', 'OK', { duration: 2000 });
+    } catch {
+      this.snack.open('Could not save your profile', 'Dismiss', { duration: 4000 });
+    } finally {
+      this.saving.set(false);
+    }
   }
 
-  cancel(): void {
-    this.ref.close();
-  }
-
-  /** Close this quick-edit dialog and open the full "My Profile & Goal" page (incl. plan history). */
-  openFullEditor(): void {
-    this.ref.close();
-    void this.router.navigate(['/tracker/profile']);
+  /** Back to the tracker dashboard. */
+  backToTracker(): void {
+    void this.router.navigate(['/tracker']);
   }
 }

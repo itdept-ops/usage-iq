@@ -7,7 +7,7 @@ import {
   FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChoreSource, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, Allowance, AllowanceMe, AllowanceMoveRequest, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, RecipeBreakdownResult, Recipe, RecipeUpsertRequest, RecipeFromBreakdownRequest, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation,
   AddSupplementRequest, SupplementEntryDto, SupplementMacrosRequest, SupplementMacrosResponse,
   AddSleepRequest, SleepEntryDto, ClientInfoRequest,
-  CoffeeEntryDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
+  CoffeeEntryDto, GoalPlanDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   AiUsageFilter, AiUsageResponse,
   NotificationUpdate, DiscordRoute, DiscordRouteUpdate, MyDiscord, MyDiscordUpdate, RecapPreview, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, ParseMealResultDto, PermissionItem, PermissionPreset, Presence, PersonDto, NudgeKind, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, ScanPantryResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
@@ -922,6 +922,15 @@ export class Api {
   /** Persist the caller's tracker profile / goals; returns the saved row. */
   saveTrackerProfile(body: TrackerProfileDto): Observable<TrackerProfileDto> {
     return this.http.put<TrackerProfileDto>(`${this.base}/tracker/profile`, body);
+  }
+
+  /**
+   * The caller's dated goal-plan history (newest-first). Each save that changes a target field versions a
+   * new plan server-side; the top row is the one active today. Owner-only (no `?user=`). Used by the Plan
+   * History section of the My Profile & Goal page.
+   */
+  goalPlans(): Observable<GoalPlanDto[]> {
+    return this.http.get<GoalPlanDto[]>(`${this.base}/tracker/goal-plans`);
   }
 
   /** People whose tracker the caller may view read-only. */

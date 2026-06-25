@@ -175,9 +175,9 @@
                 <span class="micro-label">How fast?</span>
                 <span class="ob__rate-val">{{ rateLabel() }}</span>
               </div>
-              <mat-slider class="ob__rate-slider" [min]="rateMin()" [max]="rateMax()" step="0.05" discrete>
-                <input matSliderThumb [ngModel]="effectiveWeeklyRateKg()"
-                       (ngModelChange)="weeklyRateKg.set($event)" />
+              <mat-slider class="ob__rate-slider" [min]="rateMin()" [max]="rateMax()" [step]="rateStep()" discrete>
+                <input matSliderThumb [ngModel]="effectiveWeeklyRateDisp()"
+                       (ngModelChange)="setWeeklyRateFromDisp($event)" />
               </mat-slider>
               <p class="ob__note">Faster isn’t always better — a steady pace is easier to hold.</p>
             </div>

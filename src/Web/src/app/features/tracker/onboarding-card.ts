@@ -235,15 +235,51 @@ export class OnboardingCard implements OnInit, AfterViewInit {
     () => this.goal() === 'LoseWeight' || this.goal() === 'GainMuscle',
   );
 
-  /** The signed slider bounds for the goal-pace control (kg/wk), narrower toward the goal direction. */
-  readonly rateMin = computed(() => (this.goal() === 'LoseWeight' ? -1.0 : 0));
-  readonly rateMax = computed(() => (this.goal() === 'GainMuscle' ? 0.5 : 0));
+  /**
+   * The signed slider bounds in the DISPLAYED rate unit (lb/wk or kg/wk). The canonical domain is kg/wk
+   * (−1.0…0.5, narrower toward the goal direction); the bounds + thumb + step all operate in display units
+   * so an Imperial user gets sensible lb/wk stops, then `rateToCanonical` stores kg. The canonical bounds
+   * are rounded to clean display stops (±0.5 lb / ±2.5 lb in imperial) so the end-stops aren't 1.1023 lb.
+   */
+  private readonly rateMinKg = computed(() => (this.goal() === 'LoseWeight' ? -1.0 : 0));
+  private readonly rateMaxKg = computed(() => (this.goal() === 'GainMuscle' ? 0.5 : 0));
+
+  /** Step in the active unit: 0.5 lb/wk (clean imperial stops) or 0.05 kg/wk. */
+  readonly rateStep = computed(() => (this.units.imperial() ? 0.5 : 0.05));
+
+  /** Lower slider bound in the displayed unit, snapped to a clean step (kg→lb when imperial). */
+  readonly rateMin = computed(() =>
+    this.snapRate(this.units.rateToDisplay(this.rateMinKg()), 'floor'),
+  );
+
+  /** Upper slider bound in the displayed unit, snapped to a clean step (kg→lb when imperial). */
+  readonly rateMax = computed(() =>
+    this.snapRate(this.units.rateToDisplay(this.rateMaxKg()), 'ceil'),
+  );
+
+  /** The effective pace as a DISPLAY value (lb/wk or kg/wk) — what the slider thumb binds to. */
+  readonly effectiveWeeklyRateDisp = computed(() =>
+    this.snapRate(this.units.rateToDisplay(this.effectiveWeeklyRateKg()), 'round'),
+  );
+
+  /** Snap a display-unit rate to the active step so the thumb/end-stops land on clean values. */
+  private snapRate(value: number, mode: 'floor' | 'ceil' | 'round'): number {
+    const step = this.rateStep();
+    const n = value / step;
+    const snapped = (mode === 'floor' ? Math.floor(n) : mode === 'ceil' ? Math.ceil(n) : Math.round(n)) * step;
+    return Math.round(snapped * 100) / 100;
+  }
+
+  /** A display-unit pace from the slider thumb back to canonical kg/wk for storage. */
+  setWeeklyRateFromDisp(disp: number): void {
+    this.weeklyRateKg.set(Math.round(this.units.rateToCanonical(disp) * 1000) / 1000);
+  }
 
   /** A localized "≈ X lb/wk" / "≈ X kg/wk" label for the current rate (or the goal default). */
   readonly rateLabel = computed(() => {
     const r = this.effectiveWeeklyRateKg();
     if (r === 0) return 'Maintain';
-    const disp = this.units.imperial() ? Math.abs(r) * 2.2046226 : Math.abs(r);
+    const disp = Math.abs(this.units.rateToDisplay(r));
     const unit = this.units.weightUnit();
     const dir = r < 0 ? 'lose' : 'gain';
     return `${dir} ~${disp.toFixed(disp < 1 ? 2 : 1)} ${unit}/wk`;

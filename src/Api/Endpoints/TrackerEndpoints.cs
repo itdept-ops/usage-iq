@@ -587,6 +587,19 @@ public static class TrackerEndpoints
             return Results.Ok(ToProfileDto(profile));
         }).RequirePermission(Permissions.TrackerSelf);
 
+        // ---- The caller's GOAL-PLAN HISTORY (dated list of past plans + their targets, OWNER-ONLY) ----
+        // A goal-history timeline is private body data — no ?user= param, no CanViewAsync — exactly like
+        // GET /weight and /weight/stats. Newest-first; the 0001-01-01 backfill row is the "initial" plan.
+        g.MapGet("/goal-plans", async (CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+            var plans = await db.GoalPlans.AsNoTracking()
+                .Where(p => p.UserEmail == caller.Email)
+                .OrderByDescending(p => p.EffectiveFrom)
+                .ToListAsync(ct);
+            return Results.Ok(plans.Select(ToGoalPlanDto).ToArray());
+        }).RequirePermission(Permissions.TrackerSelf);
+
         // ---- Update the caller's profile ----
         g.MapPut("/profile", async (
             TrackerProfileDto req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
@@ -594,42 +607,72 @@ public static class TrackerEndpoints
             var caller = (await me.GetUserAsync(ct))!;
             var profile = await GetOrCreateProfileAsync(db, caller.Email, ct);
 
-            profile.Goal = Enum.TryParse<TrackerGoal>(req.Goal, ignoreCase: true, out var g) ? g : TrackerGoal.Maintain;
-            profile.WeightKg = Positive(req.WeightKg);
-            profile.DailyCalorieGoal = Positive(req.DailyCalorieGoal);
-            profile.ProteinGoalG = Positive(req.ProteinGoalG);
-            profile.CarbGoalG = Positive(req.CarbGoalG);
-            profile.FatGoalG = Positive(req.FatGoalG);
-            profile.ShareWithContacts = req.ShareWithContacts;
-            profile.DateOfBirth = TryParseDate(req.DateOfBirth, out var dob) ? dob : null;
-            profile.HeightCm = Positive(req.HeightCm);
-            profile.Sex = Enum.TryParse<BiologicalSex>(req.Sex, ignoreCase: true, out var sex) ? sex : BiologicalSex.Unspecified;
-            profile.ActivityLevel = Enum.TryParse<ActivityLevel>(req.ActivityLevel, ignoreCase: true, out var act) ? act : ActivityLevel.Sedentary;
-            profile.GoalWeightKg = Positive(req.GoalWeightKg);
-            profile.UnitSystem = Enum.TryParse<UnitSystem>(req.UnitSystem, ignoreCase: true, out var unit) ? unit : UnitSystem.Metric;
-            profile.HydrationGoalMl = Positive(req.HydrationGoalMl);
-            profile.CoffeeGoalCups = Positive(req.CoffeeGoalCups);
-            profile.StepGoal = Positive(req.StepGoal);
+            // The request → profile mapping, as a local function so the same-day race-recovery path can
+            // re-apply it to a freshly-reloaded profile (a failed SaveChanges rolls back the in-place edit).
+            void ApplyProfileEdits(TrackerProfile p)
+            {
+                p.Goal = Enum.TryParse<TrackerGoal>(req.Goal, ignoreCase: true, out var g) ? g : TrackerGoal.Maintain;
+                p.WeightKg = Positive(req.WeightKg);
+                p.DailyCalorieGoal = Positive(req.DailyCalorieGoal);
+                p.ProteinGoalG = Positive(req.ProteinGoalG);
+                p.CarbGoalG = Positive(req.CarbGoalG);
+                p.FatGoalG = Positive(req.FatGoalG);
+                p.ShareWithContacts = req.ShareWithContacts;
+                p.DateOfBirth = TryParseDate(req.DateOfBirth, out var dob) ? dob : null;
+                p.HeightCm = Positive(req.HeightCm);
+                p.Sex = Enum.TryParse<BiologicalSex>(req.Sex, ignoreCase: true, out var sex) ? sex : BiologicalSex.Unspecified;
+                p.ActivityLevel = Enum.TryParse<ActivityLevel>(req.ActivityLevel, ignoreCase: true, out var act) ? act : ActivityLevel.Sedentary;
+                p.GoalWeightKg = Positive(req.GoalWeightKg);
+                p.UnitSystem = Enum.TryParse<UnitSystem>(req.UnitSystem, ignoreCase: true, out var unit) ? unit : UnitSystem.Metric;
+                p.HydrationGoalMl = Positive(req.HydrationGoalMl);
+                p.CoffeeGoalCups = Positive(req.CoffeeGoalCups);
+                p.StepGoal = Positive(req.StepGoal);
 
-            // --- optional goal-builder refinements (all nullable / neutral-default; never required) ---
-            profile.WeeklyRateKg = req.WeeklyRateKg is { } wr && double.IsFinite(wr) ? Math.Clamp(wr, -2, 2) : null;
-            profile.BodyFatPct = req.BodyFatPct is { } bf && double.IsFinite(bf) && bf >= 0 && bf <= 75 ? bf : null;
-            profile.NeckCm = Positive(req.NeckCm);
-            profile.WaistCm = Positive(req.WaistCm);
-            profile.HipCm = Positive(req.HipCm);
-            profile.DietPattern = Enum.TryParse<DietPattern>(req.DietPattern, ignoreCase: true, out var diet) ? diet : DietPattern.Balanced;
-            profile.Restrictions = Trunc(string.IsNullOrWhiteSpace(req.Restrictions) ? null : req.Restrictions.Trim(), 500);
-            profile.TrainingType = Enum.TryParse<TrainingType>(req.TrainingType, ignoreCase: true, out var tt) ? tt : TrainingType.None;
-            profile.ProteinBasis = Enum.TryParse<ProteinBasis>(req.ProteinBasis, ignoreCase: true, out var pb) ? pb : ProteinBasis.PerBodyweight;
-            profile.LifeStage = Enum.TryParse<LifeStage>(req.LifeStage, ignoreCase: true, out var ls) ? ls : LifeStage.None;
-            profile.Trimester = req.Trimester is { } tr && tr >= 1 && tr <= 3 ? tr : null;
-            profile.MealsPerDay = req.MealsPerDay is { } mpd && mpd >= 1 && mpd <= 12 ? mpd : null;
-            profile.EatingWindow = Enum.TryParse<EatingWindow>(req.EatingWindow, ignoreCase: true, out var ew) ? ew : EatingWindow.None;
-            profile.GoalBasisWeightKg = Positive(req.GoalBasisWeightKg);
-            profile.BaselineReviewedUtc = TryParseUtc(req.BaselineReviewedUtc, out var reviewed) ? reviewed : null;
+                // --- optional goal-builder refinements (all nullable / neutral-default; never required) ---
+                p.WeeklyRateKg = req.WeeklyRateKg is { } wr && double.IsFinite(wr) ? Math.Clamp(wr, -2, 2) : null;
+                p.BodyFatPct = req.BodyFatPct is { } bf && double.IsFinite(bf) && bf >= 0 && bf <= 75 ? bf : null;
+                p.NeckCm = Positive(req.NeckCm);
+                p.WaistCm = Positive(req.WaistCm);
+                p.HipCm = Positive(req.HipCm);
+                p.DietPattern = Enum.TryParse<DietPattern>(req.DietPattern, ignoreCase: true, out var diet) ? diet : DietPattern.Balanced;
+                p.Restrictions = Trunc(string.IsNullOrWhiteSpace(req.Restrictions) ? null : req.Restrictions.Trim(), 500);
+                p.TrainingType = Enum.TryParse<TrainingType>(req.TrainingType, ignoreCase: true, out var tt) ? tt : TrainingType.None;
+                p.ProteinBasis = Enum.TryParse<ProteinBasis>(req.ProteinBasis, ignoreCase: true, out var pb) ? pb : ProteinBasis.PerBodyweight;
+                p.LifeStage = Enum.TryParse<LifeStage>(req.LifeStage, ignoreCase: true, out var ls) ? ls : LifeStage.None;
+                p.Trimester = req.Trimester is { } tr && tr >= 1 && tr <= 3 ? tr : null;
+                p.MealsPerDay = req.MealsPerDay is { } mpd && mpd >= 1 && mpd <= 12 ? mpd : null;
+                p.EatingWindow = Enum.TryParse<EatingWindow>(req.EatingWindow, ignoreCase: true, out var ew) ? ew : EatingWindow.None;
+                p.GoalBasisWeightKg = Positive(req.GoalBasisWeightKg);
+                p.BaselineReviewedUtc = TryParseUtc(req.BaselineReviewedUtc, out var reviewed) ? reviewed : null;
+                p.UpdatedUtc = DateTime.UtcNow;
+            }
 
-            profile.UpdatedUtc = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
+            ApplyProfileEdits(profile);
+
+            // SAVE = VERSION: stamp a GoalPlan effective TODAY when a target changed (upsert per (user,
+            // today); unchanged saves write nothing). Added to the context here, persisted by the save below
+            // in the SAME transaction so the profile and its today-plan never diverge.
+            var today = DateOnly.FromDateTime(
+                TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, await DisplayTzAsync(db, ct)));
+            await UpsertTodayPlanAsync(db, profile, today, ct);
+
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                // A concurrent same-day save inserted the (user, today) plan first; the unique
+                // (UserEmail, EffectiveFrom) index rejected our insert AND rolled back the profile edit.
+                // Reload, re-apply the profile edits, overwrite the winning plan with our targets, re-save.
+                db.ChangeTracker.Clear();
+                profile = await GetOrCreateProfileAsync(db, caller.Email, ct);
+                ApplyProfileEdits(profile);
+                var winner = await db.GoalPlans
+                    .FirstAsync(p => p.UserEmail == caller.Email && p.EffectiveFrom == today, ct);
+                ApplyPlanSnapshot(winner, profile);
+                await db.SaveChangesAsync(ct);
+            }
             return Results.Ok(ToProfileDto(profile));
         }).RequirePermission(Permissions.TrackerSelf);
 
@@ -1580,6 +1623,17 @@ public static class TrackerEndpoints
         var profileDto = profile is null
             ? new TrackerProfileDto() // an unconfigured user reads as Maintain / no goals
             : ToProfileDto(profile);
+
+        // History-correct targets: score THIS day against the plan active on it (the latest plan with
+        // EffectiveFrom <= date), falling back to the live profile targets when no plan exists. The day DTO's
+        // embedded goal/macro targets are overlaid from the resolved plan so a viewer of a PAST day sees that
+        // day's goals, not the live ones. (The live GET /tracker/profile DTO stays current-profile-based.)
+        var targets = await ResolveTargetsAsync(db, email, date, profile, ct);
+        profileDto.Goal = targets.Goal.ToString();
+        profileDto.DailyCalorieGoal = targets.DailyCalorieGoal;
+        profileDto.ProteinGoalG = targets.ProteinGoalG;
+        profileDto.CarbGoalG = targets.CarbGoalG;
+        profileDto.FatGoalG = targets.FatGoalG;
         // Body metrics are the owner's PRIVATE data — never expose them to a viewer (shared contact or
         // coach with tracker.viewall). A viewer legitimately needs the goal direction, the daily targets
         // and the sharing/display flags, but NEVER the raw body metrics. Null every metric that reveals
@@ -1680,7 +1734,9 @@ public static class TrackerEndpoints
         var carbs = Math.Round(foods.Sum(f => f.CarbG) + supplementCarbs, 1);
         var fat = Math.Round(foods.Sum(f => f.FatG) + supplementFat, 1);
 
-        var goal = profile?.DailyCalorieGoal;
+        // The calorie goal for THIS day comes from the resolved (date-active) plan targets, not the live
+        // profile — so editing the goal today never re-scores yesterday. Remaining math is unchanged.
+        var goal = targets.DailyCalorieGoal;
         int? remaining = goal is { } g ? g - caloriesIn + caloriesOut : null;
 
         var hydrationMl = hydration.Sum(h => h.AmountMl);
@@ -1792,6 +1848,107 @@ public static class TrackerEndpoints
         }
         return profile;
     }
+
+    // ===================================================================================
+    // Goal-plan resolution (history-correct day/stats targets)
+    // ===================================================================================
+
+    /// <summary>The GoalPlan active on a local date = the row with the greatest EffectiveFrom &lt;= date for
+    /// the user. Null when the user has no plan on/before that date (caller then falls back to the live
+    /// profile targets via TrackerStats.TargetsFromProfile).</summary>
+    private static Task<GoalPlan?> ActivePlanForDateAsync(
+        UsageDbContext db, string email, DateOnly date, CancellationToken ct) =>
+        db.GoalPlans.AsNoTracking()
+            .Where(p => p.UserEmail == email && p.EffectiveFrom <= date)
+            .OrderByDescending(p => p.EffectiveFrom)
+            .FirstOrDefaultAsync(ct);
+
+    /// <summary>Resolve the targets to score a date against: the active plan's, else the profile fallback.
+    /// After the backfill every existing user has a 0001-01-01 plan, so the plan branch covers all historical
+    /// dates; the profile fallback is the safety net for the transient gap before the first goal is saved.</summary>
+    private static async Task<TrackerStats.GoalTargets> ResolveTargetsAsync(
+        UsageDbContext db, string email, DateOnly date, TrackerProfile? profile, CancellationToken ct)
+    {
+        var plan = await ActivePlanForDateAsync(db, email, date, ct);
+        return plan is null
+            ? TrackerStats.TargetsFromProfile(profile)
+            : TrackerStats.TargetsFromPlan(plan);
+    }
+
+    /// <summary>
+    /// SAVE = VERSION. After a profile/goal save, upsert a GoalPlan effective TODAY (display-tz) — but ONLY
+    /// when a target changed. "Changed" = the incoming resolved targets (Goal, WeeklyRateKg, the four numeric
+    /// goals) differ from the plan ACTIVE FOR TODAY (or there is none). Comparing to the active plan (not the
+    /// pre-edit profile) is what makes two same-day edits REPLACE one row and the first-ever save create one.
+    /// The new/edited GoalPlan is ADDED to the context but NOT saved here — the caller's existing
+    /// SaveChangesAsync persists the profile mutation and this plan in the SAME transaction (so they can't
+    /// diverge). Snapshots WeightKg/BodyFatPct/ActivityLevel/DietPattern from the now-updated profile.
+    /// </summary>
+    private static async Task UpsertTodayPlanAsync(
+        UsageDbContext db, TrackerProfile profile, DateOnly today, CancellationToken ct)
+    {
+        var active = await ActivePlanForDateAsync(db, profile.UserEmail, today, ct);
+
+        // Did any SCORING target change vs the currently-active plan? (No active plan ⇒ always a change.)
+        bool changed = active is null
+            || active.Goal != profile.Goal
+            || !NullableDoubleEquals(active.WeeklyRateKg, profile.WeeklyRateKg)
+            || active.DailyCalorieGoal != profile.DailyCalorieGoal
+            || active.ProteinGoalG != profile.ProteinGoalG
+            || active.CarbGoalG != profile.CarbGoalG
+            || active.FatGoalG != profile.FatGoalG;
+        if (!changed) return; // unchanged-target save ⇒ no plan written (rule 4)
+
+        // Upsert the (user, today) row: overwrite an existing same-day plan, else insert a new one. We read
+        // it TRACKED (not via the AsNoTracking resolver) so an overwrite is persisted by the caller's save.
+        var todayPlan = await db.GoalPlans
+            .FirstOrDefaultAsync(p => p.UserEmail == profile.UserEmail && p.EffectiveFrom == today, ct);
+        if (todayPlan is null)
+        {
+            db.GoalPlans.Add(new GoalPlan
+            {
+                UserEmail = profile.UserEmail,
+                EffectiveFrom = today,
+                Goal = profile.Goal,
+                WeeklyRateKg = profile.WeeklyRateKg,
+                DailyCalorieGoal = profile.DailyCalorieGoal,
+                ProteinGoalG = profile.ProteinGoalG,
+                CarbGoalG = profile.CarbGoalG,
+                FatGoalG = profile.FatGoalG,
+                WeightKg = profile.WeightKg,
+                BodyFatPct = profile.BodyFatPct,
+                ActivityLevel = profile.ActivityLevel,
+                DietPattern = profile.DietPattern,
+                CreatedUtc = DateTime.UtcNow,
+            });
+        }
+        else
+        {
+            ApplyPlanSnapshot(todayPlan, profile);
+        }
+    }
+
+    /// <summary>Copy the now-updated profile's targets + display snapshots onto a same-day plan row (used by
+    /// the in-place overwrite and the unique-violation race recovery so both stay identical).</summary>
+    private static void ApplyPlanSnapshot(GoalPlan plan, TrackerProfile profile)
+    {
+        plan.Goal = profile.Goal;
+        plan.WeeklyRateKg = profile.WeeklyRateKg;
+        plan.DailyCalorieGoal = profile.DailyCalorieGoal;
+        plan.ProteinGoalG = profile.ProteinGoalG;
+        plan.CarbGoalG = profile.CarbGoalG;
+        plan.FatGoalG = profile.FatGoalG;
+        plan.WeightKg = profile.WeightKg;
+        plan.BodyFatPct = profile.BodyFatPct;
+        plan.ActivityLevel = profile.ActivityLevel;
+        plan.DietPattern = profile.DietPattern;
+        plan.CreatedUtc = DateTime.UtcNow;
+    }
+
+    /// <summary>Nullable-double equality with a tiny tolerance (pace is stored as a finite double; an exact
+    /// == round-trips fine, but the epsilon guards against a re-clamp producing a 1e-15 drift).</summary>
+    private static bool NullableDoubleEquals(double? a, double? b) =>
+        (a is null && b is null) || (a is { } x && b is { } y && Math.Abs(x - y) < 1e-9);
 
     // ===================================================================================
     // Saved "My foods" upkeep
@@ -2141,6 +2298,22 @@ public static class TrackerEndpoints
         EatingWindow = p.EatingWindow.ToString(),
         GoalBasisWeightKg = p.GoalBasisWeightKg,
         BaselineReviewedUtc = p.BaselineReviewedUtc?.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+    };
+
+    private static TrackerGoalPlanDto ToGoalPlanDto(GoalPlan p) => new()
+    {
+        EffectiveFrom = p.EffectiveFrom.ToString("yyyy-MM-dd"),
+        Goal = p.Goal.ToString(),
+        WeeklyRateKg = p.WeeklyRateKg,
+        DailyCalorieGoal = p.DailyCalorieGoal,
+        ProteinGoalG = p.ProteinGoalG,
+        CarbGoalG = p.CarbGoalG,
+        FatGoalG = p.FatGoalG,
+        WeightKg = p.WeightKg,
+        BodyFatPct = p.BodyFatPct,
+        ActivityLevel = p.ActivityLevel.ToString(),
+        DietPattern = p.DietPattern.ToString(),
+        CreatedUtc = p.CreatedUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
     };
 
     private static HydrationEntryDto ToHydrationDto(HydrationEntry h) => new()

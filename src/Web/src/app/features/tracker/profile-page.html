@@ -1,0 +1,524 @@
+<div class="pp">
+  <header class="pp-head">
+    <button mat-button type="button" class="pp-back" (click)="backToTracker()">
+      <mat-icon>arrow_back</mat-icon> Tracker
+    </button>
+    <h1 class="pp-title">My profile &amp; goal</h1>
+    <p class="pp-sub">Your baseline, goal targets, and the history of every plan you've set.</p>
+  </header>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Loading your profile" />
+  } @else if (needsBaseline()) {
+    <!-- ── First-run ONBOARDING gate (same blocking 4-field baseline as the tracker) ── -->
+    <app-tracker-onboarding
+      [profile]="onboardingSeed()"
+      [saving]="savingBaseline()"
+      (completed)="onBaselineComplete($event)"
+    />
+  } @else {
+    <!-- At-a-glance read-back of what the AI meal recommenders are told. -->
+    @if (dietSummary().length) {
+      <div class="pf-diet-summary pp-diet-summary" role="note" aria-label="What the AI uses for your meals">
+        <mat-icon class="pf-diet-summary-icon" aria-hidden="true">restaurant_menu</mat-icon>
+        <span class="pf-diet-summary-chips">
+          @for (part of dietSummary(); track part; let last = $last) {
+            <span class="pf-diet-chip">{{ part }}</span>@if (!last) {<span class="pf-diet-sep" aria-hidden="true">·</span>}
+          }
+        </span>
+      </div>
+    }
+
+    <section class="pp-card">
+      <div class="pf-body pp-form">
+        <!-- Non-blocking check-in: weight drift or a stale baseline → one-tap recompute. Dismissible. -->
+        @if (checkIn(); as ci) {
+          <div class="pf-checkin" role="status">
+            <mat-icon class="pf-checkin-icon" aria-hidden="true">update</mat-icon>
+            <div class="pf-checkin-copy">
+              <span class="pf-checkin-title">Time for a check-in?</span>
+              <span class="pf-checkin-sub">{{ ci.reason }} Recompute your targets to stay on track.</span>
+            </div>
+            <div class="pf-checkin-actions">
+              <button mat-flat-button color="primary" type="button" (click)="recomputeFromCheckIn()">Recompute</button>
+              <button mat-button type="button" (click)="checkInDismissed.set(true)" aria-label="Dismiss check-in">Not now</button>
+            </div>
+          </div>
+        }
+
+        <!-- Unit toggle (display only; everything is stored in metric). -->
+        <div class="pf-units">
+          <span class="micro-label">Units</span>
+          <mat-button-toggle-group [value]="unitSystem()" (change)="onUnitChange($event.value)"
+                                   aria-label="Unit system" class="pf-unit-toggle">
+            <mat-button-toggle value="Metric">Metric</mat-button-toggle>
+            <mat-button-toggle value="Imperial">Imperial</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+
+        <mat-form-field appearance="outline" class="pf-field">
+          <mat-label>Goal</mat-label>
+          <mat-select [ngModel]="goal()" (ngModelChange)="goal.set($event)">
+            @for (g of goals; track g.value) {
+              <mat-option [value]="g.value">{{ g.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <!-- ── Body profile ── -->
+        <span class="micro-label pf-section">Body profile</span>
+
+        <mat-form-field appearance="outline" class="pf-field">
+          <mat-label>Date of birth</mat-label>
+          <input matInput type="date" [max]="todayIso" [ngModel]="dateOfBirth()" (ngModelChange)="dateOfBirth.set($event)" />
+          <mat-hint>Used to estimate your age for BMR/TDEE.</mat-hint>
+        </mat-form-field>
+
+        @if (imperial()) {
+          <div class="pf-htgrid">
+            <mat-form-field appearance="outline">
+              <mat-label>Height (ft)</mat-label>
+              <input matInput type="number" min="0" max="9" inputmode="numeric"
+                     [ngModel]="heightFt()" (ngModelChange)="heightFt.set($event)" />
+              <span matTextSuffix>ft</span>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Height (in)</mat-label>
+              <input matInput type="number" min="0" max="11" inputmode="numeric"
+                     [ngModel]="heightIn()" (ngModelChange)="heightIn.set($event)" />
+              <span matTextSuffix>in</span>
+            </mat-form-field>
+          </div>
+        } @else {
+          <mat-form-field appearance="outline" class="pf-field">
+            <mat-label>Height</mat-label>
+            <input matInput type="number" min="0" step="0.5" inputmode="decimal"
+                   [ngModel]="heightCm()" (ngModelChange)="heightCm.set($event)" />
+            <span matTextSuffix>cm</span>
+          </mat-form-field>
+        }
+
+        <div class="pf-wtgrid">
+          <mat-form-field appearance="outline">
+            <mat-label>Current weight</mat-label>
+            <input matInput type="number" min="0" step="0.1" inputmode="decimal"
+                   [ngModel]="weightDisp()" (ngModelChange)="weightDisp.set($event)" />
+            <span matTextSuffix>{{ weightUnit }}</span>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Goal weight</mat-label>
+            <input matInput type="number" min="0" step="0.1" inputmode="decimal"
+                   [ngModel]="goalWeightDisp()" (ngModelChange)="goalWeightDisp.set($event)" />
+            <span matTextSuffix>{{ weightUnit }}</span>
+          </mat-form-field>
+        </div>
+        <p class="pf-share-note">Current weight also drives the calories-burned estimate for exercise.</p>
+
+        <mat-form-field appearance="outline" class="pf-field">
+          <mat-label>Biological sex (for metabolic estimates)</mat-label>
+          <mat-select [ngModel]="sex()" (ngModelChange)="sex.set($event)">
+            @for (s of sexes; track s.value) {
+              <mat-option [value]="s.value">{{ s.label }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>Used only to estimate BMR/TDEE.</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="pf-field">
+          <mat-label>Activity level</mat-label>
+          <mat-select [ngModel]="activityLevel()" (ngModelChange)="activityLevel.set($event)">
+            @for (a of activityLevels; track a.value) {
+              <mat-option [value]="a.value">{{ a.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <!-- ── Live Estimated-TDEE preview (reward meter + suggested target) ── -->
+        @if (preview(); as s) {
+          @if (s.bmi != null || s.bmr != null || s.tdee != null || s.suggestedCalorieGoal != null) {
+            <div class="pf-preview" role="group" aria-label="Estimated stats">
+              @if (s.tdee != null) {
+                <div class="pp-meter-head">
+                  <span class="pp-meter-label">Estimated TDEE</span>
+                  <span class="pp-meter-conf" [class.is-high]="confidence() === 'high'" [class.is-med]="confidence() === 'med'">
+                    <mat-icon aria-hidden="true">{{ confidence() === 'high' ? 'verified' : 'insights' }}</mat-icon>
+                    {{ confidenceLabel() }}
+                  </span>
+                </div>
+              }
+              <div class="pf-preview-grid">
+                @if (s.bmi != null) {
+                  <div class="pf-stat"><span class="pf-stat-l">BMI</span>
+                    <span class="pf-stat-v mono-num">{{ s.bmi }}</span>
+                    <span class="pf-stat-x">{{ s.bmiCategory }}</span></div>
+                }
+                @if (s.bmr != null) {
+                  <div class="pf-stat"><span class="pf-stat-l">BMR</span>
+                    <span class="pf-stat-v mono-num">{{ s.bmr }}</span><span class="pf-stat-x">kcal/day</span></div>
+                }
+                @if (s.tdee != null) {
+                  <div class="pf-stat"><span class="pf-stat-l">TDEE</span>
+                    <span class="pf-stat-v mono-num">{{ s.tdee }}</span><span class="pf-stat-x">kcal/day</span></div>
+                }
+                @if (s.suggestedCalorieGoal != null) {
+                  <div class="pf-stat"><span class="pf-stat-l">Suggested</span>
+                    <span class="pf-stat-v mono-num">{{ s.suggestedCalorieGoal }}</span><span class="pf-stat-x">kcal/day</span></div>
+                }
+              </div>
+              @if (hasSuggestion()) {
+                <button mat-stroked-button type="button" class="pf-usesuggested" (click)="useSuggested()">
+                  <mat-icon>auto_fix_high</mat-icon> Use suggested
+                </button>
+              }
+            </div>
+          }
+        }
+
+        @if (showAi) {
+          <!-- ✨ Describe your goal: free text → structured plan that prefills the calorie + macro fields. -->
+          <div class="pf-ai-goal" role="group" aria-label="Describe your goal with AI">
+            <mat-form-field appearance="outline" class="pf-field">
+              <mat-label><mat-icon class="pf-ai-inline" aria-hidden="true">auto_awesome</mat-icon> Describe your goal</mat-label>
+              <input matInput type="text" maxlength="200" placeholder="e.g. lose 10 lbs in 3 months"
+                     [ngModel]="goalText()" (ngModelChange)="goalText.set($event)"
+                     (keyup.enter)="describeGoalWithAi()" />
+              <mat-hint>AI turns this into calorie + macro targets you can adjust below.</mat-hint>
+            </mat-form-field>
+            <button mat-stroked-button type="button" class="pf-ai-btn"
+                    [disabled]="!canDescribeGoal()" (click)="describeGoalWithAi()"
+                    aria-label="Turn your described goal into calorie and macro targets with AI">
+              @if (goalLoading()) {
+                <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+                Reading…
+              } @else {
+                <span class="pf-ai-btn-label"><mat-icon aria-hidden="true">auto_awesome</mat-icon> Build my plan</span>
+              }
+            </button>
+          </div>
+          @if (goalTimeline() || goalRealistic() !== null || goalRationale()) {
+            <div class="pf-ai-plan">
+              @if (goalTimeline(); as tl) {
+                <p class="pf-ai-rationale"><mat-icon aria-hidden="true">schedule</mat-icon> {{ tl }}</p>
+              }
+              @if (goalRealistic() !== null) {
+                <p class="pf-ai-realistic" [class.pf-ai-realistic--no]="goalRealistic() === false">
+                  <mat-icon aria-hidden="true">{{ goalRealistic() ? 'check_circle' : 'warning' }}</mat-icon>
+                  <span>{{ goalRealistic() ? 'Realistic — this pace looks sensible.' : 'Aggressive — consider a longer timeline.' }}</span>
+                </p>
+              }
+              @if (goalRationale(); as why) {
+                <p class="pf-ai-rationale"><mat-icon aria-hidden="true">auto_awesome</mat-icon> {{ why }}</p>
+              }
+            </div>
+          }
+
+          <!-- AI goal suggestion: prefills the calorie + macro goal fields from your saved profile. -->
+          <div class="pf-ai">
+            <button mat-stroked-button type="button" class="pf-ai-btn"
+                    [disabled]="aiLoading()" (click)="suggestWithAi()"
+                    aria-label="Suggest a daily calorie and macro goal with AI from your profile">
+              @if (aiLoading()) {
+                <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+                Suggesting…
+              } @else {
+                <span class="pf-ai-btn-label"><mat-icon aria-hidden="true">auto_awesome</mat-icon> Suggest with AI</span>
+              }
+            </button>
+            <span class="pf-ai-hint">AI uses your last saved profile — save edits first. It fills the goals below; adjust as you like.</span>
+          </div>
+          @if (aiRationale(); as why) {
+            <p class="pf-ai-rationale"><mat-icon aria-hidden="true">auto_awesome</mat-icon> {{ why }}</p>
+          }
+          @if (aiSourceLabel(); as srcLabel) {
+            <div class="pf-ai-meta">
+              <span class="pf-ai-chip" [class.pf-ai-chip--formula]="aiSource() === 'formula'">
+                <mat-icon aria-hidden="true">{{ aiSource() === 'ai' ? 'auto_awesome' : 'calculate' }}</mat-icon>
+                {{ srcLabel }}
+              </span>
+              @if (aiConfidence(); as conf) {
+                <span class="pf-ai-chip pf-ai-chip--conf">{{ conf }} confidence</span>
+              }
+              @if (aiBand(); as band) {
+                <span class="pf-ai-chip pf-ai-chip--band">
+                  range <span class="mono-num">{{ band.min }}–{{ band.max }}</span> kcal
+                </span>
+              }
+            </div>
+          }
+          @if (aiSafety(); as note) {
+            <p class="pf-ai-safety"><mat-icon aria-hidden="true">health_and_safety</mat-icon> {{ note }}</p>
+          }
+        }
+
+        <mat-form-field appearance="outline" class="pf-field">
+          <mat-label>Daily calorie goal (optional)</mat-label>
+          <input matInput type="number" min="0" inputmode="numeric"
+                 [ngModel]="dailyCalorieGoal()" (ngModelChange)="dailyCalorieGoal.set($event)" />
+          <span matTextSuffix>kcal</span>
+        </mat-form-field>
+
+        <span class="pf-sr-status" role="status" aria-live="polite">{{ aiAnnounce() }}</span>
+
+        <mat-form-field appearance="outline" class="pf-field">
+          <mat-label>Daily hydration goal (optional)</mat-label>
+          <input matInput type="number" min="0" inputmode="numeric"
+                 [ngModel]="hydrationGoalDisp()" (ngModelChange)="hydrationGoalDisp.set($event)" />
+          <span matTextSuffix>{{ volumeUnit }}</span>
+          <mat-hint>Defaults to {{ hydrationDefaultHint }} when left blank.</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="pf-field">
+          <mat-label>Daily step goal (optional)</mat-label>
+          <input matInput type="number" min="0" inputmode="numeric" placeholder="10000"
+                 [ngModel]="stepGoal()" (ngModelChange)="stepGoal.set($event)" />
+          <span matTextSuffix>steps</span>
+          <mat-hint>Defaults to 10,000 when left blank.</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="pf-field">
+          <mat-label>Daily coffee limit (optional)</mat-label>
+          <input matInput type="number" min="1" max="20" inputmode="numeric" placeholder="3"
+                 [ngModel]="coffeeGoalCups()" (ngModelChange)="coffeeGoalCups.set($event)" />
+          <span matTextSuffix>cups</span>
+          <mat-hint>A soft cap — the coffee ring warns when you go over. Defaults to 3.</mat-hint>
+        </mat-form-field>
+
+        <span class="micro-label pf-section">Macro targets (optional)</span>
+        <div class="pf-macgrid">
+          <mat-form-field appearance="outline">
+            <mat-label>Protein</mat-label>
+            <input matInput type="number" min="0" [ngModel]="proteinGoalG()" (ngModelChange)="proteinGoalG.set($event)" />
+            <span matTextSuffix>g</span>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Carbs</mat-label>
+            <input matInput type="number" min="0" [ngModel]="carbGoalG()" (ngModelChange)="carbGoalG.set($event)" />
+            <span matTextSuffix>g</span>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Fat</mat-label>
+            <input matInput type="number" min="0" [ngModel]="fatGoalG()" (ngModelChange)="fatGoalG.set($event)" />
+            <span matTextSuffix>g</span>
+          </mat-form-field>
+        </div>
+
+        <!-- ══ Fine-tune (fully optional) ══ -->
+        <section class="pf-refine">
+          <button type="button" class="pf-refine-toggle" (click)="refineOpen.set(!refineOpen())"
+                  [attr.aria-expanded]="refineOpen()">
+            <mat-icon aria-hidden="true">tune</mat-icon>
+            <span class="pf-refine-copy">
+              <span class="pf-refine-title">Fine-tune your target</span>
+              <span class="pf-refine-sub">Optional — body fat, pace, diet style. All skippable.</span>
+            </span>
+            <mat-icon class="pf-refine-chev" aria-hidden="true">{{ refineOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+          </button>
+
+          @if (refineOpen()) {
+            <div class="pf-refine-body">
+              <div class="pf-refine-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Weekly pace</mat-label>
+                  <input matInput type="number" [step]="rateStep" inputmode="decimal" placeholder="0"
+                         [ngModel]="weeklyRateDisp()" (ngModelChange)="weeklyRateDisp.set($event)" />
+                  <span matTextSuffix>{{ rateUnit }}</span>
+                  <mat-hint>− to lose, + to gain. Blank uses your goal default.</mat-hint>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Body fat</mat-label>
+                  <input matInput type="number" min="3" max="60" step="0.5" inputmode="decimal"
+                         [ngModel]="bodyFatPct()" (ngModelChange)="bodyFatPct.set($event)" />
+                  <span matTextSuffix>%</span>
+                  <mat-hint>Unlocks a more precise estimate.</mat-hint>
+                </mat-form-field>
+              </div>
+
+              <!-- Navy-tape body-fat estimate (optional). -->
+              <div class="pf-navy">
+                <span class="micro-label">Body-fat tape (optional)</span>
+                <div class="pf-navy-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Neck</mat-label>
+                    <input matInput type="number" min="0" step="0.1" inputmode="decimal"
+                           [ngModel]="neckDisp()" (ngModelChange)="neckDisp.set($event)" />
+                    <span matTextSuffix>{{ lengthUnit }}</span>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Waist</mat-label>
+                    <input matInput type="number" min="0" step="0.1" inputmode="decimal"
+                           [ngModel]="waistDisp()" (ngModelChange)="waistDisp.set($event)" />
+                    <span matTextSuffix>{{ lengthUnit }}</span>
+                  </mat-form-field>
+                  @if (sex() === 'Female') {
+                    <mat-form-field appearance="outline">
+                      <mat-label>Hip</mat-label>
+                      <input matInput type="number" min="0" step="0.1" inputmode="decimal"
+                             [ngModel]="hipDisp()" (ngModelChange)="hipDisp.set($event)" />
+                      <span matTextSuffix>{{ lengthUnit }}</span>
+                    </mat-form-field>
+                  }
+                </div>
+                @if (navyBodyFatPct(); as bf) {
+                  <div class="pf-navy-est">
+                    <span>Estimated body fat: <strong class="mono-num">{{ bf }}%</strong></span>
+                    <button mat-stroked-button type="button" class="pf-navy-use" (click)="applyNavyBodyFat()">
+                      Use this
+                    </button>
+                  </div>
+                } @else {
+                  <p class="pf-share-note">Add neck + waist (and hip for female) with your height &amp; sex set above for an estimate.</p>
+                }
+              </div>
+
+              <div class="pf-refine-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Eating style</mat-label>
+                  <mat-select [ngModel]="dietPattern()" (ngModelChange)="dietPattern.set($event)">
+                    @for (d of dietPatterns; track d.value) {
+                      <mat-option [value]="d.value">{{ d.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Protein basis</mat-label>
+                  <mat-select [ngModel]="proteinBasis()" (ngModelChange)="proteinBasis.set($event)">
+                    <mat-option value="PerBodyweight">Per bodyweight</mat-option>
+                    <mat-option value="PerLeanMass">Per lean mass</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div class="pf-refine-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Training</mat-label>
+                  <mat-select [ngModel]="trainingType()" (ngModelChange)="trainingType.set($event)">
+                    @for (t of trainingTypes; track t.value) {
+                      <mat-option [value]="t.value">{{ t.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Life stage</mat-label>
+                  <mat-select [ngModel]="lifeStage()" (ngModelChange)="lifeStage.set($event)">
+                    <mat-option value="None">None</mat-option>
+                    <mat-option value="Pregnant">Pregnant</mat-option>
+                    <mat-option value="Breastfeeding">Breastfeeding</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                @if (showTrimester()) {
+                  <mat-form-field appearance="outline">
+                    <mat-label>Trimester</mat-label>
+                    <mat-select [ngModel]="trimester()" (ngModelChange)="trimester.set($event)">
+                      <mat-option [value]="1">First</mat-option>
+                      <mat-option [value]="2">Second</mat-option>
+                      <mat-option [value]="3">Third</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                }
+              </div>
+
+              <div class="pf-refine-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Meals / day</mat-label>
+                  <input matInput type="number" min="1" max="8" inputmode="numeric"
+                         [ngModel]="mealsPerDay()" (ngModelChange)="mealsPerDay.set($event)" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Eating window</mat-label>
+                  <mat-select [ngModel]="eatingWindow()" (ngModelChange)="eatingWindow.set($event)">
+                    @for (w of eatingWindows; track w.value) {
+                      <mat-option [value]="w.value">{{ w.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <mat-form-field appearance="outline" class="pf-field">
+                <mat-label>Allergies &amp; foods to avoid (optional)</mat-label>
+                <textarea matInput rows="2" maxlength="300" placeholder="e.g. peanuts, shellfish, no pork"
+                          [ngModel]="restrictions()" (ngModelChange)="restrictions.set($event)"></textarea>
+                <mat-hint>Comma-separated. The AI meal planner treats these as a hard exclusion.</mat-hint>
+              </mat-form-field>
+            </div>
+          }
+        </section>
+
+        <mat-checkbox class="pf-share" [ngModel]="shareWithContacts()" (ngModelChange)="shareWithContacts.set($event)">
+          Share my tracker with my contacts
+        </mat-checkbox>
+        <p class="pf-share-note">When on, people in your contact circle can view this tracker read-only. Your body metrics (weight, BMI, BMR) stay private.</p>
+      </div>
+
+      <div class="pp-actions">
+        <button mat-stroked-button type="button" (click)="backToTracker()">Back to tracker</button>
+        <button mat-flat-button type="button" color="primary" [disabled]="saving()" (click)="save()">
+          @if (saving()) {
+            <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+            Saving…
+          } @else {
+            Save profile
+          }
+        </button>
+      </div>
+    </section>
+
+    <!-- ══ PLAN HISTORY ══ -->
+    <section class="pp-history" aria-labelledby="pp-history-title">
+      <h2 id="pp-history-title" class="pp-history-title">
+        <mat-icon aria-hidden="true">history</mat-icon> Plan history
+      </h2>
+      <p class="pp-history-sub">Every plan you've set, newest first. A new plan is saved automatically whenever your targets change.</p>
+
+      @if (plansLoading()) {
+        <mat-progress-bar mode="indeterminate" aria-label="Loading plan history" />
+      } @else if (plans().length === 0) {
+        <p class="pp-history-empty">No plan history yet — save your profile to record your first plan.</p>
+      } @else {
+        <ol class="pp-plans">
+          @for (plan of plans(); track plan.effectiveFrom + '|' + (plan.createdUtc ?? ''); let first = $first) {
+            <li class="pp-plan" [class.pp-plan--active]="first">
+              <div class="pp-plan-head">
+                <span class="pp-plan-date">{{ planEffectiveFrom(plan.effectiveFrom) }}</span>
+                @if (first) {
+                  <span class="pp-plan-badge">Active today</span>
+                }
+              </div>
+              <div class="pp-plan-targets">
+                <span class="pp-plan-goal">{{ goalLabel(plan.goal) }}</span>
+                @if (planRate(plan.weeklyRateKg); as rate) {
+                  <span class="pp-plan-chip">{{ rate }}</span>
+                }
+                @if (plan.dailyCalorieGoal != null) {
+                  <span class="pp-plan-chip"><span class="mono-num">{{ plan.dailyCalorieGoal }}</span> kcal</span>
+                }
+                @if (plan.proteinGoalG != null || plan.carbGoalG != null || plan.fatGoalG != null) {
+                  <span class="pp-plan-chip">
+                    P <span class="mono-num">{{ plan.proteinGoalG ?? 0 }}</span> ·
+                    C <span class="mono-num">{{ plan.carbGoalG ?? 0 }}</span> ·
+                    F <span class="mono-num">{{ plan.fatGoalG ?? 0 }}</span> g
+                  </span>
+                }
+              </div>
+              @if (plan.weightKg != null || plan.bodyFatPct != null || plan.activityLevel || plan.dietPattern) {
+                <div class="pp-plan-snap">
+                  @if (planWeight(plan.weightKg); as w) {
+                    <span class="pp-plan-snap-item">Weight {{ w }}</span>
+                  }
+                  @if (plan.bodyFatPct != null) {
+                    <span class="pp-plan-snap-item">Body fat <span class="mono-num">{{ plan.bodyFatPct }}%</span></span>
+                  }
+                  @if (plan.activityLevel) {
+                    <span class="pp-plan-snap-item">{{ activityLabel(plan.activityLevel) }}</span>
+                  }
+                  @if (plan.dietPattern) {
+                    <span class="pp-plan-snap-item">{{ dietLabel(plan.dietPattern) }}</span>
+                  }
+                </div>
+              }
+            </li>
+          }
+        </ol>
+      }
+    </section>
+  }
+</div>

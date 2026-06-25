@@ -1286,6 +1286,38 @@ public sealed class TrackerProfileDto
     public string? BaselineReviewedUtc { get; set; }
 }
 
+/// <summary>One dated GoalPlan in the caller's goal-history timeline (newest-first from <c>GET
+/// /api/tracker/goal-plans</c>): the effective-from date plus the TARGETS the days on/after it are scored
+/// against, and the body-state SNAPSHOT the plan was built from (display only). The <see cref="EffectiveFrom"/>
+/// <c>"0001-01-01"</c> row is the migration-backfilled "initial" plan (the page may label it "Initial").
+/// All body measures are metric (kg); the client converts for display per the unit preference.</summary>
+public sealed class TrackerGoalPlanDto
+{
+    /// <summary>"yyyy-MM-dd" — the local date this plan applies from. "0001-01-01" ⇒ the initial (backfilled) plan.</summary>
+    public string EffectiveFrom { get; set; } = "";
+
+    // ---- the TARGETS this plan scores its days against ----
+    /// <summary>One of the <c>TrackerGoal</c> names: "LoseWeight" | "Maintain" | "GainMuscle" | "Endurance".</summary>
+    public string Goal { get; set; } = "Maintain";
+    /// <summary>Signed pace kg/week at the time (display only), or null.</summary>
+    public double? WeeklyRateKg { get; set; }
+    public int? DailyCalorieGoal { get; set; }
+    public int? ProteinGoalG { get; set; }
+    public int? CarbGoalG { get; set; }
+    public int? FatGoalG { get; set; }
+
+    // ---- body-state snapshot at the time (display only; never a scoring input) ----
+    public double? WeightKg { get; set; }
+    public double? BodyFatPct { get; set; }
+    /// <summary>One of the <c>ActivityLevel</c> names: "Sedentary" | "Light" | "Moderate" | "Active" | "VeryActive".</summary>
+    public string ActivityLevel { get; set; } = "Sedentary";
+    /// <summary>One of the <c>DietPattern</c> names: "Balanced" | "HighProtein" | "LowCarb" | "Keto" | "Vegetarian" | "Vegan" | "Mediterranean" | "Paleo".</summary>
+    public string DietPattern { get; set; } = "Balanced";
+
+    /// <summary>ISO-8601 UTC timestamp when this plan row was created/last replaced.</summary>
+    public string CreatedUtc { get; set; } = "";
+}
+
 /// <summary>Computed body-metric estimates from the current profile (all metric inputs). Any field whose
 /// inputs are missing is null — partial stats are expected. NULLED entirely when a viewer reads someone
 /// else's day (body metrics are private).</summary>
