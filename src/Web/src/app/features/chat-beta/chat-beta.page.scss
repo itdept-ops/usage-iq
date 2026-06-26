@@ -117,6 +117,61 @@
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
+// ---- list header tools: search field + unread-only filter ----
+.lh__tools {
+  display: flex; align-items: center; gap: 8px; margin-top: 12px;
+}
+.lh__search {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+  height: 40px; padding: 0 8px 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--bg-rise);
+  border: 1px solid var(--glass-edge);
+  transition: border-color 140ms var(--ease-out);
+}
+.lh__search:focus-within { border-color: color-mix(in srgb, var(--accent-a) 55%, transparent); }
+.lh__search-i {
+  flex: 0 0 auto; font-size: 19px; width: 19px; height: 19px; color: var(--ink-faint);
+}
+.lh__search-in {
+  flex: 1 1 auto; min-width: 0;
+  border: none; background: transparent; outline: none;
+  color: var(--ink); font: inherit; font-size: 14px;
+  // strip the native search clear (we provide our own)
+  &::-webkit-search-decoration, &::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+}
+.lh__search-in::placeholder { color: var(--ink-faint); }
+.lh__search-x {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 28px; height: 28px; border: none; border-radius: 50%;
+  background: transparent; color: var(--ink-faint); cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.lh__search-x:hover { color: var(--ink); }
+.lh__search-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.lh__search-x mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+.lh__filter {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 40px; padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--glass-edge);
+  background: var(--bg-rise);
+  color: var(--ink-dim); font: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms var(--ease-spring), background 140ms var(--ease-out), color 140ms var(--ease-out), border-color 140ms var(--ease-out);
+}
+.lh__filter:active { transform: scale(.94); }
+.lh__filter:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.lh__filter mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.lh__filter.is-on {
+  color: #fff; border-color: transparent;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  box-shadow: var(--lift-1);
+}
+
 // ---- the scroll column (kit pull-refresh owns overflow) ----
 .list__ptr { display: block; flex: 1 1 auto; min-height: 0; }
 .list__scroll {

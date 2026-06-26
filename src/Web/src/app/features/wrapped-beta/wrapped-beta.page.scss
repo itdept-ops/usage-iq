@@ -96,6 +96,17 @@
   border-bottom: 1px solid var(--hairline);
 }
 .wb-top__seg { flex: 1 1 auto; max-width: 320px; }
+// Slide counter "3 / 8" — a glanceable position chip between the switcher and share.
+.wb-top__count {
+  flex: 0 0 auto;
+  display: inline-grid; place-items: center;
+  min-width: 44px; height: 30px; padding: 0 10px; border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--accent-a) 12%, var(--bg-rise));
+  border: 1px solid var(--glass-edge);
+  color: var(--ink-dim);
+  font: 700 12.5px/1 var(--font-ui); letter-spacing: .03em;
+  font-variant-numeric: tabular-nums;
+}
 .wb-top__share {
   flex: 0 0 auto;
   display: inline-grid; place-items: center;
@@ -253,6 +264,32 @@
   font: 500 15px/1.5 var(--font-ui);
   color: var(--ink-dim);
   max-width: 30ch;
+}
+
+// ---- Final-slide outro: Start-over + Copy-recap actions ----
+.wb-slide__outro {
+  margin-top: 22px;
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.wb-replay {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 44px; padding: 0 18px; border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--sa) 42%, transparent);
+  background: linear-gradient(135deg, var(--sa), var(--sb));
+  color: #fff; cursor: pointer;
+  font: 700 14px/1 var(--font-ui); letter-spacing: .01em;
+  transition: transform 120ms var(--ease-spring), filter 160ms var(--ease-out);
+  mat-icon { font-size: 19px; width: 19px; height: 19px; }
+  &:active { transform: scale(.94); }
+  &:hover { filter: brightness(1.06); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  // The secondary "Copy recap" — glass/ghost variant, not the gradient fill.
+  &--ghost {
+    background: color-mix(in srgb, var(--sa) 14%, var(--glass));
+    color: var(--ink);
+    &:hover { filter: none; background: color-mix(in srgb, var(--sa) 22%, var(--glass)); }
+  }
 }
 
 // ---- COVER slide (the first one): tri-tone wordmark + name ----

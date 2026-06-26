@@ -81,6 +81,9 @@ interface RecapCell { readonly num: string; readonly label: string; readonly acc
       <app-bs-segmented class="wb-top__seg"
         [segments]="periodSegments" [value]="period()" label="Wrapped period"
         [disabled]="loading()" (change)="setPeriod($event)" />
+      @if (!loading() && !errored() && slides().length) {
+        <span class="wb-top__count" aria-hidden="true">{{ active() + 1 }} / {{ slides().length }}</span>
+      }
       <button type="button" class="wb-top__share" aria-label="Share your Wrapped"
               [disabled]="loading() || errored() || !cards().length" (click)="share()">
         <mat-icon aria-hidden="true">ios_share</mat-icon>
@@ -173,6 +176,16 @@ interface RecapCell { readonly num: string; readonly label: string; readonly acc
                   <h2 class="wb-slide__label wb-reveal" [style.--ri]="2">{{ s.card?.label }}</h2>
                   @if (s.card?.sub) {
                     <p class="wb-slide__sub wb-reveal" [style.--ri]="3">{{ s.card?.sub }}</p>
+                  }
+                  @if (i === slides().length - 1) {
+                    <div class="wb-slide__outro wb-reveal" [style.--ri]="4">
+                      <button type="button" class="wb-replay" (click)="replay()">
+                        <mat-icon aria-hidden="true">replay</mat-icon> Start over
+                      </button>
+                      <button type="button" class="wb-replay wb-replay--ghost" (click)="copyShare()">
+                        <mat-icon aria-hidden="true">content_copy</mat-icon> Copy recap
+                      </button>
+                    </div>
                   }
                 }
               </section>
@@ -468,7 +481,46 @@ export class WrappedBetaPage {
     });
   }
 
+  // ─────────────── REPLAY ───────────────
+
+  /** "Start over" on the final slide — jump back to the cover and restart the reel from the top. */
+  replay(): void {
+    this.goTo(0);
+  }
+
   // ─────────────── SHARE ───────────────
+
+  /**
+   * Build a short one-line highlights summary from the WrappedResponse fields the page already has and
+   * copy it to the clipboard (navigator.clipboard) with a success toast. A net-new affordance distinct
+   * from {@link share} (which prefers the native Web Share sheet): this ALWAYS copies the short summary.
+   */
+  async copyShare(): Promise<void> {
+    const d = this.data();
+    if (!d || !this.cards().length) return;
+
+    const parts: string[] = [];
+    if (d.workouts > 0) parts.push(`${d.workouts.toLocaleString()} workout${d.workouts === 1 ? '' : 's'}`);
+    if (d.hydrationBestStreak > 0) parts.push(`${d.hydrationBestStreak.toLocaleString()} day streak`);
+    if (d.usageCostUsd > 0) parts.push(`$${d.usageCostUsd.toFixed(2)} on AI`);
+    if (d.stepsTotal > 0) parts.push(`${d.stepsTotal.toLocaleString()} steps`);
+    if (d.coffeeCups > 0) parts.push(`${d.coffeeCups.toLocaleString()} coffees`);
+
+    // Fall back to the top card headlines if none of the structured fields fired.
+    const summary = parts.length
+      ? parts.slice(0, 4).join(', ')
+      : this.cards().slice(0, 3).map(c => `${c.headline} ${c.label}`.toLowerCase()).join(', ');
+    const text = `My Usage IQ Wrapped: ${summary} — ${this.rangeLabel()}`;
+
+    const nav: (Navigator & { clipboard?: Clipboard }) | undefined =
+      typeof navigator !== 'undefined' ? navigator : undefined;
+    try {
+      await nav?.clipboard?.writeText(text);
+      this.toast.show('Highlights copied — paste them anywhere', { tone: 'success', durationMs: 2400 });
+    } catch {
+      this.toast.show('Couldn’t copy on this device', { tone: 'warn' });
+    }
+  }
 
   /** Build a plain-text recap and share it (Web Share API → clipboard fallback → toast). */
   async share(): Promise<void> {

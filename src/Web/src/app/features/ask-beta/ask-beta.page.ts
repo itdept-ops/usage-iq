@@ -31,6 +31,21 @@ interface SuggestionChip {
   question: string;
 }
 
+/**
+ * Contextual follow-up chips offered UNDER the newest answer (reuse `askMyLife`). Each entry maps a
+ * domain the snapshot drew on to a short, natural next question — so the chips deepen whatever the user
+ * just asked about. The 'default' set covers the no-domain case. Order is display order; we cap at 3.
+ */
+const FOLLOW_UPS: Record<string, string[]> = {
+  tracker: ['What should I eat next?', 'How many calories do I have left today?', 'How is my protein looking?'],
+  sleep: ['How can I sleep better?', 'What was my best night this week?'],
+  hard75: ["What's left to finish today?", 'How many days until I finish?'],
+  bills: ['What do I owe right now?', 'Who still owes me?'],
+  family: ["What's next on the calendar?", 'Any reminders I should know about?'],
+  usage: ['How does that compare to last week?', 'Which model cost me the most?'],
+  default: ['Tell me more', 'What should I focus on today?', 'Anything I should watch out for?'],
+};
+
 /** Friendly labels for the domain chips the server reports it drew on (mirrors the live page). */
 const DOMAIN_LABEL: Record<string, string> = {
   tracker: 'Food & fitness',
@@ -98,6 +113,32 @@ export class AskBetaPage {
   /** Whether the thread has any turns yet (drives the empty vs. thread layout). */
   readonly hasTurns = computed(() => this.turns().length > 0);
 
+  /**
+   * Up to 3 contextual follow-up questions shown under the NEWEST answer only — derived from the domains
+   * that answer drew on (so they deepen the same topic), or a sensible default set. Empty while loading or
+   * when there are no turns, so the chips never compete with the thinking indicator.
+   */
+  readonly followUps = computed<string[]>(() => {
+    if (this.loading()) return [];
+    const turns = this.turns();
+    const last = turns[turns.length - 1];
+    if (!last) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const pools = last.domains.length ? last.domains.map(d => FOLLOW_UPS[d]).filter(Boolean) : [FOLLOW_UPS['default']];
+    if (pools.length === 0) pools.push(FOLLOW_UPS['default']);
+    // Round-robin one from each domain pool so a multi-domain answer gets a varied set.
+    for (let i = 0; out.length < 3; i++) {
+      let advanced = false;
+      for (const pool of pools) {
+        const q = pool[i];
+        if (q && !seen.has(q)) { seen.add(q); out.push(q); advanced = true; if (out.length >= 3) break; }
+      }
+      if (!advanced) break;
+    }
+    return out;
+  });
+
   constructor() {
     // Keep the newest bubble / thinking indicator in view as the thread grows.
     effect(() => {
@@ -113,6 +154,23 @@ export class AskBetaPage {
   askSuggestion(s: SuggestionChip): void {
     if (this.loading()) return;
     void this.ask(s.question);
+  }
+
+  /** Tap a contextual follow-up chip → ask it (same path as a typed question). */
+  askFollowUp(question: string): void {
+    if (this.loading()) return;
+    void this.ask(question);
+  }
+
+  /** Copy an answer's text to the clipboard (best-effort; confirms via toast). */
+  async copyAnswer(answer: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(answer);
+      this.toast.show('Answer copied', { tone: 'success', durationMs: 1600 });
+      this.announce.set('Answer copied to clipboard.');
+    } catch {
+      this.toast.show("Couldn't copy", { tone: 'neutral', durationMs: 1600 });
+    }
   }
 
   /** Composer (send) → ask the typed question. */

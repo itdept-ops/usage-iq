@@ -75,11 +75,27 @@ import { ActivityWidget } from './widgets/activity-widget';
               }
             </div>
           </div>
-          <div class="hh__quick">
-            <a class="hh__chip" routerLink="/tracker"><mat-icon aria-hidden="true">add</mat-icon> Quick log</a>
-            <a class="hh__chip" routerLink="/family/calendar"><mat-icon aria-hidden="true">event</mat-icon> Calendar</a>
-            <a class="hh__chip" routerLink="/challenge"><mat-icon aria-hidden="true">local_fire_department</mat-icon> 75 Hard</a>
-          </div>
+          <!-- Quick actions — perm-gated chips deep-linking to the caller's common tasks. Only the chips
+               whose feature perm the session holds render (recomputed on permission change). -->
+          @if (quickActions(); as qa) {
+            @if (qa.length) {
+              <div class="hh__quick">
+                @for (a of qa; track a.route) {
+                  <a class="hh__chip" [routerLink]="a.route"><mat-icon aria-hidden="true">{{ a.icon }}</mat-icon> {{ a.label }}</a>
+                }
+              </div>
+            }
+          }
+
+          <!-- "This week" mini-glance — reuses the 75-Hard data the hard widget already loaded into the
+               shared ChallengeStore (no extra fetch). Hidden until a challenge exists. -->
+          @if (weekGlance(); as wg) {
+            <a class="hh__glance" routerLink="/challenge" aria-label="This week on 75 Hard">
+              <mat-icon aria-hidden="true">local_fire_department</mat-icon>
+              <span class="hh__glance-txt">{{ wg }}</span>
+              <mat-icon class="hh__glance-go" aria-hidden="true">chevron_right</mat-icon>
+            </a>
+          }
         </header>
 
         @if (layout.reordering()) {
@@ -154,7 +170,36 @@ export class BetaHomePage {
   private readonly activityWidgets = viewChildren(ActivityWidget);
 
   private readonly today = signal<FamilyToday | null>(null);
-  readonly greeting = computed(() => this.today()?.greeting ?? '');
+
+  /**
+   * Time-aware greeting computed CLIENT-SIDE from the local hour + the caller's own display name, so it
+   * works the instant the page paints (no dependency on the best-effort family/today fetch, which the old
+   * `today()?.greeting` relied on — that left "Welcome back" showing whenever that endpoint was slow/down
+   * or the caller lacked family access). Falls back to a name-less greeting, then to "Welcome back".
+   */
+  readonly greeting = computed(() => {
+    this.auth.session(); // re-run if the display name changes
+    const part = this.dayPart();
+    const name = this.firstName();
+    return name ? `Good ${part}, ${name}` : `Good ${part}`;
+  });
+
+  /** "morning" | "afternoon" | "evening" from the device's local hour. */
+  private dayPart(): 'morning' | 'afternoon' | 'evening' {
+    const h = new Date().getHours();
+    if (h < 12) return 'morning';
+    if (h < 18) return 'afternoon';
+    return 'evening';
+  }
+
+  /** The caller's own first name for the greeting — nickname (if chosen) else the first token of `name`. */
+  private firstName(): string {
+    const s = this.auth.session();
+    if (!s) return '';
+    const raw = (s.displayNameMode === 'nickname' && s.nickname) ? s.nickname : (s.name || '');
+    const first = raw.trim().split(/\s+/)[0] ?? '';
+    return first;
+  }
 
   /** Friendly "Thursday, June 23" — COPIED from family-home.ts:127 (not imported). */
   readonly dateLabel = computed<string>(() => {
@@ -194,9 +239,54 @@ export class BetaHomePage {
     return this.layout.visibleOrder().filter(id => this.gate(id));
   });
 
+  /**
+   * Quick-action chips deep-linking to the caller's common tasks. Each entry declares the perm it needs;
+   * a chip renders ONLY when the session holds it (recomputed on permission change). This replaces the
+   * three static chips that linked to pages a given user might not even have access to.
+   */
+  readonly quickActions = computed<{ label: string; icon: string; route: string }[]>(() => {
+    this.auth.permissions();
+    const has = (p: string) => this.auth.hasPermission(p);
+    const out: { label: string; icon: string; route: string }[] = [];
+    if (has(PERM.trackerSelf)) out.push({ label: 'Log food', icon: 'add', route: '/tracker' });
+    if (has(PERM.mealsUse)) out.push({ label: 'Meals', icon: 'restaurant_menu', route: '/beta/meals' });
+    if (has(PERM.billsUse)) out.push({ label: 'Add bill', icon: 'receipt_long', route: '/beta/bills' });
+    if (has(PERM.automationsUse)) out.push({ label: 'Automate', icon: 'bolt', route: '/beta/automations' });
+    if (has(PERM.trackerAi)) out.push({ label: 'Ask', icon: 'auto_awesome', route: '/beta/ask' });
+    if (has(PERM.trackerSelf)) out.push({ label: '75 Hard', icon: 'local_fire_department', route: '/challenge' });
+    return out;
+  });
+
+  /**
+   * A "this week" mini-glance built from the 75-Hard data the hard widget already loaded into the shared
+   * {@link ChallengeStore} — NO extra fetch. Null (and so hidden) until a challenge is loaded and the
+   * caller can see it; otherwise a compact streak + completed-days line.
+   */
+  readonly weekGlance = computed<string | null>(() => {
+    this.auth.permissions();
+    if (!this.auth.hasPermission(PERM.trackerSelf)) return null;
+    const c = this.challenge.challenge();
+    if (!c || c.currentDay <= 0) return null;
+    const streak = c.currentStreak > 0
+      ? `${c.currentStreak}-day streak`
+      : 'Streak reset — back on it today';
+    // `completedDays`/`totalDays` are required on the DTO, but guard anyway so a partial payload can never
+    // render a literal "undefined" in the glance — fall back to just the streak line.
+    const perfect = Number.isFinite(c.completedDays) && Number.isFinite(c.totalDays)
+      ? ` · ${c.completedDays} of ${c.totalDays} days perfect`
+      : '';
+    return `${streak}${perfect}`;
+  });
+
   constructor() {
     // Top-bar greeting/date — best-effort, never blocks the column.
     this.loadToday();
+    // Drive the shared ChallengeStore so the header "this week" glance is populated even if the user has
+    // reordered the 75-Hard widget off (the widget would otherwise be the only loader). Same read-only
+    // load() the widget makes; gated on the same perm; best-effort.
+    if (this.auth.hasPermission(PERM.trackerSelf)) {
+      void this.challenge.load();
+    }
     // Store-backed widgets each call load() in their own constructor; nothing else to kick off here.
   }
 

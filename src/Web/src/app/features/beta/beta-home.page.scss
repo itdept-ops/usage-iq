@@ -121,6 +121,28 @@
   color: color-mix(in srgb, var(--accent-a) 70%, var(--ink));
 }
 
+// "This week" mini-glance — a single tappable streak line, deep-links to /challenge.
+.hh__glance {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 38px; padding: 6px 12px; border-radius: 14px;
+  border: 1px solid color-mix(in srgb, #fb7185 28%, var(--hairline));
+  background: linear-gradient(135deg,
+    color-mix(in srgb, #f0a35a 12%, transparent),
+    color-mix(in srgb, #fb7185 10%, transparent));
+  color: var(--ink); text-decoration: none;
+  transition: transform 120ms var(--ease-spring);
+}
+.hh__glance:active { transform: scale(.98); }
+.hh__glance > mat-icon:first-child {
+  flex: 0 0 auto; font-size: 18px; width: 18px; height: 18px;
+  color: #fb7185;
+}
+.hh__glance-txt {
+  flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hh__glance-go { flex: 0 0 auto; font-size: 20px; width: 20px; height: 20px; color: var(--ink-faint); }
+
 // ============================================================================
 // STAGGERED SPRING ENTRANCE — each card rises + fades on a per-index delay.
 // ============================================================================

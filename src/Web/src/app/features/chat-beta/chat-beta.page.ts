@@ -5,12 +5,16 @@ import {
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 
+import { firstValueFrom } from 'rxjs';
+
+import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { ChatRealtime, TypingUser } from '../../core/chat-realtime';
-import { ChatChannelDto, ChatMessageDto, PERM } from '../../core/models';
+import { ChatChannelDto, ChatMessageDto, Presence } from '../../core/models';
 
 import {
   BetaPullRefresh, BetaBottomSheet, BetaToaster, ToastController, BetaSkeleton,
+  BetaSwipeRow,
 } from '../beta-ui';
 import { ConversationRow } from './conversation-row';
 import { MessageBubble } from './message-bubble';
@@ -59,7 +63,7 @@ const REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '🙏', '😢', '�
   providers: [ToastController],
   imports: [
     FormsModule, MatIconModule,
-    BetaPullRefresh, BetaBottomSheet, BetaToaster, BetaSkeleton,
+    BetaPullRefresh, BetaBottomSheet, BetaToaster, BetaSkeleton, BetaSwipeRow,
     ConversationRow, MessageBubble,
   ],
   template: `
@@ -78,6 +82,27 @@ const REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '🙏', '😢', '�
         } @else if (live()) {
           <span class="lh__live"><span class="lh__pulse" aria-hidden="true"></span> Live</span>
         }
+
+        <div class="lh__tools">
+          <label class="lh__search">
+            <mat-icon class="lh__search-i" aria-hidden="true">search</mat-icon>
+            <input class="lh__search-in" type="search" [ngModel]="search()"
+                   (ngModelChange)="search.set($event)" name="convSearch"
+                   placeholder="Search conversations" aria-label="Search conversations"
+                   autocomplete="off" enterkeyhint="search" />
+            @if (search().trim()) {
+              <button type="button" class="lh__search-x" (click)="search.set('')" aria-label="Clear search">
+                <mat-icon aria-hidden="true">close</mat-icon>
+              </button>
+            }
+          </label>
+          <button type="button" class="lh__filter" [class.is-on]="unreadOnly()"
+                  (click)="toggleUnreadOnly()"
+                  [attr.aria-pressed]="unreadOnly()" aria-label="Show unread conversations only">
+            <mat-icon aria-hidden="true">mark_chat_unread</mat-icon>
+            <span>Unread</span>
+          </button>
+        </div>
       </header>
 
       <app-bs-pull-refresh class="list__ptr" [busy]="refreshing()" (refresh)="refreshList()">
@@ -100,10 +125,26 @@ const REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '🙏', '😢', '�
               <h2 class="empty__h">No conversations yet</h2>
               <p class="empty__p">Your channels and direct messages will appear here as soon as someone says hello.</p>
             </div>
+          } @else if (visibleConversations().length === 0) {
+            <div class="empty">
+              <div class="empty__art" aria-hidden="true">
+                <mat-icon>{{ unreadOnly() ? 'mark_chat_read' : 'search_off' }}</mat-icon>
+              </div>
+              <h2 class="empty__h">{{ unreadOnly() ? 'All caught up' : 'No matches' }}</h2>
+              <p class="empty__p">
+                {{ unreadOnly()
+                  ? 'You have no unread conversations right now.'
+                  : 'No conversations match “' + search().trim() + '”.' }}
+              </p>
+            </div>
           } @else {
-            @for (c of conversations(); track c.id; let i = $index) {
+            @for (c of visibleConversations(); track c.id; let i = $index) {
               <div class="rise" [style.--i]="i">
-                <cb-conv-row [conv]="c" [meUserId]="meUserId()" [online]="isActive(c)" (open)="openConversation($event)" />
+                <app-bs-swipe-row [rightLabel]="c.unreadCount > 0 ? 'Mark read' : ''"
+                                  [leftDestructive]="false" [disabled]="c.unreadCount === 0"
+                                  [label]="c.displayName" (swipe)="onRowSwipe(c, $event)">
+                  <cb-conv-row [conv]="c" [meUserId]="meUserId()" [online]="peerOnline(c)" (open)="openConversation($event)" />
+                </app-bs-swipe-row>
               </div>
             }
           }
@@ -201,6 +242,7 @@ const REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '🙏', '😢', '�
 })
 export class ChatBetaPage implements OnDestroy {
   private readonly rt = inject(ChatRealtime);
+  private readonly api = inject(Api);
   private readonly auth = inject(AuthService);
   private readonly toasts = inject(ToastController);
   private readonly destroyRef = inject(DestroyRef);
@@ -217,6 +259,31 @@ export class ChatBetaPage implements OnDestroy {
     this.rt.connectionState() === 'connecting' && this.rt.channels().length === 0);
   protected readonly totalUnread = this.rt.totalUnreadMessages;
   protected readonly conversations = this.rt.channels;
+
+  // ── list filters (client-side over the loaded conversation list) ──
+  /** Live free-text filter over conversation display names (channel name / DM peer name). A signal so
+   * the visibleConversations computed re-runs on every keystroke (a plain field wouldn't invalidate it). */
+  protected readonly search = signal('');
+  /** When on, the list shows only conversations with unread > 0. */
+  protected readonly unreadOnly = signal(false);
+
+  /** The conversations actually rendered: search-filtered, then (optionally) unread-only. */
+  protected readonly visibleConversations = computed<ChatChannelDto[]>(() => {
+    const q = this.search().trim().toLowerCase();
+    const unreadOnly = this.unreadOnly();
+    return this.conversations().filter(c => {
+      if (unreadOnly && (c.unreadCount ?? 0) === 0) return false;
+      if (q && !(c.displayName ?? '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+  });
+
+  // ── live presence (cross-reference DM peer ids against GET /api/presence) ──
+  /** AppUser id → last-seen epoch ms, refreshed on a light poll. Drives the TRUE DM presence dot. */
+  private readonly presenceById = signal<Map<number, number>>(new Map());
+  private presenceTimer: ReturnType<typeof setInterval> | null = null;
+  /** A user counts as online if seen within this window. */
+  private static readonly PRESENCE_WINDOW_MS = 5 * 60_000;
 
   // ── list / thread loading + selection ──
   protected readonly loadingList = signal(true);
@@ -309,6 +376,14 @@ export class ChatBetaPage implements OnDestroy {
     void this.rt.start();
     void this.initialLoad();
 
+    // Light presence poll so the DM presence dot reflects TRUE roster presence (last authenticated
+    // request within ~5min) rather than just last-message recency. Best-effort + swallow errors.
+    void this.refreshPresence();
+    this.presenceTimer = setInterval(() => void this.refreshPresence(), 45_000);
+    this.destroyRef.onDestroy(() => {
+      if (this.presenceTimer) { clearInterval(this.presenceTimer); this.presenceTimer = null; }
+    });
+
     // Auto-scroll the thread to the newest message whenever its row set changes (open, new message, send).
     effect(() => {
       this.rows();
@@ -349,12 +424,63 @@ export class ChatBetaPage implements OnDestroy {
     }
   }
 
-  /** A light presence heuristic: a DM/channel "active" if its last message arrived within ~5 minutes. */
+  /** A light recency heuristic: a DM/channel "active" if its last message arrived within ~5 minutes. */
   isActive(conv: ChatChannelDto): boolean {
     const iso = conv.lastMessage?.createdUtc;
     if (!iso) return false;
     const t = new Date(iso).getTime();
-    return !Number.isNaN(t) && Date.now() - t < 5 * 60_000;
+    return !Number.isNaN(t) && Date.now() - t < ChatBetaPage.PRESENCE_WINDOW_MS;
+  }
+
+  /**
+   * TRUE presence for a DM row: the peer counts as online when GET /api/presence reports their last
+   * authenticated request within the ~5min window. Falls back to the last-message recency heuristic
+   * (the channel-level "active recently") when we have no presence row for the peer yet (or for a
+   * group channel, which has no single peer). Self never shows a dot.
+   */
+  peerOnline(conv: ChatChannelDto): boolean {
+    if (conv.kind !== 'direct') return false;
+    const me = this.meUserId();
+    const peer = (conv.members ?? []).find(m => m.userId !== me) ?? conv.members?.[0] ?? null;
+    const lastSeen = peer ? this.presenceById().get(peer.userId) : undefined;
+    if (lastSeen != null) return Date.now() - lastSeen < ChatBetaPage.PRESENCE_WINDOW_MS;
+    return this.isActive(conv); // recency fallback when presence has no row for this peer yet
+  }
+
+  /** Refresh the presence map (AppUser id → last-seen ms). Best-effort; swallows its own error. */
+  private async refreshPresence(): Promise<void> {
+    try {
+      const rows: Presence[] = await firstValueFrom(this.api.presence());
+      const map = new Map<number, number>();
+      for (const p of rows) {
+        if (p.userId == null) continue;
+        const t = Date.parse(p.lastSeenUtc);
+        if (!Number.isNaN(t)) map.set(p.userId, t);
+      }
+      this.presenceById.set(map);
+    } catch {
+      /* keep the last-known presence map; rows just fall back to the recency heuristic */
+    }
+  }
+
+  /** Header toggle: show only conversations with unread > 0 (over the loaded list). */
+  toggleUnreadOnly(): void {
+    this.unreadOnly.update(v => !v);
+  }
+
+  /**
+   * Swipe-row action on a conversation: a RIGHT swipe commits "Mark read" — clears the unread badge
+   * locally (optimistic) AND calls the server mark-read (POST /api/chat/channels/{id}/read via the hub)
+   * up to the newest known message so it sticks. A LEFT swipe is unused here (no destructive action).
+   */
+  onRowSwipe(conv: ChatChannelDto, side: 'left' | 'right'): void {
+    if (side !== 'right') return;
+    if ((conv.unreadCount ?? 0) === 0) return;
+    this.rt.clearUnreadLocal(conv.id);
+    const list = this.rt.messages()[conv.id] ?? [];
+    const newest = list[list.length - 1] ?? conv.lastMessage ?? null;
+    if (newest) void this.rt.markRead(conv.id, newest.id);
+    this.toasts.show('Marked read', { tone: 'success' });
   }
 
   // ── thread open/close ──

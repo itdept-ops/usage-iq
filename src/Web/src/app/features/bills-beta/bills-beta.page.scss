@@ -112,6 +112,23 @@
 .hh__owed-v { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1; color: var(--warn); letter-spacing: -.02em; }
 .hh__owed-l { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
 
+// ---- Running totals strip (grand total billed + still-unclaimed across all bills) ----
+.hh__running {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px;
+  border-radius: var(--r-tile);
+  border: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--accent-a) 7%, var(--bg-rise));
+}
+.hh__run { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.hh__run-v {
+  font-family: var(--font-display); font-weight: 600; font-size: 19px; line-height: 1;
+  letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.hh__run-l { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+.hh__run--warn .hh__run-v { color: var(--warn); }
+.hh__run-sep { flex: 0 0 auto; width: 1px; align-self: stretch; background: var(--hairline); }
+
 // ---- Summary stat row (two glance stats) ----
 .hh__stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 

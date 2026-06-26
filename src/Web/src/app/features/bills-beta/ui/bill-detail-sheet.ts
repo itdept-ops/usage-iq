@@ -18,6 +18,25 @@ export interface AddItem { bill: BillDto; name: string; amount: number; }
 export interface BumpChange { bill: BillDto; dir: number; }
 
 /**
+ * One participant's claim breakdown, derived purely from the bill's loaded item rows (who claimed/was
+ * assigned each line + its `settled` flag). Surfaces settled-vs-outstanding progress the server
+ * `personTotals` rail does not expose. `unclaimed` rows roll up every still-open line.
+ */
+interface ClaimLine {
+  name: string;
+  /** Sum of this participant's claimed/assigned item amounts (pre tax/tip — items as claimed). */
+  claimed: number;
+  /** Portion of `claimed` already marked settled. */
+  settled: number;
+  /** Number of line items attributed to this participant. */
+  count: number;
+  /** True only when every one of their items is settled (and they have at least one). */
+  allSettled: boolean;
+  /** The amber unclaimed remainder row (rendered last, never red). */
+  unclaimed?: boolean;
+}
+
+/**
  * Tally BILL-DETAIL sheet — the full per-bill editor, lifted into the kit {@link BetaBottomSheet}. Opening
  * a bill card raises this `full` sheet over the list: an editable title, a slim add-item bar (+ a receipt
  * SNAP button when the caller holds ai.vision), a determinate receipt-import bar, the claim-first item
@@ -125,6 +144,32 @@ export interface BumpChange { bill: BillDto; dir: number; }
                   <app-person-total-card [unclaimed]="true" [amount]="b.unclaimedTotal" />
                 }
               </div>
+
+              <!-- Claim summary: each participant's claimed total + settled progress + the unclaimed
+                   remainder, computed straight from the loaded item claims. -->
+              @if (claimLines(b); as lines) {
+                @if (lines.length) {
+                  <ul class="bd__owes" aria-label="Who owes what">
+                    @for (l of lines; track l.name) {
+                      <li class="bd__owe" [class.bd__owe--unclaimed]="l.unclaimed"
+                          [class.bd__owe--done]="l.allSettled">
+                        <span class="bd__owe-dot" aria-hidden="true"></span>
+                        <span class="bd__owe-name">{{ l.name }}</span>
+                        @if (l.unclaimed) {
+                          <span class="bd__owe-tag">{{ l.count }} open</span>
+                        } @else if (l.allSettled) {
+                          <span class="bd__owe-tag bd__owe-tag--done">
+                            <mat-icon aria-hidden="true">check_circle</mat-icon> settled
+                          </span>
+                        } @else if (l.settled > 0) {
+                          <span class="bd__owe-tag">{{ l.settled | currency: 'USD' }} settled</span>
+                        }
+                        <span class="bd__owe-amt">{{ l.claimed | currency: 'USD' }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+              }
             }
           } @else if (!importing()) {
             <div class="bd__noitems">
@@ -227,6 +272,34 @@ export interface BumpChange { bill: BillDto; dir: number; }
       &::-webkit-scrollbar { display: none; }
     }
 
+    .bd__owes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+    .bd__owe {
+      display: flex; align-items: center; gap: 10px;
+      min-height: 44px; padding: 6px 12px; border-radius: var(--r-tile);
+      background: var(--bg-sink);
+    }
+    .bd__owe + .bd__owe { margin-top: 2px; }
+    .bd__owe-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: color-mix(in srgb, var(--accent-b) 70%, var(--ink-dim)); }
+    .bd__owe-name { flex: 1 1 auto; min-width: 0; font: 600 14px/1.2 var(--font-ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bd__owe-tag {
+      flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 8px; border-radius: var(--r-pill);
+      font: 700 10px/1 var(--font-ui); letter-spacing: .04em; text-transform: uppercase;
+      background: color-mix(in srgb, var(--ink-dim) 14%, transparent); color: var(--ink-dim);
+      mat-icon { font-size: 13px; width: 13px; height: 13px; }
+    }
+    .bd__owe-tag--done { background: color-mix(in srgb, var(--signal) 16%, transparent); color: var(--signal); }
+    .bd__owe-amt { flex: 0 0 auto; font: 600 15px/1 var(--font-display); color: var(--ink); font-variant-numeric: tabular-nums; }
+    .bd__owe--done .bd__owe-dot { background: var(--signal); }
+    .bd__owe--unclaimed {
+      background: color-mix(in srgb, var(--warn) 10%, var(--bg-sink));
+      border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+    }
+    .bd__owe--unclaimed .bd__owe-dot { background: var(--warn); }
+    .bd__owe--unclaimed .bd__owe-amt,
+    .bd__owe--unclaimed .bd__owe-name { color: var(--warn); }
+    .bd__owe--unclaimed .bd__owe-tag { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+
     .bd__noitems {
       display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
       padding: 22px; color: var(--ink-dim);
@@ -298,6 +371,42 @@ export class BillDetailSheet {
   /** Bill list price = items + tax + tip. */
   protected total(b: BillDto): number {
     return b.items.reduce((s, i) => s + i.amount, 0) + (b.taxAmount ?? 0) + (b.tipAmount ?? 0);
+  }
+
+  /**
+   * Group the bill's LOADED item rows into a per-participant claim breakdown (claimed total + the
+   * portion already settled), with every still-open line rolled into a trailing amber Unclaimed row.
+   * Derived entirely from the items already in hand — no extra Api call. Participants are ordered by
+   * claimed total (biggest first); the unclaimed remainder always sorts last.
+   */
+  protected claimLines(b: BillDto): ClaimLine[] {
+    const by = new Map<string, ClaimLine>();
+    let unclaimedAmt = 0;
+    let unclaimedCount = 0;
+
+    for (const it of b.items) {
+      const who = it.claimedByName ?? it.assignedToName ?? null;
+      if (!who) {
+        unclaimedAmt += it.amount;
+        unclaimedCount += 1;
+        continue;
+      }
+      const line = by.get(who) ?? { name: who, claimed: 0, settled: 0, count: 0, allSettled: true };
+      line.claimed += it.amount;
+      line.count += 1;
+      if (it.settled) line.settled += it.amount;
+      else line.allSettled = false;
+      by.set(who, line);
+    }
+
+    const lines = [...by.values()].sort((a, c) => c.claimed - a.claimed);
+    if (unclaimedAmt > 0) {
+      lines.push({
+        name: 'Unclaimed', claimed: unclaimedAmt, settled: 0,
+        count: unclaimedCount, allSettled: false, unclaimed: true,
+      });
+    }
+    return lines;
   }
 
   protected commitTitle(b: BillDto, title: string): void {

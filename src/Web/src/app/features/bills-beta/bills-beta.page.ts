@@ -72,6 +72,21 @@ import { ReceiptReviewSheet, ReceiptReviewResult } from './ui/receipt-review-she
             }
           </div>
 
+          <!-- Running totals across ALL your bills (grand total + still-unclaimed money). -->
+          @if (bills().length) {
+            <div class="hh__running" aria-label="Totals across all your bills">
+              <span class="hh__run">
+                <span class="hh__run-v">{{ grandTotal() | currency: 'USD' : 'symbol' : '1.0-0' }}</span>
+                <span class="hh__run-l">total billed</span>
+              </span>
+              <span class="hh__run-sep" aria-hidden="true"></span>
+              <span class="hh__run" [class.hh__run--warn]="unclaimedTotalAll() > 0">
+                <span class="hh__run-v">{{ unclaimedTotalAll() | currency: 'USD' : 'symbol' : '1.0-0' }}</span>
+                <span class="hh__run-l">unclaimed</span>
+              </span>
+            </div>
+          }
+
           @if (bills().length) {
             <div class="hh__stats">
               <app-bs-stat-tile [value]="openCount()" label="Open bills"
@@ -232,6 +247,12 @@ export class BillsBetaPage {
   /** How many bills still have unclaimed money on them. */
   readonly unclaimedCount = computed(() =>
     this.bills().filter(b => b.status !== 'settled' && b.unclaimedTotal > 0).length);
+  /** Running grand total across EVERY one of your bills (open + settled), items + tax + tip. */
+  readonly grandTotal = computed(() =>
+    this.bills().reduce((s, b) => s + this.billTotal(b), 0));
+  /** Running unclaimed money still on the table across all your bills. */
+  readonly unclaimedTotalAll = computed(() =>
+    this.bills().reduce((s, b) => s + Math.max(0, b.unclaimedTotal), 0));
 
   readonly subtitle = computed(() => {
     const n = this.bills().length;
