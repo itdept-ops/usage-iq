@@ -767,4 +767,25 @@ export class App implements AfterViewInit {
     this.userCount.set(null);
     this.router.navigate(['/login']);
   }
+
+  /**
+   * The slim immersive bar's back affordance: always lets the user leave the page. If we're on a beta
+   * SUB-page (e.g. /beta/bills) we route up to the Beta hub (/beta) — a deterministic, in-app destination
+   * that never escapes the SPA. From the hub root (/beta or /tracker-beta) we use the browser's history
+   * back if there's somewhere to return to, else fall back to the caller's home route. This keeps the
+   * affordance simple and means it never strands the user (no dead-end, no leaving the app shell).
+   */
+  immersiveBack(): void {
+    const path = this.router.url.split('?')[0];
+    const isBetaSubPage = path.startsWith('/beta/');
+    if (isBetaSubPage) {
+      this.router.navigateByUrl('/beta');
+      return;
+    }
+    if (typeof history !== 'undefined' && history.length > 1) {
+      history.back();
+      return;
+    }
+    this.router.navigateByUrl(this.auth.homeRoute());
+  }
 }

@@ -1,4 +1,48 @@
-@if (!bareLayout()) {
+@if (bareLayout()) {
+<!-- Bare/public chrome: no app toolbar (the page brings its own). -->
+} @else if (immersiveLayout()) {
+<!-- IMMERSIVE (beta) routes: a SLIM, native-feeling glass bar replaces the full desktop toolbar.
+     LEFT = a back affordance that always lets the user leave the page; RIGHT = the SAME avatar +
+     account menu the full toolbar uses (so account/profile/sign-out/home-route still work). No full
+     nav menus, no search, no terminal prompt — the immersive page owns the rest of the chrome. -->
+<mat-toolbar class="slimbar glass">
+  <button mat-icon-button type="button" class="slimbar__back" (click)="immersiveBack()"
+          matTooltip="Back" matTooltipClass="axon-tip" aria-label="Go back">
+    <mat-icon>arrow_back_ios_new</mat-icon>
+  </button>
+
+  <span class="slimbar__brand" aria-hidden="true">
+    <svg class="slimbar__logo" width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="uiq-logo-grad-slim" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#3D8BFF" /><stop offset="0.52" stop-color="#8B7CFF" /><stop offset="1" stop-color="#3FD8D0" />
+        </linearGradient>
+      </defs>
+      <rect x="1.25" y="1.25" width="29.5" height="29.5" rx="7.5" fill="#0B1019" stroke="url(#uiq-logo-grad-slim)" stroke-width="1.5" />
+      <rect x="7" y="18" width="3.6" height="7" rx="1.3" fill="url(#uiq-logo-grad-slim)" />
+      <rect x="14.2" y="13" width="3.6" height="12" rx="1.3" fill="url(#uiq-logo-grad-slim)" />
+      <rect x="21.4" y="8" width="3.6" height="17" rx="1.3" fill="url(#uiq-logo-grad-slim)" />
+    </svg>
+    <span class="slimbar__beta">BETA</span>
+  </span>
+
+  <span class="spacer"></span>
+
+  @if (auth.isAuthenticated() && auth.session(); as u) {
+    <button mat-button class="user" [matMenuTriggerFor]="userMenu"
+            #slimUserTrigger="matMenuTrigger"
+            [class.user--open]="slimUserTrigger.menuOpen"
+            aria-haspopup="menu" aria-label="Account menu">
+      @if (u.picture) {
+        <img class="user__avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
+      } @else {
+        <span class="user__avatar user__avatar--init">{{ initials() }}</span>
+      }
+      <mat-icon class="user__chev" aria-hidden="true">expand_more</mat-icon>
+    </button>
+  }
+</mat-toolbar>
+} @else {
 <mat-toolbar class="topbar glass">
   <a class="brand" [routerLink]="auth.homeRoute()" aria-label="Usage IQ home">
     <svg class="brand__logo" width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -400,98 +444,6 @@
       <span class="user__name">{{ u.name }}</span>
       <mat-icon class="user__chev" aria-hidden="true">expand_more</mat-icon>
     </button>
-    <mat-menu #userMenu="matMenu" class="account-menu" xPosition="before" overlapTrigger="false">
-      <div class="acct-head" role="presentation">
-        @if (u.picture) {
-          <img class="acct-head__avatar" [src]="u.picture" alt="" referrerpolicy="no-referrer" />
-        } @else {
-          <span class="acct-head__avatar acct-head__avatar--init">{{ initials() }}</span>
-        }
-        <div class="acct-head__id">
-          <div class="acct-head__name">{{ u.name }}</div>
-          <div class="acct-head__email" [title]="u.email">{{ u.email }}</div>
-          <span class="acct-head__role" [attr.data-admin]="roleLabel() === 'Administrator'">
-            <span class="acct-head__role-dot" aria-hidden="true"></span>{{ roleLabel() }}
-          </span>
-        </div>
-      </div>
-
-      <div class="acct-section" role="presentation">
-        <!-- Settings hub: the centralized per-user preferences aggregator (/preferences). Reachable by
-             ANY authenticated user; DISTINCT from the admin /settings page (a link-out card inside the hub,
-             and the "Admin settings" quick-link below for settings.view holders). -->
-        <a mat-menu-item class="acct-item" routerLink="/preferences">
-          <mat-icon class="acct-item__icon" aria-hidden="true">settings</mat-icon>
-          <span class="acct-item__label">Settings</span>
-        </a>
-
-        <!-- "How others see me": identity + presence prefs. Reachable by ANY authenticated user. -->
-        <a mat-menu-item class="acct-item" routerLink="/profile">
-          <mat-icon class="acct-item__icon" aria-hidden="true">badge</mat-icon>
-          <span class="acct-item__label">How others see me</span>
-        </a>
-
-        @for (link of quickLinks(); track link.route) {
-          <a mat-menu-item class="acct-item" [routerLink]="link.route">
-            <mat-icon class="acct-item__icon" aria-hidden="true">{{ link.icon }}</mat-icon>
-            <span class="acct-item__label">{{ link.label }}</span>
-          </a>
-        }
-
-        <!-- Home page picker: a submenu of the pages the caller can reach, plus a "Default (first
-             available)" option that clears the preference. Reachable by ANY authenticated user. -->
-        <button mat-menu-item class="acct-item" [matMenuTriggerFor]="homeMenu">
-          <mat-icon class="acct-item__icon" aria-hidden="true">home</mat-icon>
-          <span class="acct-item__label">Home page</span>
-        </button>
-
-        <!-- Quick theme picker (System / Light / Dark). Not a menu-item so clicking a segment doesn't
-             close the menu; $event.stopPropagation keeps the menu open while you flip themes. Persisted
-             + applied by ThemeService; the full version lives in /preferences. -->
-        <div class="acct-theme" role="radiogroup" aria-label="Theme"
-             (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
-          <mat-icon class="acct-item__icon acct-theme__lead" aria-hidden="true">contrast</mat-icon>
-          <div class="acct-theme__seg">
-            @for (t of themeModes; track t.value) {
-              <button type="button" class="acct-theme__opt" role="radio"
-                      [class.acct-theme__opt--on]="theme.mode() === t.value"
-                      [attr.aria-checked]="theme.mode() === t.value"
-                      [matTooltip]="t.label" matTooltipClass="axon-tip"
-                      [attr.aria-label]="t.label + ' theme'"
-                      (click)="theme.setMode(t.value)">
-                <mat-icon aria-hidden="true">{{ t.icon }}</mat-icon>
-              </button>
-            }
-          </div>
-        </div>
-      </div>
-
-      <div class="acct-divider" role="separator" aria-hidden="true"></div>
-
-      <button mat-menu-item class="acct-item acct-item--danger" (click)="logout()">
-        <mat-icon class="acct-item__icon" aria-hidden="true">logout</mat-icon>
-        <span class="acct-item__label">Sign out</span>
-      </button>
-    </mat-menu>
-
-    <!-- Home-page picker submenu: radio-style rows for each page the caller can land on, plus a
-         "Default (first available)" row that clears the saved preference (null). Selecting a row PATCHes
-         the backend + updates local state, so the brand link / post-login redirect pick it up. -->
-    <mat-menu #homeMenu="matMenu" class="account-menu home-menu" overlapTrigger="false">
-      <button mat-menu-item class="acct-item acct-item--radio" (click)="setHomeRoute(null)"
-              [class.acct-item--checked]="!auth.session()?.homeRoute">
-        <mat-icon class="acct-item__radio" aria-hidden="true">{{ !auth.session()?.homeRoute ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
-        <span class="acct-item__label">Default (first available)</span>
-      </button>
-      <div class="acct-divider" role="separator" aria-hidden="true"></div>
-      @for (opt of homeOptions(); track opt.route) {
-        <button mat-menu-item class="acct-item acct-item--radio" (click)="setHomeRoute(opt.route)"
-                [class.acct-item--checked]="auth.session()?.homeRoute === opt.route">
-          <mat-icon class="acct-item__radio" aria-hidden="true">{{ auth.session()?.homeRoute === opt.route ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
-          <span class="acct-item__label">{{ opt.label }}</span>
-        </button>
-      }
-    </mat-menu>
   }
 </mat-toolbar>
 
@@ -619,6 +571,110 @@
   </nav>
 }
 }
+
+<!-- Account menu + home-page picker submenu. Declared ONCE here at the shell root (not inside either
+     toolbar branch) so BOTH the full desktop toolbar's .user trigger AND the slim immersive bar's .user
+     trigger bind to the same #userMenu / #homeMenu — account/profile/sign-out/home-route work identically
+     on every non-bare route. They live in the CDK overlay, so their position in the template is irrelevant
+     to layout; only the template-ref availability matters. They MUST sit at the template root (NOT inside
+     an @if) so the refs are visible to triggers in BOTH the full-toolbar @else and the slim @else if blocks
+     — Angular template refs don't cross control-flow block boundaries. Menu content is lazy (rendered only
+     when a trigger opens it, which only happens when authenticated), so auth.session() is reliably set; the
+     header reads it via the @if/as alias INSIDE the (already-mounted) panel, with no enclosing block. -->
+<mat-menu #userMenu="matMenu" class="account-menu" xPosition="before" overlapTrigger="false">
+  @if (auth.session(); as s) {
+    <div class="acct-head" role="presentation">
+      @if (s.picture) {
+        <img class="acct-head__avatar" [src]="s.picture" alt="" referrerpolicy="no-referrer" />
+      } @else {
+        <span class="acct-head__avatar acct-head__avatar--init">{{ initials() }}</span>
+      }
+      <div class="acct-head__id">
+        <div class="acct-head__name">{{ s.name }}</div>
+        <div class="acct-head__email" [title]="s.email">{{ s.email }}</div>
+        <span class="acct-head__role" [attr.data-admin]="roleLabel() === 'Administrator'">
+          <span class="acct-head__role-dot" aria-hidden="true"></span>{{ roleLabel() }}
+        </span>
+      </div>
+    </div>
+  }
+
+    <div class="acct-section" role="presentation">
+      <!-- Settings hub: the centralized per-user preferences aggregator (/preferences). Reachable by
+           ANY authenticated user; DISTINCT from the admin /settings page (a link-out card inside the hub,
+           and the "Admin settings" quick-link below for settings.view holders). -->
+      <a mat-menu-item class="acct-item" routerLink="/preferences">
+        <mat-icon class="acct-item__icon" aria-hidden="true">settings</mat-icon>
+        <span class="acct-item__label">Settings</span>
+      </a>
+
+      <!-- "How others see me": identity + presence prefs. Reachable by ANY authenticated user. -->
+      <a mat-menu-item class="acct-item" routerLink="/profile">
+        <mat-icon class="acct-item__icon" aria-hidden="true">badge</mat-icon>
+        <span class="acct-item__label">How others see me</span>
+      </a>
+
+      @for (link of quickLinks(); track link.route) {
+        <a mat-menu-item class="acct-item" [routerLink]="link.route">
+          <mat-icon class="acct-item__icon" aria-hidden="true">{{ link.icon }}</mat-icon>
+          <span class="acct-item__label">{{ link.label }}</span>
+        </a>
+      }
+
+      <!-- Home page picker: a submenu of the pages the caller can reach, plus a "Default (first
+           available)" option that clears the preference. Reachable by ANY authenticated user. -->
+      <button mat-menu-item class="acct-item" [matMenuTriggerFor]="homeMenu">
+        <mat-icon class="acct-item__icon" aria-hidden="true">home</mat-icon>
+        <span class="acct-item__label">Home page</span>
+      </button>
+
+      <!-- Quick theme picker (System / Light / Dark). Not a menu-item so clicking a segment doesn't
+           close the menu; $event.stopPropagation keeps the menu open while you flip themes. Persisted
+           + applied by ThemeService; the full version lives in /preferences. -->
+      <div class="acct-theme" role="radiogroup" aria-label="Theme"
+           (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+        <mat-icon class="acct-item__icon acct-theme__lead" aria-hidden="true">contrast</mat-icon>
+        <div class="acct-theme__seg">
+          @for (t of themeModes; track t.value) {
+            <button type="button" class="acct-theme__opt" role="radio"
+                    [class.acct-theme__opt--on]="theme.mode() === t.value"
+                    [attr.aria-checked]="theme.mode() === t.value"
+                    [matTooltip]="t.label" matTooltipClass="axon-tip"
+                    [attr.aria-label]="t.label + ' theme'"
+                    (click)="theme.setMode(t.value)">
+              <mat-icon aria-hidden="true">{{ t.icon }}</mat-icon>
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="acct-divider" role="separator" aria-hidden="true"></div>
+
+    <button mat-menu-item class="acct-item acct-item--danger" (click)="logout()">
+      <mat-icon class="acct-item__icon" aria-hidden="true">logout</mat-icon>
+      <span class="acct-item__label">Sign out</span>
+    </button>
+  </mat-menu>
+
+  <!-- Home-page picker submenu: radio-style rows for each page the caller can land on, plus a
+       "Default (first available)" row that clears the saved preference (null). Selecting a row PATCHes
+       the backend + updates local state, so the brand link / post-login redirect pick it up. -->
+  <mat-menu #homeMenu="matMenu" class="account-menu home-menu" overlapTrigger="false">
+    <button mat-menu-item class="acct-item acct-item--radio" (click)="setHomeRoute(null)"
+            [class.acct-item--checked]="!auth.session()?.homeRoute">
+      <mat-icon class="acct-item__radio" aria-hidden="true">{{ !auth.session()?.homeRoute ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+      <span class="acct-item__label">Default (first available)</span>
+    </button>
+    <div class="acct-divider" role="separator" aria-hidden="true"></div>
+    @for (opt of homeOptions(); track opt.route) {
+      <button mat-menu-item class="acct-item acct-item--radio" (click)="setHomeRoute(opt.route)"
+              [class.acct-item--checked]="auth.session()?.homeRoute === opt.route">
+        <mat-icon class="acct-item__radio" aria-hidden="true">{{ auth.session()?.homeRoute === opt.route ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+        <span class="acct-item__label">{{ opt.label }}</span>
+      </button>
+    }
+  </mat-menu>
 
 <main class="content" [class.content--bare]="bareLayout()" [class.content--immersive]="immersiveLayout()">
   <router-outlet />
