@@ -1,0 +1,331 @@
+// ============================================================================
+// Chat "Messenger" — rebuilt on the shared beta-ui "Strata" foundation.
+//
+// One line adopts the whole Strata token contract (layered bg, glass, ink scale, radii, the
+// lift-1/2/3 depth system, spring/bounce easing, blur cap, env() safe-area, a11y killswitches);
+// then the CHAT page OVERRIDES the per-page accent with its OWN signature gradient — a cool
+// TEAL → SKY. Every kit component (pull-refresh ring, toaster, bottom sheet, skeleton) + every
+// subcomponent (conversation rows, message bubbles, chips) reads --accent-a/--accent-b off this
+// :host cascade, so this single override re-skins the whole screen (badges, dots, mine-bubbles,
+// the send button, the focus ring all follow).
+//
+// ISOLATED + gated by beta.access (+ chat.read): nothing here touches the global --tech-* tokens
+// or the flagship tracker-beta. The kit partial is the only style import; we consume it, never
+// modify it. Two stacked panes (list + thread) share one 390px surface.
+// ============================================================================
+
+@use '../beta-ui/beta-kit' as kit;
+
+:host {
+  @include kit.beta-host;          // the whole Strata token contract on :host
+
+  // ---- CHAT's SIGNATURE ACCENT: teal → sky (the per-page contract override) ----
+  --accent-a: #2dd4bf;             // signature teal (start)
+  --accent-b: #0ea5e9;             // signature sky  (end)
+
+  // Cool the layered base slightly toward the messenger surface (still in the kit's dark contract).
+  --bg-base: #0b1016;
+  --bg-rise: #121a22;
+  --bg-sink: #080c11;
+
+  // A cool radial wash behind the whole surface.
+  background: radial-gradient(120% 80% at 50% -10%, #11252b 0%, var(--bg-base) 58%);
+
+  overflow: hidden;                // each pane owns its own scroll
+}
+
+@include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)
+@include kit.beta-a11y;             // reduced-motion + reduced-transparency/contrast killswitches (once)
+
+// ============================================================================
+// PANES — list + thread share the full surface; thread slides over the list.
+// ============================================================================
+
+.pane {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+
+// The list stays mounted underneath; hidden (and inert) while a thread is open.
+.list.is-hidden { visibility: hidden; pointer-events: none; }
+
+// The thread slides in from the right with a spring.
+.thread {
+  z-index: 10;
+  background: var(--bg-base);
+  animation: pane-in 320ms var(--ease-spring) both;
+}
+@keyframes pane-in {
+  from { transform: translateX(14%); opacity: .4; }
+  to   { transform: none; opacity: 1; }
+}
+
+// ============================================================================
+// LIST PANE
+// ============================================================================
+
+// ---- immersive list header (greeting-style, accent bloom, safe-area) ----
+.lh {
+  position: relative; isolation: isolate;
+  flex: 0 0 auto;
+  padding: calc(var(--safe-top) + 12px) var(--gutter) 10px var(--gutter);
+}
+.lh__bloom {
+  position: absolute; top: -30px; left: -20px; width: 60%; height: 130px;
+  z-index: -1; pointer-events: none;
+  background: radial-gradient(130px 90px at 28% 30%,
+    color-mix(in srgb, var(--accent-a) 42%, transparent), transparent 70%);
+  filter: blur(20px); opacity: .9;
+}
+.lh__row { display: flex; align-items: center; gap: 10px; }
+.lh__title {
+  margin: 0; font-family: var(--font-display); font-weight: 600;
+  font-size: 32px; line-height: 1.02; letter-spacing: -.02em; color: var(--ink);
+}
+.lh__count {
+  display: inline-grid; place-items: center;
+  min-width: 24px; height: 24px; padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: #fff; font-size: 12px; font-weight: 800; line-height: 1;
+  box-shadow: var(--lift-1);
+}
+.lh__live {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: var(--ink-dim);
+}
+.lh__live--wait { color: var(--ink-faint); }
+.lh__pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--signal) 60%, transparent);
+  animation: pulse 2s var(--ease-out) infinite;
+}
+.lh__live--wait .lh__pulse { background: var(--warn); }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--signal) 55%, transparent); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+// ---- the scroll column (kit pull-refresh owns overflow) ----
+.list__ptr { display: block; flex: 1 1 auto; min-height: 0; }
+.list__scroll {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 4px var(--gutter) 0 var(--gutter);
+  min-height: 100%;
+}
+.list__foot { height: calc(var(--safe-bottom) + 16px); flex: 0 0 auto; }
+
+// staggered spring entrance for each row
+.rise { animation: rise-in 460ms var(--ease-spring-up) both; animation-delay: calc(var(--i, 0) * 34ms); }
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+// list loading skeleton rows
+.skelrow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 64px; }
+.skelrow__c { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
+
+// ============================================================================
+// EMPTY STATES (list + thread)
+// ============================================================================
+
+.empty {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 10px; padding: 56px 28px;
+  animation: rise-in 460ms var(--ease-spring-up) both;
+}
+.empty--thread { padding: 40px 28px; }
+.empty__art {
+  display: grid; place-items: center;
+  width: 84px; height: 84px; border-radius: 28px;
+  background: color-mix(in srgb, var(--accent-a) 12%, var(--bg-rise));
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--lift-2);
+  margin-bottom: 4px;
+}
+.empty__art mat-icon {
+  font-size: 40px; width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.empty__h { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--ink); }
+.empty__p { margin: 0; max-width: 30ch; font-size: 14px; line-height: 1.5; color: var(--ink-dim); }
+
+// ============================================================================
+// THREAD PANE
+// ============================================================================
+
+// ---- sticky thread header (glass, back + identity) ----
+.th {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(var(--safe-top) + 8px) var(--gutter) 10px 6px;
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  border-bottom: 1px solid var(--hairline);
+}
+.th__back {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 44px; height: 44px; border: none; background: transparent;
+  color: var(--accent-a); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--ease-spring);
+}
+.th__back:active { transform: scale(.86); }
+.th__back:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 12px; }
+.th__back mat-icon { font-size: 20px; width: 20px; height: 20px; }
+
+.th__id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.th__ava { flex: 0 0 40px; width: 40px; height: 40px; }
+.th__img, .th__mono, .th__hash {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center; object-fit: cover; box-shadow: var(--lift-1);
+}
+.th__mono {
+  font-size: 15px; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, hsl(var(--h,220) 70% 56%), hsl(calc(var(--h,220) + 36) 72% 48%));
+}
+.th__hash {
+  font-size: 18px; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+}
+.th__text { min-width: 0; display: flex; flex-direction: column; }
+.th__name {
+  font-size: 16px; font-weight: 750; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.th__sub {
+  font-size: 12px; font-weight: 600; color: var(--ink-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+// ---- the message scroll region ----
+.th__scroll {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; gap: 0;
+  padding: 14px var(--gutter) 6px var(--gutter);
+}
+.th__foot { height: 6px; flex: 0 0 auto; }
+
+// thread loading skeleton — alternate left/right
+.th__load { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+.th__load-b { align-self: flex-start; }
+.th__load-b.r { align-self: flex-end; }
+
+// each bubble row; a run start gets a little extra breathing room above
+.bubrow { display: flex; flex-direction: column; }
+.bubrow.run-start { margin-top: 10px; }
+.bubrow:first-child { margin-top: 0; }
+
+// ---- day separator ----
+.daysep {
+  display: flex; align-items: center; justify-content: center;
+  margin: 16px 0 10px;
+}
+.daysep span {
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 4px 12px; border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--bg-rise) 80%, transparent);
+  border: 1px solid var(--hairline);
+}
+
+// ---- typing indicator ----
+.typing {
+  display: flex; align-items: center; gap: 8px;
+  margin: 8px 2px 4px; padding-left: 36px;
+  animation: rise-in 240ms var(--ease-out) both;
+}
+.typing__dots {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 9px 12px; border-radius: 16px 16px 16px 6px;
+  background: var(--bg-rise); box-shadow: var(--lift-1);
+}
+.typing__dots i {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint);
+  animation: typing-bounce 1.3s var(--ease-out) infinite;
+}
+.typing__dots i:nth-child(2) { animation-delay: .18s; }
+.typing__dots i:nth-child(3) { animation-delay: .36s; }
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: .5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+.typing__t { font-size: 12px; font-weight: 600; color: var(--ink-faint); }
+
+// ============================================================================
+// COMPOSER BAR — fixed at the bottom of the thread pane, glass, safe-area.
+// ============================================================================
+
+.composer {
+  flex: 0 0 auto;
+  display: flex; align-items: flex-end; gap: 10px;
+  padding: 10px var(--gutter) max(10px, var(--safe-bottom)) var(--gutter);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  border-top: 1px solid var(--hairline);
+}
+.composer__in {
+  flex: 1 1 auto; min-width: 0;
+  resize: none; overflow-y: auto;
+  min-height: 44px; max-height: 120px;
+  padding: 11px 16px;
+  border-radius: 22px;
+  border: 1px solid var(--glass-edge);
+  background: var(--bg-rise);
+  color: var(--ink); font: inherit; font-size: 15px; line-height: 1.35;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 140ms var(--ease-out);
+}
+.composer__in::placeholder { color: var(--ink-faint); }
+.composer__in:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-a) 55%, transparent);
+}
+.composer__send {
+  flex: 0 0 44px;
+  width: 44px; height: 44px; border: none; border-radius: 50%;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: #fff; box-shadow: var(--lift-2);
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms var(--ease-spring), opacity 140ms var(--ease-out), filter 140ms var(--ease-out);
+}
+.composer__send:active { transform: scale(.9); }
+.composer__send:disabled { opacity: .4; filter: grayscale(.4); cursor: default; box-shadow: var(--lift-1); }
+.composer__send:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.composer__send mat-icon { font-size: 22px; width: 22px; height: 22px; }
+
+// ============================================================================
+// REACT PICKER SHEET (kit bottom sheet content)
+// ============================================================================
+
+.react { padding: 6px 4px 18px; }
+.react__h {
+  margin: 0 0 14px; font-family: var(--font-display); font-weight: 600; font-size: 18px;
+  color: var(--ink); text-align: center;
+}
+.react__grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+}
+.react__e {
+  appearance: none; border: 1px solid var(--hairline);
+  display: grid; place-items: center;
+  min-height: 56px; border-radius: var(--r-tile);
+  background: var(--bg-rise); font-size: 28px; line-height: 1;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms var(--ease-spring), background 140ms var(--ease-out);
+}
+.react__e:active { transform: scale(.88); }
+.react__e:hover { background: color-mix(in srgb, var(--accent-a) 10%, var(--bg-rise)); }
+.react__e:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .thread, .rise, .empty, .typing { animation: none; }
+  .lh__pulse, .typing__dots i { animation: none; }
+}

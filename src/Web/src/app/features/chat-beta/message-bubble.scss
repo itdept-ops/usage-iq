@@ -1,0 +1,141 @@
+// ============================================================================
+// cb-bubble — one iMessage-feel message bubble. Inherits the page's Strata tokens
+// (--accent-a/-b, --glass, --ink*, radii, lift) off the host cascade; owns no tokens.
+// Mine = right, accent gradient; theirs = left, glass, with a small avatar + tail.
+// ============================================================================
+
+:host {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  // Tight default vertical rhythm within a run; the page adds run gaps.
+  margin-block: 1px;
+}
+:host.mine { flex-direction: row-reverse; }
+
+// ---- their small avatar gutter (28px) ----
+.cb-ava {
+  flex: 0 0 28px;
+  width: 28px; height: 28px;
+  align-self: flex-end;
+}
+.cb-ava__img,
+.cb-ava__mono {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  object-fit: cover;
+}
+.cb-ava__img { box-shadow: var(--lift-1); }
+.cb-ava__mono {
+  font-size: 11px; font-weight: 800; letter-spacing: .02em; color: #fff;
+  background:
+    linear-gradient(135deg,
+      hsl(var(--h, 220) 70% 56%),
+      hsl(calc(var(--h, 220) + 36) 72% 48%));
+  box-shadow: var(--lift-1);
+}
+
+// ---- bubble column (name + bubble + reacts + meta) ----
+.cb-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: min(80%, 320px);
+}
+:host.mine .cb-col { align-items: flex-end; }
+:host.theirs .cb-col { align-items: flex-start; }
+
+.cb-name {
+  font-size: 11px; font-weight: 700; color: var(--ink-faint);
+  margin: 0 0 2px 10px; letter-spacing: .01em;
+}
+
+// ---- the bubble itself (a button so it's tappable for react/meta) ----
+.cb-bubble {
+  appearance: none; -webkit-appearance: none;
+  border: none; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  font: inherit;
+  display: inline-block; max-width: 100%;
+  padding: 8px 13px;
+  border-radius: 20px;
+  line-height: 1.32;
+  word-break: break-word; overflow-wrap: anywhere; white-space: pre-wrap;
+  transition: transform 120ms var(--ease-spring), filter 120ms var(--ease-out);
+}
+.cb-bubble:active { transform: scale(.97); }
+
+// theirs — glass / sediment, ink text
+:host.theirs .cb-bubble {
+  background: var(--bg-rise);
+  color: var(--ink);
+  box-shadow: var(--lift-1);
+  border-bottom-left-radius: 20px;
+}
+:host.theirs.tail .cb-bubble { border-bottom-left-radius: 7px; }
+
+// mine — accent gradient, white text, depth
+:host.mine .cb-bubble {
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: #fff;
+  box-shadow: var(--lift-2);
+  border-bottom-right-radius: 20px;
+}
+:host.mine.tail .cb-bubble { border-bottom-right-radius: 7px; }
+
+.cb-text { font-size: 15px; font-weight: 500; }
+
+// deleted placeholder — muted, dashed, no accent
+.cb-bubble.is-deleted {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 1px dashed var(--hairline);
+  cursor: default;
+}
+.cb-deleted {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; font-style: italic; color: var(--ink-faint);
+}
+.cb-deleted__i { font-style: normal; opacity: .8; }
+
+// ---- reaction chips ----
+.cb-reacts {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 4px; padding-inline: 2px;
+}
+.cb-chip {
+  appearance: none; border: 1px solid var(--hairline);
+  display: inline-flex; align-items: center; gap: 3px;
+  min-height: 26px; padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--bg-rise);
+  color: var(--ink-dim);
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: transform 110ms var(--ease-spring);
+}
+.cb-chip:active { transform: scale(.9); }
+.cb-chip.is-mine {
+  border-color: color-mix(in srgb, var(--accent-a) 55%, transparent);
+  background: color-mix(in srgb, var(--accent-a) 16%, var(--bg-rise));
+  color: var(--ink);
+}
+.cb-chip__e { font-size: 14px; line-height: 1; }
+.cb-chip__n { font-size: 11px; font-weight: 800; }
+.cb-chip--add {
+  font-size: 15px; font-weight: 700; color: var(--ink-faint);
+  padding: 0 9px;
+}
+
+// ---- tap-revealed meta line ----
+.cb-meta {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  color: var(--ink-faint); margin: 2px 6px 0;
+  animation: cb-meta-in 180ms var(--ease-out) both;
+}
+.cb-edited { font-weight: 600; opacity: .85; }
+@keyframes cb-meta-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-bubble, .cb-chip { transition: none; }
+  .cb-meta { animation: none; }
+}

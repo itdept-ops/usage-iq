@@ -1,0 +1,116 @@
+<app-bs-pull-refresh class="ab-ptr" [busy]="false" (refresh)="clearThread()">
+  <div class="ab-scroll">
+
+    <!-- ── Immersive header: accent bloom + title ── -->
+    <header class="abh">
+      <div class="abh__bloom" aria-hidden="true"></div>
+      <div class="abh__avatar" aria-hidden="true">
+        <mat-icon>auto_awesome</mat-icon>
+      </div>
+      <div class="abh__text">
+        <span class="abh__eyebrow">AI · grounded in your life</span>
+        <h1 class="abh__title">Ask my life</h1>
+      </div>
+    </header>
+
+    <!-- ── Thread ── -->
+    <div class="ab-thread" role="log" aria-live="polite">
+
+      @if (!hasTurns() && !loading()) {
+        <!-- Empty state: a warm invite + suggestion chips -->
+        <section class="ab-empty">
+          <div class="ab-empty__halo" aria-hidden="true">
+            <mat-icon>forum</mat-icon>
+          </div>
+          <h2 class="ab-empty__lead">Ask me anything about your life</h2>
+          <p class="ab-empty__sub">
+            Food, fitness, sleep, 75&nbsp;Hard, bills, family, AI spend — answers come straight from your
+            own numbers. Nothing is ever changed.
+          </p>
+          <div class="ab-chips" role="list" aria-label="Suggested questions">
+            @for (s of suggestions; track s.label; let i = $index) {
+              <button
+                type="button"
+                class="ab-chip"
+                role="listitem"
+                [style.--i]="i"
+                [disabled]="loading()"
+                (click)="askSuggestion(s)">
+                <mat-icon aria-hidden="true">{{ s.icon }}</mat-icon>
+                <span>{{ s.label }}</span>
+              </button>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- Turns -->
+      @for (turn of turns(); track turn.id) {
+        <div class="ab-turn">
+          <!-- Question bubble (right) -->
+          <div class="ab-q">
+            <p class="ab-q__text">{{ turn.question }}</p>
+          </div>
+
+          <!-- Answer bubble (left, accent avatar) -->
+          <div class="ab-a">
+            <div class="ab-a__avatar" aria-hidden="true">
+              <mat-icon>auto_awesome</mat-icon>
+            </div>
+            <div class="ab-a__bubble">
+              <p class="ab-a__text">{{ turn.answer }}</p>
+
+              @if (!turn.aiUsed) {
+                <span class="ab-badge" title="AI answering is off — this is a plain summary of the data you have.">
+                  <mat-icon aria-hidden="true">info</mat-icon> Plain summary (AI off)
+                </span>
+              }
+
+              @if (turn.domains.length > 0) {
+                <div class="ab-domains" aria-label="Data this drew on">
+                  @for (d of turn.domains; track d) {
+                    <span class="ab-domain">{{ domainLabel(d) }}</span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Thinking indicator -->
+      @if (loading()) {
+        <div class="ab-a ab-a--thinking">
+          <div class="ab-a__avatar" aria-hidden="true">
+            <mat-icon>auto_awesome</mat-icon>
+          </div>
+          <div class="ab-a__bubble ab-thinking">
+            <span class="ab-thinking__dot"></span>
+            <span class="ab-thinking__dot"></span>
+            <span class="ab-thinking__dot"></span>
+            <span class="sr-only">Thinking…</span>
+          </div>
+        </div>
+      }
+
+      <!-- Error -->
+      @if (error()) {
+        <div class="ab-error" role="alert">
+          <mat-icon aria-hidden="true">error_outline</mat-icon>
+          <span class="ab-error__text">{{ error() }}</span>
+          <button type="button" class="ab-error__retry" (click)="retry()">Try again</button>
+        </div>
+      }
+
+      <!-- scroll anchor -->
+      <div #anchor class="ab-anchor"></div>
+    </div>
+  </div>
+</app-bs-pull-refresh>
+
+<!-- ── Composer (sticky bottom) ── -->
+<app-ask-composer [busy]="loading()" (send)="onSend($event)" />
+
+<span class="sr-only" aria-live="polite">{{ announce() }}</span>
+
+<app-bs-toaster />

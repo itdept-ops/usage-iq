@@ -1,0 +1,383 @@
+// ============================================================================
+// ASK BETA — "Ask my life", rebuilt as a full-screen conversational AI chat on
+// the shared beta-ui "Strata" foundation.
+//
+// One line adopts the whole Strata token contract (layered bg, glass, ink scale, radii, the
+// lift-1/2/3 depth system, spring/bounce easing, blur cap, env() safe-area, the a11y killswitches);
+// then ASK overrides the per-page accent contract with its OWN signature gradient — INDIGO
+// (#818cf8 → #6366f1). Every kit component (pull-refresh ring, toaster) + the composer reads
+// --accent-a/--accent-b off this :host cascade, so this single override re-skins the whole screen.
+//
+// ISOLATED + gated by beta.access + tracker.ai: nothing here touches the global --tech-* tokens or
+// the flagship tracker-beta. The kit partial is the only import; we consume the kit, never modify it.
+// ============================================================================
+
+@use '../beta-ui/beta-kit' as kit;
+
+:host {
+  @include kit.beta-host;          // the whole Strata token contract on :host
+
+  // ---- ASK's SIGNATURE ACCENT: indigo (the per-page contract override) ----
+  --accent-a: #818cf8;             // signature indigo (start)
+  --accent-b: #6366f1;             // signature indigo (end)
+
+  // A faint indigo wash behind the whole column (still within the kit's dark contract).
+  background: radial-gradient(120% 70% at 50% -6%, #15183a 0%, var(--bg-base) 56%);
+
+  height: 100%;                    // fill the immersive shell frame; the pull-refresh owns the scroll
+  display: flex;
+  flex-direction: column;
+}
+
+@include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)
+@include kit.beta-a11y;             // reduced-motion + reduced-transparency/contrast killswitches (once)
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+// ============================================================================
+// SHELL — the kit pull-to-refresh wrapper IS the scroll container; the composer
+// is a sticky sibling outside it.
+// ============================================================================
+
+.ab-ptr { display: block; flex: 1 1 auto; min-height: 0; }
+
+.ab-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+  padding-top: calc(var(--safe-top) + 8px);
+  padding-bottom: 24px;
+  padding-inline: var(--gutter) var(--gutter-r);
+}
+
+// ============================================================================
+// IMMERSIVE HEADER — accent avatar + title over a soft bloom.
+// ============================================================================
+
+.abh {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 4px 2px 2px;
+  isolation: isolate;
+}
+
+.abh__bloom {
+  position: absolute;
+  top: -42px; left: -28px; right: 24%;
+  height: 150px; z-index: -1; pointer-events: none;
+  background: radial-gradient(130px 96px at 26% 34%,
+    color-mix(in srgb, var(--accent-a) 46%, transparent), transparent 70%);
+  filter: blur(20px);
+  opacity: .9;
+}
+
+.abh__avatar {
+  flex: 0 0 auto;
+  width: 46px; height: 46px;
+  display: grid; place-items: center;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent-b) 44%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .25);
+
+  mat-icon { color: #fff; font-size: 25px; width: 25px; height: 25px; }
+}
+
+.abh__text { min-width: 0; }
+
+.abh__eyebrow {
+  display: block;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-dim); margin-bottom: 3px;
+}
+
+.abh__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600; font-size: 27px; line-height: 1.05; letter-spacing: -.02em;
+  color: var(--ink);
+}
+
+// ============================================================================
+// THREAD — full-bleed column of bubbles.
+// ============================================================================
+
+.ab-thread {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ab-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+// ── Question bubble (right, accent-filled) ──
+.ab-q {
+  align-self: flex-end;
+  max-width: 84%;
+  padding: 11px 15px;
+  border-radius: 22px 22px 6px 22px;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-b) 32%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .18);
+  animation: ab-q-in 360ms var(--ease-spring) both;
+}
+
+.ab-q__text {
+  margin: 0;
+  font-size: 15px; line-height: 1.45; color: #fff;
+  white-space: pre-wrap; word-break: break-word;
+}
+
+// ── Answer bubble (left, accent avatar + glass) ──
+.ab-a {
+  align-self: flex-start;
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+  max-width: 92%;
+}
+
+.ab-a__avatar {
+  flex: 0 0 auto;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--accent-b) 40%, transparent);
+  margin-bottom: 2px;
+
+  mat-icon { color: #fff; font-size: 17px; width: 17px; height: 17px; }
+}
+
+.ab-a__bubble {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px 15px;
+  border-radius: 6px 22px 22px 22px;
+  background: var(--bg-rise);
+  box-shadow: var(--lift-2);
+  animation: ab-a-in 380ms var(--ease-spring) both;
+}
+
+.ab-a__text {
+  margin: 0;
+  font-size: 15px; line-height: 1.5; color: var(--ink);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+// "Plain summary (AI off)" badge — warm amber, never red.
+.ab-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: 11.5px; font-weight: 700;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+
+  mat-icon { font-size: 14px; width: 14px; height: 14px; }
+}
+
+.ab-domains {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ab-domain {
+  padding: 2px 8px;
+  border-radius: 7px;
+  font-size: 11px; font-weight: 600;
+  color: var(--ink-dim);
+  background: var(--bg-sink);
+  border: 1px solid var(--hairline);
+}
+
+// ============================================================================
+// THINKING INDICATOR — three bouncing accent dots in an answer-shaped bubble.
+// ============================================================================
+
+.ab-thinking {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 15px 16px;
+}
+
+.ab-thinking__dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  animation: ab-bounce 1.3s var(--ease-out) infinite both;
+
+  &:nth-child(2) { animation-delay: .16s; }
+  &:nth-child(3) { animation-delay: .32s; }
+}
+
+// ============================================================================
+// EMPTY STATE — warm invite + suggestion chips.
+// ============================================================================
+
+.ab-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 30px 6px 12px;
+  animation: ab-a-in 420ms var(--ease-spring) both;
+}
+
+.ab-empty__halo {
+  width: 76px; height: 76px;
+  display: grid; place-items: center;
+  border-radius: 26px;
+  background: radial-gradient(circle at 50% 38%,
+    color-mix(in srgb, var(--accent-a) 30%, transparent), transparent 72%),
+    var(--glass);
+  box-shadow: var(--lift-3), inset 0 1px 0 var(--glass-edge);
+  margin-bottom: 4px;
+
+  mat-icon {
+    font-size: 38px; width: 38px; height: 38px;
+    color: var(--accent-a);
+  }
+}
+
+.ab-empty__lead {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600; font-size: 22px; line-height: 1.15; letter-spacing: -.01em;
+  color: var(--ink);
+  max-width: 18ch;
+}
+
+.ab-empty__sub {
+  margin: 0;
+  font-size: 13.5px; line-height: 1.5; color: var(--ink-dim);
+  max-width: 38ch;
+}
+
+.ab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.ab-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 8px 15px 8px 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--glass-edge);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  box-shadow: var(--lift-1);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13.5px; font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .13s var(--ease-spring), border-color .15s var(--ease-out),
+    box-shadow .15s var(--ease-out);
+  // Staggered spring-in keyed off --i.
+  animation: ab-chip-in 440ms var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 55ms + 120ms);
+
+  mat-icon {
+    font-size: 18px; width: 18px; height: 18px;
+    color: var(--accent-a);
+  }
+
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent-a) 55%, var(--glass-edge));
+    box-shadow: var(--lift-2);
+  }
+  &:active:not(:disabled) { transform: scale(.96); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  &:disabled { opacity: .5; cursor: default; }
+}
+
+// ============================================================================
+// ERROR — gentle inline alert with a retry (never a dead-end).
+// ============================================================================
+
+.ab-error {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: var(--r-tile);
+  background: color-mix(in srgb, var(--warn) 13%, var(--bg-rise));
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  animation: ab-a-in 320ms var(--ease-spring) both;
+
+  mat-icon { flex: 0 0 auto; color: var(--warn); }
+}
+
+.ab-error__text {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 13.5px; color: var(--ink);
+}
+
+.ab-error__retry {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  border: none;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: #fff;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active { transform: scale(.95); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+}
+
+.ab-anchor { height: 1px; }
+
+// ============================================================================
+// MOTION
+// ============================================================================
+
+@keyframes ab-q-in {
+  from { opacity: 0; transform: translateY(10px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ab-a-in {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ab-chip-in {
+  from { opacity: 0; transform: translateY(10px) scale(.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ab-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: .5; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}

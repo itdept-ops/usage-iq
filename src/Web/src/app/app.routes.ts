@@ -221,6 +221,34 @@ export const routes: Routes = [
     loadChildren: () => import('./features/beta-settings/beta-settings.routes').then(m => m.BETA_SETTINGS_ROUTES),
   },
   {
+    // Chat "Messenger" — the mobile-first iMessage-feel chat redesign over the SAME chat Api methods + DTOs +
+    // the root ChatRealtime service (read/send/react/typing). Purely additive; the lazy children file keeps it
+    // out of the initial bundle and STACKS both guards (beta.access + chat.read), so a direct nav is never less
+    // strict than the live /chat page it mirrors. Placed before the `beta` hub route so the more-specific
+    // `beta/chat` matches first (Angular is first-match). No live chat page is touched.
+    path: 'beta/chat',
+    loadChildren: () => import('./features/chat-beta/chat-beta.routes').then(m => m.CHAT_BETA_ROUTES),
+  },
+  {
+    // Ask "Ask my life" — the mobile-first conversational AI redesign over the SAME Api.askMyLife endpoint +
+    // AskResponse DTO as the live /ask page (read-only; proposes/writes nothing). Purely additive; the lazy
+    // children file keeps it out of the initial bundle and STACKS both guards (beta.access + tracker.ai), so a
+    // direct nav is never less strict than the live /ask page it mirrors. Placed before the `beta` hub route so
+    // the more-specific `beta/ask` matches first (Angular is first-match). No live page is touched.
+    path: 'beta/ask',
+    loadChildren: () => import('./features/ask-beta/ask-beta.routes').then(m => m.ASK_BETA_ROUTES),
+  },
+  {
+    // Meals "Forage" — the mobile-first "one day at a time, swipe the week" meal-planning + grocery redesign
+    // over the SAME household FamilyMeals + grocery (FamilyList) + AI plan endpoints + DTOs as the live
+    // /meal-planner. Purely additive; the lazy children file keeps it out of the initial bundle and STACKS both
+    // guards (beta.access + meals.use), so a direct nav is never less strict than the live /meal-planner page it
+    // mirrors. Placed before the `beta` hub route so the more-specific `beta/meals` matches first (Angular is
+    // first-match). No live page is touched.
+    path: 'beta/meals',
+    loadChildren: () => import('./features/meals-beta/meals-beta.routes').then(m => m.MEALS_BETA_ROUTES),
+  },
+  {
     // Beta hub — a permission-gated index of experimental surfaces. Purely additive: lives in the normal
     // app shell, gated by beta.access; each experiment card inside is further gated by its own feature perm.
     path: 'beta',

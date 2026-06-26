@@ -72,4 +72,31 @@ export const BETA_EXPERIMENTS: readonly BetaExperiment[] = [
     // No `perm` → the route guard re-checks beta.access; the page mirrors the live Settings hub's quick
     // toggles and reuses the same per-user Api methods (each toggle still self-gates by its own perm).
   },
+  {
+    title: 'Messenger',
+    blurb: 'Your channels and DMs — fast, native-feel chat with bubbles, reactions & live typing',
+    route: '/beta/chat',
+    icon: 'chat_bubble',
+    // Gated on `chat.read` (the feature); the route additionally STACKS beta.access + chat.read, so a
+    // direct nav re-checks both. Mirrors the live /chat over the same realtime data.
+    perm: 'chat.read',
+  },
+  {
+    title: 'Ask my life',
+    blurb: 'Chat with an AI grounded in your own numbers',
+    route: '/beta/ask',
+    icon: 'auto_awesome',
+    // Gated on `tracker.ai` (the OFF-by-default text-AI perm, same as the live /ask page + POST /api/ai/ask);
+    // the route additionally STACKS beta.access + tracker.ai, so a direct nav re-checks both.
+    perm: 'tracker.ai',
+  },
+  {
+    title: 'Meals',
+    blurb: 'Plan your week, swipe your days, fill the cart — mobile-first',
+    route: '/beta/meals',
+    icon: 'restaurant_menu',
+    // Gated on `meals.use` (the feature); the route additionally STACKS beta.access + meals.use, so a
+    // direct nav re-checks both. Mirrors the live /meal-planner over the same household meal/grocery data.
+    perm: 'meals.use',
+  },
 ];

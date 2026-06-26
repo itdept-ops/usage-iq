@@ -38,6 +38,9 @@ public static class HomeRoutes
         ["/beta/bills"] = new[] { Permissions.BetaAccess },
         ["/beta/wrapped"] = new[] { Permissions.BetaAccess },
         ["/beta/settings"] = new[] { Permissions.BetaAccess },
+        ["/beta/chat"] = new[] { Permissions.BetaAccess },
+        ["/beta/ask"] = new[] { Permissions.BetaAccess },
+        ["/beta/meals"] = new[] { Permissions.BetaAccess },
     };
 
     public static bool IsKnown(string route) => Map.ContainsKey(route);

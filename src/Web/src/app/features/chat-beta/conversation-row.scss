@@ -1,0 +1,77 @@
+// ============================================================================
+// cb-conv-row — one conversations-list row. Inherits Strata tokens off the page
+// cascade; owns no tokens. 44px+ touch target, avatar + preview + time + unread.
+// ============================================================================
+
+:host { display: block; }
+
+.cr {
+  appearance: none; -webkit-appearance: none; border: none; background: transparent;
+  width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; min-height: 64px;
+  border-radius: var(--r-tile);
+  transition: background 140ms var(--ease-out), transform 120ms var(--ease-spring);
+}
+.cr:active { transform: scale(.985); background: color-mix(in srgb, var(--accent-a) 7%, transparent); }
+.cr:hover { background: color-mix(in srgb, var(--accent-a) 5%, transparent); }
+.cr:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+// ---- avatar (52px) with presence dot ----
+.cr__ava {
+  position: relative; flex: 0 0 52px;
+  width: 52px; height: 52px;
+}
+.cr__img, .cr__mono, .cr__hash {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center; object-fit: cover;
+  box-shadow: var(--lift-1);
+}
+.cr__mono {
+  font-size: 18px; font-weight: 800; letter-spacing: .01em; color: #fff;
+  background: linear-gradient(135deg,
+    hsl(var(--h, 220) 70% 56%), hsl(calc(var(--h, 220) + 36) 72% 48%));
+}
+.cr__hash {
+  font-size: 22px; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+}
+.cr__dot {
+  position: absolute; right: 1px; bottom: 1px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--signal);
+  border: 2.5px solid var(--bg-rise);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--signal) 40%, transparent);
+}
+
+// ---- body ----
+.cr__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cr__top, .cr__bottom { display: flex; align-items: center; gap: 8px; }
+.cr__name {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 15.5px; font-weight: 650; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cr__time { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--ink-faint); }
+.cr__preview {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 13.5px; font-weight: 500; color: var(--ink-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+// ---- unread emphasis ----
+.cr.is-unread .cr__name { font-weight: 800; }
+.cr.is-unread .cr__preview { color: var(--ink); font-weight: 650; }
+.cr.is-unread .cr__time { color: var(--accent-a); font-weight: 800; }
+.cr__badge {
+  flex: 0 0 auto;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  display: inline-grid; place-items: center;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
+  box-shadow: var(--lift-1);
+}
+
+@media (prefers-reduced-motion: reduce) { .cr { transition: none; } }

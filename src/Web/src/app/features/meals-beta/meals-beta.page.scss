@@ -1,0 +1,255 @@
+// ============================================================================
+// Meals "Forage" — built on the shared beta-ui "Strata" foundation.
+//
+// One line adopts the whole Strata token contract (layered bg, glass, ink scale, radii, the lift-1/2/3
+// depth system, spring/bounce easing, blur cap, env() safe-area, the a11y killswitches); then the MEALS
+// page OVERRIDES the per-page accent contract with its OWN signature gradient — a fresh GREEN (emerald →
+// lime), the "forage / fresh food" identity. Every kit component (pull-refresh ring, FAB, SvgRing, swipe
+// row, bottom sheets, toaster, skeleton) + every subcomponent reads --accent-a/--accent-b off this :host
+// cascade, so this single override re-skins the whole screen.
+//
+// ISOLATED + gated by beta.access + meals.use: nothing here touches the global --tech-* tokens or the
+// flagship tracker-beta. The kit partial is the only import; we consume the kit, never modify it.
+// ============================================================================
+
+@use '../beta-ui/beta-kit' as kit;
+
+:host {
+  @include kit.beta-host;          // the whole Strata token contract on :host
+
+  // ---- MEALS' SIGNATURE ACCENT: emerald → lime (the per-page contract override) ----
+  --accent-a: #34d399;             // signature emerald (start)
+  --accent-b: #a3e635;             // signature lime    (end)
+
+  // A faint green wash behind the whole column (still within the kit's dark contract).
+  background: radial-gradient(120% 80% at 50% -8%, #0e1c16 0%, var(--bg-base) 58%);
+
+  height: 100%; // fill the immersive shell frame; the pull-refresh owns the scroll
+}
+
+@include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)
+@include kit.beta-a11y;             // reduced-motion + reduced-transparency/contrast killswitches (once)
+
+// ============================================================================
+// SHELL — the kit pull-to-refresh wrapper IS the scroll container.
+// ============================================================================
+
+.mb-ptr { display: block; height: 100%; }
+
+.mb-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100%;
+  padding-top: calc(var(--safe-top) + 8px);
+  // Reserve room for the fixed extended FAB above the safe-area.
+  padding-bottom: calc(var(--safe-bottom) + 92px);
+  padding-inline: var(--gutter) var(--gutter-r);
+}
+
+// ============================================================================
+// IMMERSIVE PAGE HEADER — title + accent bloom, week nav, planned glance.
+// ============================================================================
+
+.hh {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 2px 2px;
+  isolation: isolate;
+}
+
+.hh__bloom {
+  position: absolute;
+  top: -40px; left: -30px; right: 30%;
+  height: 160px; z-index: -1; pointer-events: none;
+  background: radial-gradient(120px 90px at 30% 30%,
+    color-mix(in srgb, var(--accent-a) 46%, transparent), transparent 70%);
+  filter: blur(18px);
+  opacity: .9;
+}
+
+.hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.hh__text { min-width: 0; }
+.hh__eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-dim); margin-bottom: 4px;
+}
+.hh__spark {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-a) 20%, transparent);
+}
+.hh__title {
+  margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 32px; line-height: 1.04;
+  letter-spacing: -.02em; color: var(--ink);
+}
+
+// Week nav cluster — prev / range pill / next.
+.hh__nav { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; }
+.hh__navbtn {
+  display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: 13px; border: 1px solid var(--hairline); background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+  color: var(--ink); cursor: pointer;
+  transition: transform 120ms var(--ease-spring);
+}
+.hh__navbtn:active { transform: scale(.9); }
+.hh__navbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hh__navbtn mat-icon { font-size: 22px; width: 22px; height: 22px; }
+
+.hh__week {
+  position: relative;
+  min-height: 40px; padding: 0 14px; border-radius: var(--r-pill);
+  border: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--accent-a) 8%, var(--bg-rise));
+  color: var(--ink); font: inherit; font-size: 13px; font-weight: 800; white-space: nowrap; cursor: pointer;
+  transition: transform 120ms var(--ease-spring);
+}
+.hh__week:active { transform: scale(.96); }
+.hh__week:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hh__today-hint {
+  margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #07140d;
+  font-size: 10px; font-weight: 800;
+}
+
+// Glance row — planned-meals + planned-kcal numerals + an optional day-goal ring.
+.hh__glance {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 16px; border-radius: var(--r-card);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  box-shadow: var(--lift-3);
+  border: 1px solid var(--glass-edge);
+}
+.hh__stat { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.hh__stat-n {
+  font-family: var(--font-display); font-variant-numeric: tabular-nums;
+  font-size: 27px; font-weight: 600; letter-spacing: -.02em; color: var(--ink); line-height: 1;
+}
+.hh__stat-n--mute { color: var(--ink-faint); }
+.hh__stat-l {
+  font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-dim);
+  white-space: nowrap;
+}
+.hh__div { width: 1px; align-self: stretch; background: var(--hairline); }
+.hh__ring { margin-left: auto; flex: 0 0 auto; }
+.hh__ring-num {
+  font-family: var(--font-display); font-variant-numeric: tabular-nums;
+  font-size: 14px; font-weight: 600; color: var(--ink);
+}
+.hh__ring-num i { font-family: var(--font-ui); font-style: normal; font-size: 9px; color: var(--ink-dim); }
+
+// ============================================================================
+// DAY STRIP wrapper.
+// ============================================================================
+.mb-strip { display: block; margin: -2px 0; }
+
+// ============================================================================
+// SELECTED-DAY SECTION — header + meals (swipe rows) / states.
+// ============================================================================
+.mb-day { display: flex; flex-direction: column; gap: 12px; }
+.mb-day-h { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.mb-day-h-txt { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mb-day-title {
+  margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 22px; color: var(--ink); line-height: 1.05;
+}
+.mb-day-sub { font-size: 12.5px; font-weight: 700; color: var(--ink-dim); }
+
+.mb-day-gro {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 0 14px; border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--accent-a) 36%, transparent);
+  background: color-mix(in srgb, var(--accent-a) 10%, var(--bg-rise));
+  color: var(--accent-a); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--ease-spring);
+}
+.mb-day-gro:active { transform: scale(.96); }
+.mb-day-gro:disabled { opacity: .55; pointer-events: none; }
+.mb-day-gro:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mb-day-gro mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+// Meals list — each row springs in on a per-index delay.
+.mb-meals { display: flex; flex-direction: column; gap: 10px; }
+.mb-meal-in {
+  animation: mb-rise 460ms var(--ease-spring-up) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+  will-change: transform, opacity;
+}
+@keyframes mb-rise {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .mb-meal-in { animation: none; } }
+
+.mb-skel { display: flex; flex-direction: column; gap: 10px; }
+
+// Empty / error states.
+.mb-state {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px;
+  padding: 32px 18px; border-radius: var(--r-card);
+  background: var(--bg-rise); border: 1px dashed var(--hairline);
+}
+.mb-state-ic {
+  display: grid; place-items: center; width: 56px; height: 56px; border-radius: 18px;
+  background: color-mix(in srgb, var(--accent-a) 12%, var(--bg-sink)); color: var(--accent-a);
+}
+.mb-state-ic mat-icon { font-size: 28px; width: 28px; height: 28px; }
+.mb-state-msg { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--ink-dim); max-width: 28ch; }
+.mb-state-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 46px; padding: 0 20px; border: none; border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #07140d;
+  font-family: var(--font-ui); font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: var(--lift-2);
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--ease-out);
+}
+.mb-state-btn:active { transform: scale(.97); }
+.mb-state-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.mb-state-btn mat-icon { font-size: 19px; width: 19px; height: 19px; }
+
+.mb-mini-spin {
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent-a) 35%, transparent); border-top-color: var(--accent-a);
+  animation: mb-spin .7s linear infinite;
+}
+@keyframes mb-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mb-mini-spin { animation: none; } }
+
+// ============================================================================
+// QUICK ACTIONS — two glance buttons (what-to-eat, grocery list).
+// ============================================================================
+.mb-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mb-q {
+  display: flex; align-items: center; gap: 11px; text-align: left;
+  padding: 13px 13px; border-radius: var(--r-card);
+  background: var(--bg-rise); border: 1px solid var(--hairline); box-shadow: var(--lift-1);
+  color: var(--ink); cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--ease-spring), box-shadow 160ms var(--ease-out);
+}
+.mb-q:active { transform: scale(.98); box-shadow: var(--press); }
+.mb-q:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mb-q-ic {
+  flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px;
+  background: color-mix(in srgb, var(--accent-a) 13%, var(--bg-sink)); color: var(--accent-a);
+}
+.mb-q-ic mat-icon { font-size: 22px; width: 22px; height: 22px; }
+.mb-q-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mb-q-txt b { font-size: 13.5px; font-weight: 800; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb-q-txt i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--ink-faint); line-height: 1.25; }
+
+// Own visible focus ring (tracks the page accent via --focus).
+:host ::ng-deep :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+// No 390px overflow: everything is fluid by construction.
+:host, .mb-scroll { max-width: 100vw; }
