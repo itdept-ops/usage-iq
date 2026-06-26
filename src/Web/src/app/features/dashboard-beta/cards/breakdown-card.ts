@@ -1,15 +1,27 @@
 import { DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 
-import { BetaSegmentedControl, BetaSkeleton, BetaSectionHeader, type Segment } from '../../beta-ui';
+import { CompactPipe } from '../../../shared/format';
+import { BetaBottomSheet, BetaSegmentedControl, BetaSkeleton, BetaSectionHeader, BetaStatTile, type Segment } from '../../beta-ui';
 
-/** One ranked breakdown row — name + cost, dimension-agnostic. */
+/**
+ * One ranked breakdown row — name + cost plus the full token/cache totals for that bucket (so a
+ * tapped row can open a rich detail sheet WITHOUT a second fetch — every figure is mapped from the
+ * same `Api.summary` bucket the page already loaded).
+ */
 export interface BreakdownSlice {
   readonly name: string;
   readonly costUsd: number;
   /** True when this slice's pricing is estimated (drives the "estimated" chip). Only models carry it. */
   readonly estimated?: boolean;
+  // ---- full bucket totals (already in-component; power the tap-through detail sheet) ----
+  readonly totalTokens: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+  readonly records: number;
 }
 
 export type BreakdownDim = 'model' | 'source' | 'project';
@@ -26,7 +38,10 @@ export type BreakdownDim = 'model' | 'source' | 'project';
   selector: 'app-pulse-breakdown',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, MatIconModule, BetaSegmentedControl, BetaSkeleton, BetaSectionHeader],
+  imports: [
+    DecimalPipe, CompactPipe, MatIconModule,
+    BetaSegmentedControl, BetaSkeleton, BetaSectionHeader, BetaBottomSheet, BetaStatTile,
+  ],
   template: `
     <div class="bd">
       <app-bs-section-header title="Breakdown" [subtitle]="subLabel()" icon="leaderboard" />
@@ -47,15 +62,19 @@ export type BreakdownDim = 'model' | 'source' | 'project';
         <ol class="bd__list">
           @for (s of top(); track s.name; let i = $index) {
             <li class="row">
-              <span class="row__head">
-                <span class="row__rank">{{ i + 1 }}</span>
-                <span class="row__name" [title]="s.name">{{ s.name }}</span>
-                <span class="row__share">{{ share(s.costUsd) }}%</span>
-                <span class="row__cost">\${{ s.costUsd | number:'1.2-2' }}</span>
-              </span>
-              <span class="row__meter" aria-hidden="true">
-                <span class="row__fill" [style.width.%]="pct(s.costUsd)"></span>
-              </span>
+              <button type="button" class="row__btn" (click)="openDetail(s)"
+                      [attr.aria-label]="s.name + ', $' + (s.costUsd | number:'1.2-2') + ', ' + share(s.costUsd) + '% of total — tap for detail'">
+                <span class="row__head">
+                  <span class="row__rank">{{ i + 1 }}</span>
+                  <span class="row__name" [title]="s.name">{{ s.name }}</span>
+                  <span class="row__share">{{ share(s.costUsd) }}%</span>
+                  <span class="row__cost">\${{ s.costUsd | number:'1.2-2' }}</span>
+                  <mat-icon class="row__chev" aria-hidden="true">chevron_right</mat-icon>
+                </span>
+                <span class="row__meter" aria-hidden="true">
+                  <span class="row__fill" [style.width.%]="pct(s.costUsd)"></span>
+                </span>
+              </button>
             </li>
           }
         </ol>
@@ -70,6 +89,46 @@ export type BreakdownDim = 'model' | 'source' | 'project';
         </div>
       }
     </div>
+
+    <!-- Tap-through detail: full totals for the picked slice, all derived from already-loaded data. -->
+    <app-bs-sheet [(open)]="detailOpen" detent="half" [label]="dimNoun() + ' detail'">
+      @if (picked(); as p) {
+        <div class="dt">
+          <header class="dt__head">
+            <span class="dt__eyebrow">{{ dimNoun() }}</span>
+            <h2 class="dt__name" [title]="p.name">{{ p.name }}</h2>
+            <div class="dt__big">
+              <span class="dt__big-cur" aria-hidden="true">$</span>
+              <span class="dt__big-val">{{ p.costUsd | number:'1.2-2' }}</span>
+              <span class="dt__big-share">{{ share(p.costUsd) }}% of total</span>
+            </div>
+            @if (p.estimated) {
+              <span class="dt__est" title="Pricing is estimated (placeholder rates)">estimated pricing</span>
+            }
+          </header>
+
+          <div class="dt__tiles">
+            <app-bs-stat-tile [value]="p.totalTokens | compact" label="Total tokens" />
+            <app-bs-stat-tile [value]="p.records | compact" label="Records" />
+            <app-bs-stat-tile [value]="p.inputTokens | compact" label="Input" />
+            <app-bs-stat-tile [value]="p.outputTokens | compact" label="Output" />
+          </div>
+
+          <section class="dt__cache">
+            <h3 class="dt__cache-title">Cache split</h3>
+            <div class="dt__cache-row">
+              <span class="dt__cache-meter" aria-hidden="true">
+                <span class="dt__cache-read" [style.width.%]="cacheReadPct(p)"></span>
+              </span>
+              <span class="dt__cache-pct">{{ cacheReadPct(p) }}%</span>
+            </div>
+            <p class="dt__cache-sub">
+              {{ cacheReadPct(p) }}% of input served from cache · {{ p.cacheReadTokens | compact }} read · {{ p.cacheWriteTokens | compact }} written
+            </p>
+          </section>
+        </div>
+      }
+    </app-bs-sheet>
   `,
   styles: [`
     :host { display: block; }
@@ -86,9 +145,22 @@ export type BreakdownDim = 'model' | 'source' | 'project';
 
     .bd__skeleton { display: flex; flex-direction: column; gap: 10px; }
 
-    .bd__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
-    .row { display: flex; flex-direction: column; gap: 6px; }
+    .bd__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+    .row { display: block; }
+    .row__btn {
+      display: flex; flex-direction: column; gap: 6px; width: 100%;
+      background: none; border: 0; padding: 8px 6px; margin: 0; cursor: pointer; text-align: left;
+      border-radius: var(--r-tile); font: inherit; color: inherit;
+      transition: background 140ms var(--ease-out);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .row__btn:active { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+    .row__btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     .row__head { display: flex; align-items: baseline; gap: 8px; }
+    .row__chev {
+      flex: 0 0 auto; align-self: center; font-size: 18px; width: 18px; height: 18px;
+      color: var(--ink-faint); margin-left: -2px;
+    }
     .row__rank {
       flex: 0 0 auto; width: 18px; text-align: center;
       font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--ink-faint);
@@ -134,6 +206,57 @@ export type BreakdownDim = 'model' | 'source' | 'project';
       transition: transform 120ms var(--ease-spring);
     }
     .bd__empty-cta:active { transform: scale(.96); }
+
+    /* ---- tap-through detail sheet ---- */
+    .dt { display: flex; flex-direction: column; gap: 20px; padding: 4px 0 24px; }
+    .dt__head { display: flex; flex-direction: column; gap: 4px; }
+    .dt__eyebrow {
+      font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-dim);
+    }
+    .dt__name {
+      margin: 0; font-size: 19px; font-weight: 800; color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .dt__big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+    .dt__big-cur {
+      font-family: var(--font-display); font-weight: 600; font-size: 24px;
+      color: color-mix(in srgb, var(--accent-a) 70%, var(--ink));
+    }
+    .dt__big-val {
+      font-family: var(--font-display); font-weight: 600; font-size: 44px; line-height: .92;
+      color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -.03em;
+    }
+    .dt__big-share { font-size: 13px; font-weight: 700; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+    .dt__est {
+      align-self: flex-start; margin-top: 6px;
+      font-size: 11px; font-weight: 700; letter-spacing: .03em; padding: 4px 10px; border-radius: var(--r-pill);
+      background: color-mix(in srgb, var(--warn) 18%, transparent);
+      color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 38%, transparent);
+    }
+
+    .dt__tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .dt__tiles app-bs-stat-tile { min-width: 0; }
+
+    .dt__cache { display: flex; flex-direction: column; gap: 8px; }
+    .dt__cache-title {
+      margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-dim);
+    }
+    .dt__cache-row { display: flex; align-items: center; gap: 10px; }
+    .dt__cache-meter {
+      flex: 1 1 auto; display: block; height: 9px; border-radius: var(--r-pill);
+      background: color-mix(in srgb, var(--ink) 8%, transparent); overflow: hidden;
+    }
+    .dt__cache-read {
+      display: block; height: 100%; border-radius: var(--r-pill);
+      background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+      box-shadow: 0 0 10px color-mix(in srgb, var(--accent-a) 40%, transparent);
+      transition: width 600ms var(--ease-spring);
+    }
+    .dt__cache-pct {
+      flex: 0 0 auto; font-family: var(--font-display); font-size: 15px; font-weight: 600;
+      color: var(--ink); font-variant-numeric: tabular-nums;
+    }
+    .dt__cache-sub { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
   `],
 })
 export class PulseBreakdownCard {
@@ -158,6 +281,27 @@ export class PulseBreakdownCard {
     const d = this.dim();
     return d === 'model' ? 'Cost by model' : d === 'source' ? 'Cost by source' : 'Cost by project';
   });
+
+  /** Singular noun for the active dimension (detail-sheet eyebrow + aria). */
+  protected readonly dimNoun = computed(() => {
+    const d = this.dim();
+    return d === 'model' ? 'Model' : d === 'source' ? 'Source' : 'Project';
+  });
+
+  // ---- tap-through detail sheet (no extra fetch — slices already carry the full totals) ----
+  readonly detailOpen = signal(false);
+  readonly picked = signal<BreakdownSlice | null>(null);
+
+  protected openDetail(s: BreakdownSlice): void {
+    this.picked.set(s);
+    this.detailOpen.set(true);
+  }
+
+  /** Cache-read share of input for the picked slice: read / (read + input), rounded. */
+  protected cacheReadPct(s: BreakdownSlice): number {
+    const denom = s.cacheReadTokens + s.inputTokens;
+    return denom > 0 ? Math.round((s.cacheReadTokens / denom) * 100) : 0;
+  }
 
   /** Cost-bearing slices only. */
   private readonly positive = computed(() => this.slices().filter(s => s.costUsd > 0));

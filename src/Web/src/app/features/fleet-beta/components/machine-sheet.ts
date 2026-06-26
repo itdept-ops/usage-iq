@@ -1,7 +1,8 @@
 import {
-  ChangeDetectionStrategy, Component, computed, input, model,
+  ChangeDetectionStrategy, Component, computed, input, model, output,
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
+import { RouterLink } from '@angular/router';
 
 import { FleetMachine } from '../../../core/models';
 import { CompactPipe, timeAgo } from '../../../shared/format';
@@ -25,7 +26,7 @@ interface DetailRow { icon: string; label: string; value: string; mono?: boolean
   selector: 'app-fleet-machine-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule, CompactPipe, BetaBottomSheet, BetaStatTile],
+  imports: [MatIconModule, RouterLink, CompactPipe, BetaBottomSheet, BetaStatTile],
   template: `
     <app-bs-sheet [(open)]="open" detent="half" [label]="sheetLabel()">
       @if (machine(); as m) {
@@ -46,11 +47,49 @@ interface DetailRow { icon: string; label: string; value: string; mono?: boolean
             </div>
           </header>
 
+          <!-- Copy the machine name (the raw host, not the "local (file sync)" label). -->
+          @if (!isLocal()) {
+            <button type="button" class="ms__copyname" (click)="copy(m.name, 'Machine name')">
+              <mat-icon aria-hidden="true">content_copy</mat-icon>
+              <span class="ms__copyname-t">{{ m.name }}</span>
+              <span class="ms__copyname-h">Copy</span>
+            </button>
+          }
+
           <div class="ms__tiles">
             <app-bs-stat-tile [value]="spendLabel()" label="Spend" />
             <app-bs-stat-tile [value]="(m.tokens | compact)" unit="tok" label="Tokens" />
-            <app-bs-stat-tile [value]="(m.records | compact)" label="Records" />
+            <app-bs-stat-tile [value]="sharePct()" unit="%" label="Of fleet" />
           </div>
+
+          <!-- Identity & network: agent + the IPs, each one-tap copyable. -->
+          @if (agentLbl() || m.localIp || m.publicIp) {
+            <section class="ms__sec">
+              <span class="ms__sec-h">Identity &amp; network</span>
+              <div class="ms__net">
+                @if (agentLbl()) {
+                  <div class="ms__net-row">
+                    <dt class="ms__net-l"><mat-icon aria-hidden="true">{{ icon() }}</mat-icon> Reporter</dt>
+                    <span class="ms__net-v">{{ agentLbl() }}</span>
+                  </div>
+                }
+                @if (m.localIp) {
+                  <button type="button" class="ms__net-row is-copy" (click)="copy(m.localIp!, 'Local IP')">
+                    <span class="ms__net-l"><mat-icon aria-hidden="true">lan</mat-icon> Local IP</span>
+                    <span class="ms__net-v mono">{{ m.localIp }}</span>
+                    <mat-icon class="ms__net-c" aria-hidden="true">content_copy</mat-icon>
+                  </button>
+                }
+                @if (m.publicIp) {
+                  <button type="button" class="ms__net-row is-copy" (click)="copy(m.publicIp!, 'Public IP')">
+                    <span class="ms__net-l"><mat-icon aria-hidden="true">public</mat-icon> Public IP</span>
+                    <span class="ms__net-v mono">{{ m.publicIp }}</span>
+                    <mat-icon class="ms__net-c" aria-hidden="true">content_copy</mat-icon>
+                  </button>
+                }
+              </div>
+            </section>
+          }
 
           <!-- Linked users -->
           <section class="ms__sec">
@@ -98,6 +137,16 @@ interface DetailRow { icon: string; label: string; value: string; mono?: boolean
               </div>
             </section>
           }
+
+          <!-- Forward CTA: stand up another reporter. -->
+          <a class="ms__cta" routerLink="/reporter" (click)="open.set(false)">
+            <span class="ms__cta-ic" aria-hidden="true"><mat-icon>add_link</mat-icon></span>
+            <span class="ms__cta-t">
+              <span class="ms__cta-h">Set up another reporter</span>
+              <span class="ms__cta-s">Connect another machine to your fleet</span>
+            </span>
+            <mat-icon class="ms__cta-chev" aria-hidden="true">arrow_forward</mat-icon>
+          </a>
         </div>
       }
     </app-bs-sheet>
@@ -109,8 +158,16 @@ export class FleetMachineSheet {
   readonly open = model<boolean>(false);
   /** The machine being detailed (null collapses the sheet body). */
   readonly machine = input<FleetMachine | null>(null);
+  /** The fleet's TOTAL spend — drives the "of fleet" share-% tile. */
+  readonly totalCost = input<number>(0);
+  /** Emitted after a copy attempt so the page can toast (label = what was copied). */
+  readonly copied = output<{ label: string; ok: boolean }>();
 
   protected readonly online = computed(() => isOnline(this.machine()?.lastSeenUtc ?? null));
+  protected readonly isLocal = computed(() => {
+    const m = this.machine();
+    return !!m && isLocalName(m.name);
+  });
   protected readonly icon = computed(() => agentIcon(this.machine()?.agent ?? null));
   protected readonly displayName = computed(() => {
     const m = this.machine();
@@ -121,6 +178,27 @@ export class FleetMachineSheet {
   protected readonly seen = computed(() => timeAgo(this.machine()?.lastSeenUtc ?? null));
   protected readonly spendLabel = computed(() => compactUsd(this.machine()?.costUsd ?? 0));
   protected readonly sheetLabel = computed(() => `${this.displayName()} details`);
+
+  /** This machine's share of the fleet's total spend, as a display % ("12" / "0.4" for tiny slices). */
+  protected readonly sharePct = computed(() => {
+    const total = this.totalCost();
+    const cost = this.machine()?.costUsd ?? 0;
+    if (total <= 0) return '0';
+    const pct = (cost / total) * 100;
+    return pct >= 10 ? Math.round(pct).toString() : pct.toFixed(1);
+  });
+
+  /** Copy a value to the clipboard (best-effort) and notify the page to toast. */
+  async copy(value: string, label: string): Promise<void> {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(value);
+      ok = true;
+    } catch {
+      ok = false;
+    }
+    this.copied.emit({ label, ok });
+  }
 
   protected readonly locLabel = computed(() => { const m = this.machine(); return m ? locationLabel(m) : ''; });
   protected readonly coords = computed(() => { const m = this.machine(); return !!m && hasCoords(m); });
@@ -135,8 +213,7 @@ export class FleetMachineSheet {
     const push = (icon: string, label: string, value: string | null | undefined, mono = false) => {
       if (value != null && String(value).trim().length) rows.push({ icon, label, value: String(value), mono });
     };
-    push('lan', 'Local IP', m.localIp, true);
-    push('public', 'Public IP', m.publicIp, true);
+    // Local/Public IP + agent now live in the copyable "Identity & network" section above.
     push('computer', 'OS', [m.os, m.arch].filter((p) => !!p).join(' · '));
     push('account_circle', 'OS user', m.osUser, true);
     push('developer_board', 'CPU', m.cpuModel ?? null);

@@ -106,6 +106,20 @@ const EMPTY_FILTER: UsageFilter = {
         <!-- Machines / Users toggle. -->
         <app-bs-segmented class="fb-seg" [segments]="boards" [(value)]="board" label="Fleet board" />
 
+        <!-- Machine controls: a sort segmented + an "Online only" filter chip. Only over the Machines board. -->
+        @if (board() === 'machines' && !loading() && !error() && totals().machineCount > 0) {
+          <div class="fb-controls">
+            <app-bs-segmented class="fb-sort" [segments]="sorts" [(value)]="sort" label="Sort machines" />
+            <button type="button" class="fb-chip" [class.fb-chip--on]="onlineOnly()"
+                    [attr.aria-pressed]="onlineOnly()"
+                    (click)="onlineOnly.set(!onlineOnly())">
+              <span class="fb-chip__dot" aria-hidden="true"></span>
+              Online only
+              @if (onlineCount() > 0) { <span class="fb-chip__n">{{ onlineCount() }}</span> }
+            </button>
+          </div>
+        }
+
         @if (loading()) {
           <!-- Skeleton loaders matching the resolved layout. -->
           <div class="fb-skel">
@@ -126,13 +140,23 @@ const EMPTY_FILTER: UsageFilter = {
           <app-bs-section-header class="fb-sh" icon="dns"
             title="Machines" [subtitle]="machineSubtitle()" />
 
-          @if (machines().length) {
+          @if (visibleMachines().length) {
             <div class="fb-cards">
-              @for (m of machines(); track m.name; let i = $index) {
+              @for (m of visibleMachines(); track m.name; let i = $index) {
                 <div class="fb-card-in" [style.--i]="i" [class.fb-defer]="i >= 3">
-                  <app-fleet-machine-card [machine]="m" [maxCost]="maxMachineCost()" (open)="openMachine(m)" />
+                  <app-fleet-machine-card [machine]="m" [maxCost]="maxMachineCost()"
+                    [totalCost]="totals().cost" (open)="openMachine(m)" />
                 </div>
               }
+            </div>
+          } @else if (onlineOnly() && machines().length) {
+            <!-- The range HAS machines, but the Online-only filter hid them all. -->
+            <div class="fb-state">
+              <span class="fb-state__ic" aria-hidden="true"><mat-icon>wifi_off</mat-icon></span>
+              <p class="fb-state__msg">No machines are online right now. {{ machines().length }} reported recently.</p>
+              <button type="button" class="fb-state__btn" (click)="onlineOnly.set(false)">
+                <mat-icon aria-hidden="true">dns</mat-icon> Show all machines
+              </button>
             </div>
           } @else {
             <div class="fb-state">
@@ -165,7 +189,8 @@ const EMPTY_FILTER: UsageFilter = {
     </app-bs-pull-refresh>
 
     <!-- Tap-through machine detail. -->
-    <app-fleet-machine-sheet [(open)]="sheetOpen" [machine]="activeMachine()" />
+    <app-fleet-machine-sheet [(open)]="sheetOpen" [machine]="activeMachine()"
+      [totalCost]="totals().cost" (copied)="onCopied($event)" />
 
     <app-bs-toaster />
   `,
@@ -190,6 +215,16 @@ export class FleetBetaPage {
     { key: 'users', label: 'Users' },
   ];
 
+  // ---- machine sort + online-only filter (client-side over the loaded fleet) ----
+  readonly sort = signal<string>('spend');
+  readonly sorts: Segment[] = [
+    { key: 'spend', label: 'Spend' },
+    { key: 'tokens', label: 'Tokens' },
+    { key: 'seen', label: 'Last seen' },
+    { key: 'name', label: 'Name' },
+  ];
+  readonly onlineOnly = signal(false);
+
   // ---- data ----
   readonly fleet = signal<Fleet | null>(null);
   readonly loading = signal(true);
@@ -200,9 +235,24 @@ export class FleetBetaPage {
   readonly sheetOpen = signal(false);
   readonly activeMachine = signal<FleetMachine | null>(null);
 
-  /** Cost-desc machines (the server may sort; we enforce a stable view). */
+  /** Cost-desc machines (the server may sort; we enforce a stable view). The canonical fleet set —
+   *  totals/maxCost/onlineCount read this; the displayed list is {@link visibleMachines}. */
   readonly machines = computed<FleetMachine[]>(() =>
     [...(this.fleet()?.machines ?? [])].sort((a, b) => b.costUsd - a.costUsd));
+
+  /** The machines actually rendered: the chosen SORT applied, then the optional Online-only filter. */
+  readonly visibleMachines = computed<FleetMachine[]>(() => {
+    const sorted = [...this.machines()];
+    switch (this.sort()) {
+      case 'tokens': sorted.sort((a, b) => b.tokens - a.tokens); break;
+      case 'name': sorted.sort((a, b) => a.name.localeCompare(b.name)); break;
+      case 'seen': sorted.sort((a, b) =>
+        (b.lastSeenUtc ? Date.parse(b.lastSeenUtc) : 0) - (a.lastSeenUtc ? Date.parse(a.lastSeenUtc) : 0)); break;
+      default: /* spend — already cost-desc */ break;
+    }
+    return this.onlineOnly() ? sorted.filter(m => isOnline(m.lastSeenUtc)) : sorted;
+  });
+
   readonly users = computed<FleetUser[]>(() =>
     [...(this.fleet()?.users ?? [])].sort((a, b) => b.costUsd - a.costUsd));
 
@@ -290,5 +340,13 @@ export class FleetBetaPage {
   openMachine(m: FleetMachine): void {
     this.activeMachine.set(m);
     this.sheetOpen.set(true);
+  }
+
+  /** The sheet copied a value to the clipboard — confirm with a toast (ok = success, else warn). */
+  onCopied(ev: { label: string; ok: boolean }): void {
+    this.toast.show(
+      ev.ok ? `${ev.label} copied` : `Couldn’t copy — long-press to select`,
+      { tone: ev.ok ? 'success' : 'warn', durationMs: 1600 },
+    );
   }
 }

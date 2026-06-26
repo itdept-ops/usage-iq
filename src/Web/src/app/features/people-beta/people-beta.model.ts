@@ -59,3 +59,14 @@ export function rosterSort(a: PersonVm, b: PersonVm): number {
   if (ra !== rb) return ra - rb;
   return a.name.localeCompare(b.name);
 }
+
+/** Strict A–Z comparator (self still floats to the top so "you" stays anchored), then by name. */
+export function alphaSort(a: PersonVm, b: PersonVm): number {
+  if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1;
+  return a.name.localeCompare(b.name);
+}
+
+/** Whether a person's DisplayName contains the (already-lowercased) query — case-insensitive substring. */
+export function matchesQuery(p: PersonVm, qLower: string): boolean {
+  return !qLower || p.name.toLowerCase().includes(qLower);
+}

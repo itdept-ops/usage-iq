@@ -159,6 +159,59 @@ $hues: #fb7185, #f0a35a, #a78bfa, #38bdf8, #34d399, #f472b6;
 
 .hh__seg { display: block; }
 
+// Compact stat strip — online · contacts · family.
+.hh__stats {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-dim);
+}
+.hh__stat strong {
+  font-family: var(--font-display); font-variant-numeric: tabular-nums;
+  font-weight: 800; color: var(--ink);
+}
+.hh__stat-sep { color: var(--ink-faint); }
+
+// Search box + order toggle row.
+.hh__tools { display: flex; flex-direction: column; gap: 10px; }
+
+.hh__search {
+  position: relative; display: flex; align-items: center;
+  border-radius: var(--r-pill);
+  background: var(--bg-sink); border: 1px solid var(--hairline);
+  transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
+}
+.hh__search--filled,
+.hh__search:focus-within {
+  border-color: color-mix(in srgb, var(--accent-a) 42%, var(--hairline));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-a) 14%, transparent);
+}
+.hh__search-ic {
+  flex: 0 0 auto; margin-left: 12px; color: var(--ink-faint);
+  font-size: 19px; width: 19px; height: 19px;
+}
+.hh__search:focus-within .hh__search-ic { color: var(--accent-a); }
+.hh__search-in {
+  flex: 1 1 auto; min-width: 0; min-height: 44px;
+  padding: 0 8px 0 9px; border: none; outline: none; background: transparent;
+  font-family: var(--font-ui); font-size: 14.5px; font-weight: 600; color: var(--ink);
+  -webkit-appearance: none; appearance: none;
+}
+.hh__search-in::placeholder { color: var(--ink-faint); font-weight: 600; }
+// Hide the native search clear (we render our own ✕).
+.hh__search-in::-webkit-search-cancel-button { display: none; }
+.hh__search-x {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 34px; height: 34px; margin-right: 5px; padding: 0;
+  border: none; border-radius: 50%; background: transparent; color: var(--ink-dim);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: background 120ms var(--ease-out), color 120ms var(--ease-out);
+}
+.hh__search-x:hover { background: var(--bg-rise); color: var(--ink); }
+.hh__search-x:active { transform: scale(.92); }
+.hh__search-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hh__search-x mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+.hh__sort { display: block; }
+
 // ============================================================================
 // LOADING SKELETONS.
 // ============================================================================

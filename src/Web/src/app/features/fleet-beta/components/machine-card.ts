@@ -50,8 +50,15 @@ import {
         <app-bs-stat-tile [value]="(machine().tokens | compact)" unit="tok" label="Tokens" />
       </div>
 
-      <div class="mc__bar" aria-hidden="true">
-        <i [style.width.%]="costPct()"></i>
+      <div class="mc__share">
+        <div class="mc__share-row">
+          <span class="mc__share-l">Share of fleet spend</span>
+          <span class="mc__share-pct">{{ sharePct() }}%</span>
+        </div>
+        <div class="mc__bar" [attr.aria-label]="sharePct() + '% of fleet spend'"
+             role="img">
+          <i [style.width.%]="costPct()"></i>
+        </div>
       </div>
     </button>
   `,
@@ -62,6 +69,8 @@ export class FleetMachineCard {
   readonly machine = input.required<FleetMachine>();
   /** The fleet's top machine cost — drives the relative-spend bar width. */
   readonly maxCost = input<number>(1);
+  /** The fleet's TOTAL spend — drives the labeled share-% (this machine's slice of the whole). */
+  readonly totalCost = input<number>(0);
   /** Fired when the card is tapped (the page opens the detail sheet). */
   readonly open = output<void>();
 
@@ -81,6 +90,14 @@ export class FleetMachineCard {
   protected readonly costPct = computed(() => {
     const max = this.maxCost() || 1;
     return Math.max(3, Math.round((this.machine().costUsd / max) * 100));
+  });
+
+  /** This machine's share of the FLEET's total spend, as a display % ("12" / "0.4" for tiny slices). */
+  protected readonly sharePct = computed(() => {
+    const total = this.totalCost();
+    if (total <= 0) return '0';
+    const pct = (this.machine().costUsd / total) * 100;
+    return pct >= 10 ? Math.round(pct).toString() : pct.toFixed(1);
   });
 
   protected readonly ariaLabel = computed(() => {

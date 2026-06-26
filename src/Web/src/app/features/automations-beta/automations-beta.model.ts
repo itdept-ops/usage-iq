@@ -6,6 +6,52 @@
 
 import { AutomationRule, RuleAction, RuleConditionOp } from '../../core/models';
 
+/**
+ * A starter TEMPLATE — a curated partial that pre-fills the create sheet (the user still reviews + commits).
+ * Every field maps onto an EXISTING trigger kind / action / condition; no new contract, no write here.
+ */
+export interface AutomationTemplate {
+  /** Stable key for tracking + the chip. */
+  key: string;
+  /** Short chip title ("Workout nudge"). */
+  title: string;
+  /** One-line "what it does" blurb. */
+  blurb: string;
+  /** Material glyph for the chip. */
+  icon: string;
+  // ---- the draft it pre-fills (all from the existing catalogs) ----
+  triggerKind: string;
+  action: RuleAction;
+  conditionOp?: RuleConditionOp;
+  conditionValue?: number | null;
+  name?: string;
+}
+
+/**
+ * The starter pack — a few ready-made "When … → then nudge me" rules built ONLY from the existing trigger
+ * kinds (TRIGGERS) + actions (ACTIONS). Tapping one opens the create sheet pre-filled; the user tweaks +
+ * commits via the SAME Api.createAutomation. Pure data — no backend, no new kinds.
+ */
+export const TEMPLATES: readonly AutomationTemplate[] = [
+  {
+    key: 'workout-nudge', title: 'Workout cheer', blurb: 'When I finish a workout → nudge me in-app.',
+    icon: 'fitness_center', triggerKind: 'workout.logged', action: 0, name: 'Workout cheer',
+  },
+  {
+    key: 'long-run', title: 'Long-run cheer', blurb: 'When a workout runs 45+ min → ping in-app + Discord.',
+    icon: 'directions_run', triggerKind: 'workout.logged', action: 2, conditionOp: 1, conditionValue: 45,
+    name: 'Long-run cheer',
+  },
+  {
+    key: 'hard-day', title: '75-Hard day done', blurb: 'When I complete a 75-Hard day → notify me.',
+    icon: 'military_tech', triggerKind: 'challenge.dayComplete', action: 0, name: '75-Hard day done',
+  },
+  {
+    key: 'water-goal', title: 'Water goal hit', blurb: 'When I hit my water goal → send to my Discord.',
+    icon: 'water_drop', triggerKind: 'hydration.goalHit', action: 1, name: 'Water goal hit',
+  },
+];
+
 /** A trigger option: the kind + a human label + a short verb + a Material icon + numeric-payload unit. */
 export interface TriggerOpt {
   kind: string;

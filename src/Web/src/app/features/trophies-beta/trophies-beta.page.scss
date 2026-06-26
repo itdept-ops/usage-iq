@@ -149,6 +149,72 @@
 .tr-seg { flex: 1 1 auto; }
 
 // ============================================================================
+// "NEXT UP" HINT — the closest locked trophy + its criterion, a tappable card.
+// ============================================================================
+
+.tr-nextup {
+  position: relative;
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; box-sizing: border-box; text-align: left;
+  padding: 14px 14px 14px 16px;
+  border-radius: var(--r-card);
+  background: var(--bg-rise);
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, var(--hairline));
+  box-shadow: var(--lift-1);
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  overflow: hidden; isolation: isolate;
+  font: inherit; color: var(--ink);
+  transition: transform 140ms var(--ease-spring), box-shadow 140ms var(--ease-out), border-color 140ms var(--ease-out);
+}
+.tr-nextup:active { transform: scale(.985); box-shadow: var(--press); }
+.tr-nextup:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.tr-nextup__bloom {
+  position: absolute; inset: -40% auto -40% -10%; width: 180px; z-index: -1; pointer-events: none;
+  background: radial-gradient(90px 90px at 30% 50%, color-mix(in srgb, var(--accent-a) 30%, transparent), transparent 70%);
+  filter: blur(10px);
+}
+
+.tr-nextup__medal {
+  flex: 0 0 auto; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%;
+  background: var(--bg-sink); border: 2px dashed color-mix(in srgb, var(--accent-a) 45%, var(--hairline));
+  color: color-mix(in srgb, var(--accent-a) 80%, var(--ink));
+}
+.tr-nextup__medal mat-icon { font-size: 24px; width: 24px; height: 24px; }
+
+.tr-nextup__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
+.tr-nextup__kicker {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent-a) 78%, var(--ink));
+}
+.tr-nextup__kicker mat-icon { font-size: 14px; width: 14px; height: 14px; }
+.tr-nextup__name {
+  font-size: 15px; font-weight: 800; letter-spacing: -.01em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tr-nextup__crit { font-size: 12.5px; font-weight: 600; color: var(--ink-dim); line-height: 1.3; }
+.tr-nextup__bar {
+  margin-top: 5px; display: block; height: 6px; border-radius: var(--r-pill); overflow: hidden;
+  background: var(--bg-sink); border: 1px solid var(--hairline);
+}
+.tr-nextup__bar-fill {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+  transition: width 700ms var(--ease-spring);
+}
+.tr-nextup__go { flex: 0 0 auto; color: var(--ink-faint); font-size: 22px; width: 22px; height: 22px; }
+
+// A small inline note when a status filter empties the grid.
+.tr-filter-empty {
+  display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+  margin: 2px 0; padding: 16px 18px; border-radius: var(--r-tile);
+  background: var(--bg-rise); border: 1px solid var(--hairline);
+  font-size: 13.5px; font-weight: 600; color: var(--ink-dim); text-align: center;
+}
+.tr-filter-empty mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--ink-faint); }
+
+// ============================================================================
 // GROUPS + GRID
 // ============================================================================
 
@@ -367,6 +433,28 @@
 .trd__status mat-icon { font-size: 16px; width: 16px; height: 16px; }
 
 .trd__desc { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--ink-dim); }
+
+// ---- How to earn it / earned confirmation ----
+.trd__how {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; border-radius: var(--r-tile);
+  background: color-mix(in srgb, var(--accent-a) 8%, var(--bg-sink));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 22%, var(--hairline));
+}
+.trd__how.is-earned {
+  background: color-mix(in srgb, var(--accent-a) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent-a) 30%, var(--hairline));
+}
+.trd__how > mat-icon {
+  flex: 0 0 auto; margin-top: 1px; font-size: 20px; width: 20px; height: 20px;
+  color: color-mix(in srgb, var(--accent-a) 82%, var(--ink));
+}
+.trd__how-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.trd__how-kicker {
+  font-style: normal; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent-a) 70%, var(--ink-dim));
+}
+.trd__how-line { font-size: 13.5px; font-weight: 700; color: var(--ink); line-height: 1.4; }
 
 // ---- The tier ladder ----
 .trd__ladder {

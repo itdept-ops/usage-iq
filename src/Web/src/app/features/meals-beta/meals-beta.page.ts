@@ -11,7 +11,8 @@ import {
   FamilyMeal, FamilyMealDay, PERM, TrackerProfileDto,
 } from '../../core/models';
 import {
-  BetaFab, BetaPullRefresh, BetaSkeleton, BetaSvgRing, BetaSwipeRow, BetaToaster, ToastController,
+  BetaFab, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaSvgRing, BetaSwipeRow,
+  BetaToaster, Segment, ToastController,
 } from '../beta-ui';
 
 import {
@@ -53,6 +54,7 @@ import { ForageMoveMealSheet } from './components/move-meal-sheet';
   providers: [ToastController],
   imports: [
     MatIconModule, BetaPullRefresh, BetaFab, BetaToaster, BetaSkeleton, BetaSvgRing, BetaSwipeRow,
+    BetaSegmentedControl,
     ForageDayStrip, ForageMealCard, ForagePlanSheet, ForageEatSheet, ForageGrocerySheet, ForageMealActionsSheet,
     ForageMoveMealSheet,
   ],
@@ -108,11 +110,40 @@ import { ForageMoveMealSheet } from './components/move-meal-sheet';
           </div>
         </header>
 
-        <!-- Swipeable week strip of day chips. -->
-        <app-forage-day-strip class="mb-strip"
-          [cells]="cells()" [selected]="selectedDate()" (pick)="selectDay($event)" />
+        <!-- Day | Week view toggle. -->
+        <app-bs-segmented class="mb-view" [segments]="viewSegments" [(value)]="viewMode" label="View" />
+
+        @if (viewMode() === 'week') {
+          <!-- WEEK MODE: a 7-up grid of per-day calorie-goal rings (tap a ring → that day, Day view). -->
+          <section class="mb-week" aria-label="Planned week at a glance">
+            <div class="mb-week-grid">
+              @for (cell of cells(); track cell.localDate) {
+                <button type="button" class="mb-wcell"
+                        [class.is-today]="cell.isToday" [class.is-selected]="cell.localDate === selectedDate()"
+                        (click)="pickFromWeek(cell.localDate)"
+                        [attr.aria-label]="weekRingLabel(cell)">
+                  <app-bs-ring class="mb-wring"
+                    [value]="weekRingFrac(cell)" [size]="58" [stroke]="7"
+                    [signalOnFull]="weekDayFull(cell)"
+                    [track]="cell.rollup.hasMacros ? 'var(--hairline)' : 'var(--bg-sink)'">
+                    <span class="mb-wring-wd">{{ cell.weekdayShort }}</span>
+                  </app-bs-ring>
+                  <span class="mb-wcell-kcal" [class.is-mute]="!cell.rollup.hasMacros">
+                    @if (cell.rollup.hasMacros) { {{ weekDayKcal(cell) }} } @else { — }
+                  </span>
+                </button>
+              }
+            </div>
+            <p class="mb-week-summary">{{ weekSummary() }}</p>
+          </section>
+        } @else {
+          <!-- Swipeable week strip of day chips. -->
+          <app-forage-day-strip class="mb-strip"
+            [cells]="cells()" [selected]="selectedDate()" (pick)="selectDay($event)" />
+        }
 
         <!-- The selected day's meals. -->
+        @if (viewMode() === 'day') {
         <section class="mb-day" [attr.aria-label]="selectedCell()?.weekdayLong + ' meals'">
           <div class="mb-day-h">
             <div class="mb-day-h-txt">
@@ -164,6 +195,7 @@ import { ForageMoveMealSheet } from './components/move-meal-sheet';
             </div>
           }
         </section>
+        }
 
         <!-- Quick actions row. -->
         <div class="mb-quick">
@@ -218,6 +250,13 @@ export class MealsBetaPage {
 
   /** The selected day's "YYYY-MM-DD" — defaults to today (or the week's Monday off-week). */
   readonly selectedDate = signal<string>(toIso(new Date()));
+
+  /** Day-at-a-time vs. the planned-week macro-ring grid. Persisted in a signal (default Day). */
+  readonly viewMode = signal<'day' | 'week'>('day');
+  readonly viewSegments: Segment[] = [
+    { key: 'day', label: 'Day' },
+    { key: 'week', label: 'Week' },
+  ];
 
   /** The meal whose action sheet is open (drives the actions sheet's content). */
   readonly activeMeal = signal<FamilyMeal | null>(null);
@@ -296,6 +335,50 @@ export class MealsBetaPage {
     const cell = this.selectedCell();
     return `${Math.round(cell?.rollup.calories ?? 0)} planned kcal, ${this.dayGoalPct()}% of daily goal`;
   });
+
+  // ---- WEEK-MODE ring grid (mirrors dayGoalFrac()/dayRingLabel() per cell) ----
+  /** One day's planned kcal as a clamped 0..1 fraction of the daily goal (0 without a goal or macros). */
+  weekRingFrac(cell: DayCell): number {
+    const goal = this.calorieGoal();
+    if (!goal || goal <= 0 || !cell.rollup.hasMacros) return 0;
+    return Math.max(0, Math.min(1, cell.rollup.calories / goal));
+  }
+  /** Whether a day hit (or passed) the calorie goal — drives [signalOnFull]. */
+  weekDayFull(cell: DayCell): boolean {
+    const goal = this.calorieGoal();
+    return !!goal && goal > 0 && cell.rollup.hasMacros && cell.rollup.calories >= goal;
+  }
+  /** A day's planned-kcal numeral under its ring (e.g. "1,850"). */
+  weekDayKcal(cell: DayCell): string {
+    return Math.round(cell.rollup.calories).toLocaleString();
+  }
+  /** aria text for a week-grid ring cell. */
+  weekRingLabel(cell: DayCell): string {
+    if (!cell.rollup.hasMacros) return `${cell.weekdayLong}, nothing planned`;
+    const pct = Math.round(this.weekRingFrac(cell) * 100);
+    const goal = this.calorieGoal();
+    const goalNote = goal && goal > 0 ? `, ${pct}% of daily goal` : '';
+    return `${cell.weekdayLong}, ${Math.round(cell.rollup.calories)} planned kcal${goalNote}`;
+  }
+
+  /** "4 of 7 days planned · avg 1,850 kcal" — the week-summary line. */
+  readonly weekSummary = computed(() => {
+    const cells = this.cells();
+    if (cells.length === 0) return 'No days in this week';
+    const planned = cells.filter(c => c.meals.length > 0);
+    const withMacros = cells.filter(c => c.rollup.hasMacros);
+    const head = `${planned.length} of ${cells.length} days planned`;
+    if (withMacros.length === 0) return head;
+    const avg = Math.round(
+      withMacros.reduce((sum, c) => sum + c.rollup.calories, 0) / withMacros.length);
+    return `${head} · avg ${avg.toLocaleString()} kcal`;
+  });
+
+  /** Tapping a week ring selects that day AND drops back to Day view so they land on it. */
+  pickFromWeek(iso: string): void {
+    this.selectDay(iso);
+    this.viewMode.set('day');
+  }
 
   constructor() {
     this.reload(true);

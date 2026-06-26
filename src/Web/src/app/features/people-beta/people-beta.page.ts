@@ -14,12 +14,15 @@ import {
   type Segment,
 } from '../beta-ui';
 
-import { PersonVm, rosterSort, toVm } from './people-beta.model';
+import { PersonVm, alphaSort, matchesQuery, rosterSort, toVm } from './people-beta.model';
 import { CircleRow } from './components/person-row';
 import { CircleSheet } from './components/person-sheet';
 
 /** Which slice of the caller's people the roster shows. */
 type Filter = 'all' | 'contacts' | 'family';
+
+/** How the roster is ordered: ONLINE-FIRST (grouped) or strict A–Z (one flat list). */
+type SortMode = 'online' | 'az';
 
 /**
  * People "Circle" — the mobile-first SOCIAL roster, built on the shared beta-ui "Strata" kit
@@ -91,9 +94,37 @@ type Filter = 'all' | 'contacts' | 'family';
             }
           </div>
 
+          <!-- Compact stat strip — online · contacts · family, from the loaded roster. -->
+          @if (!loading() && !error()) {
+            <p class="hh__stats" role="status" aria-live="polite">
+              <span class="hh__stat"><strong>{{ stats().online }}</strong> online</span>
+              <span class="hh__stat-sep" aria-hidden="true">·</span>
+              <span class="hh__stat"><strong>{{ stats().contacts }}</strong> contacts</span>
+              <span class="hh__stat-sep" aria-hidden="true">·</span>
+              <span class="hh__stat"><strong>{{ stats().family }}</strong> family</span>
+            </p>
+          }
+
           <!-- All / Contacts / Family. -->
           <app-bs-segmented class="hh__seg" [segments]="segments()" [value]="filter()"
                             label="Filter people" (change)="setFilter($event)" />
+
+          <!-- Live name search + order toggle. -->
+          <div class="hh__tools">
+            <div class="hh__search" [class.hh__search--filled]="query().length > 0">
+              <mat-icon class="hh__search-ic" aria-hidden="true">search</mat-icon>
+              <input class="hh__search-in" type="search" inputmode="search" autocomplete="off"
+                     placeholder="Search your circle" aria-label="Search your circle by name"
+                     [value]="query()" (input)="onSearch($any($event.target).value)" />
+              @if (query().length > 0) {
+                <button type="button" class="hh__search-x" aria-label="Clear search" (click)="clearQuery()">
+                  <mat-icon aria-hidden="true">close</mat-icon>
+                </button>
+              }
+            </div>
+            <app-bs-segmented class="hh__sort" [segments]="sortSegments" [value]="sortMode()"
+                              label="Sort order" (change)="setSort($event)" />
+          </div>
         </header>
 
         <!-- Loading skeletons. -->
@@ -117,6 +148,14 @@ type Filter = 'all' | 'contacts' | 'family';
               <mat-icon aria-hidden="true">refresh</mat-icon> Try again
             </button>
           </div>
+        } @else if (noMatches()) {
+          <div class="pl-state">
+            <span class="pl-state-ic" aria-hidden="true"><mat-icon>person_search</mat-icon></span>
+            <p class="pl-state-msg">No one matches “{{ query().trim() }}”.</p>
+            <button type="button" class="pl-state-btn" (click)="clearQuery()">
+              <mat-icon aria-hidden="true">close</mat-icon> Clear search
+            </button>
+          </div>
         } @else if (isEmpty()) {
           <div class="pl-state">
             <span class="pl-state-ic" aria-hidden="true"><mat-icon>groups</mat-icon></span>
@@ -128,11 +167,35 @@ type Filter = 'all' | 'contacts' | 'family';
           </div>
         } @else {
           <!-- Live "N online now" pulse line — from the already-loaded presence fields, no new endpoint. -->
-          @if (onlineCount() > 0) {
+          @if (sortMode() === 'online' && onlineCount() > 0) {
             <p class="pl-livecount" role="status" aria-live="polite">
               <span class="pl-livecount-pulse" aria-hidden="true"></span>
               <strong>{{ onlineCount() }}</strong> online now
             </p>
+          }
+
+          <!-- A–Z mode: one flat alphabetical list. -->
+          @if (sortMode() === 'az' && azGroup().length > 0) {
+            <section class="pl-group" aria-label="All people A to Z">
+              <div class="pl-group-h">
+                <span class="pl-group-dot" aria-hidden="true"></span>
+                <h2 class="pl-group-t">A–Z</h2>
+                <span class="pl-group-c">{{ azGroup().length }}</span>
+              </div>
+              <div class="pl-rows">
+                @for (p of azGroup(); track p.userId; let i = $index) {
+                  <div class="pl-row-in" [style.--i]="i">
+                    <app-bs-swipe-row [label]="p.name + ' actions'"
+                      [leftLabel]="canSwipeNudge(p) ? 'Nudge' : ''" [leftDestructive]="false"
+                      [rightLabel]="canSwipeMessage(p) ? 'Message' : ''"
+                      [disabled]="!canSwipeNudge(p) && !canSwipeMessage(p)"
+                      (swipe)="onSwipe(p, $event)">
+                      <app-circle-row [p]="p" [now]="now()" (open)="openSheet(p)" />
+                    </app-bs-swipe-row>
+                  </div>
+                }
+              </div>
+            </section>
           }
 
           <!-- ONLINE-FIRST roster: Online now, then Everyone. -->
@@ -189,7 +252,8 @@ type Filter = 'all' | 'contacts' | 'family';
     <app-circle-sheet [(open)]="sheetOpen" [p]="activePerson()" [now]="now()"
       [canMessage]="canMessage()" [canNudge]="canNudge()"
       [messaging]="opening() !== null" [nudging]="nudging() !== null"
-      (message)="messageActive()" (nudge)="nudgeActive($event)" (map)="viewActiveOnMap()" />
+      (message)="messageActive()" (nudge)="nudgeActive($event)" (map)="viewActiveOnMap()"
+      (copyName)="copyActiveName()" />
 
     <app-bs-toaster />
   `,
@@ -214,6 +278,10 @@ export class PeopleBetaPage {
   readonly now = signal(Date.now());
 
   readonly filter = signal<Filter>('all');
+  /** Live name search (case-insensitive substring over the DisplayName); '' = no filter. */
+  readonly query = signal('');
+  /** Roster ordering: online-first (grouped) vs strict A–Z (one flat list). */
+  readonly sortMode = signal<SortMode>('online');
 
   // ---- action state ----
   /** The person whose tap-sheet is open. */
@@ -233,6 +301,12 @@ export class PeopleBetaPage {
     ];
   });
 
+  /** The order toggle: online-first (default) vs A–Z. */
+  readonly sortSegments: Segment[] = [
+    { key: 'online', label: 'Online first' },
+    { key: 'az', label: 'A–Z' },
+  ];
+
   /** Caller can open DMs at all (chat.send) — re-runs on permission change. */
   readonly canMessage = computed(() => { this.auth.permissions(); return this.auth.hasPermission(PERM.chatSend); });
   /** Caller can nudge at all (chat.send). */
@@ -244,16 +318,29 @@ export class PeopleBetaPage {
     return this.people().map(p => toVm(p, now)).sort(rosterSort);
   });
 
-  /** The active filter applied to the roster. */
+  /** The active relationship filter + the live name search applied to the roster. */
   private readonly filtered = computed<PersonVm[]>(() => {
     const f = this.filter();
-    return this.roster().filter(p => f === 'all' || (f === 'contacts' ? p.isContact : p.isHousehold));
+    const q = this.query().trim().toLowerCase();
+    return this.roster()
+      .filter(p => f === 'all' || (f === 'contacts' ? p.isContact : p.isHousehold))
+      .filter(p => matchesQuery(p, q));
   });
 
-  /** The "Online now" group (online OR away) within the active filter. */
-  readonly onlineGroup = computed(() => this.filtered().filter(p => p.presence !== 'offline'));
-  /** The "Everyone (else)" group — the offline remainder within the active filter. */
-  readonly everyoneGroup = computed(() => this.filtered().filter(p => p.presence === 'offline'));
+  /** True when a search is active and no one in the current filter matches (drives the "no matches" state). */
+  readonly noMatches = computed(() =>
+    !this.loading() && !this.error() && this.query().trim().length > 0 && this.filtered().length === 0);
+
+  /** In A–Z mode the roster is ONE flat alphabetical list (online grouping suppressed). */
+  readonly azGroup = computed(() =>
+    this.sortMode() === 'az' ? [...this.filtered()].sort(alphaSort) : []);
+
+  /** The "Online now" group (online OR away) — only in online-first mode. */
+  readonly onlineGroup = computed(() =>
+    this.sortMode() === 'online' ? this.filtered().filter(p => p.presence !== 'offline') : []);
+  /** The "Everyone (else)" group — the offline remainder; only in online-first mode. */
+  readonly everyoneGroup = computed(() =>
+    this.sortMode() === 'online' ? this.filtered().filter(p => p.presence === 'offline') : []);
 
   /** Live online count across the WHOLE circle (the hero stat — not filter-scoped, excludes self). */
   readonly onlineCount = computed(() => this.roster().filter(p => !p.isSelf && p.presence !== 'offline').length);
@@ -282,8 +369,19 @@ export class PeopleBetaPage {
     };
   });
 
-  /** Whether the active filter currently yields zero people (drives the empty state). */
-  readonly isEmpty = computed(() => !this.loading() && !this.error() && this.filtered().length === 0);
+  /** Whether the active filter (with NO search) yields zero people (drives the empty state). */
+  readonly isEmpty = computed(() =>
+    !this.loading() && !this.error() && this.query().trim().length === 0 && this.filtered().length === 0);
+
+  /** Stat strip under the header: online · contacts · family, all from the loaded roster. */
+  readonly stats = computed(() => {
+    const all = this.roster();
+    return {
+      online: all.filter(p => !p.isSelf && p.presence !== 'offline').length,
+      contacts: all.filter(p => p.isContact).length,
+      family: all.filter(p => p.isHousehold).length,
+    };
+  });
 
   constructor() {
     this.reload(true);
@@ -299,6 +397,12 @@ export class PeopleBetaPage {
   }
 
   setFilter(f: string): void { this.filter.set(f as Filter); }
+  setSort(s: string): void { this.sortMode.set(s as SortMode); }
+
+  /** Bind the search box (native input → signal). */
+  onSearch(value: string): void { this.query.set(value); }
+  /** Clear the search box (the inline ✕). */
+  clearQuery(): void { this.query.set(''); }
 
   // ---- data load ----
   /** Initial / explicit load (shows the skeletons). */
@@ -355,6 +459,18 @@ export class PeopleBetaPage {
   messageActive(): void { const p = this.activePerson(); if (p) this.message(p); }
   nudgeActive(kind: NudgeKind): void { const p = this.activePerson(); if (p) this.nudge(p, kind); }
   viewActiveOnMap(): void { this.sheetOpen.set(false); this.router.navigate(['/family/locations']); }
+
+  /** Copy the active person's DisplayName to the clipboard (no email is ever held client-side). */
+  async copyActiveName(): Promise<void> {
+    const p = this.activePerson();
+    if (!p) return;
+    try {
+      await navigator.clipboard?.writeText(p.name);
+      this.toast.show(`Copied “${p.name}”`, { tone: 'success', durationMs: 1600 });
+    } catch {
+      this.toast.show('Couldn’t copy the name', { tone: 'warn' });
+    }
+  }
 
   /**
    * Open (or fetch the existing) 1:1 DM, then deep-link to /chat?c={id} — reusing POST /api/chat/direct +

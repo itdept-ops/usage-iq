@@ -8,7 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../core/api';
 import { AutomationRule, AutomationRuleInput, RuleAction, RuleConditionOp } from '../../../core/models';
 import { BetaBottomSheet } from '../../beta-ui';
-import { ACTIONS, TRIGGERS, condOpLabel, triggerOpt } from '../automations-beta.model';
+import { ACTIONS, AutomationTemplate, TRIGGERS, condOpLabel, triggerOpt } from '../automations-beta.model';
 
 /**
  * Relay CreateSheet — "Add automation" in a BetaBottomSheet. The user picks a WHEN (trigger) and a
@@ -267,6 +267,20 @@ export class RelayCreateSheet {
     this.name.set('');
     this.busy.set(false);
     this.error.set(null);
+  }
+
+  /**
+   * Pre-fill the sheet from a starter template (a partial {@link AutomationRuleInput}) so the user lands on a
+   * sensible draft they can tweak + commit. Resets first, then applies the template's fields. The user still
+   * presses "Create" — nothing is written here, and the same `Api.createAutomation` path runs on commit.
+   */
+  prefill(t: AutomationTemplate): void {
+    this.reset();
+    this.triggerKind.set(t.triggerKind);
+    this.conditionOp.set(t.conditionOp ?? 0);
+    this.conditionValue.set(t.conditionValue ?? null);
+    this.action.set(t.action);
+    this.name.set(t.name ?? '');
   }
 
   protected onClosed(): void { /* page clears its own open flag via two-way; nothing else to do */ }

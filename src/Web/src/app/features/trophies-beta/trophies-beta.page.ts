@@ -148,12 +148,44 @@ interface BadgeGroup {
         } @else if (!badges().length) {
           <!-- empty wall: the hero already carries the encouragement + the single CTA -->
         } @else {
+          <!-- ─── "NEXT UP" HINT: the closest locked trophy + its criterion ─── -->
+          @if (nextUp(); as nu) {
+            <button type="button" class="tr-nextup" (click)="openDetail(nu)"
+                    [attr.aria-label]="'Next up: ' + nu.label + '. ' + caption(nu) + '. Open details.'">
+              <span class="tr-nextup__bloom" aria-hidden="true"></span>
+              <span class="tr-nextup__medal" aria-hidden="true"><mat-icon>{{ icon(nu) }}</mat-icon></span>
+              <span class="tr-nextup__body">
+                <span class="tr-nextup__kicker"><mat-icon aria-hidden="true">my_location</mat-icon> Next up</span>
+                <span class="tr-nextup__name">{{ nu.label }}</span>
+                <span class="tr-nextup__crit">{{ unlockCriterion(nu) }}</span>
+                <span class="tr-nextup__bar" aria-hidden="true">
+                  <span class="tr-nextup__bar-fill" [style.width.%]="pct(nu)"></span>
+                </span>
+              </span>
+              <mat-icon class="tr-nextup__go" aria-hidden="true">chevron_right</mat-icon>
+            </button>
+          }
+
+          <!-- ─── FILTER: All | Earned | Locked ─── -->
+          <div class="tr-seg-wrap">
+            <app-bs-segmented class="tr-seg"
+              [segments]="statusSegments" [value]="statusFilter()" label="Filter trophies by status"
+              (change)="setStatusFilter($event)" />
+          </div>
+
           <!-- ─── GROUP-BY SWITCH ─── -->
           <div class="tr-seg-wrap">
             <app-bs-segmented class="tr-seg"
               [segments]="groupSegments" [value]="groupBy()" label="Group trophies by"
               (change)="setGroupBy($event)" />
           </div>
+
+          @if (!visibleBadges().length) {
+            <div class="tr-filter-empty">
+              <mat-icon aria-hidden="true">{{ statusFilter() === 'earned' ? 'lock_open' : 'lock' }}</mat-icon>
+              {{ statusFilter() === 'earned' ? 'No trophies earned yet — keep logging to light up the wall.' : 'Every trophy is earned. Nothing left locked.' }}
+            </div>
+          }
 
           <!-- ─── THE WALL: grouped, spring-staggered tiles ─── -->
           @for (g of groups(); track g.key) {
@@ -226,6 +258,22 @@ interface BadgeGroup {
 
           <p class="trd__desc">{{ b.description }}</p>
 
+          <!-- How to earn it / the unlock criterion (or the earned confirmation). -->
+          <div class="trd__how" [class.is-earned]="b.earned">
+            <mat-icon aria-hidden="true">{{ b.earned ? 'check_circle' : 'flag' }}</mat-icon>
+            <span class="trd__how-txt">
+              <i class="trd__how-kicker">{{ b.earned ? 'Earned' : 'How to earn it' }}</i>
+              <b class="trd__how-line">
+                @if (b.earned) {
+                  {{ tierLabel(b.tier) }} tier unlocked
+                  @if (b.nextTier) { · {{ unlockCriterion(b) }} for {{ tierLabel(b.nextTier.name) }} }
+                } @else {
+                  {{ unlockCriterion(b) }}
+                }
+              </b>
+            </span>
+          </div>
+
           <!-- the tier ladder: how it's earned, rung by rung -->
           <div class="trd__ladder" role="list" aria-label="Tier ladder">
             @for (t of b.tiers; track t.name) {
@@ -279,9 +327,18 @@ export class TrophiesBetaPage {
   /** How the grid is grouped: by the server category, or by earned tier. */
   readonly groupBy = signal<'category' | 'tier'>('category');
 
+  /** Which trophies the grid shows: all, only earned, or only locked. */
+  readonly statusFilter = signal<'all' | 'earned' | 'locked'>('all');
+
   readonly groupSegments: Segment[] = [
     { key: 'category', label: 'Category' },
     { key: 'tier', label: 'Tier' },
+  ];
+
+  readonly statusSegments: Segment[] = [
+    { key: 'all', label: 'All' },
+    { key: 'earned', label: 'Earned' },
+    { key: 'locked', label: 'Locked' },
   ];
 
   /** Stable cells for the loading skeleton grid. */
@@ -310,12 +367,27 @@ export class TrophiesBetaPage {
     return `${left} more ${left === 1 ? 'trophy' : 'trophies'} to chase` + (name ? `, ${name}.` : '.');
   });
 
+  /** Badges after the All/Earned/Locked status filter — drives the grid (catalog order preserved). */
+  readonly visibleBadges = computed<TrophyBadgeDto[]>(() => {
+    const all = this.badges();
+    const f = this.statusFilter();
+    if (f === 'earned') return all.filter(b => b.earned);
+    if (f === 'locked') return all.filter(b => !b.earned);
+    return all;
+  });
+
   /** The grouped wall — by the server `group` (catalog order preserved) or by earned tier. */
   readonly groups = computed<BadgeGroup[]>(() => {
-    const all = this.badges();
-    if (!all.length) return [];
-    return this.groupBy() === 'tier' ? this.groupByTier(all) : this.groupByCategory(all);
+    const visible = this.visibleBadges();
+    if (!visible.length) return [];
+    return this.groupBy() === 'tier' ? this.groupByTier(visible) : this.groupByCategory(visible);
   });
+
+  /**
+   * The "next up" hint: the FIRST locked badge in catalog order — the closest thing to earn next.
+   * Independent of the status filter so the nudge is always present while anything is locked.
+   */
+  readonly nextUp = computed<TrophyBadgeDto | null>(() => this.badges().find(b => !b.earned) ?? null);
 
   constructor() {
     this.reload();
@@ -340,6 +412,21 @@ export class TrophiesBetaPage {
 
   setGroupBy(key: string): void {
     this.groupBy.set(key === 'tier' ? 'tier' : 'category');
+  }
+
+  setStatusFilter(key: string): void {
+    this.statusFilter.set(key === 'earned' ? 'earned' : key === 'locked' ? 'locked' : 'all');
+  }
+
+  /**
+   * A full-sentence unlock criterion for a badge's NEXT rung ("Reach 50 workouts to unlock Gold"),
+   * or a maxed-out line. Used in the detail sheet's how-to-earn block + the next-up card.
+   */
+  unlockCriterion(b: TrophyBadgeDto): string {
+    if (!b.nextTier) return b.earned ? 'Every tier earned — maxed out.' : 'Complete this to earn it.';
+    const remaining = Math.max(0, b.nextTier.threshold - b.value);
+    if (remaining <= 0) return `Reach ${this.fmt(b.nextTier.threshold)} to unlock ${this.tierLabel(b.nextTier.name)}.`;
+    return `${this.fmt(remaining)} more to unlock ${this.tierLabel(b.nextTier.name)} (${this.fmt(b.value)} / ${this.fmt(b.nextTier.threshold)}).`;
   }
 
   // ─────────────── DETAIL SHEET ───────────────

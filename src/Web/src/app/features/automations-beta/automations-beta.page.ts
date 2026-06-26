@@ -8,11 +8,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Api } from '../../core/api';
 import { AutomationRule, AutomationRuleInput } from '../../core/models';
 import {
-  BetaFab, BetaPullRefresh, BetaSkeleton, BetaSwipeRow, BetaToaster, ToastController,
+  BetaFab, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaSwipeRow, BetaToaster,
+  ToastController, type Segment,
 } from '../beta-ui';
 
 import { RelayRuleCard } from './components/rule-card';
 import { RelayCreateSheet } from './components/rule-create-sheet';
+import { AutomationTemplate, TEMPLATES } from './automations-beta.model';
 
 /**
  * Automations "Relay" — the mobile-first if-this-then-that surface, built on the shared beta-ui "Strata"
@@ -38,7 +40,7 @@ import { RelayCreateSheet } from './components/rule-create-sheet';
   providers: [ToastController],
   imports: [
     MatIconModule, BetaPullRefresh, BetaFab, BetaToaster, BetaSkeleton, BetaSwipeRow,
-    RelayRuleCard, RelayCreateSheet,
+    BetaSegmentedControl, RelayRuleCard, RelayCreateSheet,
   ],
   template: `
     <app-bs-pull-refresh class="ab-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
@@ -98,11 +100,56 @@ import { RelayCreateSheet } from './components/rule-create-sheet';
             <div class="ab-state ab-empty">
               <span class="ab-state-ic ab-empty-ic" aria-hidden="true"><mat-icon>bolt</mat-icon></span>
               <h2 class="ab-empty-h">No automations yet</h2>
-              <p class="ab-state-msg">Create a rule to get a nudge the moment you log a workout, finish a 75-Hard day, or hit your water goal. Tap <strong>New automation</strong> below to start.</p>
+              <p class="ab-state-msg">Start from a template below, or tap <strong>New automation</strong> to build one from scratch. Rules only ever watch your own activity and only ever ping you.</p>
+            </div>
+
+            <!-- Quick-start templates (pre-fill the create sheet). -->
+            <div class="ab-tpl" role="group" aria-label="Start from a template">
+              <span class="ab-tpl-head"><mat-icon aria-hidden="true">auto_awesome</mat-icon> Start from a template</span>
+              <div class="ab-tpl-grid">
+                @for (t of templates; track t.key) {
+                  <button type="button" class="ab-tpl-card" (click)="startFromTemplate(t)"
+                          [attr.aria-label]="'Use template: ' + t.title + '. ' + t.blurb">
+                    <span class="ab-tpl-ic" aria-hidden="true"><mat-icon>{{ t.icon }}</mat-icon></span>
+                    <span class="ab-tpl-txt">
+                      <b class="ab-tpl-title">{{ t.title }}</b>
+                      <span class="ab-tpl-blurb">{{ t.blurb }}</span>
+                    </span>
+                    <mat-icon class="ab-tpl-add" aria-hidden="true">add</mat-icon>
+                  </button>
+                }
+              </div>
             </div>
           } @else {
+            <!-- Status filter: All / Active / Paused. -->
+            <div class="ab-seg-wrap">
+              <app-bs-segmented class="ab-seg"
+                [segments]="statusSegments()" [value]="statusFilter()" label="Filter automations by status"
+                (change)="setStatusFilter($event)" />
+            </div>
+
+            <!-- Quick-start templates (collapsed strip above the list). -->
+            <div class="ab-tpl ab-tpl--strip" role="group" aria-label="Start from a template">
+              <span class="ab-tpl-head"><mat-icon aria-hidden="true">auto_awesome</mat-icon> Quick add</span>
+              <div class="ab-tpl-row">
+                @for (t of templates; track t.key) {
+                  <button type="button" class="ab-tpl-chip" (click)="startFromTemplate(t)"
+                          [attr.aria-label]="'Use template: ' + t.title + '. ' + t.blurb">
+                    <mat-icon aria-hidden="true">{{ t.icon }}</mat-icon> {{ t.title }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            @if (visibleRules().length === 0) {
+              <div class="ab-filter-empty">
+                <mat-icon aria-hidden="true">{{ statusFilter() === 'active' ? 'toggle_off' : 'toggle_on' }}</mat-icon>
+                {{ statusFilter() === 'active' ? 'No active rules — every automation is paused.' : 'No paused rules — everything is active.' }}
+              </div>
+            }
+
             <div class="ab-rules">
-              @for (r of rules(); track r.id; let i = $index) {
+              @for (r of visibleRules(); track r.id; let i = $index) {
                 <div class="ab-row-in" [style.--i]="i">
                   <app-bs-swipe-row
                     leftLabel="Delete"
@@ -151,10 +198,32 @@ export class AutomationsBetaPage {
   readonly error = signal(false);
   readonly refreshing = signal(false);
 
+  /** Quick-start templates (pre-fill the create sheet). */
+  protected readonly templates = TEMPLATES;
+
+  /** Which rules the list shows: all, only active (enabled), or only paused. */
+  readonly statusFilter = signal<'all' | 'active' | 'paused'>('all');
+
   // ---- derived glance ----
   readonly total = computed(() => this.rules().length);
   readonly activeCount = computed(() => this.rules().filter(r => r.enabled).length);
   readonly pausedCount = computed(() => this.rules().filter(r => !r.enabled).length);
+
+  /** Filter segments with live counts so the user sees the split at a glance. */
+  readonly statusSegments = computed<Segment[]>(() => [
+    { key: 'all', label: `All ${this.total()}` },
+    { key: 'active', label: `Active ${this.activeCount()}` },
+    { key: 'paused', label: `Paused ${this.pausedCount()}` },
+  ]);
+
+  /** Rules after the All/Active/Paused filter (order preserved). */
+  readonly visibleRules = computed<AutomationRule[]>(() => {
+    const f = this.statusFilter();
+    const rs = this.rules();
+    if (f === 'active') return rs.filter(r => r.enabled);
+    if (f === 'paused') return rs.filter(r => !r.enabled);
+    return rs;
+  });
 
   constructor() {
     this.reload(true);
@@ -239,10 +308,21 @@ export class AutomationsBetaPage {
     }
   }
 
+  setStatusFilter(key: string): void {
+    this.statusFilter.set(key === 'active' ? 'active' : key === 'paused' ? 'paused' : 'all');
+  }
+
   // ---- create sheet ----
   openCreate(): void {
     const sheet = this.createSheet();
     sheet.reset();
+    sheet.open.set(true);
+  }
+
+  /** Open the create sheet pre-filled from a starter template (the user reviews + commits). */
+  startFromTemplate(t: AutomationTemplate): void {
+    const sheet = this.createSheet();
+    sheet.prefill(t);
     sheet.open.set(true);
   }
 

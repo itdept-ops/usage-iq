@@ -90,6 +90,81 @@
 }
 .ms__cell dd.mono { font-variant-numeric: tabular-nums; }
 
+// copy-name button (full-width, monospace host name + a "Copy" hint)
+.ms__copyname {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 11px 14px; border-radius: var(--r-tile);
+  background: var(--bg-rise); border: 1px solid var(--hairline);
+  color: var(--ink); font: inherit; cursor: pointer; text-align: left;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--ease-spring), border-color 160ms var(--ease-out);
+}
+.ms__copyname:active { transform: scale(.985); }
+.ms__copyname:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ms__copyname mat-icon { flex: 0 0 auto; font-size: 18px; width: 18px; height: 18px; color: var(--accent-a); }
+.ms__copyname-t {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ms__copyname-h {
+  flex: 0 0 auto; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+// identity & network: a column of label↔value rows; the IP rows are copy buttons.
+.ms__net { display: flex; flex-direction: column; gap: 8px; }
+.ms__net-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--r-tile);
+  background: var(--bg-rise); border: 1px solid var(--hairline);
+  width: 100%; text-align: left;
+}
+.ms__net-row.is-copy {
+  font: inherit; color: var(--ink); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--ease-spring), border-color 160ms var(--ease-out);
+}
+.ms__net-row.is-copy:active { transform: scale(.985); }
+.ms__net-row.is-copy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ms__net-l {
+  display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  font-size: 12px; font-weight: 700; color: var(--ink-dim); margin: 0;
+}
+.ms__net-l mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.ms__net-v {
+  flex: 1 1 auto; min-width: 0; text-align: right;
+  font-size: 14px; font-weight: 700; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ms__net-v.mono { font-variant-numeric: tabular-nums; }
+.ms__net-c { flex: 0 0 auto; font-size: 16px; width: 16px; height: 16px; color: var(--accent-a); }
+
+// "Set up another reporter →" CTA
+.ms__cta {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px; border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--accent-a) 10%, var(--bg-rise));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 26%, transparent);
+  color: var(--ink); text-decoration: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--ease-spring);
+}
+.ms__cta:active { transform: scale(.985); }
+.ms__cta:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ms__cta-ic {
+  flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #04222a;
+}
+.ms__cta-ic mat-icon { font-size: 22px; width: 22px; height: 22px; }
+.ms__cta-t { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ms__cta-h { font-size: 15px; font-weight: 800; color: var(--ink); }
+.ms__cta-s {
+  font-size: 12px; font-weight: 600; color: var(--ink-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ms__cta-chev { flex: 0 0 auto; color: var(--accent-a); font-size: 22px; width: 22px; height: 22px; }
+
 // location
 .ms__loc { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .ms__place { font-size: 14px; font-weight: 600; color: var(--ink); }

@@ -12,6 +12,7 @@ import {
 import { BetaPullRefresh, BetaToaster, ToastController } from '../beta-ui';
 
 import { PulseHeroCard } from './hero/hero-card';
+import { PulseInsightCard } from './cards/insight-card';
 import { PulseTrendCard } from './cards/trend-card';
 import { PulseBreakdownCard, BreakdownDim, BreakdownSlice } from './cards/breakdown-card';
 import { PulseEfficiencyCard } from './cards/efficiency-card';
@@ -46,7 +47,7 @@ const PAGE_SIZE = 25;
   providers: [ToastController],
   imports: [
     MatIconModule, BetaPullRefresh, BetaToaster,
-    PulseHeroCard, PulseTrendCard, PulseBreakdownCard, PulseEfficiencyCard, PulseRecentFeed, PulseFilterSheet,
+    PulseHeroCard, PulseInsightCard, PulseTrendCard, PulseBreakdownCard, PulseEfficiencyCard, PulseRecentFeed, PulseFilterSheet,
   ],
   template: `
     <app-bs-pull-refresh class="pb-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
@@ -81,6 +82,12 @@ const PAGE_SIZE = 25;
             [summary]="summary()" [prevSummary]="prevSummary()" [cacheEff]="cacheEff()"
             [loading]="loading()" [rangeLabel]="rangeLabel()" [prevLabel]="prevLabel()" />
         </div>
+
+        @if (showInsights()) {
+          <div class="rise pb-card" [style.--i]="1">
+            <app-pulse-insight [summary]="summary()" [cacheEff]="cacheEff()" [loading]="loading()" />
+          </div>
+        }
 
         <div class="rise pb-card" [style.--i]="1">
           <app-pulse-trend
@@ -185,6 +192,21 @@ export class DashboardBetaPage {
     return 'the previous period';
   });
 
+  /**
+   * Show the insights card only when its Top-day insight reads a real DATE (the 'day' grouping, so the
+   * bucket key is YYYY-MM-DD — never a month label) AND there's at least one cost-bearing day or some
+   * cache activity to surface. Hidden otherwise so the card never shows an empty or mislabelled insight.
+   */
+  readonly showInsights = computed(() => {
+    if (this.groupBy() !== 'day') return false;
+    const buckets = this.summary()?.buckets ?? [];
+    const hasTopDay = buckets.some(b => b.costUsd > 0);
+    const c = this.cacheEff();
+    const reads = c?.cacheReadTokens ?? this.summary()?.total?.cacheReadTokens ?? 0;
+    const hasCache = reads > 0;
+    return hasTopDay || hasCache;
+  });
+
   /** Show the efficiency card only when there's cache activity (degrade gracefully otherwise). */
   readonly showEfficiency = computed(() => {
     const c = this.cacheEff();
@@ -204,6 +226,13 @@ export class DashboardBetaPage {
         name: b.key,
         costUsd: b.costUsd,
         estimated: dim === 'model' ? (placeholderByModel.get(b.key) ?? false) : false,
+        // Full bucket totals carried through so the detail sheet needs NO second fetch.
+        totalTokens: b.totalTokens,
+        inputTokens: b.inputTokens,
+        outputTokens: b.outputTokens,
+        cacheReadTokens: b.cacheReadTokens,
+        cacheWriteTokens: b.cacheCreation5mTokens + b.cacheCreation1hTokens,
+        records: b.records,
       }))
       .sort((a, b) => b.costUsd - a.costUsd);
   });

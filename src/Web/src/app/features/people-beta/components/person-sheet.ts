@@ -83,6 +83,10 @@ const NUDGE_KINDS: { kind: NudgeKind; icon: string; label: string }[] = [
                 <span>On map</span>
               </button>
             }
+            <button type="button" class="cs__act" (click)="copyName.emit()">
+              <mat-icon aria-hidden="true">content_copy</mat-icon>
+              <span>Copy name</span>
+            </button>
           </div>
 
           <!-- Nudge picker -->
@@ -132,6 +136,8 @@ export class CircleSheet {
   readonly nudge = output<NudgeKind>();
   /** View this shared-household member on the family map. */
   readonly map = output<void>();
+  /** Copy this person's DisplayName to the clipboard. */
+  readonly copyName = output<void>();
 
   protected readonly nudgeKinds = NUDGE_KINDS;
   protected readonly timeAgo = timeAgo;
@@ -143,12 +149,9 @@ export class CircleSheet {
     return !!p && !p.isSelf && (p.isContact || p.isHousehold);
   });
 
-  /** Whether ANY action is offered (drives the empty hint for, e.g., a no-DM self row). */
-  protected readonly hasAnyAction = computed(() => {
-    const p = this.p();
-    if (!p) return false;
-    const msg = p.canDm && this.canMessage();
-    const nud = this.canNudgePerson() && this.canNudge();
-    return msg || nud || p.sharesLocation;
-  });
+  /**
+   * Whether ANY action is offered. Copy-name is ALWAYS available (a safe, identity-only action), so this
+   * is effectively always true now — the empty hint is retained only as a defensive fallback.
+   */
+  protected readonly hasAnyAction = computed(() => !!this.p());
 }
