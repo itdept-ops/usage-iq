@@ -388,6 +388,19 @@ export class App implements AfterViewInit {
     // new deployed version — "New version available — Reload" — reloads only if the user clicks.
     this.swUpdate.init();
 
+    // Lock the installed app to PORTRAIT. The manifest `orientation: "portrait"` is the real fix, but most
+    // browsers BAKE a PWA's orientation at install time, so an already-installed home-screen app won't pick
+    // up the manifest change without a reinstall. As a belt-and-suspenders, when running standalone ask the
+    // Screen Orientation API to lock portrait too — best-effort, silently ignored where unsupported (iOS,
+    // browser tabs, or when the platform disallows the lock).
+    try {
+      const so = (screen as unknown as { orientation?: { lock?: (o: string) => Promise<void> } })?.orientation;
+      const standalone =
+        window.matchMedia?.('(display-mode: standalone)').matches ||
+        (navigator as unknown as { standalone?: boolean }).standalone === true;
+      if (so?.lock && standalone) void so.lock('portrait').catch(() => { /* unsupported / not allowed */ });
+    } catch { /* Screen Orientation API absent */ }
+
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),
