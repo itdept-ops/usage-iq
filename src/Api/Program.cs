@@ -139,6 +139,11 @@ builder.Services.AddHttpClient(GeminiService.HttpClientName, c =>
 });
 builder.Services.AddScoped<GeminiService>();
 
+// Resume Builder: turns the structured ResumeData into downloadable PDF/DOCX documents (ATS-plain or the
+// designed style with the stored headshot). No external service / secret — pure in-process document
+// generation — so it always works regardless of Gemini config.
+builder.Services.AddScoped<ResumeDocumentService>();
+
 // OpenWeather powers the Family Hub "Today" weather card. The ApiKey is a secret (appsettings.Local.json
 // locally / OpenWeather__ApiKey env var in prod); when blank the card simply hides and /today still works.
 // The BaseAddress is FIXED below (not user-controlled), so the location/key can never redirect the call.
@@ -531,6 +536,7 @@ app.MapInboxEndpoints();
 app.MapPushEndpoints();
 app.MapTrackerEndpoints();
 app.MapRecipeEndpoints();
+app.MapResumeEndpoints();
 app.MapGroceryEndpoints();
 app.MapHardChallengeEndpoints();
 app.MapTrophyEndpoints();

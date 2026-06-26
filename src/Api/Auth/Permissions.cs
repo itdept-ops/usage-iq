@@ -76,6 +76,12 @@ public static class Permissions
     /// data. The AI planner ALSO requires <see cref="TrackerAi"/> (the token-spending gate, checked there).</summary>
     public const string MealsUse = "meals.use";
 
+    /// <summary>Page-gate for the Resume Builder tool (<c>/api/resume</c>): build, parse, tailor, and
+    /// generate cover letters for resumes with AI. OWNER-SCOPED private data — a caller only ever sees/edits
+    /// their own resumes + private headshot. A resume may be opted-in to share read-only with the owner's
+    /// mutual chat contacts. Never default — granted deliberately per user, since it gates private data.</summary>
+    public const string ResumeUse = "resume.use";
+
     // ---- Family ----
     public const string FamilyUse = "family.use";
     public const string FamilyFinance = "family.finance";
@@ -167,6 +173,7 @@ public static class Permissions
         new PermissionInfo(RecipesUse, "Tools", "Use My Recipes", "Save, edit, and organize your own recipes, and optionally share a recipe read-only with your mutual contacts."),
         new PermissionInfo(GroceryUse, "Tools", "Use Grocery list", "Keep a household grocery list: add, check off, and clear items, and pull missing ingredients straight from a recipe."),
         new PermissionInfo(MealsUse, "Tools", "Use Meal Planner", "Plan your weekly meals, get a macro-aware AI plan for the day or week from your recipes, recent foods, and groceries, and pull ingredients straight onto your grocery list."),
+        new PermissionInfo(ResumeUse, "Tools", "Use Resume Builder", "Build, parse, tailor, and generate cover letters for resumes with AI — your private resumes + headshot."),
 
         // ---- Family ----
         new PermissionInfo(FamilyUse, "Family", "Use Family Hub", "Access the Family Hub: see your household, its members, and shared family data."),
@@ -301,9 +308,10 @@ public static class Permissions
     /// Likewise excludes <see cref="AutomationsUse"/>: an automation rule can carry the owner's OWN Discord
     /// webhook (SSRF-allowlisted + encrypted), so the capability is a deliberate grant, never inherited by
     /// every new account.
-    /// Likewise excludes <see cref="RecipesUse"/>, <see cref="GroceryUse"/> and <see cref="MealsUse"/>: all
-    /// gate private, owner/household-scoped data (a personal recipe book, the household grocery list, and the
-    /// household meal plan), so they must be granted deliberately per user, never inherited by every new account.
+    /// Likewise excludes <see cref="RecipesUse"/>, <see cref="GroceryUse"/>, <see cref="MealsUse"/> and
+    /// <see cref="ResumeUse"/>: all gate private, owner/household-scoped data (a personal recipe book, the
+    /// household grocery list, the household meal plan, and a personal resume + headshot), so they must be
+    /// granted deliberately per user, never inherited by every new account.
     /// Finally excludes ALL AI keys (<see cref="AiKeys"/>) and ALL Location keys (<see cref="LocationKeys"/>):
     /// AI capabilities spend tokens and the Location feature reveals where a user is, so both must be
     /// granted deliberately per user — every new account starts with AI off and location off.
@@ -313,6 +321,6 @@ public static class Permissions
         && key != TrackerViewAll && key != FamilyUse && key != FamilyFinance && key != CycleTrack
         && key != ChoreClaim && key != AllowanceManage && key != IdentityMap
         && key != AiUsageView && key != BillsUse && key != BetaAccess && key != AutomationsUse
-        && key != RecipesUse && key != GroceryUse && key != MealsUse
+        && key != RecipesUse && key != GroceryUse && key != MealsUse && key != ResumeUse
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }

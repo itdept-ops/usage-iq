@@ -3825,6 +3825,179 @@ export interface RecipeFromBreakdownRequest {
   steps?: string[];
 }
 
+// ---- Resume Builder (the gated /resume Tool; mirrors Ccusage.Api.Dtos.ResumeDtos) ----
+
+/** One labelled external link on a resume's contact block (mirrors ResumeLinkDto). */
+export interface ResumeLink {
+  label: string;
+  url: string;
+}
+
+/** The contact/header block of a resume (mirrors ResumeContactDto). */
+export interface ResumeContact {
+  fullName: string;
+  headline: string;
+  email: string;
+  phone: string;
+  location: string;
+  links: ResumeLink[];
+}
+
+/** One work-experience entry (mirrors ResumeExperienceDto). `current` true ⇒ `endDate` ignored
+ * ("Present"). Dates are free text ("2021", "Jun 2021"). */
+export interface ResumeExperience {
+  company: string;
+  title: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  bullets: string[];
+}
+
+/** One education entry (mirrors ResumeEducationDto). All fields free text. */
+export interface ResumeEducation {
+  school: string;
+  degree: string;
+  field: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  gpa: string;
+  details: string;
+}
+
+/** One project entry with optional link + achievement bullets (mirrors ResumeProjectDto). */
+export interface ResumeProject {
+  name: string;
+  description: string;
+  link: string;
+  bullets: string[];
+}
+
+/** One certification entry (mirrors ResumeCertificationDto). Date is free text. */
+export interface ResumeCertification {
+  name: string;
+  issuer: string;
+  date: string;
+}
+
+/** The whole structured resume document (mirrors ResumeDataDto). All strings default ""; arrays default
+ * empty. Serialized into Resume.DataJson / ResumeApplication.TailoredDataJson on the backend. */
+export interface ResumeData {
+  contact: ResumeContact;
+  summary: string;
+  experience: ResumeExperience[];
+  education: ResumeEducation[];
+  skills: string[];
+  projects: ResumeProject[];
+  certifications: ResumeCertification[];
+}
+
+/** The owner's MASTER resume (mirrors ResumeDto). `hasHeadshot` reports whether a headshot is stored
+ * without putting the bytes on the wire (fetched via a dedicated endpoint). */
+export interface ResumeDto {
+  id: number;
+  title: string;
+  data: ResumeData;
+  hasHeadshot: boolean;
+  shareWithContacts: boolean;
+  updatedUtc: string;
+}
+
+/** A per-job tailored variant (mirrors ResumeApplicationDto): the pinned target job, the tailored data,
+ * and the generated cover letter. */
+export interface ResumeApplicationDto {
+  id: number;
+  resumeId: number;
+  jobTitle: string;
+  company: string;
+  jobDescription: string;
+  data: ResumeData;
+  coverLetter: string;
+  updatedUtc: string;
+}
+
+/** The caller's whole Resume Builder state (mirrors ResumeStateDto): the master resume (null until first
+ * save) and all of its tailored applications. */
+export interface ResumeState {
+  master: ResumeDto | null;
+  applications: ResumeApplicationDto[];
+}
+
+/** Create/update the master resume (mirrors ResumeSaveRequest). */
+export interface ResumeSaveRequest {
+  title: string;
+  data: ResumeData;
+  shareWithContacts: boolean;
+}
+
+/** Parse an existing resume into structured data (mirrors ParseResumeRequest). Supply EITHER an uploaded
+ * file (`fileBase64` + `mime`) OR raw pasted `text`. */
+export interface ParseResumeRequest {
+  fileBase64?: string | null;
+  mime?: string | null;
+  text?: string | null;
+}
+
+/** Upload/replace the headshot image (mirrors HeadshotRequest). Base64-encoded bytes + its MIME type. */
+export interface HeadshotRequest {
+  imageBase64: string;
+  mime: string;
+}
+
+/** Start a new tailored application from the master resume for a target job (mirrors NewApplicationRequest). */
+export interface NewApplicationRequest {
+  jobTitle: string;
+  company: string;
+  jobDescription: string;
+}
+
+/** Save an application's edits (mirrors ApplicationSaveRequest). */
+export interface ApplicationSaveRequest {
+  jobTitle: string;
+  company: string;
+  jobDescription: string;
+  data: ResumeData;
+  coverLetter: string;
+}
+
+/** Ask the AI to TAILOR the supplied data toward a job description (mirrors TailorRequest). */
+export interface TailorRequest {
+  jobDescription: string;
+  data: ResumeData;
+}
+
+/** Ask the AI to draft a COVER LETTER for a job from the supplied resume data (mirrors CoverLetterRequest). */
+export interface CoverLetterRequest {
+  jobTitle: string;
+  company: string;
+  jobDescription: string;
+  data: ResumeData;
+}
+
+/** Ask the AI to REFINE one section's content under a free-text instruction (mirrors RefineRequest). */
+export interface RefineRequest {
+  section: string;
+  content: string;
+  instruction: string;
+  data: ResumeData;
+}
+
+/** One turn in a resume-assistant chat (mirrors ResumeChatMessage). `role` is "user" | "assistant". */
+export interface ResumeChatMessage {
+  role: string;
+  content: string;
+}
+
+/** A resume-assistant chat turn (mirrors ResumeChatRequest): the conversation so far, the resume data as
+ * context (optional), and an optional job context (e.g. the target job description). */
+export interface ResumeChatRequest {
+  messages: ResumeChatMessage[];
+  data?: ResumeData | null;
+  jobContext?: string | null;
+}
+
 /**
  * A household chore on the shared board (mirrors ChoreDto). Optionally assigned to a member
  * (`assignedToUserId` + name; null = unassigned/anyone). `done` checks it off for the current period and
@@ -5036,6 +5209,8 @@ export const PERM = {
   recipesUse: 'recipes.use',
   /** Meal Planner (group "Tools"; page-gate): the household weekly meal plan + the macro-aware AI planner. Private, never default. */
   mealsUse: 'meals.use',
+  /** Resume Builder (group "Tools"; page-gate): build/parse/tailor resumes + cover letters with AI. Private, never default. */
+  resumeUse: 'resume.use',
   // ---- Beta (group "Beta"; page-gate for the experimental Beta section) ----
   betaAccess: 'beta.access',
   // ---- AI (group "AI"; token-spending; never default) ----
@@ -5083,6 +5258,7 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   [PERM.groceryUse]: 'Tools',
   [PERM.recipesUse]: 'Tools',
   [PERM.mealsUse]: 'Tools',
+  [PERM.resumeUse]: 'Tools',
   // ---- Beta ----
   [PERM.trackerBeta]: 'Beta',
   [PERM.betaAccess]: 'Beta',

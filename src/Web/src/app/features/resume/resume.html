@@ -1,0 +1,775 @@
+<div class="resume">
+
+  <!-- ─────────────────────────── header ─────────────────────────── -->
+  <header class="resume__head">
+    <div class="resume__id">
+      <span class="resume__glyph" aria-hidden="true"><mat-icon>description</mat-icon></span>
+      <div>
+        <h1 class="resume__title">Resume Builder</h1>
+        <p class="resume__sub">
+          Build one master resume, let the assistant sharpen it, then tailor a copy + cover letter to each job.
+        </p>
+      </div>
+    </div>
+
+    @if (hasMaster()) {
+      <div class="resume__head-actions">
+        <!-- Download menu -->
+        <button mat-stroked-button type="button" [matMenuTriggerFor]="dlMenu" [disabled]="exporting()"
+                aria-haspopup="menu">
+          @if (exporting()) {
+            <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+          } @else {
+            <mat-icon aria-hidden="true">download</mat-icon>
+          }
+          Download
+        </button>
+        <mat-menu #dlMenu="matMenu">
+          <div class="dl-section" role="presentation">Resume — ATS-plain (best for portals)</div>
+          <button mat-menu-item type="button" (click)="export('resume', 'pdf', 'ats')">
+            <mat-icon aria-hidden="true">picture_as_pdf</mat-icon> PDF
+          </button>
+          <button mat-menu-item type="button" (click)="export('resume', 'docx', 'ats')">
+            <mat-icon aria-hidden="true">article</mat-icon> Word (.docx)
+          </button>
+          <div class="dl-section" role="presentation">Resume — Designed (includes your photo)</div>
+          <button mat-menu-item type="button" (click)="export('resume', 'pdf', 'designed')">
+            <mat-icon aria-hidden="true">picture_as_pdf</mat-icon> PDF
+          </button>
+          <button mat-menu-item type="button" (click)="export('resume', 'docx', 'designed')">
+            <mat-icon aria-hidden="true">article</mat-icon> Word (.docx)
+          </button>
+        </mat-menu>
+
+        <button mat-flat-button color="primary" type="button" [disabled]="saving() || !dirty()"
+                (click)="save()">
+          @if (saving()) {
+            <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+          } @else {
+            <mat-icon aria-hidden="true">save</mat-icon>
+          }
+          {{ dirty() ? 'Save' : 'Saved' }}
+        </button>
+      </div>
+    }
+  </header>
+
+  <!-- ─────────────────────────── LOADING ─────────────────────────── -->
+  @if (loading()) {
+    <div class="resume__state" aria-live="polite">
+      <mat-progress-spinner mode="indeterminate" diameter="36" aria-hidden="true" />
+      <p>Loading your resume…</p>
+    </div>
+  }
+
+  <!-- ─────────────────────────── ERROR ─────────────────────────── -->
+  @else if (error()) {
+    <div class="resume__state">
+      <mat-icon class="resume__state-glyph" aria-hidden="true">cloud_off</mat-icon>
+      <p class="resume__state-title">Couldn't load your resume</p>
+      <button mat-stroked-button type="button" (click)="load()">
+        <mat-icon aria-hidden="true">refresh</mat-icon> Try again
+      </button>
+    </div>
+  }
+
+  <!-- ─────────────────────────── ONBOARDING ─────────────────────────── -->
+  @else if (!hasMaster()) {
+    <section class="onb">
+      <h2 class="onb__title">Let's build your resume</h2>
+      <p class="onb__sub">Pick a starting point — you can change everything afterwards.</p>
+      <div class="onb__grid">
+
+        <div class="onb__card">
+          <mat-icon class="onb__icon" aria-hidden="true">upload_file</mat-icon>
+          <h3 class="onb__card-title">Upload a resume</h3>
+          <p class="onb__card-sub">PDF, Word, an image, or plain text — the assistant reads it into editable sections.</p>
+          <label class="onb__file">
+            <input type="file" accept=".pdf,.doc,.docx,.txt,image/*,application/pdf" hidden
+                   (change)="onUploadFile($event)" [disabled]="parsing()" />
+            <span mat-flat-button color="primary" class="onb__file-btn">
+              @if (parsing()) {
+                <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" /> Reading…
+              } @else {
+                <mat-icon aria-hidden="true">upload</mat-icon> Choose file
+              }
+            </span>
+          </label>
+        </div>
+
+        <div class="onb__card">
+          <mat-icon class="onb__icon" aria-hidden="true">edit_note</mat-icon>
+          <h3 class="onb__card-title">Start blank</h3>
+          <p class="onb__card-sub">Fill in each section yourself with a live preview alongside.</p>
+          <button mat-stroked-button type="button" (click)="startBlank()" [disabled]="saving()">
+            <mat-icon aria-hidden="true">add</mat-icon> Start blank
+          </button>
+        </div>
+
+        <div class="onb__card">
+          <mat-icon class="onb__icon" aria-hidden="true">auto_awesome</mat-icon>
+          <h3 class="onb__card-title">Let the AI interview me</h3>
+          <p class="onb__card-sub">Answer a few questions and the assistant drafts your resume as you go.</p>
+          <button mat-stroked-button type="button" (click)="startAi()" [disabled]="saving()">
+            <mat-icon aria-hidden="true">forum</mat-icon> Start interview
+          </button>
+        </div>
+      </div>
+    </section>
+  }
+
+  <!-- ─────────────────────────── BUILDER ─────────────────────────── -->
+  @else {
+    <mat-tab-group class="resume__tabs" animationDuration="0ms" mat-stretch-tabs="false">
+
+      <!-- ============ TAB: Edit ============ -->
+      <mat-tab label="Edit & preview">
+        <div class="builder">
+
+          <!-- EDITOR column -->
+          <div class="builder__editor">
+
+            <!-- Title + share -->
+            <section class="ed-section">
+              <div class="ed-meta">
+                <mat-form-field appearance="outline" class="ed-meta__title">
+                  <mat-label>Resume name</mat-label>
+                  <input matInput [ngModel]="title()" (ngModelChange)="title.set($event)" name="resumeName" />
+                </mat-form-field>
+                <mat-slide-toggle class="ed-meta__share" [ngModel]="shareWithContacts()"
+                                  (ngModelChange)="shareWithContacts.set($event)"
+                                  matTooltip="Let your mutual contacts view this read-only">
+                  Share with contacts
+                </mat-slide-toggle>
+              </div>
+            </section>
+
+            <!-- Headshot -->
+            <section class="ed-section">
+              <h3 class="ed-h">Headshot <span class="ed-h-note">used in the “Designed” export</span></h3>
+              <div class="ed-headshot">
+                @if (headshotUrl()) {
+                  <img class="ed-headshot__img" [src]="headshotUrl()" alt="Your headshot" />
+                } @else {
+                  <span class="ed-headshot__placeholder" aria-hidden="true"><mat-icon>person</mat-icon></span>
+                }
+                <div class="ed-headshot__actions">
+                  <label class="ed-headshot__upload">
+                    <input type="file" accept="image/*" hidden (change)="onHeadshotFile($event)"
+                           [disabled]="headshotBusy()" />
+                    <span mat-stroked-button class="ed-headshot__btn">
+                      <mat-icon aria-hidden="true">add_a_photo</mat-icon>
+                      {{ master()?.hasHeadshot ? 'Replace' : 'Add photo' }}
+                    </span>
+                  </label>
+                  @if (master()?.hasHeadshot) {
+                    <button mat-button type="button" (click)="removeHeadshot()" [disabled]="headshotBusy()">
+                      <mat-icon aria-hidden="true">delete_outline</mat-icon> Remove
+                    </button>
+                  }
+                </div>
+              </div>
+            </section>
+
+            <!-- Contact -->
+            <section class="ed-section">
+              <h3 class="ed-h">Contact</h3>
+              <div class="ed-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Full name</mat-label>
+                  <input matInput [ngModel]="draft().contact.fullName"
+                         (ngModelChange)="setContact('fullName', $event)" name="cFullName" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Headline / role</mat-label>
+                  <input matInput [ngModel]="draft().contact.headline"
+                         (ngModelChange)="setContact('headline', $event)" name="cHeadline" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Email</mat-label>
+                  <input matInput type="email" [ngModel]="draft().contact.email"
+                         (ngModelChange)="setContact('email', $event)" name="cEmail" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Phone</mat-label>
+                  <input matInput [ngModel]="draft().contact.phone"
+                         (ngModelChange)="setContact('phone', $event)" name="cPhone" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="ed-grid__wide">
+                  <mat-label>Location</mat-label>
+                  <input matInput [ngModel]="draft().contact.location"
+                         (ngModelChange)="setContact('location', $event)" name="cLocation" />
+                </mat-form-field>
+              </div>
+
+              <div class="ed-links">
+                <div class="ed-links__head">
+                  <span class="ed-sub-h">Links</span>
+                  <button mat-button type="button" (click)="addLink()">
+                    <mat-icon aria-hidden="true">add</mat-icon> Add link
+                  </button>
+                </div>
+                @for (lnk of draft().contact.links; track $index) {
+                  <div class="ed-link-row">
+                    <mat-form-field appearance="outline" class="ed-link-row__label">
+                      <mat-label>Label</mat-label>
+                      <input matInput [ngModel]="lnk.label" (ngModelChange)="setLink($index, 'label', $event)"
+                             [name]="'linkLabel' + $index" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="ed-link-row__url">
+                      <mat-label>URL</mat-label>
+                      <input matInput [ngModel]="lnk.url" (ngModelChange)="setLink($index, 'url', $event)"
+                             [name]="'linkUrl' + $index" />
+                    </mat-form-field>
+                    <button mat-icon-button type="button" aria-label="Remove link" (click)="removeLink($index)">
+                      <mat-icon aria-hidden="true">close</mat-icon>
+                    </button>
+                  </div>
+                }
+              </div>
+            </section>
+
+            <!-- Summary -->
+            <section class="ed-section">
+              <div class="ed-section__head">
+                <h3 class="ed-h">Summary</h3>
+                <button mat-button type="button" class="ai-btn" (click)="improveSummary()"
+                        [disabled]="isRefining('summary') || !draft().summary.trim()">
+                  @if (isRefining('summary')) {
+                    <mat-progress-spinner mode="indeterminate" diameter="16" aria-hidden="true" />
+                  } @else {
+                    <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+                  }
+                  Improve with AI
+                </button>
+              </div>
+              <mat-form-field appearance="outline" class="ed-full">
+                <mat-label>Professional summary</mat-label>
+                <textarea matInput rows="4" [ngModel]="draft().summary"
+                          (ngModelChange)="setSummary($event)" name="summary"
+                          placeholder="A short headline paragraph about who you are and what you do best."></textarea>
+              </mat-form-field>
+            </section>
+
+            <!-- Experience -->
+            <section class="ed-section">
+              <div class="ed-section__head">
+                <h3 class="ed-h">Experience</h3>
+                <button mat-button type="button" (click)="addExperience()">
+                  <mat-icon aria-hidden="true">add</mat-icon> Add role
+                </button>
+              </div>
+              @for (exp of draft().experience; track $index; let ei = $index, eFirst = $first, eLast = $last) {
+                <div class="ed-item">
+                  <div class="ed-item__bar">
+                    <span class="ed-item__n">#{{ ei + 1 }}</span>
+                    <span class="ed-item__spacer"></span>
+                    <button mat-icon-button type="button" aria-label="Move up" [disabled]="eFirst"
+                            (click)="moveExperience(ei, -1)"><mat-icon aria-hidden="true">arrow_upward</mat-icon></button>
+                    <button mat-icon-button type="button" aria-label="Move down" [disabled]="eLast"
+                            (click)="moveExperience(ei, 1)"><mat-icon aria-hidden="true">arrow_downward</mat-icon></button>
+                    <button mat-icon-button type="button" aria-label="Remove role"
+                            (click)="removeExperience(ei)"><mat-icon aria-hidden="true">delete_outline</mat-icon></button>
+                  </div>
+                  <div class="ed-grid">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Title</mat-label>
+                      <input matInput [ngModel]="exp.title" (ngModelChange)="setExperience(ei, 'title', $event)"
+                             [name]="'expTitle' + ei" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Company</mat-label>
+                      <input matInput [ngModel]="exp.company" (ngModelChange)="setExperience(ei, 'company', $event)"
+                             [name]="'expCompany' + ei" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Location</mat-label>
+                      <input matInput [ngModel]="exp.location" (ngModelChange)="setExperience(ei, 'location', $event)"
+                             [name]="'expLoc' + ei" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Start</mat-label>
+                      <input matInput [ngModel]="exp.startDate" (ngModelChange)="setExperience(ei, 'startDate', $event)"
+                             [name]="'expStart' + ei" placeholder="Jun 2021" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" [class.ed-dim]="exp.current">
+                      <mat-label>End</mat-label>
+                      <input matInput [ngModel]="exp.endDate" (ngModelChange)="setExperience(ei, 'endDate', $event)"
+                             [name]="'expEnd' + ei" [disabled]="exp.current" placeholder="Present" />
+                    </mat-form-field>
+                    <div class="ed-current">
+                      <mat-slide-toggle [ngModel]="exp.current"
+                                        (ngModelChange)="setExperience(ei, 'current', $event)"
+                                        [name]="'expCurrent' + ei">I work here now</mat-slide-toggle>
+                    </div>
+                  </div>
+
+                  <div class="ed-bullets">
+                    <div class="ed-links__head">
+                      <span class="ed-sub-h">Highlights</span>
+                      <button mat-button type="button" (click)="addExpBullet(ei)">
+                        <mat-icon aria-hidden="true">add</mat-icon> Add bullet
+                      </button>
+                    </div>
+                    @for (b of exp.bullets; track $index; let bi = $index) {
+                      <div class="ed-bullet-row">
+                        <mat-form-field appearance="outline" class="ed-full">
+                          <mat-label>Achievement</mat-label>
+                          <textarea matInput rows="2" [ngModel]="b"
+                                    (ngModelChange)="setExpBullet(ei, bi, $event)"
+                                    [name]="'expBullet' + ei + '-' + bi"></textarea>
+                        </mat-form-field>
+                        <div class="ed-bullet-row__tools">
+                          <button mat-icon-button type="button" aria-label="Improve bullet with AI"
+                                  matTooltip="Improve with AI" [disabled]="isRefining('exp-' + ei + '-' + bi) || !b.trim()"
+                                  (click)="improveExpBullet(ei, bi)">
+                            <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+                          </button>
+                          <button mat-icon-button type="button" aria-label="Remove bullet"
+                                  (click)="removeExpBullet(ei, bi)"><mat-icon aria-hidden="true">close</mat-icon></button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              } @empty {
+                <p class="ed-empty">No experience yet — add your first role.</p>
+              }
+            </section>
+
+            <!-- Education -->
+            <section class="ed-section">
+              <div class="ed-section__head">
+                <h3 class="ed-h">Education</h3>
+                <button mat-button type="button" (click)="addEducation()">
+                  <mat-icon aria-hidden="true">add</mat-icon> Add education
+                </button>
+              </div>
+              @for (edu of draft().education; track $index) {
+                <div class="ed-item">
+                  <div class="ed-item__bar">
+                    <span class="ed-item__n">#{{ $index + 1 }}</span>
+                    <span class="ed-item__spacer"></span>
+                    <button mat-icon-button type="button" aria-label="Move up" [disabled]="$first"
+                            (click)="moveEducation($index, -1)"><mat-icon aria-hidden="true">arrow_upward</mat-icon></button>
+                    <button mat-icon-button type="button" aria-label="Move down" [disabled]="$last"
+                            (click)="moveEducation($index, 1)"><mat-icon aria-hidden="true">arrow_downward</mat-icon></button>
+                    <button mat-icon-button type="button" aria-label="Remove education"
+                            (click)="removeEducation($index)"><mat-icon aria-hidden="true">delete_outline</mat-icon></button>
+                  </div>
+                  <div class="ed-grid">
+                    <mat-form-field appearance="outline">
+                      <mat-label>School</mat-label>
+                      <input matInput [ngModel]="edu.school" (ngModelChange)="setEducation($index, 'school', $event)"
+                             [name]="'eduSchool' + $index" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Degree</mat-label>
+                      <input matInput [ngModel]="edu.degree" (ngModelChange)="setEducation($index, 'degree', $event)"
+                             [name]="'eduDegree' + $index" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Field of study</mat-label>
+                      <input matInput [ngModel]="edu.field" (ngModelChange)="setEducation($index, 'field', $event)"
+                             [name]="'eduField' + $index" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Location</mat-label>
+                      <input matInput [ngModel]="edu.location" (ngModelChange)="setEducation($index, 'location', $event)"
+                             [name]="'eduLoc' + $index" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Start</mat-label>
+                      <input matInput [ngModel]="edu.startDate" (ngModelChange)="setEducation($index, 'startDate', $event)"
+                             [name]="'eduStart' + $index" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>End</mat-label>
+                      <input matInput [ngModel]="edu.endDate" (ngModelChange)="setEducation($index, 'endDate', $event)"
+                             [name]="'eduEnd' + $index" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>GPA</mat-label>
+                      <input matInput [ngModel]="edu.gpa" (ngModelChange)="setEducation($index, 'gpa', $event)"
+                             [name]="'eduGpa' + $index" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="ed-grid__wide">
+                      <mat-label>Details</mat-label>
+                      <input matInput [ngModel]="edu.details" (ngModelChange)="setEducation($index, 'details', $event)"
+                             [name]="'eduDetails' + $index" />
+                    </mat-form-field>
+                  </div>
+                </div>
+              } @empty {
+                <p class="ed-empty">No education added yet.</p>
+              }
+            </section>
+
+            <!-- Skills -->
+            <section class="ed-section">
+              <h3 class="ed-h">Skills</h3>
+              <mat-form-field appearance="outline" class="ed-full">
+                <mat-label>Skills (comma or newline separated)</mat-label>
+                <textarea matInput rows="3" [ngModel]="skillsText"
+                          (ngModelChange)="setSkillsText($event)" name="skills"
+                          placeholder="TypeScript, Angular, Leadership, …"></textarea>
+              </mat-form-field>
+            </section>
+
+            <!-- Projects -->
+            <section class="ed-section">
+              <div class="ed-section__head">
+                <h3 class="ed-h">Projects</h3>
+                <button mat-button type="button" (click)="addProject()">
+                  <mat-icon aria-hidden="true">add</mat-icon> Add project
+                </button>
+              </div>
+              @for (proj of draft().projects; track $index; let pi = $index, pFirst = $first, pLast = $last) {
+                <div class="ed-item">
+                  <div class="ed-item__bar">
+                    <span class="ed-item__n">#{{ pi + 1 }}</span>
+                    <span class="ed-item__spacer"></span>
+                    <button mat-icon-button type="button" aria-label="Move up" [disabled]="pFirst"
+                            (click)="moveProject(pi, -1)"><mat-icon aria-hidden="true">arrow_upward</mat-icon></button>
+                    <button mat-icon-button type="button" aria-label="Move down" [disabled]="pLast"
+                            (click)="moveProject(pi, 1)"><mat-icon aria-hidden="true">arrow_downward</mat-icon></button>
+                    <button mat-icon-button type="button" aria-label="Remove project"
+                            (click)="removeProject(pi)"><mat-icon aria-hidden="true">delete_outline</mat-icon></button>
+                  </div>
+                  <div class="ed-grid">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Name</mat-label>
+                      <input matInput [ngModel]="proj.name" (ngModelChange)="setProject(pi, 'name', $event)"
+                             [name]="'projName' + pi" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Link</mat-label>
+                      <input matInput [ngModel]="proj.link" (ngModelChange)="setProject(pi, 'link', $event)"
+                             [name]="'projLink' + pi" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="ed-grid__wide">
+                      <mat-label>Description</mat-label>
+                      <input matInput [ngModel]="proj.description"
+                             (ngModelChange)="setProject(pi, 'description', $event)"
+                             [name]="'projDesc' + pi" />
+                    </mat-form-field>
+                  </div>
+                  <div class="ed-bullets">
+                    <div class="ed-links__head">
+                      <span class="ed-sub-h">Highlights</span>
+                      <button mat-button type="button" (click)="addProjBullet(pi)">
+                        <mat-icon aria-hidden="true">add</mat-icon> Add bullet
+                      </button>
+                    </div>
+                    @for (b of proj.bullets; track $index; let bi = $index) {
+                      <div class="ed-bullet-row">
+                        <mat-form-field appearance="outline" class="ed-full">
+                          <mat-label>Highlight</mat-label>
+                          <textarea matInput rows="2" [ngModel]="b"
+                                    (ngModelChange)="setProjBullet(pi, bi, $event)"
+                                    [name]="'projBullet' + pi + '-' + bi"></textarea>
+                        </mat-form-field>
+                        <div class="ed-bullet-row__tools">
+                          <button mat-icon-button type="button" aria-label="Improve bullet with AI"
+                                  matTooltip="Improve with AI" [disabled]="isRefining('proj-' + pi + '-' + bi) || !b.trim()"
+                                  (click)="improveProjBullet(pi, bi)">
+                            <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+                          </button>
+                          <button mat-icon-button type="button" aria-label="Remove bullet"
+                                  (click)="removeProjBullet(pi, bi)"><mat-icon aria-hidden="true">close</mat-icon></button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              } @empty {
+                <p class="ed-empty">No projects added yet.</p>
+              }
+            </section>
+
+            <!-- Certifications -->
+            <section class="ed-section">
+              <div class="ed-section__head">
+                <h3 class="ed-h">Certifications</h3>
+                <button mat-button type="button" (click)="addCertification()">
+                  <mat-icon aria-hidden="true">add</mat-icon> Add certification
+                </button>
+              </div>
+              @for (cert of draft().certifications; track $index) {
+                <div class="ed-cert-row">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Name</mat-label>
+                    <input matInput [ngModel]="cert.name" (ngModelChange)="setCertification($index, 'name', $event)"
+                           [name]="'certName' + $index" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Issuer</mat-label>
+                    <input matInput [ngModel]="cert.issuer" (ngModelChange)="setCertification($index, 'issuer', $event)"
+                           [name]="'certIssuer' + $index" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Date</mat-label>
+                    <input matInput [ngModel]="cert.date" (ngModelChange)="setCertification($index, 'date', $event)"
+                           [name]="'certDate' + $index" />
+                  </mat-form-field>
+                  <button mat-icon-button type="button" aria-label="Remove certification"
+                          (click)="removeCertification($index)"><mat-icon aria-hidden="true">close</mat-icon></button>
+                </div>
+              } @empty {
+                <p class="ed-empty">No certifications added yet.</p>
+              }
+            </section>
+
+            <!-- Danger zone -->
+            <section class="ed-section ed-danger">
+              <button mat-button type="button" class="ed-danger__btn" (click)="deleteMaster()">
+                <mat-icon aria-hidden="true">delete_forever</mat-icon> Delete resume
+              </button>
+            </section>
+          </div>
+
+          <!-- PREVIEW column -->
+          <aside class="builder__preview" aria-label="Live preview">
+            <div class="pv" [class.pv--designed]="!!headshotUrl()">
+              <header class="pv__head">
+                @if (headshotUrl()) {
+                  <img class="pv__photo" [src]="headshotUrl()" alt="" />
+                }
+                <div class="pv__id">
+                  <h2 class="pv__name">{{ draft().contact.fullName || 'Your Name' }}</h2>
+                  @if (draft().contact.headline) { <p class="pv__headline">{{ draft().contact.headline }}</p> }
+                  <p class="pv__contact">
+                    @if (draft().contact.email) { <span>{{ draft().contact.email }}</span> }
+                    @if (draft().contact.phone) { <span>{{ draft().contact.phone }}</span> }
+                    @if (draft().contact.location) { <span>{{ draft().contact.location }}</span> }
+                  </p>
+                  @if (draft().contact.links.length) {
+                    <p class="pv__links">
+                      @for (lnk of draft().contact.links; track $index) {
+                        @if (lnk.url || lnk.label) { <span>{{ lnk.label || lnk.url }}</span> }
+                      }
+                    </p>
+                  }
+                </div>
+              </header>
+
+              @if (draft().summary) {
+                <section class="pv__sec">
+                  <h3 class="pv__sec-h">Summary</h3>
+                  <p class="pv__text">{{ draft().summary }}</p>
+                </section>
+              }
+
+              @if (draft().experience.length) {
+                <section class="pv__sec">
+                  <h3 class="pv__sec-h">Experience</h3>
+                  @for (exp of draft().experience; track $index) {
+                    <div class="pv__entry">
+                      <div class="pv__entry-head">
+                        <span class="pv__entry-title">{{ exp.title || 'Role' }}@if (exp.company) {<span class="pv__at"> · {{ exp.company }}</span>}</span>
+                        <span class="pv__entry-date">{{ dateRange(exp.startDate, exp.endDate, exp.current) }}</span>
+                      </div>
+                      @if (exp.location) { <p class="pv__entry-sub">{{ exp.location }}</p> }
+                      @if (exp.bullets.length) {
+                        <ul class="pv__bullets">
+                          @for (b of exp.bullets; track $index) { @if (b.trim()) { <li>{{ b }}</li> } }
+                        </ul>
+                      }
+                    </div>
+                  }
+                </section>
+              }
+
+              @if (draft().education.length) {
+                <section class="pv__sec">
+                  <h3 class="pv__sec-h">Education</h3>
+                  @for (edu of draft().education; track $index) {
+                    <div class="pv__entry">
+                      <div class="pv__entry-head">
+                        <span class="pv__entry-title">{{ edu.degree || edu.school || 'Education' }}@if (edu.field) {<span class="pv__at"> · {{ edu.field }}</span>}</span>
+                        <span class="pv__entry-date">{{ dateRange(edu.startDate, edu.endDate, false) }}</span>
+                      </div>
+                      @if (edu.school && edu.degree) { <p class="pv__entry-sub">{{ edu.school }}</p> }
+                      @if (edu.details) { <p class="pv__entry-sub">{{ edu.details }}</p> }
+                    </div>
+                  }
+                </section>
+              }
+
+              @if (draft().skills.length) {
+                <section class="pv__sec">
+                  <h3 class="pv__sec-h">Skills</h3>
+                  <div class="pv__skills">
+                    @for (s of draft().skills; track $index) { <span class="pv__skill">{{ s }}</span> }
+                  </div>
+                </section>
+              }
+
+              @if (draft().projects.length) {
+                <section class="pv__sec">
+                  <h3 class="pv__sec-h">Projects</h3>
+                  @for (proj of draft().projects; track $index) {
+                    <div class="pv__entry">
+                      <span class="pv__entry-title">{{ proj.name || 'Project' }}</span>
+                      @if (proj.description) { <p class="pv__entry-sub">{{ proj.description }}</p> }
+                      @if (proj.bullets.length) {
+                        <ul class="pv__bullets">
+                          @for (b of proj.bullets; track $index) { @if (b.trim()) { <li>{{ b }}</li> } }
+                        </ul>
+                      }
+                    </div>
+                  }
+                </section>
+              }
+
+              @if (draft().certifications.length) {
+                <section class="pv__sec">
+                  <h3 class="pv__sec-h">Certifications</h3>
+                  @for (cert of draft().certifications; track $index) {
+                    <p class="pv__cert">
+                      {{ cert.name }}@if (cert.issuer) {<span class="pv__at"> · {{ cert.issuer }}</span>}@if (cert.date) {<span class="pv__entry-date"> {{ cert.date }}</span>}
+                    </p>
+                  }
+                </section>
+              }
+            </div>
+          </aside>
+        </div>
+      </mat-tab>
+
+      <!-- ============ TAB: Assistant ============ -->
+      <mat-tab label="AI assistant">
+        <div class="assistant-tab">
+          <app-resume-ai-panel [data]="draft()" />
+        </div>
+      </mat-tab>
+
+      <!-- ============ TAB: Applications ============ -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          Applications
+          @if (applications().length) { <span class="tab-count">{{ applications().length }}</span> }
+        </ng-template>
+
+        <div class="apps-tab">
+          @if (openApp(); as app) {
+            <!-- Application detail -->
+            <div class="app-detail">
+              <div class="app-detail__bar">
+                <button mat-button type="button" (click)="backToList()">
+                  <mat-icon aria-hidden="true">arrow_back</mat-icon> All applications
+                </button>
+                <span class="ed-item__spacer"></span>
+                <button mat-stroked-button type="button" [matMenuTriggerFor]="appDl" [disabled]="exporting()">
+                  <mat-icon aria-hidden="true">download</mat-icon> Download
+                </button>
+                <mat-menu #appDl="matMenu">
+                  <div class="dl-section" role="presentation">Resume — ATS-plain</div>
+                  <button mat-menu-item type="button" (click)="export('resume', 'pdf', 'ats', app.id)">
+                    <mat-icon aria-hidden="true">picture_as_pdf</mat-icon> PDF</button>
+                  <button mat-menu-item type="button" (click)="export('resume', 'docx', 'ats', app.id)">
+                    <mat-icon aria-hidden="true">article</mat-icon> Word</button>
+                  <div class="dl-section" role="presentation">Resume — Designed (photo)</div>
+                  <button mat-menu-item type="button" (click)="export('resume', 'pdf', 'designed', app.id)">
+                    <mat-icon aria-hidden="true">picture_as_pdf</mat-icon> PDF</button>
+                  <button mat-menu-item type="button" (click)="export('resume', 'docx', 'designed', app.id)">
+                    <mat-icon aria-hidden="true">article</mat-icon> Word</button>
+                  <div class="dl-section" role="presentation">Cover letter</div>
+                  <button mat-menu-item type="button" (click)="export('cover', 'pdf', 'ats', app.id)">
+                    <mat-icon aria-hidden="true">picture_as_pdf</mat-icon> PDF</button>
+                  <button mat-menu-item type="button" (click)="export('cover', 'docx', 'ats', app.id)">
+                    <mat-icon aria-hidden="true">article</mat-icon> Word</button>
+                </mat-menu>
+                <button mat-flat-button color="primary" type="button" [disabled]="isAppBusy(app.id)"
+                        (click)="saveApplication()">
+                  <mat-icon aria-hidden="true">save</mat-icon> Save
+                </button>
+              </div>
+
+              <div class="app-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Job title</mat-label>
+                  <input matInput [ngModel]="app.jobTitle" (ngModelChange)="setAppJobTitle($event)" name="appTitle" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Company</mat-label>
+                  <input matInput [ngModel]="app.company" (ngModelChange)="setAppCompany($event)" name="appCompany" />
+                </mat-form-field>
+              </div>
+
+              <div class="app-actions">
+                <button mat-stroked-button type="button" [disabled]="isAppBusy(app.id)" (click)="reTailor()">
+                  @if (isAppBusy(app.id)) {
+                    <mat-progress-spinner mode="indeterminate" diameter="16" aria-hidden="true" />
+                  } @else { <mat-icon aria-hidden="true">tune</mat-icon> }
+                  Re-tailor resume
+                </button>
+                <button mat-stroked-button type="button" [disabled]="isAppBusy(app.id)" (click)="regenerateCover()">
+                  <mat-icon aria-hidden="true">refresh</mat-icon> Regenerate cover letter
+                </button>
+              </div>
+
+              <h3 class="ed-h">Cover letter</h3>
+              <mat-form-field appearance="outline" class="ed-full">
+                <mat-label>Cover letter</mat-label>
+                <textarea matInput rows="16" [ngModel]="app.coverLetter"
+                          (ngModelChange)="setAppCoverLetter($event)" name="appCover"></textarea>
+              </mat-form-field>
+
+              <details class="app-jd">
+                <summary>Pinned job description</summary>
+                <p class="app-jd__text">{{ app.jobDescription || 'No job description saved.' }}</p>
+              </details>
+            </div>
+          } @else {
+            <!-- Application list -->
+            <div class="apps-head">
+              <p class="apps-lead">
+                Each application is a tailored copy of your resume plus a cover letter — your master is untouched.
+              </p>
+              <button mat-flat-button color="primary" type="button" [disabled]="creatingApp()"
+                      (click)="newApplication()">
+                @if (creatingApp()) {
+                  <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" /> Tailoring…
+                } @else { <mat-icon aria-hidden="true">add</mat-icon> New application }
+              </button>
+            </div>
+
+            @if (applications().length) {
+              <div class="apps-grid">
+                @for (app of applications(); track app.id) {
+                  <article class="app-card" [class.app-card--busy]="isAppBusy(app.id)">
+                    <button type="button" class="app-card__open" (click)="openApplication(app.id)">
+                      <h3 class="app-card__title">{{ app.jobTitle || 'Untitled role' }}</h3>
+                      @if (app.company) { <p class="app-card__co">{{ app.company }}</p> }
+                      <p class="app-card__meta">
+                        @if (app.coverLetter) {
+                          <span class="app-card__chip"><mat-icon aria-hidden="true">mail</mat-icon> Cover letter</span>
+                        }
+                        <span class="app-card__chip"><mat-icon aria-hidden="true">description</mat-icon> Tailored resume</span>
+                      </p>
+                    </button>
+                    <div class="app-card__row">
+                      <button mat-button type="button" (click)="openApplication(app.id)">Open</button>
+                      <span class="ed-item__spacer"></span>
+                      <button mat-icon-button type="button" aria-label="Delete application"
+                              [disabled]="isAppBusy(app.id)" (click)="deleteApplication(app)">
+                        <mat-icon aria-hidden="true">delete_outline</mat-icon>
+                      </button>
+                    </div>
+                  </article>
+                }
+              </div>
+            } @else {
+              <div class="apps-empty">
+                <mat-icon class="apps-empty__glyph" aria-hidden="true">work_outline</mat-icon>
+                <p class="apps-empty__title">No applications yet</p>
+                <p class="apps-empty__sub">Paste a job description and the assistant tailors a resume + cover letter for it.</p>
+              </div>
+            }
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  }
+</div>

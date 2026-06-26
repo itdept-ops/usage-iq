@@ -311,6 +311,15 @@ export const routes: Routes = [
     title: 'Usage IQ · My Recipes',
   },
   {
+    // Resume Builder — a per-user resume + cover-letter workshop. Gated resume.use; every /api/resume route
+    // is owner-scoped server-side. A structured master resume with a live preview + AI assistant, plus
+    // per-job tailored applications and PDF/DOCX exports (ATS-plain or designed-with-headshot).
+    path: 'resume',
+    canActivate: [permissionGuard(PERM.resumeUse)],
+    loadComponent: () => import('./features/resume/resume').then(m => m.Resume),
+    title: 'Usage IQ · Resume Builder',
+  },
+  {
     // Meal Planner Tool — a standalone weekly meal-plan page over the household's FamilyMeals (find-or-create
     // household via /api/family/meals). Pulled out of the Family Hub into the Tools nav. Gated meals.use; the
     // robust macro-aware "Plan my day & week" planner is layered in via the tracker.ai dialog. The family

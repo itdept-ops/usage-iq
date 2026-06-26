@@ -33,6 +33,9 @@ import {
   FeedPage, ReactResult,
   AutomationRule, AutomationRuleInput,
   VapidPublicKey, PushSubscribeRequest,
+  ResumeState, ResumeDto, ResumeApplicationDto, ResumeData, ResumeSaveRequest, ParseResumeRequest,
+  HeadshotRequest, NewApplicationRequest, ApplicationSaveRequest, TailorRequest, CoverLetterRequest,
+  RefineRequest, ResumeChatRequest,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -1824,6 +1827,99 @@ export class Api {
   /** Delete an OWN recipe (cascade removes its ingredients; foreign/missing → 404). */
   deleteRecipe(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/recipes/${id}`);
+  }
+
+  // ---- Resume Builder: the gated /resume Tool (master + tailored applications + AI), all owner-scoped ----
+
+  /** The caller's whole Resume Builder state: their master resume (null until first save) + its applications. */
+  resumeState(): Observable<ResumeState> {
+    return this.http.get<ResumeState>(`${this.base}/resume`);
+  }
+
+  /** Create/replace the single master resume for the owner (upsert). Returns the saved master. */
+  saveResume(req: ResumeSaveRequest): Observable<ResumeDto> {
+    return this.http.put<ResumeDto>(`${this.base}/resume`, req);
+  }
+
+  /** Delete the master resume + cascade its applications. */
+  deleteResume(): Observable<void> {
+    return this.http.delete<void>(`${this.base}/resume`);
+  }
+
+  /** Parse an existing resume (uploaded file OR pasted text) into structured data. 503 when AI unconfigured. */
+  parseResume(req: ParseResumeRequest): Observable<{ data: ResumeData; aiUsed: boolean }> {
+    return this.http.post<{ data: ResumeData; aiUsed: boolean }>(`${this.base}/resume/parse`, req);
+  }
+
+  /** Upload/replace the master headshot (base64 image + mime). Returns `{ ok: true }`. */
+  uploadResumeHeadshot(req: HeadshotRequest): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.base}/resume/headshot`, req);
+  }
+
+  /** The stored headshot image bytes (as a Blob), or a 404 when none is set. */
+  resumeHeadshot(): Observable<Blob> {
+    return this.http.get(`${this.base}/resume/headshot`, { responseType: 'blob' });
+  }
+
+  /** Remove the stored headshot. */
+  deleteResumeHeadshot(): Observable<void> {
+    return this.http.delete<void>(`${this.base}/resume/headshot`);
+  }
+
+  /** Start a new tailored application off the master (AI tailors data + drafts a cover letter), persisted. */
+  createResumeApplication(req: NewApplicationRequest): Observable<ResumeApplicationDto> {
+    return this.http.post<ResumeApplicationDto>(`${this.base}/resume/applications`, req);
+  }
+
+  /** Save an application's edits (job pin, tailored data, cover letter). Returns the saved row. */
+  saveResumeApplication(id: number, req: ApplicationSaveRequest): Observable<ResumeApplicationDto> {
+    return this.http.put<ResumeApplicationDto>(`${this.base}/resume/applications/${id}`, req);
+  }
+
+  /** Delete a tailored application. */
+  deleteResumeApplication(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/resume/applications/${id}`);
+  }
+
+  /** AI: tailor the supplied resume data toward a job description (a proposal — nothing persisted). */
+  tailorResume(req: TailorRequest): Observable<{ data: ResumeData }> {
+    return this.http.post<{ data: ResumeData }>(`${this.base}/resume/ai/tailor`, req);
+  }
+
+  /** AI: draft a cover letter for a job from the supplied resume data. */
+  resumeCoverLetter(req: CoverLetterRequest): Observable<{ coverLetter: string }> {
+    return this.http.post<{ coverLetter: string }>(`${this.base}/resume/ai/cover-letter`, req);
+  }
+
+  /** AI: refine one section's content under a free-text instruction (whole data as context). */
+  refineResumeSection(req: RefineRequest): Observable<{ result: string }> {
+    return this.http.post<{ result: string }>(`${this.base}/resume/ai/refine`, req);
+  }
+
+  /** AI: the resume-assistant chat (history + optional data/job context). Returns the assistant reply. */
+  resumeChat(req: ResumeChatRequest): Observable<{ reply: string }> {
+    return this.http.post<{ reply: string }>(`${this.base}/resume/ai/chat`, req);
+  }
+
+  /**
+   * Export a resume or cover letter as a downloadable file (Blob). `source` master|application; `kind`
+   * resume|cover; `format` pdf|docx; `style` ats|designed (designed embeds the stored headshot). `id` is the
+   * application id when `source==='application'`.
+   */
+  exportResume(opts: {
+    source: 'master' | 'application';
+    id?: number | null;
+    kind: 'resume' | 'cover';
+    format: 'pdf' | 'docx';
+    style: 'ats' | 'designed';
+  }): Observable<Blob> {
+    let params = new HttpParams()
+      .set('source', opts.source)
+      .set('kind', opts.kind)
+      .set('format', opts.format)
+      .set('style', opts.style);
+    if (opts.source === 'application' && opts.id != null) params = params.set('id', opts.id);
+    return this.http.get(`${this.base}/resume/export`, { params, responseType: 'blob' });
   }
 
   // ---- Family Hub F4: chore board (assignee; stars/points; recurrence; the stars tally) ----

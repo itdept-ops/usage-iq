@@ -1,0 +1,58 @@
+<div class="ai-panel">
+  <header class="ai-panel__head">
+    <span class="ai-panel__title">
+      <mat-icon aria-hidden="true">auto_awesome</mat-icon> Resume assistant
+    </span>
+    @if (messages().length) {
+      <button mat-icon-button type="button" aria-label="Clear conversation" matTooltip="Clear" (click)="clear()">
+        <mat-icon aria-hidden="true">delete_sweep</mat-icon>
+      </button>
+    }
+  </header>
+
+  <div class="ai-panel__scroll" #scroller aria-live="polite">
+    @if (!messages().length) {
+      <div class="ai-panel__empty">
+        <p class="ai-panel__empty-lead">
+          Ask the assistant to interview you, sharpen a section, or suggest what to add.
+        </p>
+        <div class="ai-panel__chips">
+          @for (s of suggestions; track s) {
+            <button type="button" class="ai-chip" [disabled]="sending()" (click)="use(s)">{{ s }}</button>
+          }
+        </div>
+      </div>
+    } @else {
+      @for (m of messages(); track $index) {
+        <div class="ai-msg" [class.ai-msg--user]="m.role === 'user'" [class.ai-msg--bot]="m.role !== 'user'">
+          <div class="ai-msg__bubble">{{ m.content }}</div>
+        </div>
+      }
+    }
+    @if (sending()) {
+      <div class="ai-msg ai-msg--bot">
+        <div class="ai-msg__bubble ai-msg__bubble--typing">
+          <mat-progress-spinner mode="indeterminate" diameter="18" aria-hidden="true" />
+          Thinking…
+        </div>
+      </div>
+    }
+  </div>
+
+  <form class="ai-panel__compose" (ngSubmit)="send()">
+    <textarea
+      class="ai-panel__input"
+      rows="2"
+      placeholder="Message the assistant…"
+      [ngModel]="draft()"
+      (ngModelChange)="draft.set($event)"
+      name="resumeAiDraft"
+      [disabled]="sending()"
+      (keydown.enter)="$event.preventDefault(); send()"
+      aria-label="Message the resume assistant"></textarea>
+    <button mat-flat-button color="primary" type="submit" [disabled]="sending() || !draft().trim()"
+            aria-label="Send">
+      <mat-icon aria-hidden="true">send</mat-icon>
+    </button>
+  </form>
+</div>

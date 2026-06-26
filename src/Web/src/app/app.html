@@ -162,8 +162,8 @@
         </mat-menu>
       }
 
-      <!-- Tools ▾ : Ask (tracker.ai), Automations (automations.use), Bills (bills.use), Grocery (grocery.use), Recipes (recipes.use), Meal Planner (meals.use) -->
-      @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use', 'grocery.use', 'recipes.use', 'meals.use')) {
+      <!-- Tools ▾ : Ask (tracker.ai), Automations (automations.use), Bills (bills.use), Grocery (grocery.use), Recipes (recipes.use), Meal Planner (meals.use), Resume (resume.use) -->
+      @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use', 'grocery.use', 'recipes.use', 'meals.use', 'resume.use')) {
         <button type="button" mat-button class="nav__item nav__group"
                 [matMenuTriggerFor]="toolsMenu" #toolsTrigger="matMenuTrigger"
                 [class.nav__group--open]="toolsTrigger.menuOpen"
@@ -206,6 +206,12 @@
             <a mat-menu-item class="nav-menu__item" routerLink="/meal-planner" routerLinkActive="active">
               <mat-icon class="nav-menu__icon" aria-hidden="true">restaurant</mat-icon>
               <span>Meal Planner</span>
+            </a>
+          }
+          @if (auth.hasPermission('resume.use')) {
+            <a mat-menu-item class="nav-menu__item" routerLink="/resume" routerLinkActive="active">
+              <mat-icon class="nav-menu__icon" aria-hidden="true">description</mat-icon>
+              <span>Resume Builder</span>
             </a>
           }
         </mat-menu>
@@ -503,7 +509,7 @@
          (click)="closeMobileNav()">Activity</a>
     }
 
-    @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use', 'grocery.use', 'recipes.use', 'meals.use')) {
+    @if (auth.hasAnyPermission('tracker.ai', 'automations.use', 'bills.use', 'grocery.use', 'recipes.use', 'meals.use', 'resume.use')) {
       <div class="mobile-nav__head" role="presentation">Tools</div>
       @if (auth.hasPermission('tracker.ai')) {
         <a class="mobile-nav__item" routerLink="/ask" routerLinkActive="active"
@@ -524,6 +530,14 @@
       @if (auth.hasPermission('recipes.use')) {
         <a class="mobile-nav__item" routerLink="/recipes" routerLinkActive="active"
            (click)="closeMobileNav()">My Recipes</a>
+      }
+      @if (auth.hasPermission('meals.use')) {
+        <a class="mobile-nav__item" routerLink="/meal-planner" routerLinkActive="active"
+           (click)="closeMobileNav()">Meal Planner</a>
+      }
+      @if (auth.hasPermission('resume.use')) {
+        <a class="mobile-nav__item" routerLink="/resume" routerLinkActive="active"
+           (click)="closeMobileNav()">Resume Builder</a>
       }
     }
 

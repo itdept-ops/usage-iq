@@ -18,10 +18,27 @@
     </PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageReference Include="WebPush" Version="1.0.13" />
+    <!-- Resume Builder doc-generation: PDFsharp 6.x (PDF) + MigraDoc (layout) + OpenXml (DOCX).
+         The non-GDI PDFsharp build is cross-platform (runs on the Linux container — no System.Drawing). -->
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
+    <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Ingestion\Ccusage.Ingestion.csproj" />
+  </ItemGroup>
+
+  <!-- Bundle a free, permissively-licensed (OFL) sans font for PDF generation. PDFsharp needs a real
+       font FILE on Linux (the container ships no guaranteed system fonts); the doc-gen phase wires a
+       font resolver that reads these from next to the dll. Family name: "Lato" (Regular + Bold). -->
+  <ItemGroup>
+    <None Include="Assets\fonts\Lato-Regular.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Assets\fonts\Lato-Bold.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

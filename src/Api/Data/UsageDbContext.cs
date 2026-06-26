@@ -86,6 +86,8 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
     public DbSet<Recipe> Recipes => Set<Recipe>();
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
+    public DbSet<Resume> Resumes => Set<Resume>();
+    public DbSet<ResumeApplication> ResumeApplications => Set<ResumeApplication>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -1144,6 +1146,43 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.Quantity).HasMaxLength(100).HasDefaultValue("");
             // Load a recipe's ingredient lines in sort order.
             e.HasIndex(x => x.RecipeId);
+        });
+
+        b.Entity<Resume>(e =>
+        {
+            e.Property(x => x.OwnerEmail).HasMaxLength(256);
+            e.Property(x => x.Title).HasMaxLength(200);
+            // The full structured ResumeData document; unbounded text (like RequestLog.Body) so a rich
+            // resume never overflows a cap.
+            e.Property(x => x.DataJson).HasDefaultValue("");
+            // HeadshotBytes maps to Postgres bytea by default; nullable (no headshot until uploaded).
+            e.Property(x => x.HeadshotMime).HasMaxLength(100);
+            e.Property(x => x.ShareWithContacts).HasDefaultValue(false);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // The "My Resume" read loads one owner's resume; the OwnerEmail prefix also serves the share
+            // lookup (an owner's shared resume joined to the caller's contact circle).
+            e.HasIndex(x => new { x.OwnerEmail, x.Id }).IsDescending(false, true);
+        });
+
+        b.Entity<ResumeApplication>(e =>
+        {
+            e.Property(x => x.OwnerEmail).HasMaxLength(256);
+            e.Property(x => x.JobTitle).HasMaxLength(200);
+            e.Property(x => x.Company).HasMaxLength(200);
+            e.Property(x => x.JobDescription).HasMaxLength(12000).HasDefaultValue("");
+            // The tailored ResumeData document; unbounded text (like Resume.DataJson).
+            e.Property(x => x.TailoredDataJson).HasDefaultValue("");
+            e.Property(x => x.CoverLetter).HasMaxLength(8000).HasDefaultValue("");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // The applications list reads one owner's variants newest-first.
+            e.HasIndex(x => new { x.OwnerEmail, x.Id }).IsDescending(false, true);
+            // Load a resume's tailored variants by parent.
+            e.HasIndex(x => x.ResumeId);
+            // An application belongs to a resume; cascade-deletes with it.
+            e.HasOne(x => x.Resume).WithMany()
+                .HasForeignKey(x => x.ResumeId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

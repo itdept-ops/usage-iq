@@ -231,7 +231,7 @@ export class App implements AfterViewInit {
     this.pathInGroup(['/tracker', '/challenge', '/trophies', '/feed']),
   );
   readonly toolsGroupActive = computed(() =>
-    this.pathInGroup(['/ask', '/automations', '/bills', '/grocery', '/recipes', '/meal-planner']),
+    this.pathInGroup(['/ask', '/automations', '/bills', '/grocery', '/recipes', '/meal-planner', '/resume']),
   );
   readonly socialGroupActive = computed(() => this.pathInGroup(['/chat', '/people']));
   readonly betaGroupActive = computed(() => this.pathInGroup(['/beta', '/tracker-beta']));
@@ -270,6 +270,7 @@ export class App implements AfterViewInit {
     '/grocery': 'grocery.use',
     '/recipes': 'recipes.use',
     '/meal-planner': 'meals.use',
+    '/resume': 'resume.use',
     '/beta': 'beta.access',
     '/family': 'family.use',
     '/locations': 'location.self',
