@@ -1,10 +1,12 @@
 import {
-  ChangeDetectionStrategy, Component, inject, model, output, signal,
+  ChangeDetectionStrategy, Component, computed, inject, model, output, signal,
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 
 import { BottomSheet } from '../ui/bottom-sheet';
 import { OptimisticTracker } from '../state/optimistic-tracker';
+import { AuthService } from '../../../core/auth';
+import { PERM } from '../../../core/models';
 
 /**
  * The canonical set of log destinations the "+ LOG" fan-out routes to. The page owns the per-domain
@@ -12,10 +14,11 @@ import { OptimisticTracker } from '../state/optimistic-tracker';
  * this menu only *chooses* one and emits it. Other sheets/components depend on this union VERBATIM.
  *
  *   domain tiles : 'food' | 'water' | 'coffee' | 'exercise' | 'weight' | 'supplement' | 'activity'
+ *                  | 'leftovers' (meals.use-gated — pull a planned meal off the household planner)
  *   fast lanes   : 'scan' (barcode) | 'snap' (photo meal) | 'brain' (AI brain-dump)
  */
 export type LogTarget =
-  | 'food' | 'water' | 'coffee' | 'exercise' | 'weight' | 'supplement' | 'activity'
+  | 'food' | 'water' | 'coffee' | 'exercise' | 'weight' | 'supplement' | 'activity' | 'leftovers'
   | 'scan' | 'snap' | 'brain';
 
 /** One pickable cell in the fan-out (domain tile or fast lane). */
@@ -80,7 +83,7 @@ interface LogOption {
 
         <!-- 2×3 domain grid. Mutating tiles disable under read-only shared views. -->
         <div class="lm-grid" role="group" aria-label="Log by category">
-          @for (o of domains; track o.target) {
+          @for (o of domains(); track o.target) {
             <button type="button" class="lm-tile"
                     [style.--ga]="o.accentA" [style.--gb]="o.accentB"
                     [disabled]="readOnly()"
@@ -196,6 +199,7 @@ interface LogOption {
 })
 export class LogMenuSheet {
   private readonly tracker = inject(OptimisticTracker);
+  private readonly auth = inject(AuthService);
 
   /** Two-way open state — the action bar's "+ LOG" button sets this true. */
   readonly open = model<boolean>(false);
@@ -204,6 +208,9 @@ export class LogMenuSheet {
 
   /** Shared-user views disable the mutating domain tiles. */
   protected readonly readOnly = this.tracker.readOnly;
+
+  /** Whether the Leftovers tile renders — gated on meals.use (it reads the household meal planner). */
+  private readonly canLeftovers = this.auth.hasPermission(PERM.mealsUse);
 
   /** The currently press-sunk cell (drives the depth sink). */
   protected readonly pressed = signal<LogTarget | null>(null);
@@ -215,8 +222,8 @@ export class LogMenuSheet {
     { target: 'brain', icon: 'auto_awesome',   label: 'Brain-dump', accentA: 'var(--cal-a)', accentB: 'var(--move-a)' },
   ];
 
-  /** 2×3 domain grid — frequency-ordered top-left to bottom-right. */
-  protected readonly domains: readonly LogOption[] = [
+  /** Base domain grid — frequency-ordered top-left to bottom-right. */
+  private readonly baseDomains: readonly LogOption[] = [
     { target: 'food',       icon: 'restaurant',   label: 'Food',       accentA: 'var(--cal-a)',    accentB: 'var(--cal-b)' },
     { target: 'water',      icon: 'water_drop',   label: 'Water',      accentA: 'var(--water-a)',  accentB: 'var(--water-b)' },
     { target: 'coffee',     icon: 'local_cafe',   label: 'Coffee',     accentA: 'var(--coffee-a)', accentB: 'var(--coffee-b)' },
@@ -225,6 +232,19 @@ export class LogMenuSheet {
     { target: 'supplement', icon: 'medication',   label: 'Supplement', accentA: 'var(--pro-a)',    accentB: 'var(--cal-b)' },
     { target: 'activity',   icon: 'watch',        label: 'Watch',      accentA: 'var(--move-a)',   accentB: 'var(--move-b)' },
   ];
+
+  /** The leftovers tile — appended only when the user holds meals.use (reads the household planner). */
+  private readonly leftoversTile: LogOption = {
+    target: 'leftovers', icon: 'takeout_dining', label: 'Leftovers', accentA: 'var(--cal-a)', accentB: 'var(--pro-a)',
+  };
+
+  /**
+   * The domain grid the template renders. Leftovers is a meals.use-gated extra tile (omitted entirely
+   * without the permission); like the other domain tiles it disables under read-only shared views.
+   */
+  protected readonly domains = computed<readonly LogOption[]>(() =>
+    this.canLeftovers ? [...this.baseDomains, this.leftoversTile] : this.baseDomains,
+  );
 
   /** Close the sheet and emit the chosen destination for the page to route. */
   protected pick(target: LogTarget): void {

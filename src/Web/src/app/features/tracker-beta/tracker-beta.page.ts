@@ -3,6 +3,7 @@ import {
   signal, viewChild,
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 
 import { TrackerStore, toLocalDate } from '../../core/tracker-store';
@@ -22,6 +23,7 @@ import { FoodSheet } from './sheets/food-sheet';
 import { WeightSheet } from './sheets/weight-sheet';
 import { WatchSheet } from './sheets/watch-sheet';
 import { CoffeeSheet, ExerciseSheet, SupplementSheet } from './sheets/quick-sheets';
+import { LeftoversSheet, LeftoversLogged } from './sheets/leftovers-sheet';
 import { currentStreak, dayHasAnyLog } from './util/streak';
 
 /**
@@ -55,6 +57,7 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
     HeroRing, QuickRail,
     FuelCard, WaterCard, MoveCard, CoffeeCard, WeightCard,
     LogMenuSheet, FoodSheet, WeightSheet, WatchSheet, CoffeeSheet, ExerciseSheet, SupplementSheet,
+    LeftoversSheet,
   ],
   template: `
     <!-- ─────────────────── DAY STRIP (fixed top glass) ─────────────────── -->
@@ -142,6 +145,7 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
     <app-supplement-sheet [(open)]="supplementOpen" />
     <app-weight-sheet [(open)]="weightOpen" (logged)="onWeighed()" />
     <app-watch-sheet [(open)]="watchOpen" (logged)="onWatchSaved()" />
+    <app-leftovers-sheet [(open)]="leftoversOpen" (logged)="onLeftoversLogged($event)" />
   `,
   styles: [`
     /* DAY STRIP internals */
@@ -208,6 +212,7 @@ export class TrackerBetaPage {
   protected readonly opt = inject(OptimisticTracker);
   protected readonly router = inject(Router);
   protected readonly units = inject(UnitService);
+  private readonly snack = inject(MatSnackBar);
 
   // ── read surface (off the shared day() signal) ──
   protected readonly day = this.opt.day;
@@ -225,6 +230,7 @@ export class TrackerBetaPage {
   protected readonly supplementOpen = signal(false);
   protected readonly weightOpen = signal(false);
   protected readonly watchOpen = signal(false);
+  protected readonly leftoversOpen = signal(false);
 
   private readonly scrollEl = viewChild<ElementRef<HTMLElement>>('scroll');
   private readonly weightCard = viewChild<WeightCard>('weightCard');
@@ -386,6 +392,7 @@ export class TrackerBetaPage {
       case 'weight': this.weightOpen.set(true); break;
       case 'supplement': this.supplementOpen.set(true); break;
       case 'activity': this.watchOpen.set(true); break;
+      case 'leftovers': this.leftoversOpen.set(true); break;
     }
   }
 
@@ -410,6 +417,31 @@ export class TrackerBetaPage {
    */
   protected onWatchSaved(): void {
     /* day().activity is already current via OptimisticTracker.upsertActivity — no extra fetch needed. */
+  }
+
+  /**
+   * Leftovers were logged from the sheet (one from-meal write per selected day). Surface a confirmation
+   * snackbar (full success, partial, or total failure — mirroring the live tracker), and if the currently-
+   * viewed day was one we logged to, reload it so the new meal shows in the rings/lists. The sheet targets
+   * FUTURE days by default, so most logs won't touch the viewed day — in which case the reload is skipped.
+   */
+  protected onLeftoversLogged(r: LeftoversLogged): void {
+    const n = r.loggedDates.length;
+    const dayWord = (k: number) => `${k} day${k === 1 ? '' : 's'}`;
+    const portion = r.servings === 1 ? '1 serving' : `${r.servings} servings`;
+    if (n === 0) {
+      this.snack.open(`Couldn’t log ${r.title} as leftovers`, 'Dismiss', { duration: 4000, politeness: 'polite' });
+    } else if (r.failed === 0) {
+      this.snack.open(`Logged ${r.title} (${portion}) to ${dayWord(n)}`, 'OK', { duration: 3000, politeness: 'polite' });
+    } else {
+      const total = n + r.failed;
+      this.snack.open(
+        `Logged ${r.title} to ${n} of ${dayWord(total)} — ${r.failed} failed`,
+        'Dismiss', { duration: 5000, politeness: 'polite' },
+      );
+    }
+    // Refresh only if the day on screen was one we just logged to (so the rings/lists pick it up).
+    if (r.loggedDates.includes(this.store.date())) void this.store.load();
   }
 
   // ── horizontal day-swipe gesture (content area) ──
