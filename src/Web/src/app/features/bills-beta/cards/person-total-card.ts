@@ -12,12 +12,12 @@ interface PayLink {
 }
 
 /**
- * Tally per-person total card — one slide in the horizontal snap rail. Shows the person's big total
- * numeral, their items-total + tax/tip-share breakdown, and inline pay chips from the owner's payment
- * handles. The amber "Unclaimed" variant (driven by `BillDto.unclaimedTotal`) reuses the same card with
- * `unclaimed=true` and never renders red.
+ * Tally per-person total card — one slide in the horizontal snap rail, REBUILT on the shared beta-ui
+ * foundation. Shows the person's big Clash Display total numeral, their items-total + tax/tip-share
+ * breakdown, and inline pay chips from the owner's payment handles. The amber "Unclaimed" variant (driven
+ * by `BillDto.unclaimedTotal`) reuses the same card with `unclaimed=true` and never renders red.
  *
- * Pure presentation: no `Api`, no store. Inherits the Tally palette tokens from the page `:host`.
+ * Pure presentation: no `Api`, no store. Inherits the cream Tally accent tokens from the page `:host`.
  */
 @Component({
   selector: 'app-person-total-card',
@@ -64,31 +64,31 @@ interface PayLink {
       box-sizing: border-box;
       padding: 16px;
       border-radius: var(--r-card);
-      background: var(--paper-rise);
+      background: var(--bg-rise);
       box-shadow: var(--lift-2);
-      border: 1px solid var(--rule);
+      border: 1px solid var(--hairline);
       display: flex; flex-direction: column; gap: 8px;
     }
     .ptc--unclaimed {
-      border-color: color-mix(in srgb, var(--owed) 40%, transparent);
-      background: color-mix(in srgb, var(--owed) 10%, var(--paper-rise));
+      border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+      background: color-mix(in srgb, var(--warn) 10%, var(--bg-rise));
     }
     .ptc__head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
     .ptc__name {
       font: 600 14px/1.2 var(--font-ui); color: var(--ink);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .ptc__warn { color: var(--owed); font-size: 18px; width: 18px; height: 18px; }
+    .ptc__warn { color: var(--warn); font-size: 18px; width: 18px; height: 18px; }
     .ptc__total {
-      margin: 0; font: 700 30px/1 var(--font-num);
-      color: var(--ink);
+      margin: 0; font: 600 30px/1 var(--font-display);
+      letter-spacing: -.02em; color: var(--ink);
     }
-    .ptc--unclaimed .ptc__total { color: var(--owed); }
+    .ptc--unclaimed .ptc__total { color: var(--warn); }
     .ptc__split {
       margin: 0; display: flex; flex-direction: column; gap: 4px;
       div { display: flex; justify-content: space-between; gap: 8px; }
       dt { margin: 0; font: 500 12px/1.2 var(--font-ui); color: var(--ink-dim); }
-      dd { margin: 0; font: 600 12px/1.2 var(--font-num); color: var(--ink-dim); }
+      dd { margin: 0; font: 600 12px/1.2 var(--font-display); color: var(--ink-dim); }
     }
     .ptc__hint { margin: 0; font: 500 12px/1.4 var(--font-ui); color: var(--ink-dim); }
     .ptc__pay { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
@@ -96,9 +96,9 @@ interface PayLink {
       display: inline-flex; align-items: center; gap: 4px;
       min-height: 36px; padding: 0 12px;
       border-radius: var(--r-pill);
-      border: 1px solid var(--rule);
-      background: var(--paper-sink);
-      color: var(--me);
+      border: 1px solid var(--hairline);
+      background: var(--bg-sink);
+      color: color-mix(in srgb, var(--accent-b) 80%, var(--ink));
       font: 600 12px/1 var(--font-ui);
       text-decoration: none;
       mat-icon { font-size: 16px; width: 16px; height: 16px; }

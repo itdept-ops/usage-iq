@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 
 import { ReceiptBreakdownDto } from '../../../core/models';
-import { BottomSheet } from '../../tracker-beta/ui/bottom-sheet';
+import { BetaBottomSheet } from '../../beta-ui';
 
 /** One editable line in the review (name + amount). */
 interface EditRow {
@@ -20,21 +20,21 @@ export interface ReceiptReviewResult {
 }
 
 /**
- * Tally receipt-review sheet — the live {@link ReceiptReviewDialog} logic ported into the imported
- * {@link BottomSheet} for the mobile flow. Opens with the AI breakdown, lets the owner fix/delete/add
+ * Tally receipt-review sheet — the live ReceiptReviewDialog logic ported into the kit
+ * {@link BetaBottomSheet} for the mobile flow. Opens with the AI breakdown, lets the owner fix/delete/add
  * lines and adjust the detected tax/tip, then emits a {@link ReceiptReviewResult} (only rows with a
  * non-empty name AND amount>0; tax/tip emitted only when > 0) for the page to batch-write.
  *
  * Two-way `open` mirrors the sheet's open state; `breakdown` seeds the editable rows when it changes.
- * Inherits the Tally palette tokens from the page `:host`; BottomSheet inherits --glass/--r-glass/etc.
+ * Inherits the cream Tally accent tokens from the page `:host`; BetaBottomSheet inherits --glass/--r-glass.
  */
 @Component({
   selector: 'app-receipt-review-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CurrencyPipe, FormsModule, MatIconModule, BottomSheet],
+  imports: [CurrencyPipe, FormsModule, MatIconModule, BetaBottomSheet],
   template: `
-    <app-bottom-sheet [(open)]="open" detent="full" label="Review receipt" (closed)="onClosed()">
+    <app-bs-sheet [(open)]="open" detent="full" label="Review receipt" (closed)="onClosed()">
       <div class="rrs">
         <h2 class="rrs__title">Review receipt</h2>
         <p class="rrs__intro">
@@ -88,43 +88,43 @@ export interface ReceiptReviewResult {
           </button>
         </div>
       </div>
-    </app-bottom-sheet>
+    </app-bs-sheet>
   `,
   styles: [`
     .rrs { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; color: var(--ink); }
-    .rrs__title { margin: 0; font: 700 20px/1.1 var(--font-num); color: var(--ink); }
+    .rrs__title { margin: 0; font: 600 22px/1.1 var(--font-display); letter-spacing: -.01em; color: var(--ink); }
     .rrs__intro { margin: 0; font: 500 13px/1.4 var(--font-ui); color: var(--ink-dim); }
     .rrs__rows { display: flex; flex-direction: column; gap: 8px; }
     .rrs__row { display: grid; grid-template-columns: 1fr 116px 40px; gap: 8px; align-items: center; }
     .rrs__name, .rrs__amt {
-      background: var(--paper-sink); border: 1px solid var(--rule); border-radius: 12px;
+      background: var(--bg-sink); border: 1px solid var(--hairline); border-radius: 12px;
       color: var(--ink); font: 500 15px/1 var(--font-ui); min-height: 48px; padding: 0 12px; outline: none;
-      &:focus { border-color: var(--me); }
+      &:focus { border-color: var(--accent-b); }
     }
     .rrs__amtwrap { position: relative; display: flex; align-items: center; }
-    .rrs__cur { position: absolute; left: 12px; color: var(--ink-dim); font: 500 14px/1 var(--font-num); pointer-events: none; }
-    .rrs__amt { width: 100%; padding-left: 26px; text-align: right; font-family: var(--font-num); font-weight: 600; }
+    .rrs__cur { position: absolute; left: 12px; color: var(--ink-dim); font: 500 14px/1 var(--font-display); pointer-events: none; }
+    .rrs__amt { width: 100%; padding-left: 26px; text-align: right; font-family: var(--font-display); font-weight: 600; }
     .rrs__del {
       width: 40px; height: 40px; display: grid; place-items: center;
-      border: 1px solid var(--rule); border-radius: 12px; background: var(--paper-sink);
+      border: 1px solid var(--hairline); border-radius: 12px; background: var(--bg-sink);
       color: var(--ink-dim); cursor: pointer;
     }
     .rrs__addline {
       align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
-      min-height: 44px; padding: 0 16px; border: 1px solid var(--rule); border-radius: var(--r-pill);
-      background: var(--paper-sink); color: var(--ink); font: 600 14px/1 var(--font-ui); cursor: pointer;
+      min-height: 44px; padding: 0 16px; border: 1px solid var(--hairline); border-radius: var(--r-pill);
+      background: var(--bg-sink); color: var(--ink); font: 600 14px/1 var(--font-ui); cursor: pointer;
       mat-icon { font-size: 18px; width: 18px; height: 18px; }
     }
     .rrs__taxtip { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .rrs__tt { display: flex; flex-direction: column; gap: 6px; font: 600 12px/1 var(--font-ui); color: var(--ink-dim); }
     .rrs__total { display: flex; justify-content: space-between; align-items: baseline; margin: 0;
       font: 600 14px/1 var(--font-ui); color: var(--ink-dim); }
-    .rrs__total-v { font: 700 18px/1 var(--font-num); color: var(--ink); }
+    .rrs__total-v { font: 600 18px/1 var(--font-display); color: var(--ink); }
     .rrs__actions { display: flex; gap: 10px; padding-top: 4px; }
-    .rrs__btn { flex: 1 1 0; min-height: var(--tap); border-radius: var(--r-pill);
-      font: 700 15px/1 var(--font-ui); cursor: pointer; border: 1px solid var(--rule); }
-    .rrs__btn--ghost { background: var(--paper-sink); color: var(--ink); }
-    .rrs__btn--primary { background: var(--ink); color: var(--paper); border: none; }
+    .rrs__btn { flex: 1 1 0; min-height: 54px; border-radius: var(--r-pill);
+      font: 700 15px/1 var(--font-ui); cursor: pointer; border: 1px solid var(--hairline); }
+    .rrs__btn--ghost { background: var(--bg-sink); color: var(--ink); }
+    .rrs__btn--primary { background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--on-accent, #2a2410); border: none; }
     .rrs__btn--primary:disabled { opacity: .4; cursor: default; }
   `],
 })

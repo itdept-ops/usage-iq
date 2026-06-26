@@ -1,432 +1,215 @@
 // ============================================================================
-// Bills Beta — "Tally" design system + shell layout.
+// Bills "Tally" — REBUILT on the shared beta-ui "Strata" foundation.
 //
-// ISOLATED design system: every token here is defined on :host of app-bills-beta
-// so all child components (and the IMPORTED tracker-beta primitives BottomSheet /
-// SwipeRow) inherit them via the cascade. NONE of the global Usage IQ --tech-*
-// tokens are used. This mirrors how tracker-beta defines its own :host tokens.
+// One line adopts the whole Strata token contract (layered bg, glass, ink scale, radii, the lift-1/2/3
+// depth system, spring/bounce easing, blur cap, env() safe-area, the a11y killswitches); then the BILLS
+// page OVERRIDES the per-page accent contract with its OWN signature — a warm CREAM / paper gradient, the
+// Tally receipt-paper identity, sitting as a light cream accent on the dark kit. Every kit component
+// (pull-refresh ring, FAB, toaster, bottom sheet, swipe rows, the ring) + every card reads
+// --accent-a/--accent-b off this :host cascade, so this single override re-skins the whole screen.
 //
-// Palette is the "receipt-paper / ink" set from the Tally build brief. Dark only.
-// A prefers-reduced-motion killswitch, a reduced-transparency / forced-contrast
-// blur-drop, and env() safe-area insets are honored here so children inherit a
-// consistent contract.
-//
-// NOTE: the imported BottomSheet + SwipeRow reference a handful of tracker-beta
-// token names (--glass, --blur-glass, --r-glass, --lift-3, --ink-faint, --r-pill,
-// --ease-out, --glass-edge, --r-tile, --warn, --bg-rise, --ease-spring). Those are
-// ALIASED into the receipt-paper palette below so the imported primitives render
-// correctly without modifying them.
+// ISOLATED + gated by beta.access (+ bills.use): nothing here touches the global --tech-* tokens or the
+// flagship tracker-beta. The kit partial is the only style import; we consume the kit, never modify it.
 // ============================================================================
+
+@use '../beta-ui/beta-kit' as kit;
 
 :host {
-  color-scheme: dark;
+  @include kit.beta-host;            // the whole Strata token contract on :host
 
-  // ---- RECEIPT-PAPER / INK palette (Tally brief, verbatim) ----
-  --paper: #14140f;
-  --paper-rise: #1d1c14;
-  --paper-sink: #0f0f0b;
-  --ink: #f7f3e7;
-  --ink-dim: #b3ad95;
-  --rule: rgba(247, 243, 231, .08);
-  --claimed: #4ade80;   // claimed / settled = green
-  --owed: #f0a35a;       // amount owed / unclaimed = warm AMBER, NEVER red
-  --me: #38bdf8;          // "you" accent
+  // ---- BILLS' SIGNATURE ACCENT: warm CREAM → soft butter (the per-page contract override) ----
+  --accent-a: #f4ead2;              // signature cream (start) — the paper highlight
+  --accent-b: #d9c08a;              // signature butter (end)  — the aged-receipt edge
 
-  // ---- RADII ----
-  --r-card: 20px;
-  --r-pill: 999px;
-  --r-row: 14px;
+  // Warm the layered base toward an inked-paper surface (still within the kit's dark contract).
+  --bg-base: #14130e;
+  --bg-rise: #1d1b14;
+  --bg-sink: #100f0a;
 
-  // ---- TAP TARGET ----
-  --tap: 56px;
+  // A warm radial wash behind the whole column (cream bloom off the top).
+  background:
+    radial-gradient(120% 80% at 50% -12%, #2a2519 0%, var(--bg-base) 62%);
 
-  // ---- TYPE ----
-  --font-num: "Clash Display", system-ui, sans-serif; // numerals / totals
-  --font-ui: "Plus Jakarta Sans", system-ui, sans-serif; // labels / body
+  // Status hues stay shared, but tuned to the warm surface: claimed = green, owed = amber (never red).
+  --signal: #6fdc9a;                // claimed / settled green
+  --warn: #f0a35a;                  // amount owed / unclaimed = warm amber, NEVER red
 
-  // ---- MOTION ----
-  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
-  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --bar-bottom-h: 78px;
 
-  // ---- Safe-area gutters ----
-  --safe-b: env(safe-area-inset-bottom, 0px);
-  --safe-top: env(safe-area-inset-top, 0px);
-  --gutter: max(16px, env(safe-area-inset-left, 0px));
-  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
-
-  // ---- Fixed-chrome heights (the scroll region reserves space for these) ----
-  --switcher-h: 56px;
-  --share-bar-h: 72px;
-
-  // ---- ALIASES for the imported tracker-beta primitives (BottomSheet / SwipeRow) ----
-  // These map the Strata token names those components reference onto the Tally palette.
-  --glass: rgba(29, 28, 20, .82);
-  --glass-edge: var(--rule);
-  --blur-glass: 18px;
-  --r-glass: var(--r-card);
-  --r-tile: var(--r-row);
-  --ink-faint: var(--ink-dim);
-  --bg-rise: var(--paper-rise);
-  --warn: var(--owed);
-  --lift-3: 0 16px 48px rgba(0, 0, 0, .55), inset 0 1px 0 var(--rule);
-  --lift-2: 0 8px 24px rgba(0, 0, 0, .45), inset 0 1px 0 var(--rule);
-
-  display: block;
-  position: relative;
-  width: 100%;
-  height: 100%; // fill the immersive shell frame (.content--immersive); inner .bb-scroll owns the scroll
-  min-height: 0;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: 15px;
-  line-height: 1.4;
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  overscroll-behavior: none;
+  // Ink on a CREAM gradient pill needs a dark foreground; the FAB/keys use this.
+  --on-accent: #2a2410;
 }
 
-// ---- a11y: reduced transparency / forced contrast => drop blur, solidify glass ----
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  :host {
-    --blur-glass: 0px;
-    --glass: var(--paper-rise);
-  }
-}
-
-// ---- MOTION KILLSWITCH ----
-@media (prefers-reduced-motion: reduce) {
-  :host,
-  :host *,
-  :host *::before,
-  :host *::after {
-    animation-duration: .001ms !important;
-    animation-delay: 0ms !important;
-    transition-duration: .001ms !important;
-    transition-delay: 0ms !important;
-    scroll-behavior: auto !important;
-  }
-}
+@include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)
+@include kit.beta-a11y;             // reduced-motion + reduced-transparency/contrast killswitches (once)
 
 // ============================================================================
-// SHELL LAYOUT
+// SHELL — the kit pull-to-refresh wrapper IS the scroll container.
 // ============================================================================
 
-// The single vertical scroll region. height:100% fills the immersive shell frame (.content--immersive),
-// so this is the ONLY scrollbar; fixed chrome (switcher up top, share bar at the bottom) pins over it.
-.bb-scroll {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
-  padding-top: calc(var(--switcher-h) + var(--safe-top));
-  padding-bottom: calc(var(--share-bar-h) + var(--safe-b) + 16px);
-  padding-inline: var(--gutter) var(--gutter-r);
+.bb-ptr { display: block; height: 100%; }
+
+// The single vertical scroll column inside the pull-refresh. The wrapper owns scroll; this is the flex
+// stack of header + summary + list, gutter + safe-area padded; bottom reserves the FAB bar.
+.scroll {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-// ---- Sticky bill-switcher pill scroller (fixed top) ----
-.bb-switcher {
-  position: fixed;
-  top: var(--beta-bar-top, 0px);
-  left: 0;
-  right: 0;
-  z-index: 30;
-  min-height: calc(var(--switcher-h) + var(--safe-top));
-  padding-top: var(--safe-top);
+  min-height: 100%;
+  padding-top: calc(var(--safe-top) + 12px);
+  padding-bottom: calc(var(--bar-bottom-h) + var(--safe-bottom) + 24px);
   padding-inline: var(--gutter) var(--gutter-r);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--glass);
-  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
-  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
-  border-bottom: 1px solid var(--rule);
 }
+.scroll__foot { height: 4px; }
 
-.bb-switcher__rail {
-  flex: 1 1 auto;
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x proximity;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding: 8px 2px;
+// ============================================================================
+// IMMERSIVE PAGE HEADER — title + tally subtitle, with a cream bloom + a settled-count chip.
+// ============================================================================
 
-  &::-webkit-scrollbar { display: none; }
-}
-
-.bb-pill {
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-  min-height: 40px;
-  padding: 0 16px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-pill);
-  background: var(--paper-rise);
-  color: var(--ink-dim);
-  font: 600 14px/1 var(--font-ui);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: color 140ms var(--ease-out), border-color 140ms var(--ease-out), background 140ms var(--ease-out);
-
-  &.is-active {
-    color: var(--ink);
-    border-color: var(--ink-dim);
-    background: var(--paper-sink);
-  }
-  &.is-settled .bb-pill__dot { background: var(--claimed); }
-}
-.bb-pill__dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--owed);
-}
-.bb-add {
-  flex: 0 0 auto;
-  width: 40px; height: 40px;
-  display: grid; place-items: center;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-pill);
-  background: var(--paper-rise);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-// ---- Generic Tally card (matte paper extrusion) ----
-.bb-card {
-  flex: 0 0 auto;
-  border-radius: var(--r-card);
-  background: var(--paper-rise);
-  box-shadow: var(--lift-2);
-  padding: 16px;
-}
-
-// ---- Hero capture card ----
-.bb-hero {
+.hh {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
+  padding: 4px 2px 2px;
+  isolation: isolate;
 }
-.bb-hero__title {
-  margin: 0;
-  font: 600 15px/1.2 var(--font-ui);
-  color: var(--ink);
-  display: flex; align-items: center; gap: 8px;
+.hh__bloom {
+  position: absolute;
+  top: -54px; left: -34px; right: 24%;
+  height: 180px; z-index: -1; pointer-events: none;
+  background: radial-gradient(140px 100px at 28% 30%,
+    color-mix(in srgb, var(--accent-a) 40%, transparent),
+    transparent 70%);
+  filter: blur(20px);
+  opacity: .85;
 }
-.bb-hero__title input {
-  flex: 1 1 auto; min-width: 0;
-  background: transparent; border: none; outline: none;
-  color: var(--ink); font: 700 18px/1.2 var(--font-num);
-  border-bottom: 1px solid transparent;
-  padding: 4px 0;
-  &:focus { border-bottom-color: var(--rule); }
+.hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.hh__text { min-width: 0; }
+.hh__eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent-a) 64%, var(--ink-dim));
+  margin-bottom: 6px;
 }
-.bb-dropzone {
-  display: flex; gap: 12px;
+.hh__eyebrow mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.hh__title {
+  margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 34px; line-height: 1;
+  letter-spacing: -.02em; color: var(--ink);
 }
-.bb-dropbtn {
-  flex: 1 1 0;
-  min-height: 112px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  border: 1.5px dashed var(--rule);
-  border-radius: var(--r-row);
-  background: var(--paper-sink);
-  color: var(--ink-dim);
-  font: 600 13px/1.2 var(--font-ui);
-  cursor: pointer;
-  transition: border-color 140ms var(--ease-out), color 140ms var(--ease-out);
-  &:active { border-color: var(--me); color: var(--ink); }
-  mat-icon { font-size: 28px; width: 28px; height: 28px; color: var(--me); }
-}
-// slim add bar once items exist
-.bb-addbar {
-  display: flex; gap: 8px; align-items: center;
-}
-.bb-addbar__field {
-  flex: 1 1 auto; min-width: 0;
-  display: flex; align-items: center; gap: 6px;
-  min-height: var(--tap);
-  padding: 0 14px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-row);
-  background: var(--paper-sink);
-}
-.bb-addbar__field input {
-  background: transparent; border: none; outline: none; color: var(--ink);
-  font: 500 15px/1 var(--font-ui); min-width: 0;
-}
-.bb-addbar__name { flex: 1 1 auto; }
-.bb-addbar__amt { width: 84px; text-align: right; font-family: var(--font-num); font-weight: 600; }
-.bb-addbar__btn,
-.bb-iconbtn {
+.hh__sub { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: var(--ink-dim); }
+
+// A small "you're owed / you've settled" summary pill at the top-right of the header.
+.hh__owed {
   flex: 0 0 auto;
-  width: var(--tap); height: var(--tap);
-  display: grid; place-items: center;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-row);
-  background: var(--paper-sink);
-  color: var(--ink);
-  cursor: pointer;
-  &:disabled { opacity: .4; cursor: default; }
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  padding: 10px 14px;
+  border-radius: var(--r-tile);
+  border: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--warn) 9%, var(--bg-rise));
+  box-shadow: var(--lift-1);
+}
+.hh__owed-v { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1; color: var(--warn); letter-spacing: -.02em; }
+.hh__owed-l { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+
+// ---- Summary stat row (two glance stats) ----
+.hh__stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+// ---- Filter segmented control ----
+.bb-filter { margin: -2px 0 -4px; }
+
+// ============================================================================
+// STAGGERED SPRING ENTRANCE — each bill card rises + fades on a per-index delay.
+// ============================================================================
+
+.rise {
+  animation: bb-rise 520ms var(--ease-spring-up) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+  will-change: transform, opacity;
+}
+@keyframes bb-rise {
+  from { opacity: 0; transform: translateY(18px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; }
 }
 
-// ---- Section heading ----
-.bb-section-h {
-  margin: 4px 2px -4px;
-  font: 600 12px/1 var(--font-ui);
-  letter-spacing: .08em; text-transform: uppercase;
-  color: var(--ink-dim);
-}
+// ---- The bills list stack ----
+.bb-list { display: flex; flex-direction: column; gap: 12px; }
 
-// ---- Items list ----
-.bb-items {
-  display: flex; flex-direction: column; gap: 8px;
-}
+// ============================================================================
+// EMPTY / LOADING STATES — warm, tasteful, keeping the "split the check" invite.
+// ============================================================================
 
-// ---- Tax / tip steppers ----
-.bb-taxtip {
-  display: flex; gap: 10px;
+.bb-empty {
+  margin: 28px auto 8px;
+  max-width: 320px;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 30px 22px;
+  border-radius: var(--r-card);
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--accent-a) 12%, transparent), transparent 60%),
+    var(--bg-rise);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--lift-2);
 }
-.bb-stepper {
-  flex: 1 1 0;
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  min-height: var(--tap);
-  padding: 0 8px 0 14px;
-  border-radius: var(--r-row);
-  background: var(--paper-sink);
+.bb-empty__art {
+  display: grid; place-items: center; width: 72px; height: 72px;
+  border-radius: var(--r-card);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-a) 30%, transparent),
+    color-mix(in srgb, var(--accent-b) 24%, transparent));
+  box-shadow: inset 0 1px 0 var(--glass-edge);
 }
-.bb-stepper__lbl { font: 600 13px/1 var(--font-ui); color: var(--ink-dim); }
-.bb-stepper__v { font: 700 16px/1 var(--font-num); color: var(--ink); min-width: 56px; text-align: right; }
-.bb-stepper__btns { display: flex; gap: 4px; }
-.bb-stepper__btn {
-  width: 40px; height: 40px;
-  display: grid; place-items: center;
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  background: var(--paper-rise);
-  color: var(--ink);
-  cursor: pointer;
+.bb-empty__art mat-icon { font-size: 36px; width: 36px; height: 36px; color: color-mix(in srgb, var(--accent-b) 70%, var(--ink)); }
+.bb-empty__h { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 22px; color: var(--ink); letter-spacing: -.01em; }
+.bb-empty__p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-dim); }
+.bb-empty__btn {
+  margin-top: 2px;
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 52px; padding: 0 26px;
+  border: none; border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: var(--on-accent); font: 700 15px/1 var(--font-ui); cursor: pointer;
+  box-shadow: var(--lift-2);
+  transition: transform 120ms var(--ease-spring);
 }
+.bb-empty__btn:active { transform: scale(.96); }
+.bb-empty__btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.bb-empty__btn mat-icon { font-size: 20px; width: 20px; height: 20px; }
 
-// ---- Per-person totals snap rail ----
-.bb-totals-rail {
-  display: flex; gap: 12px;
-  overflow-x: auto; overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding: 2px;
-  margin-inline: calc(var(--gutter) * -1) calc(var(--gutter-r) * -1);
-  padding-inline: var(--gutter) var(--gutter-r);
+// ---- skeleton list while first load is in flight ----
+.bb-skel { display: flex; flex-direction: column; gap: 12px; }
 
-  &::-webkit-scrollbar { display: none; }
-}
+// ============================================================================
+// FIXED BOTTOM ACTION BAR — the primary "New bill" FAB pill (kit BetaFab).
+// ============================================================================
 
-// ---- Bill total summary line ----
-.bb-billtotal {
-  display: flex; align-items: baseline; justify-content: space-between;
-  padding: 4px 4px 0;
-}
-.bb-billtotal__lbl { font: 600 13px/1 var(--font-ui); color: var(--ink-dim); text-transform: uppercase; letter-spacing: .06em; }
-.bb-billtotal__v { font: 700 26px/1 var(--font-num); color: var(--ink); }
-
-// ---- Sticky bottom SHARE bar ----
-.bb-share-bar {
+.actions {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  left: 0; right: 0; bottom: 0;
   z-index: 30;
-  min-height: calc(var(--share-bar-h) + var(--safe-b));
-  padding-bottom: max(12px, var(--safe-b));
-  padding-top: 10px;
-  padding-inline: var(--gutter) var(--gutter-r);
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: flex; align-items: center; gap: 12px;
+  min-height: calc(var(--bar-bottom-h) + var(--safe-bottom));
+  padding: 12px var(--gutter-r) max(12px, var(--safe-bottom)) var(--gutter);
   background: var(--glass);
   backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--hairline);
   box-shadow: var(--lift-3);
 }
-.bb-share-btn {
-  flex: 1 1 auto;
-  min-height: var(--tap);
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  border: none;
-  border-radius: var(--r-pill);
-  background: var(--ink);
-  color: var(--paper);
-  font: 700 15px/1 var(--font-ui);
-  cursor: pointer;
+.actions__new { flex: 1 1 auto; }
+// The cream FAB needs dark ink (kit FAB defaults to #fff); override the label/icon color for contrast.
+.actions__new ::ng-deep .bs-fab { width: 100%; min-height: 56px; color: var(--on-accent); }
 
-  &.is-active { background: color-mix(in srgb, var(--claimed) 22%, var(--paper-rise)); color: var(--claimed); border: 1px solid var(--claimed); }
-  &:disabled { opacity: .4; cursor: default; }
-}
-.bb-share-copy {
-  flex: 0 0 auto;
-  width: var(--tap); height: var(--tap);
-  display: grid; place-items: center;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-pill);
-  background: var(--paper-rise);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-// ---- Empty / loading states ----
-.bb-empty {
-  margin: 40px auto;
-  max-width: 280px;
-  text-align: center;
-  color: var(--ink-dim);
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-  mat-icon { font-size: 40px; width: 40px; height: 40px; color: var(--ink-dim); opacity: .6; }
-}
-.bb-empty__btn {
-  min-height: var(--tap); padding: 0 22px;
-  border: none; border-radius: var(--r-pill);
-  background: var(--ink); color: var(--paper);
-  font: 700 15px/1 var(--font-ui); cursor: pointer;
-}
-
-.bb-skeleton {
-  background: linear-gradient(100deg, var(--paper-sink) 30%, var(--paper-rise) 50%, var(--paper-sink) 70%);
-  background-size: 200% 100%;
-  animation: bb-shimmer 1.4s var(--ease-out) infinite;
-  border-radius: var(--r-card);
-}
-@keyframes bb-shimmer { to { background-position: -200% 0; } }
-
-// ---- determinate receipt-import bar ----
-.bb-importing {
-  display: flex; align-items: center; gap: 10px;
-  font: 600 13px/1.2 var(--font-ui); color: var(--ink-dim);
-}
-.bb-importing__track {
-  flex: 1 1 auto; height: 6px; border-radius: var(--r-pill);
-  background: var(--paper-sink); overflow: hidden;
-}
-.bb-importing__fill {
-  height: 100%; background: var(--me); border-radius: var(--r-pill);
-  transition: width 200ms var(--ease-out);
-}
-
-// ---- Own focus ring ----
+// Own visible focus ring (tracks the page accent via --focus).
 :host ::ng-deep :focus-visible {
-  outline: 2px solid var(--me);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
+
+// No 390px overflow: everything is fluid by construction.
+:host, .scroll, .actions { max-width: 100vw; }

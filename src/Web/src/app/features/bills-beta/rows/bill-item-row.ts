@@ -3,7 +3,7 @@ import { CurrencyPipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 
 import { BillItemDto, ChatContactDto } from '../../../core/models';
-import { SwipeRow } from '../../tracker-beta/ui/swipe-row';
+import { BetaSwipeRow } from '../../beta-ui';
 
 /** Emitted when the user picks (or clears) who an item is assigned to. `userId: null` = open for claiming. */
 export interface AssignChange {
@@ -12,25 +12,28 @@ export interface AssignChange {
 }
 
 /**
- * Tally claim-first item row — a 56px+ tappable row wrapped in the imported {@link SwipeRow} (swipe-left
- * to delete). Tapping the row expands an inline contact-avatar strip so the owner assigns the item to a
- * contact (or "Open" to clear) WITHOUT the per-item MatDialog the live page uses. A settle toggle and the
- * amount sit on the right; claimed/assigned items get the green ink, unclaimed stay neutral.
+ * Tally claim-first item row — REBUILT on the shared beta-ui foundation. A 48px+ tappable row wrapped in
+ * the kit {@link BetaSwipeRow} (swipe LEFT to delete, swipe RIGHT to settle). Tapping the row expands an
+ * inline contact-avatar strip so the owner assigns the item to a contact (or "Open" to clear) WITHOUT a
+ * per-item dialog. A settle toggle and the amount sit on the right; claimed/settled items get the green
+ * signal ink.
  *
  * Pure presentation + gesture: all writes are emitted to the page, which owns the optimistic patch +
- * reconcile. Inherits the Tally palette tokens from the page `:host`; SwipeRow inherits --r-tile/--warn etc.
+ * reconcile. Inherits the cream Tally accent tokens from the page `:host`; BetaSwipeRow inherits
+ * --r-tile/--warn/--accent-a etc off the same cascade.
  */
 @Component({
   selector: 'app-bill-item-row',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CurrencyPipe, MatIconModule, SwipeRow],
+  imports: [CurrencyPipe, MatIconModule, BetaSwipeRow],
   template: `
-    <app-swipe-row [label]="'Delete ' + item().name" (delete)="delete.emit(item())">
+    <app-bs-swipe-row [label]="item().name" leftLabel="Delete" rightLabel="Settle"
+                      [leftDestructive]="true" (swipe)="onSwipe($event)">
       <div class="bir">
         <div class="bir__main" (click)="expanded.set(!expanded())"
              role="button" tabindex="0"
-             (keydown.enter)="expanded.set(!expanded())" (keydown.space)="expanded.set(!expanded())"
+             (keydown.enter)="expanded.set(!expanded())" (keydown.space)="expanded.set(!expanded()); $event.preventDefault()"
              [attr.aria-expanded]="expanded()"
              [attr.aria-label]="'Assign ' + item().name">
           <button type="button" class="bir__check" [class.is-on]="item().settled"
@@ -72,13 +75,13 @@ export interface AssignChange {
           </div>
         }
       </div>
-    </app-swipe-row>
+    </app-bs-swipe-row>
   `,
   styles: [`
-    .bir { background: var(--paper-rise); }
+    .bir { background: var(--bg-rise); }
     .bir__main {
       display: flex; align-items: center; gap: 10px;
-      min-height: var(--tap); padding: 8px 12px;
+      min-height: 56px; padding: 8px 12px;
       cursor: pointer;
     }
     .bir__check {
@@ -86,7 +89,7 @@ export interface AssignChange {
       display: grid; place-items: center;
       border: none; background: transparent; cursor: pointer;
       color: var(--ink-dim);
-      &.is-on { color: var(--claimed); }
+      &.is-on { color: var(--signal); }
       mat-icon { font-size: 24px; width: 24px; height: 24px; }
     }
     .bir__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -97,9 +100,9 @@ export interface AssignChange {
     }
     .bir__who {
       font: 500 12px/1.2 var(--font-ui); color: var(--ink-dim);
-      &.is-claimed { color: var(--claimed); }
+      &.is-claimed { color: var(--signal); }
     }
-    .bir__amt { flex: 0 0 auto; font: 700 16px/1 var(--font-num); color: var(--ink); }
+    .bir__amt { flex: 0 0 auto; font: 600 16px/1 var(--font-display); color: var(--ink); }
     .bir__chev { flex: 0 0 auto; color: var(--ink-dim); font-size: 20px; width: 20px; height: 20px; }
 
     .bir__claimstrip {
@@ -112,14 +115,14 @@ export interface AssignChange {
       flex: 0 0 auto; width: 44px; height: 44px;
       display: grid; place-items: center;
       border-radius: 50%;
-      border: 2px solid var(--rule);
-      background: var(--paper-sink);
+      border: 2px solid var(--hairline);
+      background: var(--bg-sink);
       color: var(--ink-dim);
-      font: 700 13px/1 var(--font-num);
+      font: 700 13px/1 var(--font-display);
       cursor: pointer; overflow: hidden; padding: 0;
       img { width: 100%; height: 100%; object-fit: cover; }
       mat-icon { font-size: 20px; width: 20px; height: 20px; }
-      &.is-sel { border-color: var(--me); color: var(--me); }
+      &.is-sel { border-color: var(--accent-b); color: var(--accent-b); }
     }
     .bir__avatar--open.is-sel { border-color: var(--ink-dim); color: var(--ink); }
   `],
@@ -146,6 +149,11 @@ export class BillItemRow {
     if (it.claimedByName) return 'Claimed by ' + it.claimedByName;
     return '';
   });
+
+  protected onSwipe(side: 'left' | 'right'): void {
+    if (side === 'left') this.delete.emit(this.item());
+    else this.settle.emit(this.item());
+  }
 
   protected pick(userId: number | null): void {
     this.assign.emit({ item: this.item(), userId });

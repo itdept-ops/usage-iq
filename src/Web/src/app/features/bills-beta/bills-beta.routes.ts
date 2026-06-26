@@ -4,8 +4,8 @@ import { permissionGuard } from '../../core/permission.guard';
 import { PERM } from '../../core/models';
 
 /**
- * Bills Beta — the new mobile-first "Tally" split-the-check experience. Lazy `loadComponent` so the page
- * (and the bottom-sheet / swipe-row primitives it pulls from tracker-beta) stay out of the initial bundle.
+ * Bills Beta — the mobile-first "Tally" split-the-check experience, rebuilt on the shared beta-ui kit.
+ * Lazy `loadComponent` so the page (and the kit primitives it consumes) stay out of the initial bundle.
  * Guarded by BOTH `beta.access` (the Beta section) AND `bills.use` (the feature) — matching the live /bills
  * gate, so the beta twin is never less strict than the page it mirrors. This is purely additive — it reuses
  * the existing bills `Api` methods + DTOs and never touches the live /bills page.
