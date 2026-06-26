@@ -1,7 +1,8 @@
 import {
-  ChangeDetectionStrategy, Component, input, output, signal,
+  ChangeDetectionStrategy, Component, inject, input, output, signal,
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
+import { Haptics } from '../../core/haptics';
 
 /**
  * BETA-KIT Fab — a floating action button / action pill. A new beta-kit primitive. Two shapes:
@@ -84,13 +85,14 @@ export class BetaFab {
   readonly action = output<void>();
 
   protected readonly pressed = signal(false);
+  private readonly haptics = inject(Haptics);
 
   protected onDown(): void { if (!this.disabled()) this.pressed.set(true); }
   protected onUp(): void { this.pressed.set(false); }
   protected onCancel(): void { this.pressed.set(false); }
   protected onClick(): void {
     if (this.disabled()) return;
-    try { navigator.vibrate?.(10); } catch { /* no-op (iOS / unsupported) */ }
+    this.haptics.tap(); // light tick on a deliberate FAB press (no-ops on iOS / unsupported)
     this.action.emit();
   }
 }

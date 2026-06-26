@@ -481,6 +481,15 @@ export const routes: Routes = [
     title: 'Usage IQ · Widget',
   },
   {
+    // PWA Web Share TARGET (GET) — the OS share sheet routes shared title/text/url INTO the installed app
+    // at /share (declared in manifest.webmanifest `share_target`). The lazy children file holds a tiny,
+    // render-nothing page that self-guards (auth + tracker.self) and redirects: it seeds the shared text
+    // into the tracker's Add-food Describe dialog, or lands home. Placed BEFORE the more-generic
+    // `share/:token` public view so the bare `/share` matches here first (Angular is first-match).
+    path: 'share',
+    loadChildren: () => import('./features/share-target/share-target.routes').then(m => m.SHARE_TARGET_ROUTES),
+  },
+  {
     // Public, unauthenticated, time-limited shared view — intentionally no guard.
     path: 'share/:token',
     loadComponent: () => import('./features/share/public-share').then(m => m.PublicShareView),

@@ -32,6 +32,7 @@ import { ChatRealtime } from './core/chat-realtime';
 import { LocationCapture } from './core/location-capture';
 import { ClientInfoCapture } from './core/client-info';
 import { SwUpdateService } from './core/sw-update';
+import { PwaService } from './core/pwa';
 import { Presence, SyncStatus, PERM, QuickAddResult } from './core/models';
 import { HomeOption, HOME_OPTIONS } from './core/home-options';
 import { timeAgo, humanizeInterval } from './shared/format';
@@ -89,6 +90,7 @@ export class App implements AfterViewInit {
   private locationCapture = inject(LocationCapture);
   private clientInfoCapture = inject(ClientInfoCapture);
   private swUpdate = inject(SwUpdateService);
+  readonly pwa = inject(PwaService);
   private snack = inject(MatSnackBar);
   private dialog = inject(MatDialog);
   private host = inject(ElementRef<HTMLElement>);
@@ -123,8 +125,16 @@ export class App implements AfterViewInit {
   private static readonly IDLE_MS = 5 * 60_000; // ~5 min of no interaction → self is away
   private static readonly AWAY_MS = 60_000; // another user not seen in >60s (their polls are ~20s) → away
   private readonly lastActivity = signal(Date.now());
-  /** Whether the caller is currently idle (no interaction for ~5 min). Drives their own roster "away" badge. */
-  readonly selfAway = computed(() => this.now() - this.lastActivity() >= App.IDLE_MS);
+  /**
+   * OS-level idle/away reported by the PWA IdleDetector (user idle ~60s OR screen locked), fed by
+   * {@link PwaService}. Pure best-effort: stays false on every browser that lacks the API or hasn't granted
+   * idle-detection, so it can only ever ADD to the local-interaction away derivation, never mask it.
+   */
+  private readonly pwaIdle = signal(false);
+  /** Whether the caller is currently idle (no interaction for ~5 min, OR the OS reports idle/screen-locked). */
+  readonly selfAway = computed(
+    () => this.pwaIdle() || this.now() - this.lastActivity() >= App.IDLE_MS,
+  );
 
   /** Total user count for the toolbar (null until first loaded / when the caller lacks users.view). */
   readonly userCount = signal<number | null>(null);
@@ -400,6 +410,20 @@ export class App implements AfterViewInit {
         (navigator as unknown as { standalone?: boolean }).standalone === true;
       if (so?.lock && standalone) void so.lock('portrait').catch(() => { /* unsupported / not allowed */ });
     } catch { /* Screen Orientation API absent */ }
+
+    // Initialize the client-side PWA capability bundle once (app-badge, persistent-storage, idle→presence,
+    // online/offline, notification-click routing). Everything inside is feature-detected + guarded, so this
+    // is a silent no-op on browsers (iOS Safari, older) that lack the underlying APIs. We hand it the OS-idle
+    // sink so a granted IdleDetector can mark the caller AWAY (folded into selfAway above).
+    this.pwa.init((idle) => this.pwaIdle.set(idle));
+
+    // Drive the installed-app badge from the live UNREAD CHAT count: set it while >0, clear it at 0. The
+    // Badging API itself no-ops where unsupported (handled inside PwaService).
+    effect(() => {
+      const unread = this.chat.totalUnreadMessages();
+      if (unread > 0) this.pwa.setBadge(unread);
+      else this.pwa.clearBadge();
+    });
 
     this.router.events
       .pipe(
@@ -708,6 +732,15 @@ export class App implements AfterViewInit {
       this.lastActivity.set(Date.now());
       this.now.set(Date.now());
     }
+  }
+
+  /**
+   * Focusing the window means the user is looking at the app, so the unread chat is effectively "seen" —
+   * clear the installed-app badge (the effect re-sets it the next time totalUnreadMessages climbs above 0).
+   */
+  @HostListener('window:focus')
+  onWindowFocus(): void {
+    this.pwa.clearBadge();
   }
 
   /** True when the event target is a text field / editable element where a bare "q" should type normally. */

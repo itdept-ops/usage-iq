@@ -1,6 +1,7 @@
 import {
-  ChangeDetectionStrategy, Component, computed, input, output, signal,
+  ChangeDetectionStrategy, Component, computed, inject, input, output, signal,
 } from '@angular/core';
+import { Haptics } from '../../core/haptics';
 
 /** Which side was committed by a past-threshold swipe + release. */
 export type SwipeSide = 'left' | 'right';
@@ -103,6 +104,8 @@ export class BetaSwipeRow {
   /** px past which a release commits. */
   private static readonly THRESHOLD = 96;
 
+  private readonly haptics = inject(Haptics);
+
   protected readonly dragging = signal(false);
   protected readonly offset = signal(0);
   /** True once dragged left past threshold. */
@@ -146,7 +149,9 @@ export class BetaSwipeRow {
     const right = this.armedRight();
     this.offset.set(0);
     this.axisLocked = null;
-    if (left) { this.swipe.emit('left'); this.delete.emit(); }
-    else if (right) { this.swipe.emit('right'); }
+    // A committed swipe is a deliberate action — confirm it with a gentle double-tick
+    // (no-ops on iOS / unsupported). Snap-back without a commit stays silent.
+    if (left) { this.haptics.success(); this.swipe.emit('left'); this.delete.emit(); }
+    else if (right) { this.haptics.success(); this.swipe.emit('right'); }
   }
 }

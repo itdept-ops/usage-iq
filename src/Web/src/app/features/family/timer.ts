@@ -3,6 +3,7 @@ import {
   DestroyRef,
   OnDestroy,
   computed,
+  effect,
   inject,
   input,
   signal,
@@ -24,6 +25,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
 import { FamilyTimer, TimerAiResult } from '../../core/models';
+import { WakeLockService } from '../../core/wake-lock';
 
 /** A one-tap preset countdown. `seconds` seeds a new timer; `label` is its friendly name. */
 interface Preset {
@@ -77,6 +79,10 @@ export class FamilyTimerWidget implements OnDestroy {
   private api = inject(Api);
   private snack = inject(MatSnackBar);
   private destroyRef = inject(DestroyRef);
+  private wakeLock = inject(WakeLockService);
+
+  /** True while we currently hold a screen wake lock (so we release exactly once when timers stop). */
+  private holdingWakeLock = false;
 
   /** When true the widget renders bare (for embedding on the Family home, no hero / back link). */
   readonly embedded = input(false);
@@ -137,10 +143,29 @@ export class FamilyTimerWidget implements OnDestroy {
     // Light background refresh so a timer another member started/cancelled appears for us too.
     const poll = setInterval(() => this.reload(false), 20_000);
     this.destroyRef.onDestroy(() => clearInterval(poll));
+
+    // Keep the screen awake while a countdown is actually running (the family is watching it tick
+    // down), and let it sleep again the moment nothing is active. Reference-counted + feature-detected
+    // in WakeLockService, so this is a silent no-op where the API is unsupported (e.g. iOS Safari).
+    effect(() => {
+      const running = this.hasActive();
+      if (running && !this.holdingWakeLock) {
+        this.holdingWakeLock = true;
+        this.wakeLock.acquire();
+      } else if (!running && this.holdingWakeLock) {
+        this.holdingWakeLock = false;
+        this.wakeLock.release();
+      }
+    });
   }
 
   ngOnDestroy(): void {
     if (this.tickHandle) clearInterval(this.tickHandle);
+    // Balance any wake lock we still hold so we don't leak a reference on teardown.
+    if (this.holdingWakeLock) {
+      this.holdingWakeLock = false;
+      this.wakeLock.release();
+    }
     this.audioCtx?.close().catch(() => {});
   }
 

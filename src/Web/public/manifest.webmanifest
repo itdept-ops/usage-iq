@@ -39,6 +39,15 @@
       "sizes": "48x48 32x32 16x16"
     }
   ],
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "shortcuts": [
     {
       "name": "Tracker",

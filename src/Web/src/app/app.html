@@ -1,3 +1,13 @@
+<!-- Slim OFFLINE banner: a fixed bottom strip shown only while the browser reports no connection. It
+     auto-dismisses on reconnect (the @if drops it when pwa.online() flips back to true). Pinned to the
+     bottom + safe-area aware so it stays clear of the sticky top toolbar. -->
+@if (!pwa.online()) {
+  <div class="offline-banner" role="status" aria-live="polite">
+    <mat-icon class="offline-banner__icon" aria-hidden="true">cloud_off</mat-icon>
+    <span class="offline-banner__text">You're offline — changes may not save.</span>
+  </div>
+}
+
 @if (bareLayout()) {
 <!-- Bare/public chrome: no app toolbar (the page brings its own). -->
 } @else if (immersiveLayout()) {

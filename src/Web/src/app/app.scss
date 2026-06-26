@@ -117,6 +117,60 @@
   }
 }
 
+/* ---- Offline banner ------------------------------------------------ */
+/* A slim, fixed strip pinned to the BOTTOM of the viewport while the browser reports no connection.
+   Kept at the bottom (clear of the sticky top toolbar) + safe-area aware, and auto-removed on reconnect
+   (the @if drops it). Amber/warn-tinted glass so it reads as a soft "heads-up", not an error blocker. */
+.offline-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60; /* above the sticky toolbar (z 50) so it's never tucked under page chrome */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
+
+  font-family: var(--tech-font-ui);
+  font-size: var(--tech-fs-label, 11px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--tech-warn, #f5a623);
+
+  background: color-mix(in srgb, var(--tech-warn, #f5a623) 14%, var(--tech-bg-void, #060910));
+  border-top: 1px solid color-mix(in srgb, var(--tech-warn, #f5a623) 38%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 -8px 24px -12px rgba(0, 0, 0, 0.6);
+  animation: offline-banner-in 200ms var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1));
+
+  &__icon {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+    line-height: 16px;
+  }
+
+  &__text {
+    line-height: 1.2;
+  }
+}
+
+@keyframes offline-banner-in {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offline-banner {
+    animation: none;
+  }
+}
+
 /* ---- Brand / wordmark + terminal prompt ---------------------------- */
 .brand {
   display: inline-flex;

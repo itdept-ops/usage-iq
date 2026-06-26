@@ -1,6 +1,7 @@
 import {
-  ChangeDetectionStrategy, Component, Injectable, computed, signal,
+  ChangeDetectionStrategy, Component, Injectable, computed, inject, signal,
 } from '@angular/core';
+import { Haptics } from '../../core/haptics';
 
 /** The tone of a toast — drives its accent stripe + role. */
 export type ToastTone = 'neutral' | 'success' | 'warn';
@@ -39,6 +40,7 @@ export class ToastController {
   /** The live toast stack (oldest → newest), read by the toaster host. */
   readonly toasts = this._toasts.asReadonly();
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
+  private readonly haptics = inject(Haptics);
 
   /** Push a toast; returns its id. */
   show(
@@ -53,6 +55,8 @@ export class ToastController {
       onAction: opts.onAction,
     };
     this._toasts.update(list => [...list, msg]);
+    // Confirm a success outcome with a gentle double-tick (no-ops on iOS / unsupported).
+    if (msg.tone === 'success') this.haptics.success();
     const dur = opts.durationMs ?? (opts.actionLabel ? 5000 : 3200);
     this.timers.set(id, setTimeout(() => this.dismiss(id), dur));
     return id;

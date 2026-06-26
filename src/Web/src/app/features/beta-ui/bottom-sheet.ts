@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject,
   input, model, output, signal, viewChild,
 } from '@angular/core';
+import { Haptics } from '../../core/haptics';
 
 /** The rest heights a sheet can snap to, as a fraction of the dynamic viewport height. */
 export type SheetDetent = 'peek' | 'half' | 'full';
@@ -118,6 +119,9 @@ export class BetaBottomSheet {
   protected readonly DETENT_FRACTION = DETENT_FRACTION;
   private readonly panel = viewChild<ElementRef<HTMLDivElement>>('panel');
   private host = inject(ElementRef<HTMLElement>);
+  private readonly haptics = inject(Haptics);
+  /** Tracks the last seen open() so we haptic-tick only on the false→true (open) transition. */
+  private wasOpen = false;
 
   protected readonly dragging = signal(false);
   private readonly dragY = signal(0);
@@ -143,7 +147,11 @@ export class BetaBottomSheet {
     });
     // Move focus into the panel on open (focus-trap entry); remember the opener to restore later.
     effect(() => {
-      if (this.open()) {
+      const isOpen = this.open();
+      // Faint tick only on the open transition (not on detent changes / re-renders while open).
+      if (isOpen && !this.wasOpen) this.haptics.select();
+      this.wasOpen = isOpen;
+      if (isOpen) {
         const active = (typeof document !== 'undefined' ? document.activeElement : null) as HTMLElement | null;
         if (active && !this.host.nativeElement.contains(active)) this.opener = active;
         // Prefer the first focusable in the body; fall back to the panel (tabindex=-1) so a
