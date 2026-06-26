@@ -76,6 +76,14 @@ interface QuickLink {
 export class App implements AfterViewInit {
   private api = inject(Api);
   private router = inject(Router);
+
+  /** Captured ONCE at construction (before any navigation can strip the query): did the app open from the
+   *  PWA manifest `start_url` ("/?source=pwa")? An installed-app launch reuses the existing session with no
+   *  fresh login, so the post-login home redirect never runs — this lets us still honour the saved home. */
+  private readonly launchedFromPwa =
+    typeof location !== 'undefined' && new URLSearchParams(location.search).get('source') === 'pwa';
+  /** Guard so the PWA-launch home redirect fires at most once per app instance. */
+  private pwaHomeApplied = false;
   readonly auth = inject(AuthService);
   private chat = inject(ChatRealtime);
   private locationCapture = inject(LocationCapture);
@@ -390,6 +398,7 @@ export class App implements AfterViewInit {
         this.immersiveLayout.set(App.isImmersive(this.router.url));
         this.currentPath.set(this.router.url.split('?')[0]);
         this.closeMobileNav(); // never leave the drawer open across a route change
+        this.maybeApplyPwaHome(); // installed-app launch → saved home (once the router has settled)
       });
 
     // Lightweight clock tick (~15s) so the relative "active …" labels AND the derived away/idle states
@@ -511,6 +520,26 @@ export class App implements AfterViewInit {
         this.onForcedLogout();
       }
     });
+
+  }
+
+  /**
+   * PWA cold-launch home redirect. The manifest `start_url` is "/?source=pwa", so launching the INSTALLED
+   * app always opens "/" with the existing (already-authenticated) session and NO fresh login — meaning the
+   * post-login home redirect never runs and the app ignored the user's saved landing page. Run from the
+   * FIRST settled NavigationEnd (so `router.url` is the real launch URL, not the pre-nav value), once the
+   * session is ready: send the launch to the saved home route, once. The `source=pwa` marker only ever
+   * appears on the launch URL, so a normal in-app visit to "/" is never hijacked, and a deep-linked launch
+   * (a different path) is left alone (the `=== '/'` guard).
+   */
+  private maybeApplyPwaHome(): void {
+    if (this.pwaHomeApplied || !this.launchedFromPwa) return;
+    if (!this.auth.isAuthenticated()) return; // session not ready yet — a later NavigationEnd retries
+    this.pwaHomeApplied = true;
+    const home = this.auth.homeRoute();
+    if (home && home !== '/' && this.router.url.split('?')[0] === '/') {
+      void this.router.navigateByUrl(home);
+    }
   }
 
   /**
