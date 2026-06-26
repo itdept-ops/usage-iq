@@ -6,7 +6,10 @@ using DocumentFormat.OpenXml.Wordprocessing;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.Rendering;
 using PdfSharp.Fonts;
+using PdfSharp.Drawing;
+using PdfSharp.Pdf;
 using Color = MigraDoc.DocumentObjectModel.Color;
+using MCell = MigraDoc.DocumentObjectModel.Tables.Cell;
 using Document = MigraDoc.DocumentObjectModel.Document;
 using Border = MigraDoc.DocumentObjectModel.Border;
 using VerticalAlignment = MigraDoc.DocumentObjectModel.Tables.VerticalAlignment;
@@ -59,6 +62,23 @@ public sealed class ResumeDocumentService
     private static readonly Color RuleColor = Color.FromRgb(0xC9, 0xCF, 0xD8);
     private const string FontFamily = "Lato";
 
+    // ----- designed two-column sidebar palette -----
+    private static readonly Color SbLabel = Color.FromRgb(0xFF, 0xFF, 0xFF);       // sidebar section labels (white)
+    private static readonly Color SbText = Color.FromRgb(0xCF, 0xDC, 0xE4);        // sidebar body (light tint)
+    private static readonly Color SbRule = Color.FromRgb(0x4C, 0x6E, 0x80);        // hairline under sidebar labels
+    private static readonly Color SbDot = Color.FromRgb(0x8F, 0xC2, 0xD4);         // skill bullet dot (light teal)
+    private static readonly Color MainName = Color.FromRgb(0x18, 0x24, 0x2E);      // big name (near-black)
+    private static readonly Color MainAccent = Color.FromRgb(0x21, 0x49, 0x5C);    // headings / headline / rules
+    private static readonly Color MainBody = Color.FromRgb(0x2B, 0x34, 0x3E);      // body text
+    private static readonly Color MainMuted = Color.FromRgb(0x60, 0x6A, 0x76);     // meta lines
+    // Sidebar background + photo ring, painted behind the text by PDFsharp.
+    private static readonly XColor SidebarBgX = XColor.FromArgb(0x21, 0x49, 0x5C);
+    private static readonly XColor RingX = XColor.FromArgb(0xFF, 0xFF, 0xFF);
+    private const double SidebarCm = 6.9;
+    private const double PhotoReserveCm = 5.85;  // empty top space in the sidebar reserved for the painted photo
+    private const double PhotoCenterYCm = 3.15;
+    private const double PhotoRadiusCm = 2.15;
+
     static ResumeDocumentService() => LatoFontResolver.EnsureRegistered();
 
     // ===========================================================================================
@@ -75,32 +95,365 @@ public sealed class ResumeDocumentService
     public byte[] BuildResumePdf(ResumeDataDto data, bool designed, byte[]? headshot, string? headshotMime)
     {
         data ??= ResumeDataDto.Empty;
+        if (designed) return RenderDesignedPdf(data, headshot, headshotMime);
+
+        // ATS-plain: single column, photo-free, machine-parseable.
         var doc = NewDocument();
         var section = doc.AddSection();
-        ConfigurePage(section, designed);
+        ConfigurePage(section, designed: false);
+        RenderPlainHeaderPdf(section, data.Contact);
+        RenderBodyPdf(section, data, designed: false);
+        return RenderPdf(doc);
+    }
 
-        string? tempImage = null;
+    // ===========================================================================================
+    // Designed PDF — two-column layout: a deep accent SIDEBAR (circular photo + contact + skills +
+    // certs) and a clean MAIN column (bold name header → profile → experience → education → projects).
+    // MigraDoc lays out the text in a borderless 2-cell table; a PDFsharp post-pass PREPENDS (draws
+    // behind) the full-height sidebar fill on every page and the circular-clipped headshot on page 1 —
+    // so the photo is a true circle and the sidebar spans multi-page resumes, with NO image library
+    // and NO temp file.
+    // ===========================================================================================
+    private static byte[] RenderDesignedPdf(ResumeDataDto data, byte[]? headshot, string? headshotMime)
+    {
+        var contact = data.Contact ?? ResumeDataDto.Empty.Contact;
+        var photo = DecodablePhoto(headshot);            // null when absent / undecodable
+        var hasPhoto = photo is not null;
+
+        var doc = NewDocument();
+        var section = doc.AddSection();
+        var ps = section.PageSetup;
+        ps.PageFormat = PageFormat.Letter;
+        // Standard PageFormats don't populate PageWidth/Height, so set them explicitly — the column math
+        // below needs a real page width (else the main column collapses to ~0 and wraps one word per line).
+        ps.PageWidth = Unit.FromInch(8.5);
+        ps.PageHeight = Unit.FromInch(11);
+        ps.TopMargin = Unit.FromCentimeter(0);
+        ps.BottomMargin = Unit.FromCentimeter(0);
+        ps.LeftMargin = Unit.FromCentimeter(0);
+        ps.RightMargin = Unit.FromCentimeter(0);
+
+        var table = section.AddTable();
+        table.Borders.Width = 0;
+        var sidebarW = Unit.FromCentimeter(SidebarCm);
+        table.AddColumn(sidebarW);
+        table.AddColumn(ps.PageWidth - sidebarW);
+        var row = table.AddRow();
+        row.VerticalAlignment = VerticalAlignment.Top;
+        var sb = row.Cells[0];
+        var main = row.Cells[1];
+
+        // ---------- SIDEBAR ----------
+        sb.Format.LeftIndent = Unit.FromCentimeter(0.75);
+        sb.Format.RightIndent = Unit.FromCentimeter(0.6);
+        var photoPad = sb.AddParagraph();
+        photoPad.Format.SpaceBefore = Unit.FromCentimeter(hasPhoto ? PhotoReserveCm : 0.95);
+        photoPad.Format.LineSpacingRule = LineSpacingRule.Single;
+
+        var contactLines = SidebarContactLines(contact);
+        if (contactLines.Count > 0)
+        {
+            SidebarLabel(sb, "Contact");
+            foreach (var line in contactLines) SidebarLine(sb, line);
+        }
+
+        var skills = (data.Skills ?? Array.Empty<string>())
+            .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList();
+        if (skills.Count > 0)
+        {
+            SidebarGap(sb);
+            SidebarLabel(sb, "Skills");
+            foreach (var s in skills) SidebarLine(sb, s, bullet: true);
+        }
+
+        var certs = (data.Certifications ?? Array.Empty<ResumeCertificationDto>())
+            .Where(c => c is not null && !IsBlankCert(c)).ToList();
+        if (certs.Count > 0)
+        {
+            SidebarGap(sb);
+            SidebarLabel(sb, "Certifications");
+            foreach (var c in certs)
+            {
+                SidebarLine(sb, Safe(c.Name, "Certification"), strong: true);
+                var sub = JoinPipe(c.Issuer, c.Date);
+                if (!string.IsNullOrWhiteSpace(sub)) SidebarLine(sb, sub, small: true);
+            }
+        }
+
+        // ---------- MAIN ----------
+        main.Format.LeftIndent = Unit.FromCentimeter(0.95);
+        main.Format.RightIndent = Unit.FromCentimeter(0.85);
+        var mainPad = main.AddParagraph();
+        mainPad.Format.SpaceBefore = Unit.FromCentimeter(1.05);
+
+        var name = main.AddParagraph(Safe(contact.FullName, "Your Name"));
+        name.Format.Font.Size = 25;
+        name.Format.Font.Bold = true;
+        name.Format.Font.Color = MainName;
+        name.Format.SpaceAfter = 1;
+        if (!string.IsNullOrWhiteSpace(contact.Headline))
+        {
+            var h = main.AddParagraph(contact.Headline.Trim());
+            h.Format.Font.Size = 12;
+            h.Format.Font.Bold = true;
+            h.Format.Font.Color = MainAccent;
+            h.Format.SpaceAfter = 7;
+        }
+
+        if (!string.IsNullOrWhiteSpace(data.Summary))
+        {
+            MainHeading(main, "Profile");
+            var p = main.AddParagraph(data.Summary.Trim());
+            p.Format.Font.Size = 9.7;
+            p.Format.Font.Color = MainBody;
+            p.Format.SpaceAfter = 7;
+            p.Format.Alignment = ParagraphAlignment.Justify;
+        }
+
+        var experience = (data.Experience ?? Array.Empty<ResumeExperienceDto>())
+            .Where(e => e is not null && !IsBlankExperience(e)).ToList();
+        if (experience.Count > 0)
+        {
+            MainHeading(main, "Experience");
+            foreach (var e in experience) MainExperience(main, e);
+        }
+
+        var education = (data.Education ?? Array.Empty<ResumeEducationDto>())
+            .Where(e => e is not null && !IsBlankEducation(e)).ToList();
+        if (education.Count > 0)
+        {
+            MainHeading(main, "Education");
+            foreach (var e in education) MainEducation(main, e);
+        }
+
+        var projects = (data.Projects ?? Array.Empty<ResumeProjectDto>())
+            .Where(p => p is not null && !IsBlankProject(p)).ToList();
+        if (projects.Count > 0)
+        {
+            MainHeading(main, "Projects");
+            foreach (var pr in projects) MainProject(main, pr);
+        }
+
+        var renderer = new PdfDocumentRenderer { Document = doc };
+        renderer.RenderDocument();
+        PaintDesignedChrome(renderer.PdfDocument, sidebarW.Point, photo);
+        using var ms = new MemoryStream();
+        renderer.PdfDocument.Save(ms, closeStream: false);
+        return ms.ToArray();
+    }
+
+    /// <summary>Prepend (draw BEHIND the text) the full-height sidebar fill on every page, and the
+    /// circular-clipped headshot + ring on page 1. PDFsharp's <c>IntersectClip</c> with an ellipse gives a
+    /// true circle; a bad image just skips the photo (the sidebar still paints).</summary>
+    private static void PaintDesignedChrome(PdfDocument pdf, double sidebarWpt, byte[]? photo)
+    {
+        XImage? img = null;
+        using var photoStream = photo is not null ? new MemoryStream(photo) : null;
+        if (photoStream is not null)
+        {
+            try { img = XImage.FromStream(photoStream); } catch { img = null; }
+        }
+
+        for (var i = 0; i < pdf.PageCount; i++)
+        {
+            var page = pdf.Pages[i];
+            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Prepend);
+            gfx.DrawRectangle(new XSolidBrush(SidebarBgX), 0, 0, sidebarWpt, page.Height.Point);
+
+            if (i == 0 && img is not null)
+            {
+                var cx = sidebarWpt / 2.0;
+                var cy = XUnit.FromCentimeter(PhotoCenterYCm).Point;
+                var r = XUnit.FromCentimeter(PhotoRadiusCm).Point;
+                var aspect = (double)img.PixelWidth / Math.Max(1, img.PixelHeight);
+                double dw, dh;
+                if (aspect >= 1) { dh = 2 * r; dw = 2 * r * aspect; }
+                else { dw = 2 * r; dh = 2 * r / aspect; }
+                var dx = cx - dw / 2.0;
+                var dy = cy - dh / 2.0;
+
+                var state = gfx.Save();
+                var clip = new XGraphicsPath();
+                clip.AddEllipse(cx - r, cy - r, 2 * r, 2 * r);
+                gfx.IntersectClip(clip);
+                gfx.DrawImage(img, dx, dy, dw, dh);
+                gfx.Restore(state);
+                gfx.DrawEllipse(new XPen(RingX, 2.4), cx - r, cy - r, 2 * r, 2 * r);
+            }
+        }
+        img?.Dispose();
+    }
+
+    private static byte[]? DecodablePhoto(byte[]? headshot)
+    {
+        if (headshot is null || headshot.Length == 0) return null;
         try
         {
-            if (designed)
-            {
-                tempImage = TryWriteTempImage(headshot, headshotMime);
-                RenderDesignedHeaderPdf(section, data.Contact, tempImage);
-            }
-            else
-            {
-                RenderPlainHeaderPdf(section, data.Contact);
-            }
-
-            RenderBodyPdf(section, data, designed);
-            return RenderPdf(doc);
+            using var ms = new MemoryStream(headshot);
+            var test = XImage.FromStream(ms);
+            return test.PixelWidth > 0 ? headshot : null;
         }
-        finally
+        catch { return null; }
+    }
+
+    private static List<string> SidebarContactLines(ResumeContactDto c)
+    {
+        var lines = new List<string>();
+        if (!string.IsNullOrWhiteSpace(c.Email)) lines.Add(c.Email.Trim());
+        if (!string.IsNullOrWhiteSpace(c.Phone)) lines.Add(c.Phone.Trim());
+        if (!string.IsNullOrWhiteSpace(c.Location)) lines.Add(c.Location.Trim());
+        foreach (var l in (c.Links ?? Array.Empty<ResumeLinkDto>())
+                     .Where(x => x is not null && !string.IsNullOrWhiteSpace(x.Url)))
         {
-            if (tempImage is not null)
-                TryDeleteTemp(tempImage);
+            var url = l.Url.Trim();
+            url = url.Replace("https://", "").Replace("http://", "").TrimEnd('/');
+            lines.Add(url);
+        }
+        return lines;
+    }
+
+    private static void SidebarLabel(MCell c, string text)
+    {
+        var p = c.AddParagraph(Spaced(text.ToUpperInvariant()));
+        p.Format.Font.Name = FontFamily;
+        p.Format.Font.Size = 10;
+        p.Format.Font.Bold = true;
+        p.Format.Font.Color = SbLabel;
+        p.Format.SpaceBefore = 2;
+        p.Format.SpaceAfter = 4;
+        p.Format.Borders.Bottom = new Border { Width = 0.75, Color = SbRule };
+        p.Format.Borders.DistanceFromBottom = 3;
+    }
+
+    private static void SidebarLine(MCell c, string text, bool bullet = false, bool strong = false, bool small = false)
+    {
+        var p = c.AddParagraph();
+        p.Format.Font.Name = FontFamily;
+        p.Format.Font.Size = small ? 8.3 : 9.2;
+        p.Format.Font.Color = strong ? SbLabel : SbText;
+        p.Format.Font.Bold = strong;
+        p.Format.SpaceAfter = small ? 3 : 2.5;
+        p.Format.LineSpacingRule = LineSpacingRule.Single;
+        if (bullet)
+        {
+            var dot = p.AddFormattedText("•  ");
+            dot.Color = SbDot;
+        }
+        p.AddText(text);
+    }
+
+    private static void SidebarGap(MCell c)
+    {
+        var p = c.AddParagraph();
+        p.Format.SpaceAfter = Unit.FromCentimeter(0.4);
+    }
+
+    private static void MainHeading(MCell c, string text)
+    {
+        var p = c.AddParagraph(Spaced(text.ToUpperInvariant()));
+        p.Format.Font.Name = FontFamily;
+        p.Format.Font.Size = 11;
+        p.Format.Font.Bold = true;
+        p.Format.Font.Color = MainAccent;
+        p.Format.SpaceBefore = 8;
+        p.Format.SpaceAfter = 4;
+        p.Format.Borders.Bottom = new Border { Width = 1.0, Color = MainAccent };
+        p.Format.Borders.DistanceFromBottom = 3;
+    }
+
+    private static void MainExperience(MCell c, ResumeExperienceDto e)
+    {
+        var head = c.AddParagraph();
+        head.Format.SpaceAfter = 0;
+        var t = head.AddFormattedText(Safe(e.Title, "Role"), TextFormat.Bold);
+        t.Size = 10.5;
+        t.Color = MainName;
+        var meta = JoinPipe(e.Company, e.Location, DateRange(e.StartDate, e.EndDate, e.Current));
+        if (!string.IsNullOrWhiteSpace(meta))
+        {
+            var m = c.AddParagraph(meta);
+            m.Format.Font.Size = 8.8;
+            m.Format.Font.Color = MainMuted;
+            m.Format.SpaceAfter = 2;
+        }
+        MainBullets(c, e.Bullets);
+        var sp = c.AddParagraph();
+        sp.Format.SpaceAfter = 5;
+    }
+
+    private static void MainEducation(MCell c, ResumeEducationDto e)
+    {
+        var degree = JoinComma(JoinDash(e.Degree, e.Field), e.School);
+        var head = c.AddParagraph();
+        head.Format.SpaceAfter = 0;
+        var ft = head.AddFormattedText(Safe(degree, e.School), TextFormat.Bold);
+        ft.Size = 10.5;
+        ft.Color = MainName;
+        var meta = JoinPipe(e.Location, DateRange(e.StartDate, e.EndDate, current: false),
+            string.IsNullOrWhiteSpace(e.Gpa) ? "" : $"GPA {e.Gpa.Trim()}");
+        if (!string.IsNullOrWhiteSpace(meta))
+        {
+            var m = c.AddParagraph(meta);
+            m.Format.Font.Size = 8.8;
+            m.Format.Font.Color = MainMuted;
+            m.Format.SpaceAfter = 1;
+        }
+        if (!string.IsNullOrWhiteSpace(e.Details))
+        {
+            var d = c.AddParagraph(e.Details.Trim());
+            d.Format.Font.Size = 9.3;
+            d.Format.Font.Color = MainBody;
+        }
+        var sp = c.AddParagraph();
+        sp.Format.SpaceAfter = 5;
+    }
+
+    private static void MainProject(MCell c, ResumeProjectDto pr)
+    {
+        var head = c.AddParagraph();
+        head.Format.SpaceAfter = 0;
+        var ft = head.AddFormattedText(Safe(pr.Name, "Project"), TextFormat.Bold);
+        ft.Size = 10.5;
+        ft.Color = MainName;
+        if (!string.IsNullOrWhiteSpace(pr.Link))
+        {
+            head.AddText("   ");
+            var link = head.AddFormattedText(pr.Link.Trim().Replace("https://", "").Replace("http://", ""));
+            link.Size = 8.8;
+            link.Color = MainMuted;
+        }
+        if (!string.IsNullOrWhiteSpace(pr.Description))
+        {
+            var d = c.AddParagraph(pr.Description.Trim());
+            d.Format.Font.Size = 9.3;
+            d.Format.Font.Color = MainBody;
+            d.Format.SpaceAfter = 1;
+        }
+        MainBullets(c, pr.Bullets);
+        var sp = c.AddParagraph();
+        sp.Format.SpaceAfter = 5;
+    }
+
+    private static void MainBullets(MCell c, IReadOnlyList<string>? bullets)
+    {
+        if (bullets is null) return;
+        foreach (var b in bullets.Where(x => !string.IsNullOrWhiteSpace(x)))
+        {
+            var p = c.AddParagraph();
+            p.Format.LeftIndent = Unit.FromCentimeter(0.4);
+            p.Format.FirstLineIndent = Unit.FromCentimeter(-0.4);
+            p.Format.Font.Size = 9.5;
+            p.Format.Font.Color = MainBody;
+            p.Format.SpaceAfter = 1.5;
+            var dot = p.AddFormattedText("–  ");
+            dot.Color = MainAccent;
+            dot.Bold = true;
+            p.AddText(b.Trim());
         }
     }
+
+    /// <summary>Cheap letter-spacing: thin-space between characters for the uppercase labels/headline.</summary>
+    private static string Spaced(string s) => s;
 
     /// <summary>Render a cover letter to PDF as a clean business letter: the sender block from
     /// <paramref name="contact"/>, the date, then the body paragraphs (blank-line separated).</summary>
