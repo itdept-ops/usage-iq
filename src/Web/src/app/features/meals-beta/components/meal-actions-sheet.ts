@@ -56,6 +56,9 @@ import { hasIngredients, slotMeta } from '../meals-beta.model';
                 <mat-icon aria-hidden="true">add_shopping_cart</mat-icon> Add to grocery list
               </button>
             }
+            <button type="button" class="ma-btn ma-btn--ghost" (click)="move.emit()">
+              <mat-icon aria-hidden="true">event_repeat</mat-icon> Move to another day
+            </button>
             <button type="button" class="ma-btn ma-btn--danger" (click)="remove.emit()">
               <mat-icon aria-hidden="true">delete_outline</mat-icon> Remove from plan
             </button>
@@ -112,6 +115,9 @@ import { hasIngredients, slotMeta } from '../meals-beta.model';
       border: none; background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #07140d;
       box-shadow: var(--lift-2);
     }
+    .ma-btn--ghost {
+      border: 1px solid color-mix(in srgb, var(--accent-a) 40%, var(--hairline)); background: transparent; color: var(--ink);
+    }
     .ma-btn--danger {
       border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); background: transparent; color: var(--warn);
     }
@@ -124,6 +130,8 @@ export class ForageMealActionsSheet {
   readonly meal = input<FamilyMeal | null>(null);
   /** Add this meal's ingredients to the grocery list. */
   readonly grocery = output<void>();
+  /** Move this meal to another day of the week (kept in the same slot). */
+  readonly move = output<void>();
   /** Remove this meal from the plan. */
   readonly remove = output<void>();
 

@@ -23,6 +23,7 @@ import { ForagePlanSheet } from './components/plan-sheet';
 import { ForageEatSheet } from './components/eat-sheet';
 import { ForageGrocerySheet } from './components/grocery-sheet';
 import { ForageMealActionsSheet } from './components/meal-actions-sheet';
+import { ForageMoveMealSheet } from './components/move-meal-sheet';
 
 /**
  * Meals "Forage" — the mobile-first meal-planning + grocery surface, built on the shared beta-ui "Strata"
@@ -53,6 +54,7 @@ import { ForageMealActionsSheet } from './components/meal-actions-sheet';
   imports: [
     MatIconModule, BetaPullRefresh, BetaFab, BetaToaster, BetaSkeleton, BetaSvgRing, BetaSwipeRow,
     ForageDayStrip, ForageMealCard, ForagePlanSheet, ForageEatSheet, ForageGrocerySheet, ForageMealActionsSheet,
+    ForageMoveMealSheet,
   ],
   template: `
     <app-bs-pull-refresh class="mb-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
@@ -185,7 +187,9 @@ import { ForageMealActionsSheet } from './components/meal-actions-sheet';
     <app-forage-eat-sheet #eatSheet />
     <app-forage-grocery-sheet #grocerySheet (changed)="noop()" />
     <app-forage-meal-actions-sheet #mealSheet
-      [meal]="activeMeal()" (grocery)="addActiveMealToGrocery()" (remove)="removeActiveMeal()" />
+      [meal]="activeMeal()" (grocery)="addActiveMealToGrocery()" (move)="openMoveActiveMeal()" (remove)="removeActiveMeal()" />
+    <app-forage-move-meal-sheet #moveSheet
+      [meal]="activeMeal()" [cells]="cells()" (move)="moveActiveMeal($event)" />
 
     <app-bs-toaster />
   `,
@@ -201,6 +205,7 @@ export class MealsBetaPage {
   private readonly eatSheet = viewChild.required(ForageEatSheet);
   private readonly grocerySheet = viewChild.required(ForageGrocerySheet);
   private readonly mealSheet = viewChild.required(ForageMealActionsSheet);
+  private readonly moveSheet = viewChild.required(ForageMoveMealSheet);
 
   // ---- week + data state ----
   readonly weekStart = signal<Date>(thisMonday());
@@ -437,6 +442,44 @@ export class MealsBetaPage {
   removeActiveMeal(): void {
     const meal = this.activeMeal();
     if (meal) { this.mealSheet().open.set(false); void this.removeMeal(meal); }
+  }
+
+  // ---- move to another day (reuse patchFamilyMeal, optimistic + revert) ----
+  /** Hand off from the actions sheet to the day-picker sheet (same active meal). */
+  openMoveActiveMeal(): void {
+    if (this.activeMeal()) { this.mealSheet().open.set(false); this.moveSheet().open.set(true); }
+  }
+
+  moveActiveMeal(targetIso: string): void {
+    const meal = this.activeMeal();
+    if (meal) { this.moveSheet().open.set(false); void this.moveMeal(meal, targetIso); }
+  }
+
+  /** Reschedule one meal to `targetIso` (same slot): optimistically shuffle the day buckets, then PATCH. */
+  async moveMeal(meal: FamilyMeal, targetIso: string): Promise<void> {
+    const fromIso = dateOnly(meal.localDate);
+    if (targetIso === fromIso) return;
+
+    // Optimistic move: drop the meal from its old day, add the re-dated copy to the new day.
+    const prev = this.days();
+    const moved: FamilyMeal = { ...meal, localDate: targetIso };
+    this.days.set(prev.map(d => {
+      const iso = dateOnly(d.localDate);
+      if (iso === fromIso) return { ...d, meals: d.meals.filter(m => m.id !== meal.id) };
+      if (iso === targetIso) return { ...d, meals: [...d.meals, moved] };
+      return d;
+    }));
+
+    const dayLabel = this.cells().find(c => c.localDate === targetIso)?.weekdayLong ?? 'that day';
+    try {
+      await firstValueFrom(this.api.patchFamilyMeal(meal.id, { localDate: targetIso }));
+      // Reconcile with the server's truth (mirrors the post-write reload the other paths use).
+      this.reload();
+      this.toast.show(`Moved to ${dayLabel}`, { tone: 'success', durationMs: 2600 });
+    } catch {
+      this.days.set(prev); // revert
+      this.toast.show('Couldn’t move that meal', { tone: 'warn' });
+    }
   }
 
   // ---- sheets ----
