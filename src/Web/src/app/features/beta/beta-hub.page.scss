@@ -183,7 +183,9 @@
     inset 0 1px 0 rgba(255, 255, 255, .25);
 }
 .bh-tile__icon mat-icon {
-  font-size: 25px; width: 25px; height: 25px; color: #fff;
+  // The kit's on-accent ink — clears WCAG AA on EVERY accent pair, incl. the light cream/amber/gold/lime
+  // chips where white was invisible (Bills/Family/Trophies/Meals).
+  font-size: 25px; width: 25px; height: 25px; color: var(--ink-on-accent);
 }
 
 // Subtle "new / experimental" treatment — a tiny pulsing-dot pill in the corner.
@@ -239,3 +241,161 @@
   font-size: 30px; width: 30px; height: 30px; color: color-mix(in srgb, var(--accent-a) 80%, var(--ink));
 }
 .bh-empty__msg { margin: 0; color: var(--ink-dim); font-size: 14px; max-width: 32ch; }
+.bh-empty__btn {
+  min-height: 40px; padding: 0 18px; border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--accent-a) 36%, var(--hairline));
+  background: color-mix(in srgb, var(--accent-a) 14%, transparent);
+  color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: transform 120ms var(--ease-spring);
+}
+.bh-empty__btn:active { transform: scale(.95); }
+
+// ============================================================================
+// HEADER ACTIONS — Customize / Done / Reset.
+// ============================================================================
+
+.bh-head__actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+
+.bh-act {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 38px; padding: 0 14px; border-radius: var(--r-pill);
+  border: 1px solid var(--hairline); background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: transform 120ms var(--ease-spring), background 140ms var(--ease-out), border-color 140ms var(--ease-out);
+}
+.bh-act:active { transform: scale(.93); }
+.bh-act:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-a) 70%, var(--focus)); outline-offset: 2px; }
+.bh-act--icon { width: 38px; padding: 0; }
+.bh-act--icon mat-icon { font-size: 21px; width: 21px; height: 21px; }
+.bh-act--primary {
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  border-color: transparent; color: #fff;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-a) 32%, transparent);
+}
+.bh-act--ghost { background: transparent; color: var(--ink-dim); }
+.bh-act--ghost:hover { color: var(--ink); }
+// Reset, armed for its confirming second tap — warn-tinted so the destructive scope is obvious.
+.bh-act--armed {
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 46%, var(--hairline));
+  color: var(--warn);
+}
+
+// Visually-hidden live region (announces reorder/hide/show/reset) — present for SRs, invisible on screen.
+.bh-sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+// ============================================================================
+// CUSTOMIZE MODE — the hint banner + the drag-reorderable list + hidden tray.
+// ============================================================================
+
+.bh-hint {
+  display: flex; align-items: center; gap: 9px; margin: 0;
+  padding: 11px 14px; border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--accent-a) 9%, var(--bg-rise));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 22%, var(--hairline));
+  color: var(--ink-dim); font-size: 13px; font-weight: 600; line-height: 1.35;
+}
+.bh-hint mat-icon {
+  flex: 0 0 auto; font-size: 20px; width: 20px; height: 20px;
+  color: color-mix(in srgb, var(--accent-b) 72%, var(--ink));
+}
+
+// The grid becomes a single-column vertical LIST in edit mode (room for the controls; clean drag targets).
+.bh-grid--edit {
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+// Each tile becomes a compact ROW: handle · icon · title · controls. Reuses the .bh-tile depth surface
+// but kills the hover-lift/glow/min-height (it's an editable row now, not a launch target).
+.bh-tile--edit {
+  flex-direction: row; align-items: center; gap: 11px;
+  min-height: 0; padding: 10px 12px;
+  cursor: default;
+  transition: box-shadow 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+.bh-tile--edit::before { display: none; }                       // no accent glow bloom in edit mode
+.bh-tile--edit:hover {
+  transform: none; box-shadow: var(--lift-2);
+  border-color: color-mix(in srgb, var(--ta, var(--accent-a)) 24%, var(--hairline));
+}
+
+.bh-handle {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 30px; height: 40px; border: 0; background: transparent;
+  color: var(--ink-faint); cursor: grab; touch-action: none;   // touch-action:none → the handle drags, page still scrolls
+  -webkit-tap-highlight-color: transparent;
+}
+.bh-handle:active { cursor: grabbing; }
+.bh-handle mat-icon { font-size: 22px; width: 22px; height: 22px; }
+
+.bh-tile__icon--sm {
+  width: 38px; height: 38px; border-radius: 11px;
+}
+.bh-tile__icon--sm mat-icon { font-size: 21px; width: 21px; height: 21px; }
+
+.bh-tile__title--edit {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.bh-editbtns { flex: 0 0 auto; display: flex; gap: 5px; }
+.bh-ebtn {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
+  border: 1px solid var(--hairline); background: color-mix(in srgb, var(--ink) 3%, transparent);
+  color: var(--ink); cursor: pointer; transition: transform 120ms var(--ease-spring);
+}
+.bh-ebtn:active { transform: scale(.9); }
+// At the first/last slot the nudge is a no-op — dimmed for the cue, but kept focusable (NOT [disabled]) so a
+// keyboard user pressing it at the boundary isn't ejected to <body>.
+.bh-ebtn--end { opacity: .3; }
+.bh-ebtn--end:active { transform: none; }
+.bh-ebtn--off { color: var(--warn); }
+.bh-ebtn mat-icon { font-size: 19px; width: 19px; height: 19px; }
+
+// Hidden tray — perm-gated tiles the user turned off, as dashed accent chips that re-add on tap.
+.bh-hidden { display: flex; flex-direction: column; gap: 9px; margin-top: 2px; }
+.bh-hidden__label {
+  // --ink-dim (≈6.8:1), not --ink-faint (~3.7:1) — this label tells the user the tray is interactive.
+  font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim);
+}
+.bh-hidden__list { display: flex; flex-wrap: wrap; gap: 8px; }
+.bh-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 11px 6px 7px; border-radius: var(--r-pill);
+  border: 1px dashed color-mix(in srgb, var(--ta, var(--accent-a)) 40%, var(--hairline));
+  background: color-mix(in srgb, var(--ta, var(--accent-a)) 9%, var(--bg-rise));
+  color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: transform 120ms var(--ease-spring), background 140ms var(--ease-out);
+}
+.bh-chip:hover { background: color-mix(in srgb, var(--ta, var(--accent-a)) 15%, var(--bg-rise)); }
+.bh-chip:active { transform: scale(.95); }
+.bh-chip__ic {
+  flex: 0 0 auto; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--ta, var(--accent-a)), var(--tb, var(--accent-b)));
+}
+.bh-chip__ic mat-icon { font-size: 16px; width: 16px; height: 16px; color: var(--ink-on-accent); }
+.bh-chip__add {
+  flex: 0 0 auto; font-size: 18px; width: 18px; height: 18px;
+  color: color-mix(in srgb, var(--ta, var(--accent-a)) 78%, var(--ink-dim));
+}
+
+// ---- Angular CDK drag-drop chrome -----------------------------------------
+// The lifted preview clone (rendered into the list's parent via cdkDragPreviewContainer="parent", so it
+// keeps the page's kit token context), the gap the dragged item leaves behind, and the settle animation.
+.cdk-drag-preview {
+  border-radius: var(--r-card);
+  box-shadow: var(--lift-3),
+    0 0 0 1px color-mix(in srgb, var(--ta, var(--accent-a)) 38%, transparent);
+}
+.cdk-drag-placeholder { opacity: .32; }
+.cdk-drag-animating { transition: transform 220ms var(--ease-spring); }
+.bh-grid--edit.cdk-drop-list-dragging .bh-tile--edit:not(.cdk-drag-dragging) {
+  transition: transform 220ms var(--ease-spring);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cdk-drag-animating,
+  .bh-grid--edit.cdk-drop-list-dragging .bh-tile--edit:not(.cdk-drag-dragging) { transition: none; }
+}
