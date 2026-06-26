@@ -99,7 +99,8 @@ export class Calendar {
     });
   }
 
-  fmtHour(h: number): string {
+  fmtHour(h: number | null | undefined): string {
+    if (h == null || !Number.isFinite(h)) return '—';
     return `${String(h).padStart(2, '0')}:00`;
   }
   shortId(id: string): string {

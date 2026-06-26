@@ -168,11 +168,19 @@
 
 .challenge__hero-stats {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--tech-space-5, 20px);
   margin: 0;
-  div { display: flex; flex-direction: column; }
+  div { display: flex; flex-direction: column; min-width: 0; }
   dt { font-size: var(--tech-fs-caption, 0.75rem); color: var(--tech-text-tertiary); text-transform: uppercase; letter-spacing: 0.03em; }
   dd { margin: 2px 0 0; font-size: 1.3rem; font-weight: 700; color: var(--tech-text); font-variant-numeric: tabular-nums; }
+
+  /* On mobile, fall to a 2×2 grid so no column runs off the card edge. */
+  @media (max-width: 560px) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--tech-space-4, 16px) var(--tech-space-5, 20px);
+  }
 }
 .challenge__unit { font-size: 0.8rem; font-weight: 500; color: var(--tech-text-tertiary); }
 

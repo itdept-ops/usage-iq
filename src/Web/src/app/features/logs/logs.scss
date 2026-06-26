@@ -259,7 +259,9 @@ mat-form-field { --mat-form-field-container-text-size: 13px; }
   .bodies { gap: 12px; }
   .body { max-height: 240px; font-size: 11.5px; }
 
-  .empty { display: block; padding: 24px 8px; }
+  /* Must out-specify `.log-table td { white-space: nowrap }` (0,1,1) or the empty-state text
+     stays one long line and forces the card wider than the 390px viewport. */
+  .log-table td.empty { display: block; padding: 24px 8px; white-space: normal; word-break: break-word; }
 }
 
 @media (prefers-reduced-motion: reduce) {
