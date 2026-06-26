@@ -842,12 +842,15 @@ public sealed class ResumeDocumentService
             var body = main.Document.AppendChild(new Body());
 
             if (designed)
-                RenderDesignedHeaderDocx(main, body, data.Contact, headshot, headshotMime);
+            {
+                RenderDesignedDocx(main, body, data, headshot, headshotMime);
+            }
             else
+            {
                 RenderPlainHeaderDocx(body, data.Contact);
-
-            RenderBodyDocx(body, data, designed);
-            body.AppendChild(LetterPageSize());
+                RenderBodyDocx(body, data, designed: false);
+                body.AppendChild(LetterPageSize());
+            }
             main.Document.Save();
         }
         return ms.ToArray();
@@ -883,62 +886,255 @@ public sealed class ResumeDocumentService
 
     // ---- DOCX building blocks -------------------------------------------------------------------
 
-    private static void RenderDesignedHeaderDocx(
-        MainDocumentPart main, Body body, ResumeContactDto contact, byte[]? headshot, string? headshotMime)
+    // ---- Designed DOCX: two-column sidebar (mirrors the designed PDF) ----
+    // A borderless single-row, two-cell table on a 0-margin page: a teal SIDEBAR cell (shaded, circular photo
+    // via an ellipse preset geometry + center-crop srcRect, then Contact / Skills / Certifications in light
+    // text) and a white MAIN cell (bold name, accent headline, then Profile / Experience / Education /
+    // Projects). Word continues the cell shading across page breaks, so the sidebar spans multi-page resumes.
+    private const string SbBgHex = "21495C";
+    private const string SbTextHex = "CFDCE4";
+    private const string SbDotHex = "8FC2D4";
+    private const string MainNameHex = "18242E";
+    private const string MainAccentHex = "21495C";
+    private const string MainMutedHex = "606A76";
+
+    private static void RenderDesignedDocx(
+        MainDocumentPart main, Body body, ResumeDataDto data, byte[]? headshot, string? headshotMime)
     {
-        var hasPhoto = TryAddImagePart(main, headshot, headshotMime, out var relId);
+        var contact = data.Contact ?? ResumeDataDto.Empty.Contact;
+        var photo = DecodablePhoto(headshot);
+        var hasPhoto = photo is not null && TryAddImagePart(main, photo, headshotMime, out _);
+        var relId = "";
+        if (hasPhoto) TryAddImagePart(main, photo, headshotMime, out relId);
 
         var table = new DW.Table();
         table.AppendChild(new TableProperties(
-            new TableWidth { Width = "5000", Type = TableWidthUnitValues.Pct },
+            new TableWidth { Width = "12240", Type = TableWidthUnitValues.Dxa },
+            new TableIndentation { Width = 0, Type = TableWidthUnitValues.Dxa },
             new TableLayout { Type = TableLayoutValues.Fixed },
             new TableBorders(
-                new TopBorder { Val = BorderValues.None },
-                new BottomBorder { Val = BorderValues.None },
-                new LeftBorder { Val = BorderValues.None },
-                new RightBorder { Val = BorderValues.None },
+                new TopBorder { Val = BorderValues.None }, new BottomBorder { Val = BorderValues.None },
+                new LeftBorder { Val = BorderValues.None }, new RightBorder { Val = BorderValues.None },
                 new InsideHorizontalBorder { Val = BorderValues.None },
                 new InsideVerticalBorder { Val = BorderValues.None })));
 
         var row = new TableRow();
 
-        // text cell
-        var textCell = new TableCell();
-        textCell.AppendChild(new TableCellProperties(
-            new TableCellWidth { Width = hasPhoto ? "8200" : "10000", Type = TableWidthUnitValues.Dxa },
-            new Shading { Val = ShadingPatternValues.Clear, Fill = "1F3A5F" },
-            new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
+        // ---------- SIDEBAR ----------
+        var sb = new TableCell();
+        sb.AppendChild(new TableCellProperties(
+            new TableCellWidth { Width = "3960", Type = TableWidthUnitValues.Dxa },
+            new Shading { Val = ShadingPatternValues.Clear, Fill = SbBgHex },
+            new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Top },
             new TableCellMargin(
-                new TopMargin { Width = "220", Type = TableWidthUnitValues.Dxa },
-                new BottomMargin { Width = "220", Type = TableWidthUnitValues.Dxa },
-                new LeftMargin { Width = "300", Type = TableWidthUnitValues.Dxa },
-                new RightMargin { Width = "200", Type = TableWidthUnitValues.Dxa })));
+                new TopMargin { Width = "560", Type = TableWidthUnitValues.Dxa },
+                new BottomMargin { Width = "400", Type = TableWidthUnitValues.Dxa },
+                new LeftMargin { Width = "380", Type = TableWidthUnitValues.Dxa },
+                new RightMargin { Width = "300", Type = TableWidthUnitValues.Dxa })));
 
-        textCell.AppendChild(Para(Run(Safe(contact.FullName, "Your Name"), bold: true, size: 44, color: "FFFFFF")));
-        if (!string.IsNullOrWhiteSpace(contact.Headline))
-            textCell.AppendChild(Para(Run(contact.Headline.Trim(), size: 23, color: "FFFFFF")));
-        var contactLine = ContactLine(contact);
-        if (!string.IsNullOrWhiteSpace(contactLine))
-            textCell.AppendChild(Para(Run(contactLine, size: 18, color: "FFFFFF")));
-        row.AppendChild(textCell);
-
-        // photo cell
         if (hasPhoto)
         {
-            var photoCell = new TableCell();
-            photoCell.AppendChild(new TableCellProperties(
-                new TableCellWidth { Width = "1800", Type = TableWidthUnitValues.Dxa },
-                new Shading { Val = ShadingPatternValues.Clear, Fill = "1F3A5F" },
-                new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center }));
-            var p = new Paragraph(new ParagraphProperties(new Justification { Val = JustificationValues.Center }));
-            p.AppendChild(ImageRun(relId, widthEmu: 935_000, heightEmu: 935_000));
-            photoCell.AppendChild(p);
-            row.AppendChild(photoCell);
+            var (cropH, cropV) = SquareCrop(photo!);
+            var pp = new Paragraph(new ParagraphProperties(
+                new Justification { Val = JustificationValues.Center },
+                new SpacingBetweenLines { After = "240" }));
+            pp.AppendChild(CircleImageRun(relId, 1_500_000, cropH, cropV));
+            sb.AppendChild(pp);
         }
+
+        var cLines = SidebarContactLines(contact);
+        if (cLines.Count > 0)
+        {
+            sb.AppendChild(SbLabelDocx("Contact"));
+            foreach (var l in cLines) sb.AppendChild(SbLineDocx(l));
+        }
+        var skills = (data.Skills ?? Array.Empty<string>())
+            .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList();
+        if (skills.Count > 0)
+        {
+            sb.AppendChild(SbGapDocx());
+            sb.AppendChild(SbLabelDocx("Skills"));
+            foreach (var s in skills) sb.AppendChild(SbLineDocx(s, bullet: true));
+        }
+        var certs = (data.Certifications ?? Array.Empty<ResumeCertificationDto>())
+            .Where(c => c is not null && !IsBlankCert(c)).ToList();
+        if (certs.Count > 0)
+        {
+            sb.AppendChild(SbGapDocx());
+            sb.AppendChild(SbLabelDocx("Certifications"));
+            foreach (var c in certs)
+            {
+                sb.AppendChild(SbLineDocx(Safe(c.Name, "Certification"), strong: true));
+                var sub = JoinPipe(c.Issuer, c.Date);
+                if (!string.IsNullOrWhiteSpace(sub)) sb.AppendChild(SbLineDocx(sub, small: true));
+            }
+        }
+        sb.AppendChild(new Paragraph());   // a cell must end with a paragraph
+        row.AppendChild(sb);
+
+        // ---------- MAIN ----------
+        var mc = new TableCell();
+        mc.AppendChild(new TableCellProperties(
+            new TableCellWidth { Width = "8280", Type = TableWidthUnitValues.Dxa },
+            new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Top },
+            new TableCellMargin(
+                new TopMargin { Width = "620", Type = TableWidthUnitValues.Dxa },
+                new BottomMargin { Width = "400", Type = TableWidthUnitValues.Dxa },
+                new LeftMargin { Width = "460", Type = TableWidthUnitValues.Dxa },
+                new RightMargin { Width = "380", Type = TableWidthUnitValues.Dxa })));
+
+        mc.AppendChild(Para(Run(Safe(contact.FullName, "Your Name"), bold: true, size: 50, color: MainNameHex)));
+        if (!string.IsNullOrWhiteSpace(contact.Headline))
+            mc.AppendChild(Para(Run(contact.Headline.Trim(), bold: true, size: 24, color: MainAccentHex)));
+
+        if (!string.IsNullOrWhiteSpace(data.Summary))
+        {
+            mc.AppendChild(HeadingDocx("Profile", designed: true));
+            mc.AppendChild(JustifiedPara(Run(data.Summary.Trim(), size: 19), spaceAfter: 140));
+        }
+
+        var experience = (data.Experience ?? Array.Empty<ResumeExperienceDto>())
+            .Where(e => e is not null && !IsBlankExperience(e)).ToList();
+        if (experience.Count > 0)
+        {
+            mc.AppendChild(HeadingDocx("Experience", designed: true));
+            foreach (var e in experience)
+            {
+                mc.AppendChild(MakePara(SpacingProps(spaceAfter: 0),
+                    Run(Safe(e.Title, "Role"), bold: true, size: 21, color: MainNameHex)));
+                var meta = JoinPipe(e.Company, e.Location, DateRange(e.StartDate, e.EndDate, e.Current));
+                if (!string.IsNullOrWhiteSpace(meta))
+                    mc.AppendChild(MakePara(SpacingProps(spaceAfter: 40), Run(meta, size: 18, color: MainMutedHex)));
+                foreach (var b in CleanBullets(e.Bullets)) mc.AppendChild(BulletDocx(b));
+                mc.AppendChild(Spacer(90));
+            }
+        }
+
+        var education = (data.Education ?? Array.Empty<ResumeEducationDto>())
+            .Where(e => e is not null && !IsBlankEducation(e)).ToList();
+        if (education.Count > 0)
+        {
+            mc.AppendChild(HeadingDocx("Education", designed: true));
+            foreach (var e in education)
+            {
+                var degree = JoinComma(JoinDash(e.Degree, e.Field), e.School);
+                mc.AppendChild(MakePara(SpacingProps(spaceAfter: 0),
+                    Run(Safe(degree, e.School), bold: true, size: 21, color: MainNameHex)));
+                var meta = JoinPipe(e.Location, DateRange(e.StartDate, e.EndDate, current: false),
+                    string.IsNullOrWhiteSpace(e.Gpa) ? "" : $"GPA {e.Gpa.Trim()}");
+                if (!string.IsNullOrWhiteSpace(meta))
+                    mc.AppendChild(MakePara(SpacingProps(spaceAfter: 20), Run(meta, size: 18, color: MainMutedHex)));
+                if (!string.IsNullOrWhiteSpace(e.Details))
+                    mc.AppendChild(Para(Run(e.Details.Trim(), size: 18)));
+                mc.AppendChild(Spacer(90));
+            }
+        }
+
+        var projects = (data.Projects ?? Array.Empty<ResumeProjectDto>())
+            .Where(p => p is not null && !IsBlankProject(p)).ToList();
+        if (projects.Count > 0)
+        {
+            mc.AppendChild(HeadingDocx("Projects", designed: true));
+            foreach (var pr in projects)
+            {
+                var head = new Paragraph();
+                head.AppendChild(SpacingProps(spaceAfter: 0));
+                head.AppendChild(Run(Safe(pr.Name, "Project"), bold: true, size: 21, color: MainNameHex));
+                if (!string.IsNullOrWhiteSpace(pr.Link))
+                    head.AppendChild(Run("   " + pr.Link.Trim(), size: 18, color: MainMutedHex));
+                mc.AppendChild(head);
+                if (!string.IsNullOrWhiteSpace(pr.Description))
+                    mc.AppendChild(Para(Run(pr.Description.Trim(), size: 18)));
+                foreach (var b in CleanBullets(pr.Bullets)) mc.AppendChild(BulletDocx(b));
+                mc.AppendChild(Spacer(90));
+            }
+        }
+        mc.AppendChild(new Paragraph());
+        row.AppendChild(mc);
 
         table.AppendChild(row);
         body.AppendChild(table);
-        body.AppendChild(Spacer());
+        body.AppendChild(new SectionProperties(
+            new PageSize { Width = 12240U, Height = 15840U },
+            new PageMargin { Top = 0, Bottom = 0, Left = 0, Right = 0, Header = 0U, Footer = 0U, Gutter = 0U }));
+    }
+
+    private static Paragraph MakePara(ParagraphProperties props, params OpenXmlElement[] runs)
+    {
+        var p = new Paragraph();
+        p.AppendChild(props);
+        foreach (var r in runs) p.AppendChild(r);
+        return p;
+    }
+
+    private static Paragraph SbLabelDocx(string text)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "60", After = "70" },
+            new ParagraphBorders(new BottomBorder
+            { Val = BorderValues.Single, Color = "4C6E80", Size = 6U, Space = 3U })));
+        p.AppendChild(Run(text.ToUpperInvariant(), bold: true, size: 20, color: "FFFFFF"));
+        return p;
+    }
+
+    private static Paragraph SbLineDocx(string text, bool bullet = false, bool strong = false, bool small = false)
+    {
+        var p = new Paragraph(new ParagraphProperties(new SpacingBetweenLines { After = small ? "60" : "40" }));
+        if (bullet) p.AppendChild(Run("•  ", size: 18, color: SbDotHex));
+        p.AppendChild(Run(text, bold: strong, size: small ? 16 : 18, color: strong ? "FFFFFF" : SbTextHex));
+        return p;
+    }
+
+    private static Paragraph SbGapDocx() =>
+        new(new ParagraphProperties(new SpacingBetweenLines { After = "200" }));
+
+    /// <summary>Center-crop fractions (in 1000ths of a percent) to square a non-square photo for the circle.</summary>
+    private static (int horiz, int vert) SquareCrop(byte[] photo)
+    {
+        try
+        {
+            using var s = new MemoryStream(photo);
+            var img = XImage.FromStream(s);
+            int w = img.PixelWidth, h = img.PixelHeight;
+            if (w <= 0 || h <= 0) return (0, 0);
+            if (h > w) return (0, (int)((h - w) / 2.0 / h * 100000));   // crop top + bottom
+            if (w > h) return ((int)((w - h) / 2.0 / w * 100000), 0);   // crop left + right
+            return (0, 0);
+        }
+        catch { return (0, 0); }
+    }
+
+    /// <summary>A square inline image clipped to a CIRCLE (ellipse preset geometry) with a center-crop srcRect
+    /// so a non-square source isn't distorted.</summary>
+    private static Run CircleImageRun(string relId, long diameterEmu, int cropHoriz, int cropVert)
+    {
+        var docPrId = (uint)Random.Shared.Next(1, int.MaxValue);
+        var drawing = new Drawing(
+            new WP.Inline(
+                new WP.Extent { Cx = diameterEmu, Cy = diameterEmu },
+                new WP.EffectExtent { LeftEdge = 0, TopEdge = 0, RightEdge = 0, BottomEdge = 0 },
+                new WP.DocProperties { Id = docPrId, Name = "Headshot" },
+                new WP.NonVisualGraphicFrameDrawingProperties(new DRAW.GraphicFrameLocks { NoChangeAspect = true }),
+                new DRAW.Graphic(
+                    new DRAW.GraphicData(
+                        new PIC.Picture(
+                            new PIC.NonVisualPictureProperties(
+                                new PIC.NonVisualDrawingProperties { Id = 0U, Name = "Headshot" },
+                                new PIC.NonVisualPictureDrawingProperties()),
+                            new PIC.BlipFill(
+                                new DRAW.Blip { Embed = relId },
+                                new DRAW.SourceRectangle { Left = cropHoriz, Top = cropVert, Right = cropHoriz, Bottom = cropVert },
+                                new DRAW.Stretch(new DRAW.FillRectangle())),
+                            new PIC.ShapeProperties(
+                                new DRAW.Transform2D(
+                                    new DRAW.Offset { X = 0L, Y = 0L },
+                                    new DRAW.Extents { Cx = diameterEmu, Cy = diameterEmu }),
+                                new DRAW.PresetGeometry(new DRAW.AdjustValueList()) { Preset = DRAW.ShapeTypeValues.Ellipse }))
+                    ) { Uri = "http://schemas.openxmlformats.org/drawingml/2006/picture" }))
+            {
+                DistanceFromTop = 0U, DistanceFromBottom = 0U, DistanceFromLeft = 0U, DistanceFromRight = 0U,
+            });
+        return new Run(drawing);
     }
 
     private static void RenderPlainHeaderDocx(Body body, ResumeContactDto contact)
@@ -1051,8 +1247,8 @@ public sealed class ResumeDocumentService
 
     private static Paragraph HeadingDocx(string text, bool designed)
     {
-        var color = designed ? "1F3A5F" : "000000";
-        var ruleColor = designed ? "1F3A5F" : "C9CFD8";
+        var color = designed ? "21495C" : "000000";
+        var ruleColor = designed ? "21495C" : "C9CFD8";
         var props = new ParagraphProperties(
             new SpacingBetweenLines { Before = "120", After = "60" },
             new ParagraphBorders(new BottomBorder
