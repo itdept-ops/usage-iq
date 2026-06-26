@@ -44,17 +44,26 @@
   gap: 4px;
 
   border-radius: var(--tech-r-chrome, 0);
-  border-bottom: 1px solid var(--tech-border, #26303f);
+  /* Subtle hairline that reads on dark (the light --tech-border would flash on the dark beta surface). */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
-  box-shadow: inset 0 1px 0 var(--tech-glass-inset-hi, rgba(255, 255, 255, 0.05));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 
-  /* Back affordance: a quiet icon-button that always lets the user leave the page. */
+  /* The beta routes are ALWAYS dark immersive surfaces. Pin a dark translucent glass here so the bar
+     blends in regardless of the active theme — overrides the light .glass background (.slimbar.glass)
+     while keeping the inherited backdrop blur above. */
+  &.glass {
+    background: rgba(10, 11, 18, 0.72);
+  }
+
+  /* Back affordance: a quiet icon-button that always lets the user leave the page. Pinned light so it
+     reads on the dark bar (not the theme's secondary text token, which goes dark in light mode). */
   .slimbar__back.mat-mdc-icon-button {
     flex: 0 0 auto;
     width: 40px;
     height: 40px;
-    color: var(--tech-text-secondary);
+    color: rgba(255, 255, 255, 0.72);
     transition: color var(--tech-t-control, 140ms) ease;
 
     mat-icon {
@@ -63,7 +72,7 @@
       height: 19px;
     }
 
-    &:hover { color: var(--tech-text); }
+    &:hover { color: #fff; }
     &:focus-visible { outline: none; box-shadow: var(--tech-focus-ring); }
   }
 
@@ -94,9 +103,17 @@
     background: color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 10%, transparent);
   }
 
-  /* The account trigger reuses .user; tuck it to the bar edge on the slim strip. */
+  /* The account trigger reuses .user; tuck it to the bar edge on the slim strip. Pin its color light so
+     the dropdown caret reads on the dark bar (the shared .user uses the theme's secondary text token,
+     which flips dark in light mode). The avatar circle keeps its own gradient/image and is untouched. */
   .user.mat-mdc-button {
     margin-left: 0;
+    color: rgba(255, 255, 255, 0.72);
+
+    .user__chev { color: rgba(255, 255, 255, 0.72); }
+
+    &:hover .user__chev { color: #fff; }
+    &.user--open .user__chev { color: #fff; }
   }
 }
 
