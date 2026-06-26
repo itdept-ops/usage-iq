@@ -66,8 +66,9 @@ import { ActivityWidget } from './widgets/activity-widget';
               @if (layout.reordering()) {
                 <button type="button" class="hh__btn hh__btn--primary" (click)="layout.setReorder(false)">Done</button>
               } @else {
-                <button type="button" class="hh__btn" (click)="layout.toggleReorder()" aria-label="Rearrange widgets">
-                  <mat-icon aria-hidden="true">tune</mat-icon>
+                <button type="button" class="hh__btn" (click)="layout.toggleReorder()"
+                        aria-label="Customize tiles — reorder or hide">
+                  <mat-icon aria-hidden="true">dashboard_customize</mat-icon>
                 </button>
                 <a class="hh__btn" routerLink="/settings" aria-label="Settings">
                   <mat-icon aria-hidden="true">settings</mat-icon>

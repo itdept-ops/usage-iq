@@ -26,7 +26,7 @@ const MAX_AVATARS = 6;
   imports: [AtriumWidgetShell],
   template: `
     <atr-widget-shell
-      title="Who's online" route="/users"
+      title="Who's online" route="/beta/people"
       accentA="#34d399" accentB="#22d3ee"
       [phase]="phase()" emptyText="No one else is online right now." emptyIcon="groups"
       [reordering]="reordering()"

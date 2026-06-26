@@ -22,7 +22,7 @@ import { ReorderableWidget } from './reorderable';
   imports: [AtriumWidgetShell],
   template: `
     <atr-widget-shell
-      title="Spend this month" route="/family/finance"
+      title="Spend this month" route="/beta/dashboard"
       accentA="#fb7185" accentB="#f0a35a"
       [phase]="phase()" emptyText="No spending recorded this month." emptyIcon="savings"
       [reordering]="reordering()"

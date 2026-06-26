@@ -24,7 +24,7 @@ import { ReorderableWidget } from './reorderable';
   imports: [AtriumWidgetShell, MatIconModule],
   template: `
     <atr-widget-shell
-      title="Next event" route="/family/calendar"
+      title="Next event" route="/beta/family"
       accentA="#38bdf8" accentB="#7c5cff"
       [phase]="phase()" emptyText="Nothing else on the calendar today." emptyIcon="event_available"
       [reordering]="reordering()"
