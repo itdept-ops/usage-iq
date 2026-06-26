@@ -161,7 +161,7 @@
 .ab-state-btn {
   display: inline-flex; align-items: center; gap: 7px;
   min-height: 48px; padding: 0 22px; border: none; border-radius: var(--r-pill);
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #2a0a00;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--ink-on-accent);
   font-family: var(--font-ui); font-size: 14.5px; font-weight: 800; cursor: pointer; box-shadow: var(--lift-2);
   -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   transition: transform 120ms var(--ease-out);

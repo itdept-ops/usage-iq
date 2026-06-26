@@ -38,33 +38,33 @@ import { ReorderableWidget } from './reorderable';
       @if (day(); as d) {
         <div body class="rings">
           <div class="ring">
-            <app-bs-ring [value]="calFrac()" [size]="92" [stroke]="9"
+            <app-bs-ring [value]="ringValue(calFrac())" [size]="92" [stroke]="9"
                          from="#7c5cff" to="#4f7bff" [label]="calPct() + '% of calorie goal'">
               <span class="ring__c">
-                <span class="ring__num">{{ d.caloriesIn }}</span>
-                <span class="ring__unit">/ {{ d.calorieGoal ?? '—' }}</span>
+                <span class="ring__num">{{ d.caloriesIn ?? 0 }}</span>
+                <span class="ring__unit">{{ d.calorieGoal ? 'of ' + d.calorieGoal : 'no goal' }}</span>
               </span>
             </app-bs-ring>
             <span class="ring__lbl">Calories</span>
           </div>
 
           <div class="ring">
-            <app-bs-ring [value]="proFrac()" [size]="92" [stroke]="9"
+            <app-bs-ring [value]="ringValue(proFrac())" [size]="92" [stroke]="9"
                          from="#22d3ee" to="#34d399" [label]="proPct() + '% of protein goal'">
               <span class="ring__c">
-                <span class="ring__num">{{ d.proteinG }}<small>g</small></span>
-                <span class="ring__unit">{{ proteinGoal() ? '/ ' + proteinGoal() + 'g' : 'protein' }}</span>
+                <span class="ring__num">{{ d.proteinG ?? 0 }}<small>g</small></span>
+                <span class="ring__unit">{{ proteinGoal() ? 'of ' + proteinGoal() + 'g' : 'no goal' }}</span>
               </span>
             </app-bs-ring>
             <span class="ring__lbl">Protein</span>
           </div>
 
           <div class="ring">
-            <app-bs-ring [value]="waterFrac()" [size]="92" [stroke]="9"
+            <app-bs-ring [value]="ringValue(waterFrac())" [size]="92" [stroke]="9"
                          from="#38bdf8" to="#22d3ee" [label]="waterPct() + '% of hydration goal'">
               <span class="ring__c">
                 <span class="ring__num">{{ waterCups(d.hydrationMl) }}</span>
-                <span class="ring__unit">/ {{ waterCups(d.hydrationGoalMl) }} cups</span>
+                <span class="ring__unit">of {{ waterCups(d.hydrationGoalMl) }} cups</span>
               </span>
             </app-bs-ring>
             <button type="button" class="ring__add" (click)="addWater($event)"
@@ -144,6 +144,15 @@ export class RingsWidget extends ReorderableWidget {
   /** ~250 ml per cup, rounded. */
   waterCups(ml: number | undefined): number {
     return Math.round((ml ?? 0) / 250);
+  }
+
+  /**
+   * Floor the ring fraction to a faint minimum so the accent gradient's rounded cap still hints at
+   * 0 (an all-grey donut reads as broken). The aria %/numerals stay truthful — this only nudges the
+   * drawn arc.
+   */
+  ringValue(frac: number): number {
+    return frac > 0 ? frac : 0.035;
   }
 
   /** Optimistic +water: the existing store action POSTs then refreshes the shared `day()` signal. */

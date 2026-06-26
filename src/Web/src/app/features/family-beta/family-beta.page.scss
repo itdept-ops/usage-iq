@@ -80,6 +80,19 @@
 
 .hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .hh__text { min-width: 0; }
+
+// Small uppercase eyebrow over the display greeting — the shared beta-page header pattern.
+.hh__eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-dim); margin-bottom: 6px;
+}
+.hh__spark {
+  flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-a) 20%, transparent);
+}
+
 .hh__date {
   display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   color: var(--ink-dim); margin-bottom: 4px;
@@ -106,10 +119,17 @@
 .hh__finder mat-icon { font-size: 22px; width: 22px; height: 22px; }
 
 // Quick-action chip rail under the greeting — horizontal momentum scroll, hidden scrollbar.
+// A right-edge gutter + soft fade keeps the LAST chip ('Meals') fully readable (never clipped to 'M')
+// while signalling the rail is scrollable.
 .hh__quick {
   display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden;
   scroll-snap-type: x proximity; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
-  scrollbar-width: none; margin-inline: -2px; padding: 2px;
+  scrollbar-width: none;
+  margin-inline: -2px;
+  padding-block: 2px;
+  padding-inline: 2px var(--gutter-r, 16px);
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
 }
 .hh__quick::-webkit-scrollbar { display: none; }
 .hh__chip {

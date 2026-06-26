@@ -76,6 +76,7 @@ import { WeatherCard } from './cards/weather-card';
           <div class="hh__bloom" aria-hidden="true"></div>
           <div class="hh__row">
             <div class="hh__text">
+              <span class="hh__eyebrow"><span class="hh__spark" aria-hidden="true"></span> Family · Hearth</span>
               @if (dateLabel(); as dl) { <span class="hh__date">{{ dl }}</span> }
               <h1 class="hh__greet">{{ greeting() || 'Hi there' }}</h1>
             </div>

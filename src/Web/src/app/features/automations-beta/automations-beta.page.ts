@@ -68,7 +68,7 @@ import { RelayCreateSheet } from './components/rule-create-sheet';
                 <span class="hh__stat-n">{{ total() }}</span>
                 <span class="hh__stat-l">{{ total() === 1 ? 'total' : 'total rules' }}</span>
               } @else {
-                <span class="hh__stat-n hh__stat-n--mute">—</span>
+                <span class="hh__stat-n hh__stat-n--mute">0</span>
                 <span class="hh__stat-l">none yet</span>
               }
             </div>
@@ -98,10 +98,7 @@ import { RelayCreateSheet } from './components/rule-create-sheet';
             <div class="ab-state ab-empty">
               <span class="ab-state-ic ab-empty-ic" aria-hidden="true"><mat-icon>bolt</mat-icon></span>
               <h2 class="ab-empty-h">No automations yet</h2>
-              <p class="ab-state-msg">Create a rule to get a nudge the moment you log a workout, finish a 75-Hard day, or hit your water goal.</p>
-              <button type="button" class="ab-state-btn" (click)="openCreate()">
-                <mat-icon aria-hidden="true">add</mat-icon> New automation
-              </button>
+              <p class="ab-state-msg">Create a rule to get a nudge the moment you log a workout, finish a 75-Hard day, or hit your water goal. Tap <strong>New automation</strong> below to start.</p>
             </div>
           } @else {
             <div class="ab-rules">

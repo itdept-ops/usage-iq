@@ -31,21 +31,25 @@ import { ReorderableWidget } from './reorderable';
 
       @if (challenge(); as c) {
         <div body class="hard">
-          <app-bs-ring class="hard__ring" [value]="dayFrac()" [size]="78" [stroke]="9"
+          <app-bs-ring class="hard__ring" [value]="ringValue()" [size]="78" [stroke]="9"
                        from="#f0a35a" to="#fb7185"
                        [label]="'Day ' + c.currentDay + ' of ' + c.totalDays">
             <span class="hard__c">
               <span class="hard__day">{{ c.currentDay }}</span>
-              <span class="hard__of">/ {{ c.totalDays }}</span>
+              <span class="hard__of">of {{ c.totalDays }}</span>
             </span>
           </app-bs-ring>
 
           <div class="hard__side">
-            <div class="hard__streak">
-              <span class="hard__flame" aria-hidden="true">🔥</span>
-              <span class="hard__streak-n">{{ c.currentStreak }}</span>
-              <span class="hard__streak-l">day streak</span>
-            </div>
+            @if (c.currentDay <= 0) {
+              <div class="hard__notstarted">Not started</div>
+            } @else {
+              <div class="hard__streak">
+                <span class="hard__flame" aria-hidden="true">🔥</span>
+                <span class="hard__streak-n">{{ c.currentStreak }}</span>
+                <span class="hard__streak-l">day streak</span>
+              </div>
+            }
             <div class="hard__pts">{{ c.todayPoints }} pts today</div>
             <div class="hard__pips" role="img" [attr.aria-label]="c.currentDay + ' of ' + c.totalDays + ' days'">
               @for (p of pips(); track p.i) {
@@ -65,7 +69,14 @@ import { ReorderableWidget } from './reorderable';
       font-family: var(--font-display); font-variant-numeric: tabular-nums;
       font-weight: 600; font-size: 28px; letter-spacing: -.03em; color: var(--ink); line-height: 1;
     }
-    .hard__of { font-family: var(--font-ui); font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+    .hard__of { font-family: var(--font-ui); font-size: 11px; font-weight: 600; color: var(--ink-faint); white-space: nowrap; }
+
+    .hard__notstarted {
+      align-self: flex-start;
+      padding: 3px 10px; border-radius: var(--r-pill);
+      background: color-mix(in srgb, var(--ink) 8%, transparent);
+      color: var(--ink-dim); font-size: 12px; font-weight: 700;
+    }
 
     .hard__side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
     .hard__streak { display: flex; align-items: baseline; gap: 6px; }
@@ -114,6 +125,15 @@ export class HardWidget extends ReorderableWidget {
     const c = this.store.challenge();
     if (!c || c.totalDays <= 0) return 0;
     return Math.max(0, Math.min(1, c.currentDay / c.totalDays));
+  });
+
+  /**
+   * Floor the hero-ring fraction to a faint minimum so the accent cap still hints at day 0 (an
+   * all-grey ring reads as broken). The aria label keeps the true day count.
+   */
+  readonly ringValue = computed(() => {
+    const f = this.dayFrac();
+    return f > 0 ? f : 0.035;
   });
 
   /** One pip per day; filled up to (and including) the current day, with the current day marked. */

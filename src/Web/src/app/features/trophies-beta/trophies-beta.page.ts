@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy, Component, computed, inject, signal,
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 
 import { Api } from '../../core/api';
@@ -77,7 +78,7 @@ interface BadgeGroup {
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './trophies-beta.page.scss',
   imports: [
-    MatIconModule,
+    MatIconModule, RouterLink,
     BetaPullRefresh, BetaSegmentedControl, BetaSvgRing, BetaBottomSheet, BetaSkeleton,
   ],
   template: `
@@ -117,6 +118,12 @@ interface BadgeGroup {
             <p class="tr-hero__sub">
               {{ subline() }}
             </p>
+
+            @if (!badges().length && !errored()) {
+              <a class="tr-hero__cta" routerLink="/tracker-beta">
+                Start earning <mat-icon aria-hidden="true">arrow_forward</mat-icon> Open the tracker
+              </a>
+            }
           }
         </header>
 
@@ -139,15 +146,7 @@ interface BadgeGroup {
           </div>
 
         } @else if (!badges().length) {
-          <div class="tr-state">
-            <span class="tr-state__orb"><mat-icon aria-hidden="true">workspace_premium</mat-icon></span>
-            <h2 class="tr-state__title">No trophies yet</h2>
-            <p class="tr-state__body">
-              Log a workout, hydrate, knock out a 75-Hard day — your milestones turn into
-              trophies the moment you cross them. Your wall is waiting.
-            </p>
-          </div>
-
+          <!-- empty wall: the hero already carries the encouragement + the single CTA -->
         } @else {
           <!-- ─── GROUP-BY SWITCH ─── -->
           <div class="tr-seg-wrap">
