@@ -47,7 +47,15 @@ export interface Segment {
     }
   `,
   styles: [`
-    .bs-seg {
+    /* ALL structural styling lives on the HOST. The control's class (\`bs-seg\`) sits on the host
+       element, which belongs to the PARENT's view — so under emulated encapsulation a plain
+       \`.bs-seg { … }\` rule compiles to \`.bs-seg[_ngcontent-…]\` and NEVER matches the host (the host
+       only carries \`_nghost-…\`). The host must therefore be targeted via \`:host(.bs-seg)\`, which is
+       also a higher-specificity guard (0,2,0) so a consumer setting \`display\` on the element (a
+       single class, 0,1,0) can never collapse the control's internal flex row. Critically this
+       includes \`position: relative\`: the pill is \`position:absolute\` and MUST be contained by the
+       control, otherwise it escapes to a distant positioned ancestor and stretches to its height. */
+    :host(.bs-seg) {
       position: relative; display: inline-flex; align-items: stretch;
       padding: 4px; gap: 0;
       background: var(--bg-sink); border: 1px solid var(--hairline);

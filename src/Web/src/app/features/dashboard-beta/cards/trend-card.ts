@@ -1,70 +1,110 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
-import type { EChartsOption } from 'echarts';
 
 import { GroupBy, SummaryResponse } from '../../../core/models';
-import { ChartComponent } from '../../../shared/chart';
+import { BetaSegmentedControl, BetaSkeleton, BetaSectionHeader, type Segment } from '../../beta-ui';
 
 type Metric = 'cost' | 'tokens';
 
 /**
- * ONE honest time-series card. A single ECharts series — Cost OR Tokens, flipped by a local 2-seg
- * toggle (no network) — over the day/month buckets. The day/month toggle changes `groupBy`, which is
- * the ONLY control here that re-fetches (emitted up to the page). The chart option is lifted from the
- * live dashboard's time branch (same `s.buckets` mapping, same grid), so the curve matches the live
- * page for the same filter. `ChartComponent` applies the AXON theme + a reduced-motion-safe render
- * (it is canvas + ResizeObserver; no entry animation is forced).
+ * The TREND card — one honest time-series, rebuilt on the shared beta-ui kit. A hand-rolled SVG
+ * GRADIENT AREA chart (accent stroke over a soft area fill, never flat) of Cost OR Tokens over the
+ * day/month buckets, flipped by two {@link BetaSegmentedControl}s: Day/Month (re-fetches `groupBy`,
+ * bubbled to the page) and Cost/Tokens (local, no network). The bucket mapping mirrors the live
+ * dashboard's time branch, so the curve matches for the same filter. Tasteful skeleton while loading,
+ * a clean empty state otherwise. Honors reduced-motion (the host killswitch collapses the draw-in).
  */
 @Component({
   selector: 'app-pulse-trend',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ChartComponent],
+  imports: [BetaSegmentedControl, BetaSkeleton, BetaSectionHeader],
   template: `
     <div class="trend">
-      <header class="trend__head">
-        <h2 class="trend__title">Trend</h2>
-        <div class="trend__seg" role="group" aria-label="Group by">
-          <button type="button" class="seg" [class.seg--on]="groupBy() === 'day'"
-                  (click)="setGroup('day')">Day</button>
-          <button type="button" class="seg" [class.seg--on]="groupBy() === 'month'"
-                  (click)="setGroup('month')">Month</button>
+      <app-bs-section-header title="Trend" [subtitle]="subLabel()" icon="show_chart" />
+
+      <div class="trend__segs">
+        <app-bs-segmented class="trend__seg" [segments]="groupSegs" [value]="groupBy()"
+                          label="Group by" (change)="onGroup($event)" />
+        <app-bs-segmented class="trend__seg" [segments]="metricSegs" [value]="metric()"
+                          label="Metric" (change)="metric.set($any($event))" />
+      </div>
+
+      @if (loading() && !summary()) {
+        <div class="trend__skeleton">
+          <app-bs-skeleton height="180px" radius="var(--r-tile)" />
         </div>
-      </header>
+      } @else if (chart(); as c) {
+        <div class="trend__chart">
+          <svg [attr.viewBox]="'0 0 ' + VW + ' ' + VH" preserveAspectRatio="none"
+               class="trend__svg" role="img" [attr.aria-label]="ariaLabel()"
+               [style.--len]="c.len">
+            <defs>
+              <linearGradient [attr.id]="lineId" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="var(--accent-a)" />
+                <stop offset="1" stop-color="var(--accent-b)" />
+              </linearGradient>
+              <linearGradient [attr.id]="fillId" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--accent-a)" stop-opacity="0.30" />
+                <stop offset="1" stop-color="var(--accent-a)" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <!-- baseline gridlines -->
+            @for (g of c.grid; track g) {
+              <line class="trend__grid" [attr.x1]="0" [attr.x2]="VW" [attr.y1]="g" [attr.y2]="g" />
+            }
+            <path [attr.d]="c.area" [attr.fill]="'url(#' + fillId + ')'" />
+            <path class="trend__line" [attr.d]="c.line" fill="none" [attr.stroke]="'url(#' + lineId + ')'"
+                  stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+            <circle [attr.cx]="c.peakX" [attr.cy]="c.peakY" r="3.4" fill="var(--accent-b)" />
+          </svg>
+          <div class="trend__axis">
+            <span>{{ c.firstKey }}</span>
+            @if (c.midKey) { <span>{{ c.midKey }}</span> }
+            <span>{{ c.lastKey }}</span>
+          </div>
+        </div>
 
-      <div class="trend__seg trend__metric" role="group" aria-label="Metric">
-        <button type="button" class="seg" [class.seg--cost]="metric() === 'cost'"
-                [class.seg--on]="metric() === 'cost'" (click)="metric.set('cost')">Cost</button>
-        <button type="button" class="seg" [class.seg--tok]="metric() === 'tokens'"
-                [class.seg--on]="metric() === 'tokens'" (click)="metric.set('tokens')">Tokens</button>
-      </div>
-
-      <div class="trend__chart">
-        <app-chart [option]="chart()"></app-chart>
-      </div>
+        <div class="trend__legend">
+          <span class="trend__peak">
+            Peak {{ metric() === 'cost' ? '$' + c.peakLabel : c.peakLabel }} · {{ c.peakKey }}
+          </span>
+        </div>
+      } @else {
+        <p class="trend__empty">No data in this range</p>
+      }
     </div>
   `,
   styles: [`
     :host { display: block; }
-    .trend { display: flex; flex-direction: column; gap: 12px; }
-    .trend__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .trend__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--pulse-ink); }
+    .trend { display: flex; flex-direction: column; gap: 14px; }
 
-    .trend__seg {
-      display: inline-flex; gap: 4px; background: var(--pulse-rise); border: 1px solid var(--pulse-edge);
-      border-radius: var(--r-pill); padding: 4px; width: fit-content;
-    }
-    .trend__metric { align-self: flex-start; }
-    .seg {
-      min-height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-pill);
-      background: none; color: var(--pulse-ink-dim); font: inherit; font-size: 13px; cursor: pointer;
-      transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
-    }
-    .seg--on { color: #07101f; font-weight: 600; background: var(--pulse-ink-dim); }
-    .seg--on.seg--cost { background: var(--cost-a); }
-    .seg--on.seg--tok { background: var(--tok-a); }
+    .trend__segs { display: flex; flex-direction: column; gap: 8px; }
+    /* NOTE: never set a display value on app-bs-segmented — it clobbers the kit host inline-flex
+       (equal specificity) and collapses the control. It is already width:100% as a flex item. */
 
-    .trend__chart { width: 100%; height: 300px; }
-    .trend__chart app-chart { display: block; width: 100%; height: 100%; }
+    .trend__skeleton { padding-top: 4px; }
+
+    .trend__chart { display: flex; flex-direction: column; gap: 6px; }
+    .trend__svg {
+      width: 100%; height: 190px; display: block; overflow: visible;
+    }
+    .trend__line {
+      stroke-dasharray: var(--len, 0); stroke-dashoffset: var(--len, 0);
+      animation: trend-draw 900ms var(--ease-out) forwards;
+    }
+    @keyframes trend-draw { to { stroke-dashoffset: 0; } }
+    @media (prefers-reduced-motion: reduce) { .trend__line { animation: none; stroke-dashoffset: 0; } }
+    .trend__grid { stroke: var(--hairline); stroke-width: 1; vector-effect: non-scaling-stroke; }
+
+    .trend__axis {
+      display: flex; justify-content: space-between; gap: 8px;
+      font-size: 11px; font-weight: 600; color: var(--ink-faint); font-variant-numeric: tabular-nums;
+    }
+    .trend__legend { display: flex; align-items: center; gap: 8px; }
+    .trend__peak {
+      font-size: 12px; font-weight: 700; color: var(--ink-dim); font-variant-numeric: tabular-nums;
+    }
+    .trend__empty { margin: 24px 0; text-align: center; color: var(--ink-dim); font-size: 14px; }
   `],
 })
 export class PulseTrendCard {
@@ -77,53 +117,83 @@ export class PulseTrendCard {
 
   readonly metric = signal<Metric>('cost');
 
-  setGroup(g: GroupBy): void {
-    if (this.groupBy() !== g) this.groupByChange.emit(g);
+  protected readonly groupSegs: Segment[] = [
+    { key: 'day', label: 'Day' },
+    { key: 'month', label: 'Month' },
+  ];
+  protected readonly metricSegs: Segment[] = [
+    { key: 'cost', label: 'Cost' },
+    { key: 'tokens', label: 'Tokens' },
+  ];
+
+  protected readonly VW = 320;
+  protected readonly VH = 190;
+
+  /** Unique gradient ids so multiple instances don't collide. */
+  protected readonly lineId = `trend-line-${Math.random().toString(36).slice(2, 8)}`;
+  protected readonly fillId = `trend-fill-${Math.random().toString(36).slice(2, 8)}`;
+
+  protected readonly subLabel = computed(() =>
+    this.metric() === 'cost' ? 'Cost (USD)' : 'Total tokens');
+
+  protected onGroup(g: string): void {
+    if (this.groupBy() !== g) this.groupByChange.emit(g as GroupBy);
   }
 
-  readonly chart = computed<EChartsOption>(() => {
+  protected ariaLabel(): string {
+    return `${this.metric() === 'cost' ? 'Cost' : 'Tokens'} trend by ${this.groupBy()}`;
+  }
+
+  /** Build the SVG area-chart geometry from the summary buckets for the active metric. */
+  readonly chart = computed(() => {
     const s = this.summary();
-    // Loading vs resolved-empty guard (copied from the live dashboard).
-    if (!s) {
-      const text = this.loading() ? 'Loading…' : 'No data';
-      return { title: { text, left: 'center', top: 'center', textStyle: { color: '#5e6c82' } } };
-    }
-    if (s.buckets.length === 0) {
-      return { title: { text: 'No data', left: 'center', top: 'center', textStyle: { color: '#5e6c82' } } };
+    if (!s || s.buckets.length === 0) return null;
+
+    const isCost = this.metric() === 'cost';
+    const keys = s.buckets.map(b => b.key);
+    const vals = isCost ? s.buckets.map(b => +b.costUsd.toFixed(2)) : s.buckets.map(b => b.totalTokens);
+
+    const W = this.VW, H = this.VH, PAD_Y = 10;
+    const max = Math.max(...vals);
+    const min = Math.min(0, ...vals);
+    const span = max - min || 1;
+    const n = vals.length;
+
+    const pts = vals.map((v, i) => {
+      const x = n === 1 ? W / 2 : (i / (n - 1)) * W;
+      const y = PAD_Y + (1 - (v - min) / span) * (H - PAD_Y * 2);
+      return { x, y };
+    });
+
+    const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ');
+    const area = `${line} L${W} ${H} L0 ${H} Z`;
+
+    // Approx path length for the draw-in dash animation (sum of segment lengths).
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) {
+      len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
     }
 
-    const keys = s.buckets.map(b => b.key);
-    const isCost = this.metric() === 'cost';
-    const data = isCost
-      ? s.buckets.map(b => +b.costUsd.toFixed(2))
-      : s.buckets.map(b => b.totalTokens);
-    const seriesColor = isCost ? '#f472b6' : '#3d8bff';
-    const areaTop = isCost ? 'rgba(244,114,182,0.28)' : 'rgba(61,139,255,0.28)';
+    // Peak point + its key/label.
+    let peakIdx = 0;
+    for (let i = 1; i < vals.length; i++) if (vals[i] > vals[peakIdx]) peakIdx = i;
+    const peak = pts[peakIdx];
+
+    // 3 baseline gridlines across the band.
+    const grid = [0.25, 0.5, 0.75].map(f => +(PAD_Y + f * (H - PAD_Y * 2)).toFixed(1));
 
     return {
-      tooltip: {
-        trigger: 'axis',
-        valueFormatter: (v) => isCost ? '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 }) : shortNum(Number(v)),
-      },
-      grid: { left: 8, right: 8, top: 24, bottom: 28, containLabel: true },
-      xAxis: { type: 'category', data: keys, axisLabel: { rotate: keys.length > 14 ? 45 : 0 } },
-      yAxis: {
-        type: 'value',
-        axisLabel: { formatter: (v: number) => isCost ? '$' + shortNum(v) : shortNum(v) },
-      },
-      series: [{
-        name: isCost ? 'Cost (USD)' : 'Tokens',
-        type: 'line', smooth: true, symbol: 'none',
-        data,
-        itemStyle: { color: seriesColor },
-        lineStyle: { width: 2.5, color: seriesColor },
-        areaStyle: {
-          color: {
-            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [{ offset: 0, color: areaTop }, { offset: 1, color: 'rgba(0,0,0,0)' }],
-          },
-        },
-      }],
+      line, area,
+      grid,
+      peakX: peak.x, peakY: peak.y,
+      peakKey: keys[peakIdx],
+      peakLabel: isCost
+        ? vals[peakIdx].toLocaleString(undefined, { maximumFractionDigits: 2 })
+        : shortNum(vals[peakIdx]),
+      firstKey: keys[0],
+      midKey: keys.length > 2 ? keys[Math.floor((keys.length - 1) / 2)] : '',
+      lastKey: keys[keys.length - 1],
+      len,
     };
   });
 }

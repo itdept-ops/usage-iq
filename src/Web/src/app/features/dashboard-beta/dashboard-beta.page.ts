@@ -1,86 +1,119 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 import { Api } from '../../core/api';
 import {
   CacheEfficiency, GroupBy, IngestionSource, MachineStat, ModelStat, PagedResult,
   ProjectDto, SummaryResponse, UsageFilter, UsageRecord,
 } from '../../core/models';
+import { BetaPullRefresh, BetaToaster, ToastController } from '../beta-ui';
 
 import { PulseHeroCard } from './hero/hero-card';
 import { PulseTrendCard } from './cards/trend-card';
 import { PulseBreakdownCard, BreakdownDim, BreakdownSlice } from './cards/breakdown-card';
+import { PulseEfficiencyCard } from './cards/efficiency-card';
 import { PulseRecentFeed } from './cards/recent-feed';
 import { PulseFilterSheet } from './sheets/filter-sheet';
 
 const PAGE_SIZE = 25;
 
 /**
- * Dashboard "Pulse" — the mobile-first, isolated redesign of the live usage dashboard.
+ * Dashboard "Pulse" — the mobile-first usage-analytics cockpit, rebuilt on the shared beta-ui "Strata"
+ * kit (`@use '../beta-ui/beta-kit'`). One signature accent — a vivid PINK → MAGENTA — re-skins the whole
+ * screen via the per-page accent contract. An immersive scrolling header (range pills + filter), a HERO
+ * spend card (big Clash Display $ + delta vs the previous period + a gradient sparkline), the kit
+ * BetaSegmentedControl for Day/Month + Cost/Tokens, a gradient SVG area TREND chart, a per-model/
+ * per-source/per-project BREAKDOWN (ranked accent bars + share %), a cache-efficiency BetaSvgRing +
+ * BetaStatTiles, and the recent feed. Pull-to-refresh, spring-stagger entrance, BetaSkeleton loaders.
  *
  * DATA PARITY: every figure is sourced from the SAME endpoints the live page uses — `Api.summary`
  * (hero totals + trend buckets + breakdown), `Api.records` (recent feed), `Api.cacheEfficiency`
- * (cache-hit chip). The server does all dedup + sidechain aggregation; this page never re-aggregates
- * client-side. Sending the identical {@link UsageFilter} + {@link GroupBy} guarantees identical
- * numbers. The deep-link query scheme (`from/to/p/m/s/mc/sc/g/preset`) mirrors the live page so
- * shared links interoperate.
+ * (cache cockpit). The headline delta uses a SECOND `Api.summary` over the prior equivalent window
+ * (computed from the active range). The server does all dedup + sidechain aggregation; this page never
+ * re-aggregates client-side. The deep-link query scheme (`from/to/p/m/s/mc/sc/g/preset`) mirrors the
+ * live page so shared links interoperate.
  *
- * ISOLATION: all design tokens live on this component's `:host` (Pulse palette + bottom-sheet alias
- * tokens) — NO global `--tech-*`. No live page is imported.
+ * ISOLATION: gated by `beta.access`; consumes the kit + the SAME read-only Api as /dashboard. No live
+ * page is imported or modified; the flagship tracker-beta + the kit are consumed, never changed.
  */
 @Component({
   selector: 'app-dashboard-beta',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [ToastController],
   imports: [
-    MatIconModule,
-    PulseHeroCard, PulseTrendCard, PulseBreakdownCard, PulseRecentFeed, PulseFilterSheet,
+    MatIconModule, BetaPullRefresh, BetaToaster,
+    PulseHeroCard, PulseTrendCard, PulseBreakdownCard, PulseEfficiencyCard, PulseRecentFeed, PulseFilterSheet,
   ],
   template: `
-    <!-- Sticky range strip: scroll-snap range pills + filter button with an active-badge. -->
-    <header class="pb-strip">
-      <div class="pb-pills" role="group" aria-label="Date range">
-        @for (p of presets; track p.key) {
-          <button type="button" class="pill" [class.pill--on]="activePreset() === p.key"
-                  (click)="setDatePreset(p.key)">{{ p.label }}</button>
+    <app-bs-pull-refresh class="pb-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
+      <div class="pb-scroll">
+
+        <!-- Immersive header: title + accent bloom, range pills, filter button. -->
+        <header class="hh">
+          <div class="hh__bloom" aria-hidden="true"></div>
+          <div class="hh__row">
+            <div class="hh__text">
+              <span class="hh__eyebrow">Usage</span>
+              <h1 class="hh__title">Spend Pulse</h1>
+            </div>
+            <button type="button" class="hh__filter" (click)="openFilter()" aria-label="Filters">
+              <mat-icon aria-hidden="true">tune</mat-icon>
+              @if (activeFilterCount()) { <span class="hh__filter-badge">{{ activeFilterCount() }}</span> }
+            </button>
+          </div>
+
+          <div class="hh__pills" role="group" aria-label="Date range">
+            @for (p of presets; track p.key) {
+              <button type="button" class="pill" [class.pill--on]="activePreset() === p.key"
+                      (click)="setDatePreset(p.key)">{{ p.label }}</button>
+            }
+          </div>
+        </header>
+
+        <!-- Staggered spring entrance: each block animates in on a per-index delay (--i). -->
+        <div class="rise" [style.--i]="0">
+          <app-pulse-hero
+            [summary]="summary()" [prevSummary]="prevSummary()" [cacheEff]="cacheEff()"
+            [loading]="loading()" [rangeLabel]="rangeLabel()" [prevLabel]="prevLabel()" />
+        </div>
+
+        <div class="rise pb-card" [style.--i]="1">
+          <app-pulse-trend
+            [summary]="summary()" [loading]="loading()" [groupBy]="groupBy()"
+            (groupByChange)="setGroupBy($event)" />
+        </div>
+
+        <div class="rise pb-card pb-defer" [style.--i]="2">
+          <app-pulse-breakdown
+            [slices]="breakdownSlices()" [dim]="breakdownDim()" [loading]="loading()"
+            (dimChange)="setBreakdownDim($event)" />
+        </div>
+
+        @if (showEfficiency()) {
+          <div class="rise pb-card pb-defer" [style.--i]="3">
+            <app-pulse-efficiency [cacheEff]="cacheEff()" [summary]="summary()" [loading]="loading()" />
+          </div>
         }
+
+        <div class="rise pb-card pb-defer" [style.--i]="4">
+          <app-pulse-recent
+            [page]="records()" [loading]="loading()" [loadingMore]="loadingMore()"
+            (more)="loadMore()" />
+        </div>
       </div>
-      <button type="button" class="pb-filter" (click)="openFilter()" aria-label="Filters">
-        <mat-icon aria-hidden="true">tune</mat-icon>
-        @if (activeFilterCount()) { <span class="pb-filter__badge">{{ activeFilterCount() }}</span> }
-      </button>
-    </header>
-
-    <main class="pb-scroll">
-      <app-pulse-hero
-        [summary]="summary()" [cacheEff]="cacheEff()" [loading]="loading()" [rangeLabel]="rangeLabel()" />
-
-      <section class="pb-card pb-defer">
-        <app-pulse-trend
-          [summary]="summary()" [loading]="loading()" [groupBy]="groupBy()"
-          (groupByChange)="setGroupBy($event)" />
-      </section>
-
-      <section class="pb-card pb-defer">
-        <app-pulse-breakdown
-          [slices]="breakdownSlices()" [dim]="breakdownDim()" [loading]="loading()"
-          (dimChange)="setBreakdownDim($event)" />
-      </section>
-
-      <section class="pb-card pb-defer">
-        <app-pulse-recent
-          [page]="records()" [loading]="loading()" [loadingMore]="loadingMore()"
-          (more)="loadMore()" />
-      </section>
-    </main>
+    </app-bs-pull-refresh>
 
     <app-pulse-filter-sheet #sheet
       [(open)]="filterOpen"
       [projects]="projects()" [models]="modelStats()" [sources]="sources()" [machines]="machines()"
       [filter]="filter()" [groupBy]="groupBy()"
       (applied)="onApplyFilters($event)" />
+
+    <app-bs-toaster />
   `,
   styleUrl: './dashboard-beta.page.scss',
 })
@@ -88,6 +121,7 @@ export class DashboardBetaPage {
   private api = inject(Api);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private toast = inject(ToastController);
   private readonly sheet = viewChild.required(PulseFilterSheet);
 
   // ---- filter + view state (shapes copied from the live dashboard for parity) ----
@@ -107,6 +141,8 @@ export class DashboardBetaPage {
 
   // ---- data ----
   readonly summary = signal<SummaryResponse | null>(null);
+  /** Prior equivalent-period summary, for the hero delta. Null when the range has no prior window. */
+  readonly prevSummary = signal<SummaryResponse | null>(null);
   readonly records = signal<PagedResult<UsageRecord> | null>(null);
   readonly cacheEff = signal<CacheEfficiency | null>(null);
   /** Per-dimension breakdown summary (grouped by model/source/project via the SAME summary endpoint). */
@@ -114,6 +150,7 @@ export class DashboardBetaPage {
 
   readonly loading = signal(false);
   readonly loadingMore = signal(false);
+  readonly refreshing = signal(false);
 
   readonly page = signal(1);
 
@@ -136,6 +173,22 @@ export class DashboardBetaPage {
     const f = this.filter();
     if (f.from && f.to) return `${f.from} → ${f.to}`;
     return 'All time';
+  });
+
+  /** Human label for the prior comparison window (hero delta tooltip). */
+  readonly prevLabel = computed(() => {
+    const key = this.activePreset();
+    if (key === 'mtd') return 'last month';
+    const found = this.presets.find(p => p.key === key);
+    if (found && key !== 'all') return `the previous ${found.label}`;
+    return 'the previous period';
+  });
+
+  /** Show the efficiency card only when there's cache activity (degrade gracefully otherwise). */
+  readonly showEfficiency = computed(() => {
+    const c = this.cacheEff();
+    if (!c) return false;
+    return !(c.cacheReadTokens === 0 && c.inputTokens === 0 && c.cacheWriteTokens === 0);
   });
 
   /** Breakdown slices for the active dimension, mapped from the SAME server summary buckets. */
@@ -259,6 +312,24 @@ export class DashboardBetaPage {
     this.reloadBreakdown();
   }
 
+  /**
+   * Build the prior equivalent-period filter: shift [from,to] back by its own length. Returns null
+   * when the active range is open-ended (all-time / one-sided), in which case there's no comparison.
+   */
+  private priorFilter(): UsageFilter | null {
+    const f = this.filter();
+    if (!f.from || !f.to) return null;
+    const from = new Date(`${f.from}T00:00:00`);
+    const to = new Date(`${f.to}T00:00:00`);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
+    const dayMs = 86400000;
+    const lenDays = Math.round((to.getTime() - from.getTime()) / dayMs) + 1; // inclusive span
+    const prevTo = new Date(from.getTime() - dayMs);
+    const prevFrom = new Date(prevTo.getTime() - (lenDays - 1) * dayMs);
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return { ...f, from: fmt(prevFrom), to: fmt(prevTo) };
+  }
+
   // ---- data loads ----
   private loadOptions(): void {
     this.api.projects().subscribe({ next: p => this.projects.set(p), error: () => { /* non-critical */ } });
@@ -269,25 +340,29 @@ export class DashboardBetaPage {
 
   private reloadAll(): void {
     this.loading.set(true);
+    const prior = this.priorFilter();
     forkJoin({
       summary: this.api.summary(this.filter(), this.groupBy()),
       records: this.api.records(this.filter(), 1, PAGE_SIZE, 'timestamp', true),
-      cacheEff: this.api.cacheEfficiency(this.filter()),
+      cacheEff: this.api.cacheEfficiency(this.filter()).pipe(catchError(() => of<CacheEfficiency | null>(null))),
+      // Prior-period summary for the delta — best-effort (null when no prior window or it errors).
+      prev: prior ? this.api.summary(prior, this.groupBy()).pipe(catchError(() => of<SummaryResponse | null>(null))) : of<SummaryResponse | null>(null),
     }).subscribe({
       next: r => {
         this.summary.set(r.summary);
         this.records.set(r.records);
         this.cacheEff.set(r.cacheEff);
+        this.prevSummary.set(r.prev);
         this.loading.set(false);
       },
-      // Degrade the cache chip independently: a cache-efficiency 4xx must not blank the page. If the
-      // whole forkJoin fails we still clear loading so the cards show their resolved-empty state.
+      // If the critical streams fail, still clear loading so the cards show their resolved-empty state,
+      // then best-effort retry the two essential streams alone.
       error: () => {
         this.loading.set(false);
-        // Best-effort: try the two critical streams alone so a single bad endpoint doesn't kill the page.
         this.api.summary(this.filter(), this.groupBy()).subscribe({ next: s => this.summary.set(s), error: () => {} });
         this.api.records(this.filter(), 1, PAGE_SIZE, 'timestamp', true).subscribe({ next: rec => this.records.set(rec), error: () => {} });
         this.cacheEff.set(null);
+        this.prevSummary.set(null);
       },
     });
   }
@@ -304,6 +379,34 @@ export class DashboardBetaPage {
     this.api.summary(this.filter(), this.breakdownDim()).subscribe({
       next: s => this.breakdownSummary.set(s),
       error: () => { /* keep prior breakdown */ },
+    });
+  }
+
+  /** Pull-to-refresh: re-run all data loads. Flips the spinner + confirms with a toast. */
+  async refreshAll(): Promise<void> {
+    this.refreshing.set(true);
+    const prior = this.priorFilter();
+    forkJoin({
+      summary: this.api.summary(this.filter(), this.groupBy()).pipe(catchError(() => of<SummaryResponse | null>(null))),
+      records: this.api.records(this.filter(), 1, PAGE_SIZE, 'timestamp', true).pipe(catchError(() => of<PagedResult<UsageRecord> | null>(null))),
+      cacheEff: this.api.cacheEfficiency(this.filter()).pipe(catchError(() => of<CacheEfficiency | null>(null))),
+      breakdown: this.api.summary(this.filter(), this.breakdownDim()).pipe(catchError(() => of<SummaryResponse | null>(null))),
+      prev: prior ? this.api.summary(prior, this.groupBy()).pipe(catchError(() => of<SummaryResponse | null>(null))) : of<SummaryResponse | null>(null),
+    }).subscribe({
+      next: r => {
+        if (r.summary) this.summary.set(r.summary);
+        if (r.records) this.records.set(r.records);
+        this.cacheEff.set(r.cacheEff);
+        if (r.breakdown) this.breakdownSummary.set(r.breakdown);
+        this.prevSummary.set(r.prev);
+        this.page.set(1);
+        this.refreshing.set(false);
+        this.toast.show('Usage refreshed', { tone: 'success', durationMs: 1800 });
+      },
+      error: () => {
+        this.refreshing.set(false);
+        this.toast.show('Couldn’t refresh — pull again', { tone: 'warn' });
+      },
     });
   }
 

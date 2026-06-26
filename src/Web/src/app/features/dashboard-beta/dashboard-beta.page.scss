@@ -1,232 +1,173 @@
 // ============================================================================
-// Dashboard Beta — "Pulse" design system + shell layout.
+// Dashboard "Pulse" — rebuilt on the shared beta-ui "Strata" foundation.
 //
-// ISOLATED design system: every token here is declared on :host of app-dashboard-beta so all child
-// cards/sheets inherit them via the cascade. NONE of the global Usage IQ --tech-* tokens are used.
+// One line adopts the whole Strata token contract (layered bg, glass, ink scale, radii, the lift-1/2/3
+// depth system, spring/bounce easing, blur cap, env() safe-area, the a11y killswitches); then the
+// DASHBOARD page OVERRIDES the per-page accent contract with its OWN signature gradient — a vivid
+// PINK → MAGENTA, the namesake "spend cockpit" identity. Every kit component (pull-refresh ring,
+// segmented control, SvgRing, stat tiles, toaster, bottom sheet) + every card reads --accent-a/
+// --accent-b off this :host cascade, so this single override re-skins the whole screen.
 //
-// The shared bottom-sheet (tracker-beta/ui/bottom-sheet.ts) reads a handful of generic tokens
-// (--glass, --blur-glass, --r-glass, --r-pill, --glass-edge, --ink-faint, --lift-3, --ease-out);
-// those are aliased to the Pulse palette below so the sheet inherits a consistent look.
-//
-// A prefers-reduced-motion killswitch, a prefers-reduced-transparency / prefers-contrast blur-drop,
-// and env() safe-area insets are all honored. content-visibility defers below-fold cards.
+// ISOLATED + gated by beta.access: nothing here touches the global --tech-* tokens or the flagship
+// tracker-beta. The kit partial is the only import; we consume the kit, never modify it.
 // ============================================================================
+
+@use '../beta-ui/beta-kit' as kit;
 
 :host {
-  // Dark-only (matches the rest of Usage IQ); declaring the scheme renders dark UA chrome.
-  color-scheme: dark;
+  @include kit.beta-host;          // the whole Strata token contract on :host
 
-  // ---- PULSE PALETTE (AXON-mobile observability) ----
-  --pulse-bg: #0a0d16;
-  --pulse-rise: #121826;
-  --pulse-glass: rgba(18, 24, 38, .66);
-  --pulse-edge: rgba(255, 255, 255, .09);
-  --pulse-ink: #eef2fb;
-  --pulse-ink-dim: #93a0bd;
+  // ---- DASHBOARD's SIGNATURE ACCENT: pink → magenta (the per-page contract override) ----
+  --accent-a: #f472b6;             // signature pink    (start)
+  --accent-b: #c026d3;             // signature magenta (end)
 
-  --cost-a: #f472b6;
-  --cost-b: #c026d3; // cost magenta
-  --tok-a: #3d8bff;
-  --tok-b: #8b7cff;  // tokens blue->violet (harmonized with the AXON chart theme)
-  --cache-hit: #3dd68c;
-  --warn: #f0a35a;   // estimated-pricing chip (warm, never red)
+  // A faint magenta wash behind the whole column (still within the kit's dark contract).
+  background: radial-gradient(120% 80% at 50% -8%, #1d1023 0%, var(--bg-base) 58%);
 
-  // ---- RADII ----
-  --r-glass: 26px;
-  --r-card: 20px;
-  --r-pill: 999px;
-
-  // ---- ELEVATION ----
-  --lift-1: 0 2px 8px rgba(4, 6, 20, .35);
-  --lift-2: 0 8px 24px rgba(4, 6, 20, .45), inset 0 1px 0 var(--pulse-edge);
-  --lift-3: 0 16px 48px rgba(4, 6, 20, .55), inset 0 1px 0 var(--pulse-edge);
-
-  // ---- MOTION ----
-  --ease-out: cubic-bezier(.22, 1, .36, 1);
-
-  // ---- BLUR (restricted to the floating surfaces) ----
-  --blur-glass: 18px;
-
-  // ---- TYPE (hero numerals) ----
-  --hero-num-family: "Clash Display", system-ui, sans-serif;
-  --hero-num-size: 44px;
-
-  // ---- Safe-area gutters ----
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --gutter: max(16px, env(safe-area-inset-left, 0px));
-  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
-
-  // ---- Fixed-chrome heights ----
-  --strip-h: 52px;
-
-  // ---- Bottom-sheet alias tokens (the shared sheet reads these generic names) ----
-  --glass: var(--pulse-glass);
-  --glass-edge: var(--pulse-edge);
-  --ink-faint: var(--pulse-ink-dim);
-
-  display: block;
-  position: relative;
-  width: 100%;
-  height: 100%; // fill the immersive shell frame (.content--immersive); inner .pb-scroll owns the scroll
-  min-height: 0;
-  background: var(--pulse-bg);
-  color: var(--pulse-ink);
-  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
-  font-size: 15px;
-  line-height: 1.4;
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  overscroll-behavior: none;
+  height: 100%; // fill the immersive shell frame (.content--immersive); the pull-refresh owns the scroll
 }
 
-// ---- a11y: reduced transparency / forced contrast => drop blur, solidify glass ----
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  :host {
-    --blur-glass: 0px;
-    --pulse-glass: var(--pulse-rise);
-    --glass: var(--pulse-rise);
-  }
-}
-
-// ---- MOTION KILLSWITCH: collapse every animation/transition to instant ----
-@media (prefers-reduced-motion: reduce) {
-  :host,
-  :host *,
-  :host *::before,
-  :host *::after {
-    animation-duration: .001ms !important;
-    animation-delay: 0ms !important;
-    transition-duration: .001ms !important;
-    transition-delay: 0ms !important;
-    scroll-behavior: auto !important;
-  }
-}
+@include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)
+@include kit.beta-a11y;             // reduced-motion + reduced-transparency/contrast killswitches (once)
 
 // ============================================================================
-// SHELL LAYOUT
+// SHELL — the kit pull-to-refresh wrapper IS the scroll container.
 // ============================================================================
 
-// Sticky glass RANGE STRIP — fixed chrome at the top, safe-area aware.
-.pb-strip {
-  position: fixed;
-  top: var(--beta-bar-top, 0px);
-  left: 0;
-  right: 0;
-  z-index: 30;
-  min-height: calc(var(--strip-h) + var(--safe-top));
-  padding-top: var(--safe-top);
-  padding-inline: var(--gutter) var(--gutter-r);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--pulse-glass);
-  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
-  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
-  border-bottom: 1px solid var(--pulse-edge);
-}
+.pb-ptr { display: block; height: 100%; }
 
-// Range pills — horizontal scroll-snap, hidden scrollbar.
-.pb-pills {
-  flex: 1 1 auto;
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x proximity;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar { display: none; }
-}
-
-.pill {
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--pulse-edge);
-  background: var(--pulse-rise);
-  color: var(--pulse-ink-dim);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 160ms var(--ease-out), color 160ms var(--ease-out), border-color 160ms var(--ease-out);
-}
-.pill--on {
-  background: linear-gradient(120deg, var(--tok-a), var(--tok-b));
-  color: #07101f;
-  font-weight: 600;
-  border-color: transparent;
-}
-
-.pb-filter {
-  flex: 0 0 auto;
-  position: relative;
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--pulse-edge);
-  background: var(--pulse-rise);
-  color: var(--pulse-ink);
-  cursor: pointer;
-}
-.pb-filter__badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: var(--r-pill);
-  background: var(--cost-a);
-  color: #0a0d16;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 18px;
-  text-align: center;
-}
-
-// The single vertical scroll region. height:100% fills the immersive shell frame (.content--immersive),
-// so this is the ONLY scrollbar (previously it grew past 100dvh and the :host/document scrolled — the
-// source of the double scrollbar). The fixed strip pins over it at the top of the frame.
+// The single vertical scroll column inside the pull-refresh: the flex stack of header + cards,
+// gutter + safe-area padded.
 .pb-scroll {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
-  padding-top: calc(var(--strip-h) + var(--safe-top) + 12px);
-  padding-bottom: calc(var(--safe-bottom) + 32px);
-  padding-inline: var(--gutter) var(--gutter-r);
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-height: 100%;
+  padding-top: calc(var(--safe-top) + 8px);
+  padding-bottom: calc(var(--safe-bottom) + 32px);
+  padding-inline: var(--gutter) var(--gutter-r);
+  scroll-snap-type: y proximity;
 }
 
-// Stacked cards — matte rise, --lift-2.
+// ============================================================================
+// IMMERSIVE PAGE HEADER — title + accent bloom, range pills, filter button.
+// ============================================================================
+
+.hh {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 2px 4px;
+  isolation: isolate;
+}
+
+// Soft accent bloom behind the title — the page's "wow" gradient, never flat.
+.hh__bloom {
+  position: absolute;
+  top: -40px; left: -30px; right: 30%;
+  height: 160px; z-index: -1; pointer-events: none;
+  background: radial-gradient(120px 90px at 30% 30%,
+    color-mix(in srgb, var(--accent-a) 44%, transparent),
+    transparent 70%);
+  filter: blur(18px);
+  opacity: .9;
+}
+
+.hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.hh__text { min-width: 0; }
+.hh__eyebrow {
+  display: block; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-dim); margin-bottom: 4px;
+}
+.hh__title {
+  margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 30px; line-height: 1.05;
+  letter-spacing: -.02em; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+.hh__filter {
+  flex: 0 0 auto; position: relative;
+  display: inline-grid; place-items: center; width: 44px; height: 44px;
+  border-radius: 14px; border: 1px solid var(--hairline);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+  color: var(--ink); cursor: pointer;
+  transition: transform 120ms var(--ease-spring), color 120ms var(--ease-out);
+}
+.hh__filter:active { transform: scale(.92); }
+.hh__filter:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hh__filter mat-icon { font-size: 22px; width: 22px; height: 22px; }
+.hh__filter-badge {
+  position: absolute; top: -4px; right: -4px;
+  min-width: 18px; height: 18px; padding: 0 4px; border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-a) 50%, transparent);
+}
+
+// Range-pill rail — horizontal momentum scroll, hidden scrollbar.
+.hh__pills {
+  display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x proximity; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; margin-inline: -2px; padding: 2px;
+}
+.hh__pills::-webkit-scrollbar { display: none; }
+.pill {
+  flex: 0 0 auto; scroll-snap-align: start;
+  min-height: 40px; padding: 0 16px; border-radius: var(--r-pill);
+  border: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--accent-a) 6%, var(--bg-rise));
+  color: var(--ink-dim); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: transform 120ms var(--ease-spring), background 160ms var(--ease-out), color 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+.pill:active { transform: scale(.95); }
+.pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pill--on {
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: #fff; border-color: transparent;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-a) 34%, transparent);
+}
+
+// ============================================================================
+// SEDIMENT CARDS — matte rise, --lift-2.
+// ============================================================================
+
 .pb-card {
   border-radius: var(--r-card);
-  background: var(--pulse-rise);
+  background: var(--bg-rise);
   box-shadow: var(--lift-2);
-  border: 1px solid var(--pulse-edge);
+  border: 1px solid var(--hairline);
   padding: 16px;
 }
 
-// Defer below-fold render work (paired with contain-intrinsic-size for CLS~=0).
-.pb-defer {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 320px;
+// Below-fold cards: skip render work until they scroll near.
+.pb-defer { content-visibility: auto; contain-intrinsic-size: auto 320px; }
+
+// ============================================================================
+// STAGGERED SPRING ENTRANCE — each block rises + fades on a per-index delay.
+// ============================================================================
+
+.rise {
+  animation: pb-rise 540ms var(--ease-spring-up) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+  will-change: transform, opacity;
+}
+@keyframes pb-rise {
+  from { opacity: 0; transform: translateY(16px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; }
 }
 
-// ---- Own visible focus ring (never outline:none without a replacement) ----
+// Own visible focus ring (tracks the page accent via --focus).
 :host ::ng-deep :focus-visible {
-  outline: 2px solid var(--tok-a);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
+
+// No 390px overflow: everything is fluid by construction.
+:host, .pb-scroll { max-width: 100vw; }

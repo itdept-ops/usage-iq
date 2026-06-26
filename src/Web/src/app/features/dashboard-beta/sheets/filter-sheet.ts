@@ -1,30 +1,28 @@
 import {
   ChangeDetectionStrategy, Component, computed, input, model, output, signal,
 } from '@angular/core';
-import { MatIconModule } from '@angular/material/icon';
 
 import {
   GroupBy, IngestionSource, MachineStat, ModelStat, ProjectDto, UsageFilter,
 } from '../../../core/models';
-// Beta -> beta cross-import: both surfaces are isolated; the bottom-sheet shell is shared verbatim.
-import { BottomSheet } from '../../tracker-beta/ui/bottom-sheet';
+import { BetaBottomSheet, BetaSegmentedControl, type Segment } from '../../beta-ui';
 
 /**
- * The full filter surface, exiled into a bottom sheet (the live page's 4x mat-select is unusable at
- * 390px). Edits a LOCAL draft of the filter so Cancel discards and Apply commits — the page only
- * re-fetches on Apply. Chip grids are 44px+ touch targets. A live result-count hint and a sticky
- * Apply in the thumb zone keep the commit obvious.
+ * The full filter surface, exiled into the kit {@link BetaBottomSheet} (the live page's 4× mat-select
+ * is unusable at 390px). Rebuilt on the shared beta-ui kit: chip grids + a {@link BetaSegmentedControl}
+ * for the time grouping, all reading the page accent + ink/glass tokens. Edits a LOCAL draft so Cancel
+ * discards and Apply commits — the page only re-fetches on Apply. Chips are 44px+ touch targets.
  *
- * Parity note: this only edits a {@link UsageFilter} (+ {@link GroupBy}); the page hands the exact
- * same filter to `Api.summary`, so the numbers match the live dashboard. No client aggregation here.
+ * Parity note: this only edits a {@link UsageFilter} (+ {@link GroupBy}); the page hands the exact same
+ * filter to `Api.summary`, so the numbers match the live dashboard. No client aggregation here.
  */
 @Component({
   selector: 'app-pulse-filter-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule, BottomSheet],
+  imports: [BetaBottomSheet, BetaSegmentedControl],
   template: `
-    <app-bottom-sheet [(open)]="open" detent="full" label="Filter usage" (closed)="onClosed()">
+    <app-bs-sheet [(open)]="open" detent="full" label="Filter usage" (closed)="onClosed()">
       <div class="fs">
         <header class="fs__head">
           <h2 class="fs__title">Filters</h2>
@@ -81,12 +79,8 @@ import { BottomSheet } from '../../tracker-beta/ui/bottom-sheet';
 
         <section class="fs__group">
           <h3 class="fs__label">Group time by</h3>
-          <div class="fs__seg" role="group" aria-label="Group time by">
-            <button type="button" class="seg" [class.seg--on]="draftGroupBy() === 'day'"
-                    (click)="draftGroupBy.set('day')">Day</button>
-            <button type="button" class="seg" [class.seg--on]="draftGroupBy() === 'month'"
-                    (click)="draftGroupBy.set('month')">Month</button>
-          </div>
+          <app-bs-segmented [segments]="groupSegs" [value]="draftGroupBy()"
+                            label="Group time by" (change)="draftGroupBy.set($any($event))" />
         </section>
 
         <section class="fs__group">
@@ -109,63 +103,54 @@ import { BottomSheet } from '../../tracker-beta/ui/bottom-sheet';
           Apply{{ activeCount() ? ' · ' + activeCount() : '' }}
         </button>
       </div>
-    </app-bottom-sheet>
+    </app-bs-sheet>
   `,
   styles: [`
     :host { display: contents; }
 
     .fs { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 88px; }
     .fs__head { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; }
-    .fs__title { margin: 0; font-size: 20px; font-weight: 700; color: var(--pulse-ink); }
+    .fs__title { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
     .fs__reset {
-      background: none; border: 0; color: var(--pulse-ink-dim); font: inherit; font-size: 14px;
+      background: none; border: 0; color: var(--ink-dim); font: inherit; font-size: 14px; font-weight: 600;
       min-height: 44px; padding: 0 8px; cursor: pointer; border-radius: var(--r-pill);
     }
-    .fs__reset:active { color: var(--pulse-ink); }
+    .fs__reset:active { color: var(--ink); }
 
     .fs__group { display: flex; flex-direction: column; gap: 10px; }
     .fs__label {
-      margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-      color: var(--pulse-ink-dim);
+      margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--ink-dim);
     }
     .fs__chips { display: flex; flex-wrap: wrap; gap: 8px; }
 
     .chip {
       min-height: 44px; padding: 0 16px; border-radius: var(--r-pill);
-      background: var(--pulse-rise); color: var(--pulse-ink-dim);
-      border: 1px solid var(--pulse-edge); font: inherit; font-size: 14px;
+      background: var(--bg-rise); color: var(--ink-dim);
+      border: 1px solid var(--hairline); font: inherit; font-size: 14px; font-weight: 600;
       cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       transition: background 160ms var(--ease-out), color 160ms var(--ease-out), border-color 160ms var(--ease-out);
     }
     .chip--on {
-      background: color-mix(in srgb, var(--tok-a) 22%, var(--pulse-rise));
-      color: var(--pulse-ink);
-      border-color: color-mix(in srgb, var(--tok-a) 55%, var(--pulse-edge));
+      background: color-mix(in srgb, var(--accent-a) 22%, var(--bg-rise));
+      color: var(--ink);
+      border-color: color-mix(in srgb, var(--accent-a) 55%, var(--hairline));
     }
-
-    .fs__seg, .fs__seg { display: inline-flex; gap: 6px; background: var(--pulse-rise);
-      border: 1px solid var(--pulse-edge); border-radius: var(--r-pill); padding: 4px; width: fit-content; }
-    .seg {
-      min-height: 44px; padding: 0 22px; border: 0; border-radius: var(--r-pill);
-      background: none; color: var(--pulse-ink-dim); font: inherit; font-size: 14px; cursor: pointer;
-      transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
-    }
-    .seg--on { background: var(--tok-a); color: #07101f; font-weight: 600; }
 
     .fs__toggle {
       display: flex; align-items: center; justify-content: space-between; gap: 16px;
       width: 100%; min-height: 56px; padding: 10px 16px; border-radius: var(--r-card);
-      background: var(--pulse-rise); border: 1px solid var(--pulse-edge); cursor: pointer; text-align: left;
+      background: var(--bg-rise); border: 1px solid var(--hairline); cursor: pointer; text-align: left;
     }
     .fs__toggle-text { display: flex; flex-direction: column; gap: 2px; }
-    .fs__toggle-title { font-size: 15px; color: var(--pulse-ink); font-weight: 600; }
-    .fs__toggle-sub { font-size: 12px; color: var(--pulse-ink-dim); }
+    .fs__toggle-title { font-size: 15px; color: var(--ink); font-weight: 600; }
+    .fs__toggle-sub { font-size: 12px; color: var(--ink-dim); }
 
     .switch {
       flex: 0 0 auto; width: 46px; height: 28px; border-radius: var(--r-pill);
-      background: var(--pulse-edge); position: relative; transition: background 200ms var(--ease-out);
+      background: var(--hairline); position: relative; transition: background 200ms var(--ease-out);
     }
-    .switch--on { background: var(--cache-hit); }
+    .switch--on { background: var(--signal); }
     .switch__dot {
       position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
       background: #fff; transition: transform 200ms var(--ease-out);
@@ -182,12 +167,14 @@ import { BottomSheet } from '../../tracker-beta/ui/bottom-sheet';
     }
     .fs__cancel, .fs__commit {
       flex: 1 1 auto; min-height: 52px; border-radius: var(--r-pill); font: inherit;
-      font-size: 16px; font-weight: 600; cursor: pointer; border: 1px solid var(--pulse-edge);
+      font-size: 16px; font-weight: 700; cursor: pointer; border: 1px solid var(--hairline);
+      transition: transform 120ms var(--ease-spring);
     }
-    .fs__cancel { flex: 0 0 38%; background: var(--pulse-rise); color: var(--pulse-ink-dim); }
+    .fs__cancel:active, .fs__commit:active { transform: scale(.98); }
+    .fs__cancel { flex: 0 0 38%; background: var(--bg-rise); color: var(--ink-dim); }
     .fs__commit {
-      background: linear-gradient(120deg, var(--tok-a), var(--tok-b)); color: #07101f; border: 0;
-      box-shadow: 0 8px 22px -8px var(--tok-a);
+      background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #fff; border: 0;
+      box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--accent-a) 70%, transparent);
     }
   `],
 })
@@ -207,6 +194,11 @@ export class PulseFilterSheet {
 
   /** Emitted on Apply with the committed draft (page re-fetches). */
   readonly applied = output<{ filter: UsageFilter; groupBy: GroupBy }>();
+
+  protected readonly groupSegs: Segment[] = [
+    { key: 'day', label: 'Day' },
+    { key: 'month', label: 'Month' },
+  ];
 
   /** Local editable draft — Cancel discards, Apply commits. */
   private readonly draftFilter = signal<UsageFilter>(this.blankFilter());

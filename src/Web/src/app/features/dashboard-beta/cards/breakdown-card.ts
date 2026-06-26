@@ -1,8 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import type { EChartsOption } from 'echarts';
 
-import { ChartComponent } from '../../../shared/chart';
+import { BetaSegmentedControl, BetaSkeleton, BetaSectionHeader, type Segment } from '../../beta-ui';
 
 /** One ranked breakdown row — name + cost, dimension-agnostic. */
 export interface BreakdownSlice {
@@ -15,102 +14,104 @@ export interface BreakdownSlice {
 export type BreakdownDim = 'model' | 'source' | 'project';
 
 /**
- * Tap-to-flip BREAKDOWN card. A donut (lifted from the live dashboard's `modelChart`) plus a ranked
- * top-5 list with proportional cost meters. A 3-seg toggle flips the dimension (Model / Source /
- * Project); the page supplies the slices per dimension (fetched via the SAME `Api.summary` grouped by
- * that dimension, so totals match the live page). An "estimated" chip appears when any visible model
- * slice uses placeholder pricing.
+ * The BREAKDOWN card — a per-MODEL / per-SOURCE / per-PROJECT ranked list, rebuilt on the shared
+ * beta-ui kit. A {@link BetaSegmentedControl} flips the dimension; the page supplies the slices per
+ * dimension (fetched via the SAME `Api.summary` grouped by that dimension, so totals match the live
+ * page). Each row is a horizontal ACCENT BAR proportional to its share of total cost, with the cost +
+ * share %. An "estimated" chip appears when any visible model slice uses placeholder pricing. Tasteful
+ * skeleton while loading; a clean empty state otherwise.
  */
 @Component({
   selector: 'app-pulse-breakdown',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ChartComponent, DecimalPipe],
+  imports: [DecimalPipe, BetaSegmentedControl, BetaSkeleton, BetaSectionHeader],
   template: `
     <div class="bd">
-      <header class="bd__head">
-        <h2 class="bd__title">Breakdown</h2>
+      <app-bs-section-header title="Breakdown" [subtitle]="subLabel()" icon="leaderboard" />
+
+      <div class="bd__bar">
+        <app-bs-segmented class="bd__seg" [segments]="dimSegs" [value]="dim()"
+                          label="Breakdown dimension" (change)="dimChange.emit($any($event))" />
         @if (hasEstimated()) {
           <span class="bd__chip" title="Some pricing is estimated (placeholder rates)">estimated</span>
         }
-      </header>
-
-      <div class="bd__seg" role="group" aria-label="Breakdown dimension">
-        <button type="button" class="seg" [class.seg--on]="dim() === 'model'"
-                (click)="dimChange.emit('model')">Model</button>
-        <button type="button" class="seg" [class.seg--on]="dim() === 'source'"
-                (click)="dimChange.emit('source')">Source</button>
-        <button type="button" class="seg" [class.seg--on]="dim() === 'project'"
-                (click)="dimChange.emit('project')">Project</button>
       </div>
 
-      @if (top().length) {
-        <div class="bd__chart">
-          <app-chart [option]="donut()"></app-chart>
+      @if (loading() && !slices().length) {
+        <div class="bd__skeleton">
+          @for (i of [1,2,3,4]; track i) { <app-bs-skeleton height="34px" radius="var(--r-tile)" /> }
         </div>
-
+      } @else if (top().length) {
         <ol class="bd__list">
           @for (s of top(); track s.name; let i = $index) {
             <li class="row">
-              <span class="row__rank">{{ i + 1 }}</span>
-              <span class="row__name" [title]="s.name">{{ s.name }}</span>
-              <span class="row__cost">\${{ s.costUsd | number:'1.2-2' }}</span>
+              <span class="row__head">
+                <span class="row__rank">{{ i + 1 }}</span>
+                <span class="row__name" [title]="s.name">{{ s.name }}</span>
+                <span class="row__share">{{ share(s.costUsd) }}%</span>
+                <span class="row__cost">\${{ s.costUsd | number:'1.2-2' }}</span>
+              </span>
               <span class="row__meter" aria-hidden="true">
                 <span class="row__fill" [style.width.%]="pct(s.costUsd)"></span>
               </span>
             </li>
           }
         </ol>
+        @if (otherCount()) {
+          <p class="bd__more">+{{ otherCount() }} more · \${{ otherCost() | number:'1.2-2' }}</p>
+        }
       } @else {
-        <p class="bd__empty">{{ loading() ? 'Loading…' : 'No cost in this range' }}</p>
+        <p class="bd__empty">No cost in this range</p>
       }
     </div>
   `,
-  // number pipe is in CommonModule; import it via the standalone DecimalPipe below to stay lean.
   styles: [`
     :host { display: block; }
     .bd { display: flex; flex-direction: column; gap: 14px; }
-    .bd__head { display: flex; align-items: center; gap: 10px; }
-    .bd__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--pulse-ink); }
+
+    .bd__bar { display: flex; align-items: center; gap: 10px; }
+    .bd__seg { flex: 1 1 auto; min-width: 0; }
     .bd__chip {
-      font-size: 11px; font-weight: 600; letter-spacing: .03em; padding: 3px 9px; border-radius: var(--r-pill);
-      background: color-mix(in srgb, var(--warn, #f0a35a) 22%, var(--pulse-rise));
-      color: var(--warn, #f0a35a); border: 1px solid color-mix(in srgb, var(--warn, #f0a35a) 40%, transparent);
+      flex: 0 0 auto;
+      font-size: 11px; font-weight: 700; letter-spacing: .03em; padding: 4px 10px; border-radius: var(--r-pill);
+      background: color-mix(in srgb, var(--warn) 18%, transparent);
+      color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 38%, transparent);
     }
 
-    .bd__seg {
-      display: inline-flex; gap: 4px; background: var(--pulse-rise); border: 1px solid var(--pulse-edge);
-      border-radius: var(--r-pill); padding: 4px; width: fit-content;
-    }
-    .seg {
-      min-height: 44px; padding: 0 16px; border: 0; border-radius: var(--r-pill);
-      background: none; color: var(--pulse-ink-dim); font: inherit; font-size: 13px; cursor: pointer;
-      transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
-    }
-    .seg--on { background: var(--tok-a); color: #07101f; font-weight: 600; }
+    .bd__skeleton { display: flex; flex-direction: column; gap: 10px; }
 
-    .bd__chart { width: 100%; height: 220px; }
-    .bd__chart app-chart { display: block; width: 100%; height: 100%; }
-
-    .bd__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-    .row {
-      display: grid; grid-template-columns: 22px 1fr auto; grid-template-rows: auto auto;
-      align-items: center; gap: 2px 10px;
-    }
+    .bd__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+    .row { display: flex; flex-direction: column; gap: 6px; }
+    .row__head { display: flex; align-items: baseline; gap: 8px; }
     .row__rank {
-      grid-row: 1 / 3; font-size: 13px; font-weight: 700; color: var(--pulse-ink-dim);
-      width: 22px; text-align: center; font-variant-numeric: tabular-nums;
+      flex: 0 0 auto; width: 18px; text-align: center;
+      font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--ink-faint);
+      font-variant-numeric: tabular-nums;
     }
-    .row__name { font-size: 14px; color: var(--pulse-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .row__cost { font-size: 14px; font-weight: 700; color: var(--pulse-ink); font-variant-numeric: tabular-nums; }
+    .row__name {
+      flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 600; color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .row__share {
+      flex: 0 0 auto; font-size: 12px; font-weight: 700; color: var(--ink-dim); font-variant-numeric: tabular-nums;
+    }
+    .row__cost {
+      flex: 0 0 auto; font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
     .row__meter {
-      grid-column: 2 / 4; height: 5px; border-radius: var(--r-pill); background: var(--pulse-edge); overflow: hidden;
+      display: block; height: 7px; border-radius: var(--r-pill);
+      background: color-mix(in srgb, var(--ink) 7%, transparent); overflow: hidden;
     }
     .row__fill {
       display: block; height: 100%; border-radius: var(--r-pill);
-      background: linear-gradient(90deg, var(--tok-a), var(--cost-a));
+      background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+      box-shadow: 0 0 10px color-mix(in srgb, var(--accent-a) 40%, transparent);
+      transition: width 600ms var(--ease-spring);
     }
-    .bd__empty { margin: 8px 0; color: var(--pulse-ink-dim); font-size: 14px; }
+    .bd__more { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+    .bd__empty { margin: 16px 0; text-align: center; color: var(--ink-dim); font-size: 14px; }
   `],
 })
 export class PulseBreakdownCard {
@@ -122,31 +123,42 @@ export class PulseBreakdownCard {
   /** Emitted when the user flips the dimension toggle (page swaps the slices). */
   readonly dimChange = output<BreakdownDim>();
 
-  /** Top 5 cost-bearing slices. */
-  readonly top = computed(() => this.slices().filter(s => s.costUsd > 0).slice(0, 5));
+  protected readonly dimSegs: Segment[] = [
+    { key: 'model', label: 'Model' },
+    { key: 'source', label: 'Source' },
+    { key: 'project', label: 'Project' },
+  ];
+
+  protected readonly subLabel = computed(() => {
+    const d = this.dim();
+    return d === 'model' ? 'Cost by model' : d === 'source' ? 'Cost by source' : 'Cost by project';
+  });
+
+  /** Cost-bearing slices only. */
+  private readonly positive = computed(() => this.slices().filter(s => s.costUsd > 0));
+  /** Top 6 cost-bearing slices. */
+  readonly top = computed(() => this.positive().slice(0, 6));
 
   readonly hasEstimated = computed(() => this.top().some(s => s.estimated));
 
+  /** Total cost across ALL positive slices (share % denominator). */
+  private readonly totalCost = computed(() => this.positive().reduce((sum, s) => sum + s.costUsd, 0));
   private readonly maxCost = computed(() => Math.max(0, ...this.top().map(s => s.costUsd)));
+
+  readonly otherCount = computed(() => Math.max(0, this.positive().length - this.top().length));
+  readonly otherCost = computed(() =>
+    this.positive().slice(6).reduce((sum, s) => sum + s.costUsd, 0));
+
+  /** Bar fill as a fraction of the largest visible slice (so #1 is full-width). */
   pct(c: number): number {
     const m = this.maxCost();
     return m > 0 ? (c / m) * 100 : 0;
   }
-
-  readonly donut = computed<EChartsOption>(() => {
-    const data = this.slices().filter(s => s.costUsd > 0);
-    if (data.length === 0) {
-      const text = this.loading() ? 'Loading…' : 'No data';
-      return { title: { text, left: 'center', top: 'center', textStyle: { color: '#5e6c82' } } };
-    }
-    return {
-      tooltip: { trigger: 'item', formatter: (p: any) => `${p.name}: $${Number(p.value).toLocaleString()} (${p.percent}%)` },
-      legend: { show: false },
-      series: [{
-        type: 'pie', radius: ['45%', '72%'], avoidLabelOverlap: true, label: { show: false },
-        itemStyle: { borderColor: '#0a0d16', borderWidth: 2 },
-        data: data.map(s => ({ name: s.name, value: +s.costUsd.toFixed(2) })),
-      }],
-    };
-  });
+  /** Share of the grand total, rounded for the label. */
+  share(c: number): string {
+    const t = this.totalCost();
+    if (t <= 0) return '0';
+    const p = (c / t) * 100;
+    return p >= 10 ? Math.round(p).toString() : p.toFixed(1).replace(/\.0$/, '');
+  }
 }
