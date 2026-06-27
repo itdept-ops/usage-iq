@@ -1,144 +1,105 @@
-:host { display: block; }
+@use '../marketing/aurora' as aur;
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SIGN-IN — Aurora reskin
+//  Self-contained, always-dark Aurora brand surface (theme-independent), so the
+//  obsidian landing flows straight into the sign-in page. Keeps the exact IA +
+//  copy and the Google Identity Services button flow 100% intact (the GIS button
+//  is a cross-origin iframe; its white UA backing is dropped globally in
+//  styles.scss via `iframe[src*="accounts.google.com"] { color-scheme: normal }`).
+//  No global tokens, no app-theme reads.
+// ════════════════════════════════════════════════════════════════════════════
+
+:host {
+  display: block;
+  @include aur.aurora-vars;
+  // On the HOST (not the inner .signin) so the obsidian canvas + drifting aurora
+  // fields cover the sibling <app-marketing-nav> + <app-marketing-footer> too —
+  // otherwise the chrome falls on the light app body in light/system theme.
+  // Matches login.scss + the other Aurora pages.
+  @include aur.aurora-surface;
+}
 
 .signin {
-  position: relative;
-  isolation: isolate;
   overflow-x: clip;
 }
 
-/* ───────────────────────── Animated backdrop ───────────────────────── */
-.bg-fx {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  overflow: hidden;
-}
+// ───────────────────────── Legacy backdrop → retired ─────────────────────────
+// The Aurora canvas (aurora-surface ::before/::after) IS the backdrop now.
+// Neutralise the old grid + neon orbs left in the template.
+.bg-fx { display: none; }
 
-.grid-fade {
-  position: absolute;
-  inset: -2px;
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--tech-border-subtle) 60%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--tech-border-subtle) 60%, transparent) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 32%, #000 0%, transparent 74%);
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 32%, #000 0%, transparent 74%);
-  opacity: 0.55;
-}
-
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(72px);
-  opacity: 0.5;
-  animation: signin-float 18s ease-in-out infinite;
-}
-.orb-a { top: -140px; left: -90px; width: 460px; height: 460px;
-  background: radial-gradient(circle, color-mix(in srgb, var(--tech-accent) 70%, transparent), transparent 68%); }
-.orb-b { top: 60px; right: -130px; width: 520px; height: 520px; animation-delay: -6s;
-  background: radial-gradient(circle, color-mix(in srgb, var(--tech-accent-2, #8b7cff) 60%, transparent), transparent 68%); }
-.orb-c { bottom: -160px; left: 32%; width: 400px; height: 400px; animation-delay: -11s;
-  background: radial-gradient(circle, color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 42%, transparent), transparent 68%); }
-
-@keyframes signin-float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(40px, -30px) scale(1.08); }
-  66% { transform: translate(-30px, 24px) scale(0.96); }
-}
-
-/* ───────────────────────── Stage ───────────────────────── */
+// ───────────────────────── Stage ─────────────────────────
 .signin-stage {
   display: grid;
   place-items: center;
   min-height: calc(100dvh - 64px);
-  max-width: var(--tech-max-width, 1280px);
+  max-width: 1240px;
   margin: 0 auto;
-  padding: clamp(56px, 12vh, 120px) clamp(16px, 5vw, 40px) clamp(48px, 8vw, 88px);
+  padding: clamp(56px, 12vh, 120px) clamp(20px, 5vw, 48px) clamp(56px, 9vw, 96px);
 }
 
-/* ───────────────────────── Auth card ───────────────────────── */
+// ───────────────────────── Auth card ─────────────────────────
 .auth-card {
+  @include aur.aurora-glass(22px);
   position: relative;
   overflow: hidden;
   width: 100%;
   max-width: 440px;
-  padding: clamp(32px, 5vw, 48px) clamp(24px, 4vw, 40px);
-  border-radius: 22px;
-  border: 1px solid var(--tech-border-strong);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--tech-panel-raised, var(--tech-panel)) 88%, transparent),
-      color-mix(in srgb, var(--tech-panel) 92%, transparent));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow:
-    0 40px 90px -36px rgba(0, 0, 0, 0.72),
-    var(--tech-glow, 0 0 60px -20px rgba(99, 140, 255, 0.4));
+  padding: clamp(36px, 5vw, 52px) clamp(26px, 4vw, 42px);
   text-align: center;
-  animation: card-rise 640ms var(--tech-ease) both;
+  animation: card-rise 760ms var(--aur-ease) both;
 }
 @keyframes card-rise {
-  from { opacity: 0; transform: translateY(22px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* soft top glow inside the card */
+// soft aurora glow blooming above the card interior
 .card-glow {
   position: absolute;
-  left: 50%; top: -46%;
+  left: 50%; top: -42%;
   width: 460px; height: 320px;
   transform: translateX(-50%);
-  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--tech-accent) 36%, transparent), transparent 66%);
-  filter: blur(46px);
+  background: radial-gradient(ellipse at center, rgba(168, 85, 247, .26), transparent 66%);
+  filter: blur(50px);
   pointer-events: none;
   z-index: 0;
+  animation: card-glow-pulse 8s ease-in-out infinite;
 }
+@keyframes card-glow-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
 
 .auth-card > :not(.card-glow) { position: relative; z-index: 1; }
 
-/* brand mark */
+// brand mark — quiet glass tile holding the gradient logo
 .card-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 72px;
   height: 72px;
-  margin: 0 auto 22px;
-  border-radius: var(--tech-r-panel, 16px);
-  background: color-mix(in srgb, var(--tech-accent, #3d8bff) 12%, transparent);
-  border: 1px solid var(--tech-border-subtle);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  margin: 0 auto 24px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--aur-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
 }
 
 .card-title {
-  margin: 0 0 10px;
-  font-family: var(--tech-font-ui);
-  font-size: clamp(1.55rem, 3.4vw, 2rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  color: var(--tech-text);
+  @include aur.aurora-display(h2);
+  margin: 0 0 12px;
+  font-size: clamp(1.7rem, 3.4vw, 2.15rem);
 
-  .grad {
-    background: var(--tech-border-neon, linear-gradient(100deg, #3d8bff, #8b7cff 52%, #3fd8d0));
-    background-size: 200% auto;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: signin-shimmer 6s linear infinite;
-  }
+  .grad { @include aur.aurora-text-gradient; }
 }
-@keyframes signin-shimmer { to { background-position: 200% center; } }
 
 .card-sub {
-  margin: 0 0 30px;
-  font-size: clamp(0.95rem, 1.4vw, 1.04rem);
-  line-height: 1.55;
-  color: var(--tech-text-secondary);
+  @include aur.aurora-body(clamp(.98rem, 1.4vw, 1.06rem));
+  margin: 0 auto 32px;
+  max-width: 340px;
 }
 
-/* ───────────────────────── Auth zone ───────────────────────── */
+// ───────────────────────── Auth zone ─────────────────────────
 .card-auth {
   display: flex;
   flex-direction: column;
@@ -159,15 +120,15 @@
   align-items: center;
   gap: 9px;
   margin: 2px 0 0;
-  font-size: var(--tech-fs-label, 13px);
-  color: var(--tech-accent-cyan, #3fd8d0);
+  font-size: 13px;
+  color: var(--aur-c);
 }
 .spinner {
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 30%, transparent);
-  border-top-color: var(--tech-accent-cyan, #3fd8d0);
+  border: 2px solid rgba(45, 212, 191, .3);
+  border-top-color: var(--aur-c);
   animation: spin 720ms linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -179,38 +140,39 @@
   margin: 2px 0 0;
   padding: 9px 14px;
   max-width: 320px;
-  font-size: var(--tech-fs-label, 13px);
+  font-size: 13px;
   line-height: 1.45;
   text-align: left;
-  color: var(--tech-error, #ff5c6c);
-  background: color-mix(in srgb, var(--tech-error, #ff5c6c) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tech-error, #ff5c6c) 38%, transparent);
-  border-radius: var(--tech-r-control, 10px);
+  color: #ff8189;
+  background: rgba(255, 92, 108, .12);
+  border: 1px solid rgba(255, 92, 108, .34);
+  border-radius: 12px;
   mat-icon { flex: 0 0 auto; font-size: 17px; width: 17px; height: 17px; }
 }
 
-/* ───────────────────────── Footnotes ───────────────────────── */
+// ───────────────────────── Footnotes ─────────────────────────
 .card-lock {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin: 30px 0 0;
-  font-size: var(--tech-fs-micro, 11px);
-  letter-spacing: 0.05em;
+  margin: 32px 0 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .12em;
   text-transform: uppercase;
-  color: var(--tech-text-tertiary);
+  color: var(--aur-ink-faint);
   mat-icon { font-size: 15px; width: 15px; height: 15px; }
 }
 
 .card-hint {
+  @include aur.aurora-body(12.5px);
   margin: 16px auto 0;
   padding-top: 16px;
   max-width: 340px;
-  font-size: 12.5px;
   line-height: 1.55;
-  color: var(--tech-text-tertiary);
-  border-top: 1px solid var(--tech-border-subtle);
+  color: var(--aur-ink-faint);
+  border-top: 1px solid var(--aur-line);
 }
 
 @media (max-width: 420px) {
@@ -218,8 +180,8 @@
   .auth-error { max-width: 100%; }
 }
 
-/* Very narrow phones: the GIS button is a fixed 280px cross-origin iframe that
-   the .gbtn wrapper can't shrink, so scale it down to fit inside the card. */
+// Very narrow phones: the GIS button is a fixed 280px cross-origin iframe that
+// the .gbtn wrapper can't shrink, so scale it down to fit inside the card.
 @media (max-width: 360px) {
   .gbtn {
     transform: scale(0.85);
@@ -228,5 +190,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .orb, .grad, .auth-card, .spinner { animation: none !important; }
+  .grad, .auth-card, .spinner, .card-glow { animation: none !important; }
 }
