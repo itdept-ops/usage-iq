@@ -1261,6 +1261,10 @@
      can read --beta-bar-bottom to clear the tab bar. */
   --beta-bar-top: var(--mobile-bar-h);
   --beta-bar-bottom: var(--mobile-tabbar-h);
+  /* The kit default --fab-clear was set before the GLOBAL bottom tab bar existed. IN-SHELL, a fixed FAB only
+     needs to clear the ~62px tab bar + a 16px gap (there is no page-level bottom bar here — the global tab bar
+     replaced it), so override to 16px above the tab-bar height. (BetaFab reads var(--fab-clear); see fab.ts.) */
+  --fab-clear: calc(16px + var(--mobile-tabbar-h));
 }
 /* NOTE: the sticky-footer rules for bare pages live in the GLOBAL src/styles.scss, not here — they must
    reach the router-inserted page component, which doesn't carry this (encapsulated) component's scope. */

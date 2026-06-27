@@ -145,7 +145,7 @@
   -webkit-overflow-scrolling: touch;
   // Reserve room for the two fixed chrome bars so content never hides beneath them.
   padding-top: calc(var(--day-strip-h) + var(--safe-top));
-  padding-bottom: calc(var(--action-bar-h) + var(--safe-bottom) + 12px);
+  padding-bottom: calc(var(--action-bar-h) + var(--safe-bottom) + var(--beta-bar-bottom, 0px) + 12px);
   padding-inline: var(--gutter) var(--gutter-r);
   display: flex;
   flex-direction: column;
@@ -229,7 +229,9 @@
 // Fixed bottom ACTION BAR — glass, --lift-3 (the 3rd blurred surface). Thumb-arc anchor.
 .tb-action-bar {
   position: fixed;
-  bottom: 0;
+  // Clear the GLOBAL bottom tab bar (~62px): in the mobile shell --beta-bar-bottom resolves to the
+  // tab-bar height; on the standalone /beta preview it falls back to 0 so the bar still docks to the edge.
+  bottom: var(--beta-bar-bottom, 0px);
   left: 0;
   right: 0;
   z-index: 30;

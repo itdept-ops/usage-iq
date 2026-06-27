@@ -12,9 +12,12 @@ export type HeroFace = 'rings' | 'macros';
 /**
  * Strata HERO — the single glanceable SVG triple concentric ring + count-up ticker.
  *
- *   outer ring = calories  (cal gradient, violet→blue) — value caloriesIn / calorieGoal
- *   mid   ring = protein   (pro gradient, cyan→green)  — value proteinG  / proteinGoalG
- *   inner ring = move      (move gradient, rose→amber) — value steps     / stepGoal
+ *   outer ring = protein  (pro  gradient, cyan→green)  — value proteinG / proteinGoalG
+ *   mid   ring = carbs    (carb gradient, cal-b→cal-a) — value carbG    / carbGoalG
+ *   inner ring = fat      (fat  gradient, move-b→move-a) — value fatG    / fatGoalG
+ *
+ * The three rings are the three MACROS; CALORIES are the center number (the big count-up ticker + its
+ * over-goal warm/--warn coloring). Steps/move have their own move-card elsewhere and leave the ring.
  *
  * Center: a live ticker numeral "1,240 / 2,000" (denominator at 40% size, --ink-dim) with a caption
  * "kcal · 760 left" (GRAFT Daylight: abundance framing — shows what's LEFT, not just consumed). When the
@@ -61,9 +64,13 @@ export type HeroFace = 'rings' | 'macros';
                   <stop offset="0" stop-color="var(--pro-a)" />
                   <stop offset="1" stop-color="var(--pro-b)" />
                 </linearGradient>
-                <linearGradient id="hr-move" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stop-color="var(--move-a)" />
-                  <stop offset="1" stop-color="var(--move-b)" />
+                <linearGradient id="hr-carb" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="var(--cal-b)" />
+                  <stop offset="1" stop-color="var(--cal-a)" />
+                </linearGradient>
+                <linearGradient id="hr-fat" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="var(--move-b)" />
+                  <stop offset="1" stop-color="var(--move-a)" />
                 </linearGradient>
                 <linearGradient id="hr-warn" x1="0" y1="0" x2="1" y2="1">
                   <stop offset="0" stop-color="var(--warn)" />
@@ -375,12 +382,12 @@ export class HeroRing {
   // ── ring descriptors (track / arc geometry) ─────────────────────────────────
   protected readonly rings = computed(() => {
     const specs = [
-      { key: 'cal', grad: this.calOver() ? 'hr-warn' : 'hr-cal',
-        cur: this.calCur(), goal: this.calGoal(), over: this.calOver(), radius: this.RADII[0] },
       { key: 'pro', grad: 'hr-pro',
-        cur: this.proCur(), goal: this.proGoal(), over: false, radius: this.RADII[1] },
-      { key: 'move', grad: 'hr-move',
-        cur: this.stepCur(), goal: this.stepGoal(), over: false, radius: this.RADII[2] },
+        cur: this.proCur(), goal: this.proGoal(), over: false, radius: this.RADII[0] },
+      { key: 'carb', grad: 'hr-carb',
+        cur: this.carbCur(), goal: this.carbGoal(), over: false, radius: this.RADII[1] },
+      { key: 'fat', grad: 'hr-fat',
+        cur: this.fatCur(), goal: this.fatGoal(), over: false, radius: this.RADII[2] },
     ];
     return specs.map(s => {
       const circ = 2 * Math.PI * s.radius;
@@ -416,13 +423,13 @@ export class HeroRing {
     } else {
       parts.push(`${group(this.calCur())} kilocalories`);
     }
+    // the three rings = the three macros
     const pg = this.proGoal();
     parts.push(pg != null ? `Protein ${this.proCur()} of ${pg} grams` : `Protein ${this.proCur()} grams`);
-    const sg = this.stepGoal();
-    if (this.stepCur() > 0 || sg != null) {
-      parts.push(sg != null ? `${group(this.stepCur())} of ${group(sg)} steps` : `${group(this.stepCur())} steps`);
-    }
-    parts.push(`Carbs ${this.carbCur()} grams, fat ${this.fatCur()} grams`);
+    const cg = this.carbGoal();
+    parts.push(cg != null ? `Carbs ${this.carbCur()} of ${cg} grams` : `Carbs ${this.carbCur()} grams`);
+    const fg = this.fatGoal();
+    parts.push(fg != null ? `Fat ${this.fatCur()} of ${fg} grams` : `Fat ${this.fatCur()} grams`);
     return parts.join('. ') + '.';
   });
 

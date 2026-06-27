@@ -5,9 +5,10 @@
 :host {
   display: block;
   position: sticky;
-  bottom: 0;
+  // Dock above the GLOBAL bottom tab bar (~62px via --beta-bar-bottom; 0 on the standalone /beta preview).
+  bottom: var(--beta-bar-bottom, 0px);
   z-index: 20;
-  padding: 10px var(--gutter-r, 16px) max(12px, var(--safe-bottom, 0px)) var(--gutter, 16px);
+  padding: 10px var(--gutter-r, 16px) max(12px, calc(var(--safe-bottom, 0px) + var(--beta-bar-bottom, 0px))) var(--gutter, 16px);
   // A soft upward fade so the thread dissolves into the bar rather than hard-cutting.
   background: linear-gradient(180deg, transparent, var(--bg-base) 38%);
 }

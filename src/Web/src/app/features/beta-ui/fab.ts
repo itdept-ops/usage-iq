@@ -48,7 +48,9 @@ import { Haptics } from '../../core/haptics';
     :host(.bs-fab-fixed) {
       position: fixed; z-index: 40;
       right: max(16px, env(safe-area-inset-right, 0px));
-      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+      /* Reads the shell's clearance token so the FAB clears the global bottom tab bar (the mobile shell
+         overrides --fab-clear on .content--mobile). Falls back to a plain 16px dock for the standalone case. */
+      bottom: var(--fab-clear, calc(16px + env(safe-area-inset-bottom, 0px)));
     }
     .bs-fab {
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
