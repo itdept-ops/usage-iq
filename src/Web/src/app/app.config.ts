@@ -1,5 +1,5 @@
 import { ApplicationConfig, isDevMode, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withRouterConfig } from '@angular/router';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideServiceWorker } from '@angular/service-worker';
@@ -27,7 +27,10 @@ function swEnabled(): boolean {
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideRouter(routes),
+    // `onSameUrlNavigation: 'reload'` lets the desktop/mobile override re-render the CURRENT url (the platform
+    // `canMatch` re-evaluates and swaps in the other variant). Scroll restoration is deliberately left at the
+    // default so desktop navigation behavior is unchanged.
+    provideRouter(routes, withRouterConfig({ onSameUrlNavigation: 'reload' })),
     provideHttpClient(withFetch(), withInterceptors([authInterceptor, offlineInterceptor])),
     provideAnimations(),
     // Register our custom worker (it importScripts ngsw-worker.js) so push notifications render from the
