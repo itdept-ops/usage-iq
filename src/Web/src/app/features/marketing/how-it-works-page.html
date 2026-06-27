@@ -1,9 +1,7 @@
 <app-marketing-nav />
 
 <main class="mpage">
-  <div class="bg-fx" aria-hidden="true"><div class="grid-fade"></div><div class="orb orb-a"></div><div class="orb orb-b"></div></div>
-
-  <header class="mpage-hero">
+  <header class="mpage-hero reveal">
     <span class="page-eyebrow">How it works</span>
     <h1>How the OS <span class="grad">runs your life</span>, privately, on your own infra.</h1>
     <p>Usage IQ is one self-hosted system. A lightweight reporter moves your AI-work usage off your machine idempotently; your server and one Postgres database become the single source of truth; the workspace, the real-time layer, and a team of AI agents light up on top. Same login, same database, nothing phoning home.</p>
@@ -13,12 +11,12 @@
   <section class="flow" aria-label="How the OS boots and runs">
     <div class="flow-line" aria-hidden="true"></div>
     @for (s of stages; track s.n) {
-      <article class="flow-stage" [attr.data-accent]="s.accent">
+      <article class="flow-stage reveal" [attr.data-accent]="s.accent">
         <div class="flow-marker">
           <span class="flow-icon"><mat-icon aria-hidden="true">{{ s.icon }}</mat-icon></span>
           <span class="flow-n">{{ s.n }}</span>
         </div>
-        <div class="flow-body panel">
+        <div class="flow-body">
           <span class="flow-domain">{{ s.domain }}</span>
           <h2>{{ s.title }}</h2>
           <p class="boot-line" aria-hidden="true"><span class="boot-caret">›</span> {{ s.boot }}</p>
@@ -31,13 +29,13 @@
 
   <!-- Operating guarantees (FAQ) -->
   <section class="faq-section">
-    <header class="section-head">
+    <header class="section-head reveal">
       <span class="section-eyebrow">Operating guarantees</span>
       <h2>The things people ask first.</h2>
     </header>
     <div class="faqs">
       @for (f of faqs; track f.q) {
-        <details class="faq panel">
+        <details class="faq reveal">
           <summary>{{ f.q }}<mat-icon aria-hidden="true">expand_more</mat-icon></summary>
           <p>{{ f.a }}</p>
         </details>
@@ -46,7 +44,7 @@
   </section>
 
   <section class="mpage-cta">
-    <div class="cta-card panel">
+    <div class="cta-card reveal">
       <div class="cta-glow" aria-hidden="true"></div>
       <h2>One system. Hosted by you.</h2>
       <p>Boot the operating system for your life — or tour every domain it runs.</p>

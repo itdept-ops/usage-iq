@@ -1,4 +1,11 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  ElementRef,
+  AfterViewInit,
+  OnDestroy,
+  inject,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MarketingNav } from './marketing-nav';
@@ -31,9 +38,43 @@ interface Subsystem {
   imports: [RouterLink, MatIconModule, MarketingNav, MarketingFooter],
   templateUrl: './features-page.html',
   changeDetection: ChangeDetectionStrategy.Eager,
-  styleUrls: ['./marketing-page.scss', './features-page.scss'],
+  styleUrls: ['./features-page.scss'],
 })
-export class FeaturesPage {
+export class FeaturesPage implements AfterViewInit, OnDestroy {
+  private readonly host = inject(ElementRef<HTMLElement>);
+  private io?: IntersectionObserver;
+
+  /** Gentle scroll-reveal: toggle `.is-in` on `.reveal` elements as they enter. */
+  ngAfterViewInit(): void {
+    const root = this.host.nativeElement as HTMLElement;
+    const targets = Array.from(root.querySelectorAll<HTMLElement>('.reveal'));
+    const reduce =
+      typeof matchMedia === 'function' &&
+      matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (reduce || typeof IntersectionObserver === 'undefined') {
+      targets.forEach((el) => el.classList.add('is-in'));
+      return;
+    }
+
+    this.io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add('is-in');
+            this.io?.unobserve(e.target);
+          }
+        }
+      },
+      { rootMargin: '0px 0px -10% 0px', threshold: 0.08 },
+    );
+    targets.forEach((el) => this.io!.observe(el));
+  }
+
+  ngOnDestroy(): void {
+    this.io?.disconnect();
+  }
+
   /** Subsystem metadata, keyed by group name (rendered as a "module" header). */
   readonly subsystems: Record<string, Subsystem> = {
     'Work · AI cost intelligence': {

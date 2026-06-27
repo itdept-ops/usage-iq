@@ -42,8 +42,9 @@ interface Cert {
 /**
  * Public "About" page for Junior Fortunato.
  *
- * Bare layout: shared marketing nav + footer, the landing's animated grid/orb
- * backdrop, and a sequence of scroll-revealed chapters. All heavy motion is
+ * Bare layout: shared marketing nav + footer, the Aurora obsidian canvas with
+ * softly drifting aurora fields (from the shared marketing partial), and a
+ * sequence of scroll-revealed chapters. All heavy motion is
  * gated behind `prefers-reduced-motion` and the IntersectionObserver reveal
  * degrades gracefully (everything is visible if JS/observer is unavailable).
  */

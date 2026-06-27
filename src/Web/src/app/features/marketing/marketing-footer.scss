@@ -1,31 +1,45 @@
+@use './aurora' as aur;
+
 /* margin-top:auto sinks the footer to the bottom when its page is a full-height flex column (see the
-   .content--bare sticky-footer rule). A no-op in normal block flow, so it's safe everywhere the footer is used. */
-:host { display: block; margin-top: auto; }
+   .content--bare sticky-footer rule). A no-op in normal block flow, so it's safe everywhere the footer is used.
+   Aurora-scoped: palette declared on :host so children read var(--aur-*); always-dark, theme-independent. */
+:host {
+  display: block;
+  margin-top: auto;
+  @include aur.aurora-vars;
+}
 
 .mfoot {
   position: relative;
   overflow: hidden;
-  border-top: 1px solid var(--tech-border-subtle);
-  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--tech-bg-sunken, #05080f) 60%, transparent));
+  border-top: 1px solid var(--aur-line);
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--aur-void) 70%, transparent));
 }
 
+// Soft aurora glow rising from the base — washes, not a neon orb.
 .mfoot-glow {
   position: absolute;
   left: 50%;
-  bottom: -160px;
-  width: 680px;
-  height: 320px;
+  bottom: -180px;
+  width: 760px;
+  height: 360px;
+  max-width: 130vw;
   transform: translateX(-50%);
-  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--tech-accent) 28%, transparent), transparent 70%);
-  filter: blur(40px);
+  background:
+    radial-gradient(ellipse 60% 100% at 38% 50%, rgba(99, 102, 241, 0.22), transparent 70%),
+    radial-gradient(ellipse 50% 100% at 62% 60%, rgba(168, 85, 247, 0.18), transparent 72%),
+    radial-gradient(ellipse 44% 90% at 80% 70%, rgba(45, 212, 191, 0.14), transparent 70%);
+  filter: blur(70px);
   pointer-events: none;
+  z-index: 0;
 }
 
 .mfoot-inner {
   position: relative;
-  max-width: var(--tech-max-width, 1280px);
+  z-index: 1;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: clamp(40px, 6vw, 72px) clamp(16px, 4vw, 40px) 32px;
+  padding: clamp(48px, 6vw, 80px) clamp(16px, 4vw, 40px) 36px;
   display: grid;
   grid-template-columns: 1.4fr 1fr;
   gap: 48px;
@@ -37,28 +51,33 @@
     align-items: center;
     gap: 10px;
     text-decoration: none;
-    span { font-family: var(--tech-font-ui); font-weight: 700; font-size: 17px; letter-spacing: -0.02em; color: var(--tech-text); }
+    span {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 600;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+      color: var(--aur-ink);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--aur-c);
+      outline-offset: 4px;
+      border-radius: 8px;
+    }
   }
   .tag {
-    margin: 16px 0 18px;
+    margin: 18px 0 22px;
     max-width: 46ch;
-    color: var(--tech-text-secondary);
-    font-size: 14px;
-    line-height: 1.6;
+    color: var(--aur-ink-dim);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14.5px;
+    line-height: 1.65;
+    letter-spacing: -0.005em;
   }
   .gh {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    @include aur.aurora-pill;
     padding: 8px 16px;
     font-size: 13px;
-    font-weight: 600;
-    color: var(--tech-text-secondary);
-    text-decoration: none;
-    border: 1px solid var(--tech-border);
-    border-radius: var(--tech-r-pill, 999px);
-    transition: color 160ms var(--tech-ease), border-color 160ms var(--tech-ease);
-    &:hover { color: var(--tech-text); border-color: var(--tech-border-strong); }
+    font-weight: 450;
   }
 }
 
@@ -73,35 +92,48 @@
   flex-direction: column;
   gap: 10px;
   h4 {
-    margin: 0 0 4px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    margin: 0 0 6px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: var(--tech-text-tertiary);
+    color: var(--aur-ink-faint);
   }
   a {
+    font-family: 'Inter', system-ui, sans-serif;
     font-size: 14px;
-    color: var(--tech-text-secondary);
+    color: var(--aur-ink-dim);
     text-decoration: none;
-    transition: color 160ms var(--tech-ease);
-    &:hover { color: var(--tech-text-accent, var(--tech-text)); }
+    transition: color 180ms var(--aur-ease);
+    width: fit-content;
+    &:hover { color: var(--aur-ink); }
+    &:focus-visible {
+      outline: 2px solid var(--aur-c);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
   }
 }
 
 .mfoot-base {
   position: relative;
-  max-width: var(--tech-max-width, 1280px);
+  z-index: 1;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 18px clamp(16px, 4vw, 40px);
-  border-top: 1px solid var(--tech-border-subtle);
+  border-top: 1px solid var(--aur-line);
   display: flex;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: 12.5px;
-  color: var(--tech-text-tertiary);
-  .mfoot-stack { font-family: var(--tech-font-mono); letter-spacing: 0.02em; }
+  color: var(--aur-ink-faint);
+  .mfoot-stack {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    letter-spacing: 0.04em;
+  }
 }
 
 @media (max-width: 720px) {

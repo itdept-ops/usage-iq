@@ -1,6 +1,5 @@
 import {
   Component,
-  HostListener,
   OnDestroy,
   effect,
   signal,
@@ -36,7 +35,28 @@ export class MarketingNav implements OnDestroy {
   readonly scrolled = signal(false);
   readonly menuOpen = signal(false);
 
+  // The marketing pages scroll their content INSIDE <body> (the app shell makes
+  // <body> a height:100% / overflow:auto scroller, so the viewport/window never
+  // scrolls). A `window:scroll` HostListener therefore never fires and the nav
+  // would stay transparent over scrolling content. We listen on `document` in
+  // the CAPTURE phase (catches scroll bubbling from body OR window) and read the
+  // position from whichever scroller is actually moving.
+  private readonly onScroll = (): void => {
+    const y =
+      window.scrollY ||
+      document.scrollingElement?.scrollTop ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0;
+    this.scrolled.set(y > 8);
+  };
+
   constructor() {
+    // Capture phase + passive: see the body's scroll even though it doesn't
+    // reach window. Passive keeps it off the scroll-jank critical path.
+    document.addEventListener('scroll', this.onScroll, { capture: true, passive: true });
+    this.onScroll(); // seed initial state (e.g. restored scroll position)
+
     // Lock page scroll while the mobile drawer is open so the long marketing
     // pages don't scroll behind the overlay. Set inline since this component's
     // styles are emulated-scoped and can't target the global <body>.
@@ -46,6 +66,7 @@ export class MarketingNav implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    document.removeEventListener('scroll', this.onScroll, { capture: true });
     document.body.style.overflow = '';
   }
 
@@ -57,11 +78,6 @@ export class MarketingNav implements OnDestroy {
     { path: '/ai', label: 'AI', opts: SUBSET_IGNORING_QUERY },
     { path: '/about', label: 'About', opts: SUBSET_IGNORING_QUERY },
   ];
-
-  @HostListener('window:scroll')
-  onScroll(): void {
-    this.scrolled.set(window.scrollY > 8);
-  }
 
   toggle(): void {
     this.menuOpen.update((v) => !v);

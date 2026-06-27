@@ -1,4 +1,11 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  ElementRef,
+  AfterViewInit,
+  OnDestroy,
+  inject,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MarketingNav } from './marketing-nav';
@@ -27,7 +34,39 @@ interface Faq {
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./marketing-page.scss', './how-it-works-page.scss'],
 })
-export class HowItWorksPage {
+export class HowItWorksPage implements AfterViewInit, OnDestroy {
+  private readonly host = inject(ElementRef<HTMLElement>);
+  private io?: IntersectionObserver;
+
+  ngAfterViewInit(): void {
+    const els = Array.from(
+      (this.host.nativeElement as HTMLElement).querySelectorAll('.reveal'),
+    );
+    const reduce =
+      typeof matchMedia !== 'undefined' &&
+      matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || typeof IntersectionObserver === 'undefined') {
+      els.forEach((el) => el.classList.add('is-in'));
+      return;
+    }
+    this.io = new IntersectionObserver(
+      (entries, obs) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add('is-in');
+            obs.unobserve(e.target);
+          }
+        }
+      },
+      { rootMargin: '0px 0px -8% 0px', threshold: 0.12 },
+    );
+    els.forEach((el) => this.io!.observe(el));
+  }
+
+  ngOnDestroy(): void {
+    this.io?.disconnect();
+  }
+
   /** The kernel coming online: data flows in, the source of truth forms, the live + AI layers light up. */
   readonly stages: Stage[] = [
     {

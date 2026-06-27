@@ -1,92 +1,288 @@
-/* ─────────────────────────────────────────────────────────────────────────
-   How it works — page-specific styles only.
-   Shared classes (.mpage, .bg-fx, .panel, .flow, .flow-stage, .flow-marker,
-   .flow-body, .section-head, .faq, .cta-card, etc.) come from
-   marketing-page.scss; --tech-* vars are global. Reframed as the OS boot
-   sequence: domain-tinted stages, monospace boot status lines, agent-pulse.
-   ───────────────────────────────────────────────────────────────────────── */
+// ════════════════════════════════════════════════════════════════════════════
+//  How it works — AURORA reskin (self-contained, marketing-scoped).
+//  Replaces the electric --tech-* boot-sequence look with the premium dark
+//  Aurora language: obsidian canvas + drifting fields, glass step cards,
+//  aurora-gradient step numerals, hairline dividers, gentle scroll reveal.
+//
+//  Loaded alongside (and OVERRIDING) the shared marketing-page.scss. All Aurora
+//  treatment is scoped to :host so it never leaks into the authenticated app or
+//  the global --tech-* theme.
+// ════════════════════════════════════════════════════════════════════════════
 
-/* Clipped-gradient hero word (reuses the shipped .grad treatment). */
-.mpage-hero h1 .grad {
-  background: var(--tech-border-neon, linear-gradient(100deg, #3d8bff, #8b7cff 52%, #3fd8d0));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
+@use './aurora' as aur;
 
-/* ───────────────────────── Domain-tinted boot stages ─────────────────────────
-   Each stage wears one of the three tech accents via a CSS var, so the tint is
-   never hardcoded and the light theme keeps working. */
-.flow-stage {
-  --stage-accent: var(--tech-accent);
-  &[data-accent='blue']   { --stage-accent: var(--tech-accent); }
-  &[data-accent='violet'] { --stage-accent: var(--tech-accent-2, #8b7cff); }
-  &[data-accent='cyan']   { --stage-accent: var(--tech-accent-cyan, #3fd8d0); }
-}
+:host {
+  @include aur.aurora-vars;
 
-/* Tint the node ring + a gradient top-rule on the panel by the stage accent. */
-.flow-stage .flow-marker .flow-icon {
-  border-color: color-mix(in srgb, var(--stage-accent) 60%, transparent);
-  color: var(--stage-accent);
-  position: relative;
-
-  /* AGENT-PULSE: a traveling lit dot that runs the node ring, signifying an
-     agent acting. Static lit dot under reduced motion. */
-  &::after {
-    content: '';
-    position: absolute;
-    inset: -3px;
-    border-radius: 50%;
-    border: 1.5px solid transparent;
-    border-top-color: color-mix(in srgb, var(--stage-accent) 85%, transparent);
-    opacity: 0.85;
-    animation: agent-pulse 3.2s linear infinite;
+  // ── The obsidian canvas + drifting aurora fields ─────────────────────────
+  .mpage {
+    @include aur.aurora-surface;
+    padding-bottom: clamp(48px, 8vw, 110px);
   }
-}
 
-.flow-body {
-  position: relative;
-  border-top: 1px solid color-mix(in srgb, var(--stage-accent) 55%, var(--tech-border-subtle));
-}
+  // The shared backdrop (.bg-fx grid + neon orbs) is removed from the template;
+  // belt-and-braces in case it lingers.
+  .bg-fx { display: none; }
 
-.flow-domain {
-  display: inline-block;
-  margin-bottom: 8px;
-  padding: 3px 10px;
-  border-radius: var(--tech-r-pill, 999px);
-  border: 1px solid color-mix(in srgb, var(--stage-accent) 45%, var(--tech-border-subtle));
-  background: color-mix(in srgb, var(--stage-accent) 12%, transparent);
-  font-family: var(--tech-font-mono);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--stage-accent);
-}
+  // ── Reveal: every .reveal element fades + rises into place ────────────────
+  .reveal { @include aur.aurora-reveal; }
 
-/* BOOT SEQUENCE: monospace status line under each stage title. */
-.boot-line {
-  margin: 4px 0 12px;
-  font-family: var(--tech-font-mono);
-  font-size: 0.82rem;
-  line-height: 1.5;
-  color: var(--tech-text-tertiary);
-  .boot-caret {
-    color: var(--stage-accent);
-    font-weight: 700;
+  // ── Hero ──────────────────────────────────────────────────────────────────
+  .mpage-hero {
+    padding-top: clamp(72px, 12vw, 150px);
+    padding-bottom: clamp(40px, 6vw, 72px);
+
+    .page-eyebrow {
+      @include aur.aurora-eyebrow;
+      margin-bottom: 22px;
+    }
+    h1 {
+      @include aur.aurora-display(h1);
+      max-width: 18ch;
+      margin: 0 auto 22px;
+      .grad { @include aur.aurora-text-gradient; }
+    }
+    p {
+      @include aur.aurora-body(clamp(1.02rem, 1.5vw, 1.22rem));
+      max-width: 60ch;
+      margin: 0 auto;
+    }
   }
-}
 
-@keyframes agent-pulse {
-  to { transform: rotate(360deg); }
-}
+  // ── Flow / boot sequence ────────────────────────────────────────────────
+  .flow {
+    gap: clamp(20px, 3vw, 36px);
+    padding-top: clamp(16px, 3vw, 40px);
+    padding-bottom: clamp(48px, 7vw, 96px);
+  }
 
-@media (prefers-reduced-motion: reduce) {
-  .flow-stage .flow-marker .flow-icon::after {
-    animation: none;
-    /* static lit dot at the top of the ring */
-    inset: -3px;
-    border-color: transparent;
-    border-top-color: color-mix(in srgb, var(--stage-accent) 85%, transparent);
+  // The vertical spine — a soft aurora-tinted hairline.
+  .flow-line {
+    left: calc(clamp(16px, 4vw, 40px) + 29px);
+    width: 1px;
+    opacity: 1;
+    background: linear-gradient(
+      180deg,
+      rgba(99, 102, 241, .4) 0%,
+      rgba(168, 85, 247, .28) 50%,
+      rgba(45, 212, 191, .18) 80%,
+      transparent 100%
+    );
+  }
+
+  // Per-stage accent (drives the numeral gradient + node tint).
+  .flow-stage {
+    --stage-grad: var(--aur-grad);
+    --stage-tint: var(--aur-b);
+    &[data-accent='blue'] {
+      --stage-grad: linear-gradient(120deg, #6366F1, #818CF8);
+      --stage-tint: #818CF8;
+    }
+    &[data-accent='violet'] {
+      --stage-grad: linear-gradient(120deg, #A855F7, #C084FC);
+      --stage-tint: #C084FC;
+    }
+    &[data-accent='cyan'] {
+      --stage-grad: linear-gradient(120deg, #2DD4BF, #5EEAD4);
+      --stage-tint: #5EEAD4;
+    }
+  }
+
+  // The marker node — a quiet glass disc with an aurora-tinted ring.
+  .flow-marker {
+    gap: 12px;
+
+    .flow-icon {
+      width: 58px;
+      height: 58px;
+      background: rgba(255, 255, 255, .035);
+      border: 1px solid color-mix(in srgb, var(--stage-tint) 45%, var(--aur-line));
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow:
+        0 1px 0 0 rgba(255, 255, 255, .08) inset,
+        0 10px 28px -16px rgba(0, 0, 0, .7);
+      color: var(--stage-tint);
+      mat-icon { font-size: 26px; width: 26px; height: 26px; }
+    }
+
+    // Aurora-gradient step numeral.
+    .flow-n {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      background: var(--stage-grad);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+        color: var(--stage-tint);
+        -webkit-text-fill-color: var(--stage-tint);
+      }
+    }
+  }
+
+  // The step card — glass with a faint aurora top-edge tint.
+  .flow-body {
+    @include aur.aurora-glass(18px);
+    padding: clamp(20px, 3vw, 30px) clamp(22px, 3vw, 32px);
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 1px;
+      border-radius: 18px 18px 0 0;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in srgb, var(--stage-tint) 55%, transparent) 30%,
+        color-mix(in srgb, var(--stage-tint) 55%, transparent) 70%,
+        transparent
+      );
+      opacity: .6;
+    }
+
+    h2 {
+      @include aur.aurora-display(h3);
+      margin: 0 0 6px;
+    }
+    .flow-lead {
+      @include aur.aurora-body(1.02rem);
+      margin: 10px 0 0;
+    }
+    .flow-detail {
+      @include aur.aurora-body(0.95rem);
+      color: var(--aur-ink-faint);
+      margin: 12px 0 0;
+    }
+  }
+
+  // Domain pill — quiet glass chip, accent ink.
+  .flow-domain {
+    display: inline-block;
+    margin-bottom: 14px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--stage-tint) 35%, var(--aur-line));
+    background: color-mix(in srgb, var(--stage-tint) 10%, transparent);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--stage-tint);
+  }
+
+  // Monospace boot status line.
+  .boot-line {
+    margin: 4px 0 0;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--aur-ink-faint);
+    .boot-caret { color: var(--stage-tint); font-weight: 700; }
+  }
+
+  // ── FAQ ────────────────────────────────────────────────────────────────
+  .faq-section {
+    padding-top: clamp(48px, 7vw, 96px);
+    padding-bottom: clamp(28px, 4vw, 48px);
+  }
+  .section-head {
+    .section-eyebrow {
+      @include aur.aurora-eyebrow;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+    h2 { @include aur.aurora-display(h2); }
+  }
+
+  .faqs { gap: 14px; }
+  .faq {
+    @include aur.aurora-glass(16px);
+    overflow: hidden;
+    transition: border-color .25s var(--aur-ease), background .25s var(--aur-ease);
+
+    summary {
+      padding: 19px 22px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 1.04rem;
+      font-weight: 450;
+      letter-spacing: -.01em;
+      color: var(--aur-ink);
+      mat-icon {
+        color: var(--aur-ink-faint);
+        transition: transform .25s var(--aur-ease);
+      }
+    }
+    p {
+      @include aur.aurora-body(0.97rem);
+      padding: 0 22px 22px;
+    }
+    &[open] summary mat-icon { transform: rotate(180deg); }
+    &:hover { border-color: rgba(255, 255, 255, .16); }
+    &:focus-within { border-color: color-mix(in srgb, var(--aur-b) 40%, var(--aur-line)); }
+  }
+
+  // ── CTA ────────────────────────────────────────────────────────────────
+  .mpage-cta {
+    padding-top: clamp(56px, 8vw, 100px);
+    padding-bottom: clamp(64px, 9vw, 120px);
+  }
+  .cta-card {
+    @include aur.aurora-glass(22px);
+    overflow: hidden;
+    text-align: center;
+    padding: clamp(44px, 6vw, 80px) clamp(24px, 4vw, 40px);
+
+    .cta-glow {
+      position: absolute;
+      left: 50%; top: -45%;
+      width: 620px; height: 400px;
+      max-width: 120%;
+      transform: translateX(-50%);
+      background: radial-gradient(
+        ellipse at center,
+        rgba(168, 85, 247, .26) 0%,
+        rgba(99, 102, 241, .14) 45%,
+        transparent 70%
+      );
+      filter: blur(60px);
+      pointer-events: none;
+    }
+    h2 {
+      @include aur.aurora-display(h2);
+      position: relative;
+      margin: 0 0 14px;
+    }
+    p {
+      @include aur.aurora-body(1.06rem);
+      position: relative;
+      margin: 0 auto 28px;
+      max-width: 48ch;
+    }
+  }
+  .cta-row { gap: 20px; }
+  .cta-pill {
+    @include aur.aurora-cta;
+    span { transition: transform .2s var(--aur-ease); }
+    &:hover span { transform: translateX(3px); }
+  }
+  .ghost-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .5em;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: .98rem;
+    font-weight: 450;
+    color: var(--aur-ink-dim);
+    text-decoration: none;
+    transition: color .25s var(--aur-ease);
+    span { transition: transform .2s var(--aur-ease); }
+    &:hover { color: var(--aur-ink); span { transform: translateX(3px); } }
+    &:focus-visible { outline: 2px solid var(--aur-c); outline-offset: 3px; border-radius: 6px; }
   }
 }

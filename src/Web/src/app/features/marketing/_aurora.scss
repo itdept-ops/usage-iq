@@ -1,0 +1,406 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  AURORA — the shared, marketing-scoped design layer
+// ════════════════════════════════════════════════════════════════════════════
+//
+//  Premium dark brand surface for the PUBLIC/marketing pages only (Linear /
+//  Vercel / Anthropic energy: calm, expensive, frontier-AI-lab). This partial
+//  is the single source of truth all 7 reskin surfaces @use so the site reads
+//  as one coherent scene.
+//
+//  SCOPING CONTRACT (do not break):
+//   • This file is FORWARD-ONLY. It emits NO global selectors and must NEVER be
+//     imported into src/styles.scss. Everything lives behind a mixin so the
+//     adopting component decides where it lands.
+//   • The marketing surface is ALWAYS-DARK Aurora — theme-independent. All
+//     colors below are HARDCODED Aurora hex; they do NOT read or flip with the
+//     app's light/dark theme and do NOT reference any global --tech-* token.
+//
+//  ── ADOPTION (copy the @use line for your folder) ──────────────────────────
+//
+//    features/login/    →  @use '../marketing/aurora' as aur;
+//    features/marketing/ →  @use './aurora'           as aur;
+//    features/about/    →  @use '../marketing/aurora' as aur;
+//
+//    Then, in the component :host:
+//
+//      :host {
+//        @include aur.aurora-vars;     // declare the palette as custom props
+//        @include aur.aurora-surface;  // obsidian canvas + drifting fields
+//      }
+//
+//    Glass card / display type / gradient text / CTA / eyebrow / reveal are
+//    opt-in mixins you sprinkle on the elements that need them (see each below).
+// ════════════════════════════════════════════════════════════════════════════
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  1 · PALETTE  (SCSS-side constants — also re-emitted as custom props by
+//     `aurora-vars` so HTML/child components can read them at runtime)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Canvas — obsidian
+$void:  #08090D; // deepest backdrop / footer sink edges
+$bg:    #0B0D12; // the page canvas
+$sink:  #070809; // recessed wells (inputs, code, deep panels)
+
+// Ink
+$ink:       #ECEEF3; // primary text / display headings
+$ink-dim:   #A6ADBB; // body copy
+$ink-faint: #868D9C; // captions, meta, disabled (AA-legible on obsidian: ~5.2:1)
+
+// Hairlines
+$line: rgba(255, 255, 255, .08);
+
+// Aurora hues
+$a: #6366F1; // indigo  (top-left field)
+$b: #A855F7; // violet  (center field)
+$c: #2DD4BF; // teal    (bottom-right field)
+
+// The canonical aurora gradient (indigo → violet → teal)
+$gradient: linear-gradient(115deg, #{$a} 0%, #{$b} 52%, #{$c} 100%);
+
+// Premium easing — slow, settled
+$ease: cubic-bezier(.22, 1, .36, 1);
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  2 · aurora-vars — declare the palette as scoped custom properties
+//     Put on the page :host (or any wrapper). Children read e.g. var(--aur-ink).
+//     `--aur-grad` is the canonical gradient; `--aur-ease` the shared easing.
+// ─────────────────────────────────────────────────────────────────────────────
+@mixin aurora-vars {
+  --aur-void:      #{$void};
+  --aur-bg:        #{$bg};
+  --aur-sink:      #{$sink};
+
+  --aur-ink:       #{$ink};
+  --aur-ink-dim:   #{$ink-dim};
+  --aur-ink-faint: #{$ink-faint};
+
+  --aur-line:      #{$line};
+
+  --aur-a:         #{$a};
+  --aur-b:         #{$b};
+  --aur-c:         #{$c};
+
+  --aur-grad:      #{$gradient};
+  --aur-ease:      #{$ease};
+
+  // glass tuning knobs (override per-surface if needed)
+  --aur-glass-fill:   rgba(255, 255, 255, .035);
+  --aur-glass-line:   rgba(255, 255, 255, .09);
+  --aur-glass-radius: 20px;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  3 · aurora-surface — the full obsidian canvas + soft drifting aurora fields
+//     + faint grain. Self-contained; reduced-motion guarded. Apply to :host.
+//
+//     Uses ::before (the drifting radial washes) and ::after (the grain film).
+//     Content must sit in its own stacking context above them — this mixin sets
+//     position:relative + isolation:isolate so direct children render on top
+//     without any z-index bookkeeping on the page side.
+// ─────────────────────────────────────────────────────────────────────────────
+@mixin aurora-surface {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  background: var(--aur-bg, #{$bg});
+  color: var(--aur-ink, #{$ink});
+  overflow-x: clip;
+
+  // — the aurora fields: three large, soft, low-opacity radial washes that
+  //   slowly drift. Heavy blur keeps them washes, never hard neon orbs.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -20% -10% auto -10%;
+    height: 140%;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      radial-gradient(42% 38% at 18% 14%,  rgba(99, 102, 241, .16) 0%, transparent 70%),  // indigo TL
+      radial-gradient(46% 42% at 52% 40%,  rgba(168, 85, 247, .13) 0%, transparent 72%),  // violet center
+      radial-gradient(48% 44% at 84% 88%,  rgba(45, 212, 191, .12) 0%, transparent 70%);  // teal BR
+    filter: blur(90px);
+    will-change: transform;
+    animation: aur-drift 34s var(--aur-ease, #{$ease}) infinite alternate;
+  }
+
+  // — faint film grain for texture (data-URI SVG noise; ~4% opacity)
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: .04;
+    mix-blend-mode: soft-light;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before { animation: none; }
+  }
+}
+
+// drift keyframes (module-level so they emit once even if the mixin is used by
+// several components; identical @keyframes blocks collapse in the cascade).
+@keyframes aur-drift {
+  0%   { transform: translate3d(0, 0, 0)        scale(1);    }
+  50%  { transform: translate3d(2.5%, -2%, 0)   scale(1.06); }
+  100% { transform: translate3d(-2%, 2.5%, 0)   scale(1.03); }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  4 · aurora-glass — the glass card
+//     translucent fill + backdrop-blur + hairline + inner top-highlight +
+//     soft (non-glow) shadow + large radius. Drop onto any card/panel element.
+// ─────────────────────────────────────────────────────────────────────────────
+@mixin aurora-glass($radius: var(--aur-glass-radius, 20px)) {
+  position: relative;
+  background: var(--aur-glass-fill, rgba(255, 255, 255, .035));
+  border: 1px solid var(--aur-glass-line, rgba(255, 255, 255, .09));
+  border-radius: $radius;
+  backdrop-filter: blur(16px) saturate(118%);
+  -webkit-backdrop-filter: blur(16px) saturate(118%);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, .06) inset,            // top inner highlight
+    0 24px 60px -28px rgba(0, 0, 0, .65),                // soft drop
+    0 2px 10px -6px rgba(0, 0, 0, .5);
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  5 · DISPLAY TYPE — oversized, LIGHT, airy
+//     $level: display | h1 | h2 | h3 — picks the clamp() size + weight.
+// ─────────────────────────────────────────────────────────────────────────────
+@mixin aurora-display($level: display) {
+  margin: 0;
+  color: var(--aur-ink, #{$ink});
+  font-family: 'Inter', system-ui, sans-serif;
+  text-wrap: balance;
+
+  @if $level == display {
+    font-size: clamp(2.75rem, 7vw, 5.25rem);
+    font-weight: 200;
+    line-height: 1.02;
+    letter-spacing: -.03em;
+  } @else if $level == h1 {
+    font-size: clamp(2.25rem, 5.2vw, 3.75rem);
+    font-weight: 250;
+    line-height: 1.06;
+    letter-spacing: -.025em;
+  } @else if $level == h2 {
+    font-size: clamp(1.75rem, 3.6vw, 2.6rem);
+    font-weight: 300;
+    line-height: 1.12;
+    letter-spacing: -.02em;
+  } @else if $level == h3 {
+    font-size: clamp(1.3rem, 2.2vw, 1.7rem);
+    font-weight: 350;
+    line-height: 1.2;
+    letter-spacing: -.015em;
+  }
+}
+
+// body copy helper (dim ink, comfortable measure)
+@mixin aurora-body($size: 1.0625rem) {
+  margin: 0;
+  color: var(--aur-ink-dim, #{$ink-dim});
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: $size;
+  line-height: 1.65;
+  letter-spacing: -.005em;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  6 · aurora-text-gradient — clip the canonical aurora gradient into text.
+//     Apply to the <span> wrapping the KEY word(s) of a heading, not the whole
+//     line. Falls back to solid ink where background-clip:text is unsupported.
+// ─────────────────────────────────────────────────────────────────────────────
+@mixin aurora-text-gradient($gradient-override: null) {
+  $g: $gradient;
+  @if $gradient-override != null { $g: $gradient-override; }
+  background: $g;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+
+  @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+    color: var(--aur-b, #{$b});
+    -webkit-text-fill-color: var(--aur-b, #{$b});
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  7 · aurora-cta — the primary gradient-fill button. Uses a DEEPER indigo→violet
+//     fill (NOT the canonical 3-hue grad — its bright teal end fails AA under white)
+//     so the #fff label clears 4.5:1 across the whole pill. `aurora-pill` = quiet pill.
+// ─────────────────────────────────────────────────────────────────────────────
+@mixin aurora-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: .5em;
+  padding: .85em 1.6em;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: .98rem;
+  letter-spacing: -.01em;
+  color: #fff;
+  text-decoration: none;
+  background: linear-gradient(118deg, #4F46E5 0%, #7C3AED 58%, #6D28D9 100%);
+  background-size: 160% 160%;
+  background-position: 0% 50%;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, .22) inset,
+    0 14px 34px -14px rgba(99, 102, 241, .55);
+  transition:
+    background-position .6s var(--aur-ease, #{$ease}),
+    transform .25s var(--aur-ease, #{$ease}),
+    box-shadow .25s var(--aur-ease, #{$ease});
+
+  &:hover {
+    background-position: 100% 50%;
+    transform: translateY(-1px);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, .26) inset,
+      0 18px 42px -14px rgba(168, 85, 247, .6);
+  }
+  &:active { transform: translateY(0); }
+  &:focus-visible {
+    outline: 2px solid var(--aur-c, #{$c});
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &:hover { transform: none; }
+  }
+}
+
+@mixin aurora-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .5em;
+  padding: .8em 1.45em;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 450;
+  font-size: .95rem;
+  letter-spacing: -.005em;
+  color: var(--aur-ink, #{$ink});
+  text-decoration: none;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--aur-line, #{$line});
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: background .25s var(--aur-ease, #{$ease}),
+              border-color .25s var(--aur-ease, #{$ease});
+
+  &:hover {
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(255, 255, 255, .16);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--aur-c, #{$c});
+    outline-offset: 3px;
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  8 · aurora-eyebrow — the small mono kicker/label above a heading.
+//     JetBrains Mono, uppercase, tracked, faint ink + a small gradient tick.
+// ─────────────────────────────────────────────────────────────────────────────
+@mixin aurora-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .6em;
+  margin: 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 500;
+  font-size: .72rem;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--aur-ink-faint, #{$ink-faint});
+
+  &::before {
+    content: '';
+    width: 1.6em;
+    height: 1px;
+    background: var(--aur-grad, #{$gradient});
+    flex: none;
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  9 · aurora-divider — a hairline rule that fades to a faint aurora tint
+//     at center. Apply to an <hr> or a divider element.
+// ─────────────────────────────────────────────────────────────────────────────
+@mixin aurora-divider {
+  height: 1px;
+  border: 0;
+  margin: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--aur-line, #{$line}) 18%,
+    rgba(168, 85, 247, .28) 50%,
+    var(--aur-line, #{$line}) 82%,
+    transparent 100%
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  10 · aurora-reveal — gentle scroll-reveal (fade + ~12px rise).
+//      Usage: add the base mixin to a class, and toggle the `.is-in` state from
+//      the page (e.g. via IntersectionObserver). Fully reduced-motion guarded:
+//      when motion is reduced OR the page never toggles `.is-in`, content stays
+//      visible (no hidden-content trap).
+//
+//      .reveal      { @include aur.aurora-reveal; }
+//      .reveal.is-in{ @include aur.aurora-reveal-in; }   // optional explicit
+//
+//      The single-mixin form below wires both states + the a11y guard for you,
+//      so most pages only need `.reveal { @include aur.aurora-reveal; }`.
+// ─────────────────────────────────────────────────────────────────────────────
+@mixin aurora-reveal($rise: 12px, $delay: 0s) {
+  opacity: 0;
+  transform: translateY($rise);
+  transition:
+    opacity .7s var(--aur-ease, #{$ease}) $delay,
+    transform .7s var(--aur-ease, #{$ease}) $delay;
+  will-change: opacity, transform;
+
+  &.is-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  // No JS / reduced motion → never trap content offscreen.
+  @media (prefers-reduced-motion: reduce) {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+// explicit "revealed" state, if a page prefers to compose the two halves.
+@mixin aurora-reveal-in {
+  opacity: 1;
+  transform: none;
+}

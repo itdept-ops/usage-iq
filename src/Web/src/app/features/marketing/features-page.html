@@ -1,18 +1,16 @@
 <app-marketing-nav />
 
 <main class="mpage">
-  <div class="bg-fx" aria-hidden="true"><div class="grid-fade"></div><div class="orb orb-a"></div><div class="orb orb-b"></div></div>
-
-  <header class="mpage-hero">
+  <header class="mpage-hero reveal">
     <span class="page-eyebrow">The installed surface</span>
-    <h1>Everything the OS can do.</h1>
+    <h1>Everything <span class="grad">the OS</span> can do.</h1>
     <p>An operating system is the sum of what it can do for you — so here is the full surface. Every capability below is a real, shipping module of one self-hosted system: your AI-work spend, your body, your home, your people, your place, the agentic layer that acts across all of them, and the access spine that enforces it. Lead with the breadth; let the depth of each block prove it isn’t bluff.</p>
   </header>
 
   <section class="blocks">
     @for (g of groupOrder; track g) {
       @let sub = subsystems[g];
-      <header class="module-head" [attr.data-accent]="sub.accent">
+      <header class="module-head reveal" [attr.data-accent]="sub.accent">
         <span class="module-status"><span class="module-dot" aria-hidden="true"></span>{{ sub.status }}</span>
         <h2>{{ g }}</h2>
         <p class="module-lead">{{ sub.lead }}</p>
@@ -20,7 +18,7 @@
 
       @for (b of blocks; track b.title) {
         @if (b.group === g) {
-          <article class="block" [attr.data-accent]="sub.accent">
+          <article class="block reveal" [attr.data-accent]="sub.accent">
             <div class="block-copy">
               <span class="block-icon"><mat-icon aria-hidden="true">{{ b.icon }}</mat-icon></span>
               <span class="block-kicker">{{ b.kicker }}</span>
@@ -39,9 +37,9 @@
   </section>
 
   <section class="mpage-cta">
-    <div class="cta-card panel">
+    <div class="cta-card panel reveal">
       <div class="cta-glow" aria-hidden="true"></div>
-      <h2>Boot the operating system for your life.</h2>
+      <h2>Boot the operating system for <span class="grad">your life</span>.</h2>
       <p>One system for your work, your body, your home, your money, and your day — run by agents, hosted by you. Sign in with an approved account, or see how it all fits together.</p>
       <div class="cta-row">
         <a class="cta-pill" routerLink="/signin">Enter the OS <span>→</span></a>

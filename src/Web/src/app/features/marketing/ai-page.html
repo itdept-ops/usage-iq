@@ -3,7 +3,7 @@
 <main class="mpage">
   <div class="bg-fx" aria-hidden="true"><div class="grid-fade"></div><div class="orb orb-a"></div><div class="orb orb-b"></div><div class="orb orb-c"></div></div>
 
-  <header class="mpage-hero ai-hero">
+  <header class="mpage-hero ai-hero reveal is-in">
     <span class="page-eyebrow">The agentic layer</span>
     <h1>Agents that don't just report. <span class="grad">They act.</span></h1>
     <p>
@@ -13,7 +13,7 @@
     </p>
 
     <!-- BOOT SEQUENCE — the agent layer coming online -->
-    <div class="boot-term" role="img" aria-label="Agent layer boot sequence: kernel ok, Gemini bridge connected, agents armed and off by default, leash engaged — you confirm every action.">
+    <div class="boot-term reveal is-in" role="img" aria-label="Agent layer boot sequence: kernel ok, Gemini bridge connected, agents armed and off by default, leash engaged — you confirm every action.">
       <div class="boot-bar" aria-hidden="true"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="boot-name">agents.sh</span></div>
       <ul class="boot-lines" aria-hidden="true">
         @for (line of bootLines; track line; let i = $index) {
@@ -27,7 +27,7 @@
 
   <!-- (1) The ACT — what makes them agents, not a chatbot -->
   <section class="ai-section">
-    <header class="section-head">
+    <header class="section-head reveal">
       <span class="section-eyebrow">Action, not chat</span>
       <h2>A sentence or a photo in. A logged action out.</h2>
       <p class="section-lead">
@@ -37,19 +37,19 @@
     </header>
 
     <ul class="act-grid">
-      <li class="act-card panel">
+      <li class="act-card panel reveal">
         <span class="act-glyph" aria-hidden="true"><mat-icon>photo_camera</mat-icon></span>
         <p class="act-line"><span class="act-in">Snap your dinner</span> <span class="act-pulse" aria-hidden="true"></span> <span class="act-out">logged as macros</span></p>
       </li>
-      <li class="act-card panel">
+      <li class="act-card panel reveal">
         <span class="act-glyph" aria-hidden="true"><mat-icon>directions_run</mat-icon></span>
         <p class="act-line"><span class="act-in">“Jogged two miles”</span> <span class="act-pulse" aria-hidden="true"></span> <span class="act-out">a structured entry, scaled to you</span></p>
       </li>
-      <li class="act-card panel">
+      <li class="act-card panel reveal">
         <span class="act-glyph" aria-hidden="true"><mat-icon>flag</mat-icon></span>
         <p class="act-line"><span class="act-in">“Lose 10 lbs in 3 months”</span> <span class="act-pulse" aria-hidden="true"></span> <span class="act-out">a safe daily plan</span></p>
       </li>
-      <li class="act-card panel">
+      <li class="act-card panel reveal">
         <span class="act-glyph" aria-hidden="true"><mat-icon>tips_and_updates</mat-icon></span>
         <p class="act-line"><span class="act-in">“What can I eat?”</span> <span class="act-pulse" aria-hidden="true"></span> <span class="act-out">answers, not charts</span></p>
       </li>
@@ -58,14 +58,14 @@
 
   <!-- (2) The leash — guardrails as a feature -->
   <section class="ai-section">
-    <header class="section-head">
+    <header class="section-head reveal">
       <span class="section-eyebrow">The leash</span>
       <h2>Agents that act — on a leash you hold.</h2>
       <p class="section-lead">One careful pattern wraps every agent in the OS. The autonomy is real; the guardrails are the selling point.</p>
     </header>
     <ul class="pillar-grid">
       @for (p of pillars; track p.title) {
-        <li class="pillar-card panel">
+        <li class="pillar-card panel reveal">
           <span class="pillar-icon" aria-hidden="true"><mat-icon>{{ p.icon }}</mat-icon></span>
           <h3>{{ p.title }}</h3>
           <p>{{ p.text }}</p>
@@ -75,7 +75,7 @@
   </section>
 
   <!-- (3) The agents, grouped by life-domain -->
-  <header class="section-head agents-intro">
+  <header class="section-head agents-intro reveal">
     <span class="section-eyebrow">The roster</span>
     <h2>The agents that run your life.</h2>
     <p class="section-lead">Every one is a shipped endpoint under <code>/api/ai/*</code> — here is exactly what you say, what the agent does, and the strict JSON it hands back for you to confirm.</p>
@@ -83,7 +83,7 @@
 
   @for (g of groups; track g.group) {
     <section class="ai-section" [attr.data-accent]="g.accent" [attr.aria-label]="g.group">
-      <header class="group-head">
+      <header class="group-head reveal">
         <span class="group-rule" aria-hidden="true"></span>
         <h2><mat-icon aria-hidden="true">{{ g.icon }}</mat-icon>{{ g.group }}</h2>
         <span class="group-rule" aria-hidden="true"></span>
@@ -92,7 +92,7 @@
 
       <ul class="assist-grid">
         @for (a of g.assists; track a.title) {
-          <li class="assist-card panel">
+          <li class="assist-card panel reveal">
             <div class="assist-head">
               <span class="assist-icon" aria-hidden="true"><mat-icon>{{ a.icon }}</mat-icon></span>
               <div class="assist-titles">
@@ -136,7 +136,7 @@
 
   <!-- (4) Privacy / gate posture -->
   <section class="ai-section">
-    <aside class="ai-privacy panel">
+    <aside class="ai-privacy panel reveal">
       <span class="ai-privacy-icon" aria-hidden="true"><mat-icon>shield</mat-icon></span>
       <div class="ai-privacy-body">
         <h2>Multimodal, and private by posture.</h2>
@@ -152,7 +152,7 @@
 
   <!-- (5) CTA -->
   <section class="mpage-cta">
-    <div class="cta-card panel">
+    <div class="cta-card panel reveal">
       <div class="cta-glow" aria-hidden="true"></div>
       <h2>Put the agents to work.</h2>
       <p>Enter the OS, or tour the domains they act across.</p>

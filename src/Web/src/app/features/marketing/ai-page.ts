@@ -1,4 +1,11 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  AfterViewInit,
+  OnDestroy,
+  ElementRef,
+  inject,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MarketingNav } from './marketing-nav';
@@ -66,7 +73,46 @@ interface Pillar {
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./marketing-page.scss', './ai-page.scss'],
 })
-export class AiPage {
+export class AiPage implements AfterViewInit, OnDestroy {
+  private readonly host = inject(ElementRef<HTMLElement>);
+  private revealObserver?: IntersectionObserver;
+
+  /**
+   * Aurora gentle scroll-reveal — fade + rise as `.reveal` elements enter the
+   * viewport. Fully degradable: if IntersectionObserver is unavailable, or the
+   * user prefers reduced motion, every element is revealed immediately so no
+   * content is ever trapped offscreen.
+   */
+  ngAfterViewInit(): void {
+    const root = this.host.nativeElement as HTMLElement;
+    const targets = Array.from(root.querySelectorAll<HTMLElement>('.reveal'));
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    if (prefersReduced || typeof IntersectionObserver === 'undefined') {
+      for (const el of targets) el.classList.add('is-in');
+      return;
+    }
+
+    this.revealObserver = new IntersectionObserver(
+      (entries, obs) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-in');
+            obs.unobserve(entry.target);
+          }
+        }
+      },
+      { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
+    );
+    for (const el of targets) this.revealObserver.observe(el);
+  }
+
+  ngOnDestroy(): void {
+    this.revealObserver?.disconnect();
+  }
+
   /** Boot-sequence status lines for the hero terminal — the agent layer coming online. */
   readonly bootLines: readonly string[] = [
     'kernel: ok',
