@@ -1,8 +1,10 @@
 import {
   Component,
+  ElementRef,
   OnDestroy,
   effect,
   signal,
+  viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { IsActiveMatchOptions, RouterLink, RouterLinkActive } from '@angular/router';
@@ -35,6 +37,11 @@ export class MarketingNav implements OnDestroy {
   readonly scrolled = signal(false);
   readonly menuOpen = signal(false);
 
+  /** The drawer <nav> — focus is moved in / trapped within it while open. */
+  private readonly drawer = viewChild<ElementRef<HTMLElement>>('drawer');
+  /** The burger button — focus returns here when the drawer closes. */
+  private readonly burger = viewChild<ElementRef<HTMLButtonElement>>('burger');
+
   // The marketing pages scroll their content INSIDE <body> (the app shell makes
   // <body> a height:100% / overflow:auto scroller, so the viewport/window never
   // scrolls). A `window:scroll` HostListener therefore never fires and the nav
@@ -63,7 +70,22 @@ export class MarketingNav implements OnDestroy {
     effect(() => {
       document.body.style.overflow = this.menuOpen() ? 'hidden' : '';
     });
+
+    // FOCUS MANAGEMENT (mirrors beta-ui/bottom-sheet): on open, remember the
+    // opener and move focus to the first link inside the drawer so Tab is
+    // trapped there (see onKeydown). On close, restore focus to the burger.
+    effect(() => {
+      if (this.menuOpen()) {
+        const active = (typeof document !== 'undefined' ? document.activeElement : null) as HTMLElement | null;
+        if (active && active !== this.burger()?.nativeElement) this.opener = active;
+        queueMicrotask(() => this.focusables()[0]?.focus?.());
+      }
+    });
   }
+
+  /** The element focused when the drawer opened — focus returns here on close
+   *  (falls back to the burger so focus never lands on a detached node). */
+  private opener: HTMLElement | null = null;
 
   ngOnDestroy(): void {
     document.removeEventListener('scroll', this.onScroll, { capture: true });
@@ -83,6 +105,52 @@ export class MarketingNav implements OnDestroy {
     this.menuOpen.update((v) => !v);
   }
   close(): void {
+    if (!this.menuOpen()) return;
     this.menuOpen.set(false);
+    // Focus-trap exit: restore focus to the opener (or the burger) after the
+    // drawer leaves the DOM, so keyboard users aren't dumped at <body>.
+    const target = this.opener ?? this.burger()?.nativeElement ?? null;
+    this.opener = null;
+    if (target?.isConnected) queueMicrotask(() => target.focus?.());
+  }
+
+  /** Escape closes the drawer; Tab / Shift+Tab wrap focus within it. */
+  onKeydown(e: KeyboardEvent): void {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      this.close();
+      return;
+    }
+    if (e.key === 'Tab') this.trapTab(e);
+  }
+
+  /** Focusable elements inside the drawer, in DOM order (visible ones only). */
+  private focusables(): HTMLElement[] {
+    const root = this.drawer()?.nativeElement;
+    if (!root) return [];
+    const sel = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]),'
+      + ' select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    return Array.from(root.querySelectorAll<HTMLElement>(sel))
+      .filter((el) => el.offsetParent !== null || el === document.activeElement);
+  }
+
+  /** Wrap Tab / Shift+Tab focus within the drawer so it can't escape behind the scrim. */
+  private trapTab(e: KeyboardEvent): void {
+    const els = this.focusables();
+    if (els.length === 0) return;
+    const first = els[0];
+    const last = els[els.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+    const root = this.drawer()?.nativeElement;
+    if (e.shiftKey) {
+      if (active === first || !root?.contains(active)) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (active === last || !root?.contains(active)) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 }

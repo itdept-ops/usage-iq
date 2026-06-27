@@ -70,7 +70,13 @@
 <mat-card appearance="outlined" class="panel">
   <div class="cal-wrap" [style.height.px]="wrapHeight()" role="img"
     [attr.aria-label]="'Year calendar heatmap of daily ' + metric() + ' across ' + stats().activeDays + ' active days; total active time ' + (stats().totalHours | number: '1.0-0') + ' hours' + (stats().busiest ? ', peak day ' + stats().busiest!.date : '') + '. See the stat cards and Top sessions list for the data.'">
-    <div aria-hidden="true"><app-chart [option]="chart()" /></div>
+    <div aria-hidden="true">
+      @defer (on viewport) {
+        <app-chart [option]="chart()" />
+      } @placeholder {
+        <div class="chart-skeleton" style="height:100%;min-height:220px"></div>
+      }
+    </div>
   </div>
 </mat-card>
 
@@ -80,7 +86,13 @@
     <div class="panel-header">When you work with AI</div>
     <div class="hw-wrap" role="img"
       [attr.aria-label]="metrics() ? 'Heatmap of message volume by hour and weekday; busiest hour ' + fmtHour(metrics()!.busiestHour) + (metrics()!.mostActiveDay ? ', most active day ' + metrics()!.mostActiveDay : '') + '.' : 'Heatmap of message volume by hour and weekday.'">
-      <div aria-hidden="true"><app-chart [option]="heatmapChart()" /></div>
+      <div aria-hidden="true">
+        @defer (on viewport) {
+          <app-chart [option]="heatmapChart()" />
+        } @placeholder {
+          <div class="chart-skeleton" style="height:260px"></div>
+        }
+      </div>
     </div>
   </mat-card>
 

@@ -1290,6 +1290,18 @@
   }
 }
 
+/* In the 721–960px band the inline nav is already gone (≤960px block) but the
+   right cluster still carries the full username, which mat-toolbar's
+   overflow:hidden hard-clips off the right edge (no ellipsis), taking the
+   account chevron partly off-canvas with it. Drop the verbose username here —
+   the avatar + chevron still open the menu — matching the existing ≤480px
+   handling, just triggered earlier. */
+@media (max-width: 860px) {
+  .user.mat-mdc-button .user__name {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   .brand__prompt {
     display: none;

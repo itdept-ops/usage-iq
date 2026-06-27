@@ -86,11 +86,6 @@ export class TechnologyPage implements AfterViewInit, OnDestroy {
       icon: 'bolt',
     },
     {
-      name: '@zxing/browser + BarcodeDetector',
-      role: 'In-browser barcode scanning for the food tracker, using the native detector where available.',
-      icon: 'qr_code_scanner',
-    },
-    {
       name: 'Docker + Docker Compose',
       role: 'The whole stack — api, web, and db — packaged to run anywhere.',
       icon: 'deployed_code',

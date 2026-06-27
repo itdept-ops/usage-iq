@@ -115,7 +115,7 @@ export class FeaturesPage implements AfterViewInit, OnDestroy {
     },
     'The access spine': {
       group: 'The access spine',
-      status: 'kernel: ok · 39 caps enforced',
+      status: 'kernel: ok · 49 caps enforced',
       lead: 'The security and self-hosting floor that makes one system safe to run a whole life on.',
       accent: 'blue',
     },
@@ -474,10 +474,10 @@ export class FeaturesPage implements AfterViewInit, OnDestroy {
       group: 'The access spine',
       icon: 'shield_person',
       kicker: 'Permissions',
-      title: '39 capabilities, server-enforced',
-      text: 'A catalog of 39 granular capabilities across seven groups decides what each user can do, re-checked on the server every single request — not just hidden in the UI. One-click presets get a friend, family member, teammate, or your kids set up fast.',
+      title: '49 capabilities, server-enforced',
+      text: 'A catalog of 49 granular capabilities across nine groups decides what each user can do, re-checked on the server every single request — not just hidden in the UI. One-click presets get a friend, family member, teammate, or your kids set up fast.',
       points: [
-        '39-capability catalog (AI perms are their own group, off by default)',
+        '49-capability catalog (AI perms are their own group, off by default)',
         'Re-checked server-side on every request',
         'Presets + a home-page picker per user',
       ],

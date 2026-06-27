@@ -14,8 +14,8 @@ const PUBLIC_ROUTES: Routes = [
   { path: 'how-it-works', loadComponent: () => import('./features/marketing/how-it-works-page').then(m => m.HowItWorksPage), title: 'Usage IQ · How it works' },
   { path: 'technology', loadComponent: () => import('./features/marketing/technology-page').then(m => m.TechnologyPage), title: 'Usage IQ · Technology' },
   { path: 'ai', loadComponent: () => import('./features/marketing/ai-page').then(m => m.AiPage), title: 'Usage IQ · AI' },
-  { path: 'signin', loadComponent: () => import('./features/signin/signin').then(m => m.SignIn), title: 'Usage IQ - Sign in' },
-  { path: 'about', loadComponent: () => import('./features/about/about').then(m => m.About), title: 'Usage IQ - About' },
+  { path: 'signin', loadComponent: () => import('./features/signin/signin').then(m => m.SignIn), title: 'Usage IQ · Sign in' },
+  { path: 'about', loadComponent: () => import('./features/about/about').then(m => m.About), title: 'Usage IQ · About' },
   { path: 'welcome', canActivate: [authGuard], loadComponent: () => import('./features/welcome/welcome').then(m => m.Welcome), title: 'Usage IQ · Welcome' },
 ];
 

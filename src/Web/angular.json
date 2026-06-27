@@ -48,7 +48,12 @@
                   "maximumError": "40kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "sourceMap": false,
+              "allowedCommonJsDependencies": [
+                "echarts",
+                "leaflet"
+              ]
             },
             "development": {
               "optimization": false,

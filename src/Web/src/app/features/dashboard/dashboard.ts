@@ -581,14 +581,17 @@ export class Dashboard {
       const text = this.loading() ? 'Loading…' : 'No data';
       return { title: { text, left: 'center', top: 'center', textStyle: { color: '#5e6c82' } } };
     }
-    if (s.buckets.length === 0)
+    // Guard the array off the async response: a SummaryResponse with a missing/undefined `buckets`
+    // must not throw "reading 'length' of undefined" before the real data lands.
+    const buckets = s.buckets ?? [];
+    if (buckets.length === 0)
       return {
         title: { text: 'No data', left: 'center', top: 'center', textStyle: { color: '#5e6c82' } },
       };
 
     const isTime = s.groupBy === 'day' || s.groupBy === 'month';
     if (isTime) {
-      const keys = s.buckets.map((b) => b.key);
+      const keys = buckets.map((b) => b.key);
       // Active hours per bucket, from the calendar data (exact day, or summed across the month).
       const cal = this.calendarDays();
       const dayMins = new Map(cal.map((d) => [d.date, d.activeMinutes]));
@@ -626,7 +629,7 @@ export class Dashboard {
           {
             name: 'Cost (USD)',
             type: 'bar',
-            data: s.buckets.map((b) => +b.costUsd.toFixed(2)),
+            data: buckets.map((b) => +b.costUsd.toFixed(2)),
             itemStyle: { color: '#f472b6', borderRadius: [4, 4, 0, 0] },
           },
           {
@@ -635,7 +638,7 @@ export class Dashboard {
             yAxisIndex: 1,
             smooth: true,
             symbol: 'none',
-            data: s.buckets.map((b) => b.totalTokens),
+            data: buckets.map((b) => b.totalTokens),
             itemStyle: { color: '#3fd8d0' },
             lineStyle: {
               width: 2,
@@ -658,7 +661,7 @@ export class Dashboard {
       };
     }
 
-    const top = s.buckets.slice(0, 15).reverse();
+    const top = buckets.slice(0, 15).reverse();
     return {
       tooltip: { trigger: 'axis', valueFormatter: (v) => '$' + Number(v).toLocaleString() },
       grid: { left: 150, right: 28, top: 12, bottom: 32 },

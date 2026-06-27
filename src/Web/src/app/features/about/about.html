@@ -13,6 +13,9 @@
             class="portrait-img"
             [src]="photoUrl()"
             [alt]="'Portrait of ' + name"
+            width="600"
+            height="600"
+            loading="lazy"
             (error)="onPhotoError()" />
         } @else {
           <span class="monogram" role="img" [attr.aria-label]="name + ' monogram'">{{ initials }}</span>

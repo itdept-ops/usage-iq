@@ -62,7 +62,13 @@
         <h2 class="family__card-title">Time by role</h2>
         @if (hasTime()) {
           <div class="idm__chart" role="img" [attr.aria-label]="chartAria()">
-            <div aria-hidden="true"><app-chart [option]="option()" /></div>
+            <div aria-hidden="true">
+              @defer (on viewport) {
+                <app-chart [option]="option()" />
+              } @placeholder {
+                <div class="chart-skeleton" style="height:300px"></div>
+              }
+            </div>
             <span class="idm__chart-total" aria-hidden="true">{{ minutesLabel(totalMinutes()) }}</span>
           </div>
           <ul class="idm__breakdown">

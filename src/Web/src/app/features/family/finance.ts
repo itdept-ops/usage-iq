@@ -169,7 +169,7 @@ export class FamilyFinance {
   readonly hasData = computed(
     () =>
       this.accounts().length > 0 ||
-      (this.summary()?.byCategory.length ?? 0) > 0 ||
+      (this.summary()?.byCategory?.length ?? 0) > 0 ||
       this.imports().length > 0,
   );
 
@@ -221,7 +221,7 @@ export class FamilyFinance {
         catchError(() => of<FinanceAccount[]>([])),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((a) => this.accounts.set(a));
+      .subscribe((a) => this.accounts.set(a ?? []));
   }
 
   private loadImports(): void {
@@ -231,7 +231,7 @@ export class FamilyFinance {
         catchError(() => of<FinanceImportBatch[]>([])),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((i) => this.imports.set(i));
+      .subscribe((i) => this.imports.set(i ?? []));
   }
 
   /**
@@ -300,8 +300,8 @@ export class FamilyFinance {
       )
       .subscribe((p) => {
         if (p) {
-          this.txns.set(p.items);
-          this.txnTotal.set(p.total);
+          this.txns.set(p.items ?? []);
+          this.txnTotal.set(p.total ?? 0);
         }
         this.txnLoading.set(false);
       });

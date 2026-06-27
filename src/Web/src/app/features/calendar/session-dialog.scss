@@ -83,3 +83,17 @@
   .sx-list { max-height: none; } // dialog body already scrolls; avoid a nested scroll box
   .sx-row { gap: 7px; .sx-cost { min-width: 60px; } }
 }
+
+/* @defer placeholder for the code-split echarts <app-chart> — reserves the chart height. */
+.chart-skeleton {
+  width: 100%;
+  border-radius: var(--tech-r-control, 10px);
+  background: linear-gradient(100deg,
+    var(--tech-bg-sunken, rgba(255, 255, 255, .03)) 30%,
+    var(--tech-border-subtle, rgba(255, 255, 255, .07)) 50%,
+    var(--tech-bg-sunken, rgba(255, 255, 255, .03)) 70%);
+  background-size: 200% 100%;
+  animation: chart-skeleton-shimmer 1.4s ease-out infinite;
+}
+@keyframes chart-skeleton-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .chart-skeleton { animation: none; } }

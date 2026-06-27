@@ -507,7 +507,9 @@ export class App implements AfterViewInit {
         ),
         takeUntilDestroyed(),
       )
-      .subscribe((list) => this.online.set(list));
+      // Coalesce to [] so a null/empty presence body can never make `online` non-array — the toolbar's
+      // onlineCount()/onlineUsers() read .length/.map off it on every authenticated page (presence chrome).
+      .subscribe((list) => this.online.set(list ?? []));
 
     // Poll the total user count (~60s) only while signed in AND holding users.view — it's a nav-bar
     // nicety, so it's cheap (just a number) and any error keeps the prior value rather than flickering.

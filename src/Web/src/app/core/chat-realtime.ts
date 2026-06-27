@@ -445,7 +445,9 @@ export class ChatRealtime {
 
   /** (Re)load the channel list and join every channel so live broadcasts arrive. */
   async refreshChannels(): Promise<ChatChannelDto[]> {
-    const list = await firstValueFrom(this.api.chatChannels());
+    // Guard the array off the async response: a null/undefined body must not make _channels non-iterable
+    // (the always-mounted shell chrome — bell/presence — derives off these signals on every page).
+    const list = (await firstValueFrom(this.api.chatChannels())) ?? [];
     this._channels.set(list);
     this._unread.update(map => {
       const next = { ...map };
@@ -567,8 +569,10 @@ export class ChatRealtime {
       firstValueFrom(this.api.inboxNotifications({ limit })),
       firstValueFrom(this.api.inboxUnreadCount()),
     ]);
-    this._notifications.set(list);
-    this._inboxUnread.set(unread.count);
+    // Guard the array off the async response so the bell's notifications() read can never see a non-array
+    // (it renders in the shell on every authenticated page); coalesce the count likewise.
+    this._notifications.set(list ?? []);
+    this._inboxUnread.set(unread?.count ?? 0);
   }
 
   /** Load the caller's delivery preferences into the {@link preferences} signal. */

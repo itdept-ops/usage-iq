@@ -206,7 +206,11 @@
       </mat-button-toggle-group>
     </div>
     <div class="chart-well">
-      <app-chart [option]="mainChart()" />
+      @defer (on viewport) {
+        <app-chart [option]="mainChart()" />
+      } @placeholder {
+        <div class="chart-skeleton" style="height:320px"></div>
+      }
     </div>
   </section>
 
@@ -214,7 +218,11 @@
     <section class="chart-card panel">
       <div class="chart-head"><h3 class="panel-header">Cost by model</h3></div>
       <div class="chart-well">
-        <app-chart [option]="modelChart()" />
+        @defer (on viewport) {
+          <app-chart [option]="modelChart()" />
+        } @placeholder {
+          <div class="chart-skeleton" style="height:320px"></div>
+        }
       </div>
       @if (modelStats().length && hasPlaceholder()) {
         <p class="placeholder-note"><mat-icon>info</mat-icon> Some models use placeholder pricing — set real rates in <a routerLink="/pricing">Pricing</a>.</p>
@@ -314,7 +322,7 @@
       </table>
     </div>
 
-    @if (!r.items.length) {
+    @if (!r.items?.length) {
       <p class="empty">No messages match these filters yet.</p>
     }
 

@@ -92,7 +92,7 @@
                   {{ ai.fellBackToPlain ? 'This month' : 'Explain this month' }}
                 </p>
                 <p class="briefing__text">{{ ai.narrative }}</p>
-                @if (ai.insights.length) {
+                @if (ai.insights?.length) {
                   <ul class="fin-ai__insights">
                     @for (insight of ai.insights; track $index) {
                       <li>{{ insight }}</li>
@@ -116,7 +116,7 @@
            below — hidden when fellBackToPlain. Calm, reassuring, advice-only: the coach NEVER cancels or edits
            anything. Mirrors the finance "explain this month" card UX. -->
       @if (coach(); as c) {
-        @if (c.recurring.length > 0) {
+        @if (c.recurring?.length > 0) {
           <section class="fin-card fin-coach" aria-label="Recurring charges and money coaching">
             <div class="fin-coach__head">
               <span class="fin-coach__crest" aria-hidden="true">
@@ -149,7 +149,7 @@
             @if (!c.fellBackToPlain && c.narrative) {
               <div class="fin-coach__ai" aria-live="polite">
                 <p class="fin-coach__narrative">{{ c.narrative }}</p>
-                @if (c.tips.length) {
+                @if (c.tips?.length) {
                   <ul class="fin-coach__tips">
                     @for (tip of c.tips; track $index) {
                       <li>{{ tip }}</li>
@@ -188,8 +188,14 @@
         <div class="fin-grid">
           <section class="fin-card fin-chartcard">
             <h2 class="fin-card__title">Where it went</h2>
-            @if (s.byCategory.length > 0) {
-              <div class="fin-chart fin-chart--donut"><app-chart [option]="categoryOption()" /></div>
+            @if (s.byCategory?.length > 0) {
+              <div class="fin-chart fin-chart--donut">
+                @defer (on viewport) {
+                  <app-chart [option]="categoryOption()" />
+                } @placeholder {
+                  <div class="chart-skeleton" style="height:300px"></div>
+                }
+              </div>
             } @else {
               <p class="fin-card__empty">No spending recorded this month.</p>
             }
@@ -197,8 +203,14 @@
 
           <section class="fin-card fin-chartcard">
             <h2 class="fin-card__title">His vs Hers</h2>
-            @if (s.byOwner.length > 0) {
-              <div class="fin-chart fin-chart--owner"><app-chart [option]="ownerOption()" /></div>
+            @if (s.byOwner?.length > 0) {
+              <div class="fin-chart fin-chart--owner">
+                @defer (on viewport) {
+                  <app-chart [option]="ownerOption()" />
+                } @placeholder {
+                  <div class="chart-skeleton" style="height:180px"></div>
+                }
+              </div>
               <p class="fin-card__foot">Set an account's owner below to move it between His, Hers, and Joint.</p>
             } @else {
               <p class="fin-card__empty">Tag your accounts' owners below to see the split.</p>
@@ -210,7 +222,7 @@
         <div class="fin-grid">
           <section class="fin-card">
             <h2 class="fin-card__title">By account</h2>
-            @if (s.byAccount.length > 0) {
+            @if (s.byAccount?.length > 0) {
               <ul class="fin-acctspend">
                 @for (a of s.byAccount; track a.accountId) {
                   <li class="fin-acctspend__row">
@@ -228,8 +240,14 @@
 
           <section class="fin-card fin-chartcard">
             <h2 class="fin-card__title">12-month trend</h2>
-            @if (s.monthlyTrend.length) {
-              <div class="fin-chart fin-chart--trend"><app-chart [option]="trendOption()" /></div>
+            @if (s.monthlyTrend?.length) {
+              <div class="fin-chart fin-chart--trend">
+                @defer (on viewport) {
+                  <app-chart [option]="trendOption()" />
+                } @placeholder {
+                  <div class="chart-skeleton" style="height:260px"></div>
+                }
+              </div>
             } @else {
               <p class="fin-card__empty">Not enough history yet — import a few months to see the trend.</p>
             }

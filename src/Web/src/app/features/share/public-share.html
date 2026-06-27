@@ -36,8 +36,20 @@
     </div>
 
     <div class="ps-charts">
-      <section class="ps-chart wide"><app-chart [option]="mainChart()" /></section>
-      <section class="ps-chart"><app-chart [option]="modelChart()" /></section>
+      <section class="ps-chart wide">
+        @defer (on viewport) {
+          <app-chart [option]="mainChart()" />
+        } @placeholder {
+          <div class="chart-skeleton" style="height:300px"></div>
+        }
+      </section>
+      <section class="ps-chart">
+        @defer (on viewport) {
+          <app-chart [option]="modelChart()" />
+        } @placeholder {
+          <div class="chart-skeleton" style="height:300px"></div>
+        }
+      </section>
     </div>
 
     <footer class="ps-foot">

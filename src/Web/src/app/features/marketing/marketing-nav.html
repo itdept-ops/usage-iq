@@ -21,7 +21,8 @@
       <div class="mnav-scrim" (click)="close()" aria-hidden="true"></div>
     }
 
-    <nav class="mnav-links" [class.open]="menuOpen()" aria-label="Primary">
+    <nav #drawer id="mnav-drawer" class="mnav-links" [class.open]="menuOpen()" aria-label="Primary"
+         (keydown)="onKeydown($event)">
       @for (l of links; track l.path) {
         <a [routerLink]="l.path" routerLinkActive="active" [routerLinkActiveOptions]="l.opts"
            (click)="close()">{{ l.label }}</a>
@@ -36,7 +37,7 @@
       <a class="mnav-cta desktop-only" routerLink="/signin">
         Sign in <span class="cta-arrow">→</span>
       </a>
-      <button type="button" class="mnav-burger" (click)="toggle()" [attr.aria-expanded]="menuOpen()" aria-label="Menu">
+      <button #burger type="button" class="mnav-burger" (click)="toggle()" [attr.aria-expanded]="menuOpen()" aria-controls="mnav-drawer" aria-label="Menu">
         <span></span><span></span><span></span>
       </button>
     </div>

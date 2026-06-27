@@ -164,7 +164,7 @@ export class HowItWorksPage implements AfterViewInit, OnDestroy {
     },
     {
       q: 'Who can sign in, and how is access enforced?',
-      a: 'Google accounts, each pinned to its Google subject id. An open sign-up policy with a default permission set lets new accounts in, governed by a kill switch you can flip. 39 server-enforced capabilities across seven groups (AI permissions are their own group, off by default) decide what each user can do — re-checked on the server every request, never hidden only in the UI, with every request written to an audit log.',
+      a: 'Google accounts, each pinned to its Google subject id. An open sign-up policy with a default permission set lets new accounts in, governed by a kill switch you can flip. 49 server-enforced capabilities across nine groups (AI permissions are their own group, off by default) decide what each user can do — re-checked on the server every request, never hidden only in the UI, with every request written to an audit log.',
     },
     {
       q: 'Can I sign someone out without locking them out?',

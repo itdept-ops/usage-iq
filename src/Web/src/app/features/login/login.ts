@@ -167,7 +167,7 @@ export class Login {
   readonly proofs: Proof[] = [
     {
       icon: 'shield_person',
-      title: '39 server-enforced capabilities',
+      title: '49 server-enforced capabilities',
       text: 'Granular permissions re-checked on the server every request — not hidden in the UI. Google-pinned identity, full audit log, real-time force-logout.',
     },
     {
@@ -189,7 +189,7 @@ export class Login {
 
   readonly stats: Stat[] = [
     { value: 6, suffix: '', label: 'Life-domains, one OS' },
-    { value: 39, suffix: '', label: 'Server-enforced caps' },
+    { value: 49, suffix: '', label: 'Server-enforced caps' },
     { value: 2, suffix: '', label: 'First-class platforms' },
     { value: 100, suffix: '%', label: 'Self-hosted, yours' },
   ];

@@ -20,7 +20,13 @@
       <div class="sx-kpi"><span class="k">Messages</span><span class="v">{{ d.messages | number }}</span></div>
     </div>
 
-    <div class="sx-chart"><app-chart [option]="chart()" /></div>
+    <div class="sx-chart">
+      @defer (on viewport) {
+        <app-chart [option]="chart()" />
+      } @placeholder {
+        <div class="chart-skeleton" style="height:200px"></div>
+      }
+    </div>
 
     <div class="sx-list-head">Timeline</div>
     <div class="sx-list">
