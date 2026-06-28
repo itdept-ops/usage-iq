@@ -287,8 +287,10 @@ public static class FeedEndpoints
 
         // ---- DELETE /api/feed/comments/{cid} : soft-delete a comment (author OR chat.moderate) ----
         // The author may delete their own comment; a chat.moderate caller may delete anyone's (the same
-        // moderation override the chat world uses). 404 when the comment doesn't exist or is already deleted;
-        // 403 when the caller is neither the author nor a moderator. Soft-delete (DeletedUtc) — never hard-removed.
+        // moderation override the chat world uses). 404 both when the comment doesn't exist/is already deleted
+        // AND when the caller is neither author nor moderator — collapsing the two cases so a non-author can't
+        // use the status code as an existence oracle (mirrors the event-scoped routes' 404-on-not-visible).
+        // Soft-delete (DeletedUtc) — never hard-removed.
         g.MapDelete("/comments/{cid:long}", async (
             long cid, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
         {
@@ -302,7 +304,7 @@ public static class FeedEndpoints
             var isAuthor = string.Equals(comment.AuthorEmail, callerEmail, StringComparison.Ordinal);
             var canModerate = caller.Permissions.Contains(Permissions.ChatModerate);
             if (!isAuthor && !canModerate)
-                return Results.StatusCode(StatusCodes.Status403Forbidden);
+                return Results.NotFound(); // never reveal a comment's existence to a non-author/non-moderator
 
             comment.DeletedUtc = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);

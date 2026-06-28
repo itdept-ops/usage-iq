@@ -190,6 +190,15 @@ public static class PactEndpoints
                 .FirstOrDefaultAsync(m => m.HabitPactId == id && m.MemberEmail == callerEmail, ct);
             if (member is null) return Results.NotFound(); // never invited ⇒ existence not revealed
 
+            // Join only transitions a PENDING invite → Active. An already-Active member is idempotent (no-op
+            // success). A member who Left (or declined) must NOT be able to silently re-activate — they need a
+            // fresh owner invite. This keeps the Left status meaning "not a participant" airtight, so a future
+            // owner-remove feature can safely reuse Left without this path letting the removed user re-add themselves.
+            if (member.Status != HabitPactMemberStatus.Invited)
+                return member.Status == HabitPactMemberStatus.Active
+                    ? Results.NoContent()
+                    : Results.Conflict(new { message = "This invite is no longer pending. Ask the pact owner to invite you again." });
+
             member.Status = HabitPactMemberStatus.Active;
             member.JoinedUtc = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);

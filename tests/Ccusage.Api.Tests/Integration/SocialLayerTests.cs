@@ -242,6 +242,27 @@ public class SocialLayerTests(WebAppFactory factory)
         thread.EnumerateArray().Should().BeEmpty("a soft-deleted comment is excluded from the thread");
     }
 
+    [Fact]
+    public async Task Comment_delete_by_a_non_author_404s_and_is_not_an_existence_oracle()
+    {
+        var (authorEmail, author) = await ProvisionUser("tracker.self");
+        var (_, stranger) = await ProvisionUser("tracker.self"); // not the author, no chat.moderate
+        var eventId = await SeedEvent(authorEmail);
+        var created = await Json(await author.PostAsJsonAsync($"/api/feed/{eventId}/comments", new { body = "mine" }));
+        var cid = created.GetProperty("id").GetInt64();
+
+        // A non-author/non-moderator gets 404 — IDENTICAL to a missing comment — so the status code can't be
+        // iterated as an existence oracle (existing-but-not-yours is indistinguishable from doesn't-exist).
+        (await stranger.DeleteAsync($"/api/feed/comments/{cid}")).StatusCode
+            .Should().Be(HttpStatusCode.NotFound, "a non-author must not learn whether the comment exists");
+        (await stranger.DeleteAsync($"/api/feed/comments/{cid + 9_999_999}")).StatusCode
+            .Should().Be(HttpStatusCode.NotFound, "a genuinely missing comment returns the same 404");
+
+        // The unauthorized delete was a no-op — the author still sees their comment.
+        var thread = await Json(await author.GetAsync($"/api/feed/{eventId}/comments"));
+        thread.EnumerateArray().Should().ContainSingle("a non-author delete must not remove the comment");
+    }
+
     // ======================= FEATURE #7 — HABIT PACTS =======================
 
     [Fact]
@@ -352,6 +373,39 @@ public class SocialLayerTests(WebAppFactory factory)
         var progress = await Json(await owner.GetAsync($"/api/pacts/{pactId}/progress"));
         var ownerRow = progress.EnumerateArray().Single(r => r.GetProperty("userId").GetInt32() == ownerUserId);
         ownerRow.GetProperty("count").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Pact_join_activates_an_invite_but_a_member_who_left_cannot_silently_rejoin()
+    {
+        var (ownerEmail, owner) = await ProvisionUser("tracker.self");
+        var (friendEmail, friend) = await ProvisionUser("tracker.self");
+        await MakeContacts(ownerEmail, friendEmail);
+        var friendId = await UserIdFor(friendEmail);
+
+        var pact = await Json(await owner.PostAsJsonAsync("/api/pacts",
+            new { title = "Run club", kind = "workout.logged", targetIntValue = 5, periodDays = 7,
+                  memberUserIds = new[] { friendId } }));
+        var pactId = pact.GetProperty("id").GetInt64();
+
+        // Invited → Active on join, and joining again while Active is idempotent (not an error).
+        (await friend.PostAsync($"/api/pacts/{pactId}/join", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await friend.PostAsync($"/api/pacts/{pactId}/join", null)).StatusCode
+            .Should().Be(HttpStatusCode.NoContent, "re-joining while already Active is a no-op success");
+
+        // Leave → Left.
+        (await friend.PostAsync($"/api/pacts/{pactId}/leave", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // A member who LEFT must NOT be able to silently re-activate — that needs a fresh owner invite. This keeps
+        // Left meaning "not a participant" airtight (so a future owner-remove feature can safely reuse Left).
+        (await friend.PostAsync($"/api/pacts/{pactId}/join", null)).StatusCode
+            .Should().Be(HttpStatusCode.Conflict, "leaving is sticky — re-joining requires a fresh invite");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var status = await db.HabitPactMembers.AsNoTracking()
+            .Where(m => m.HabitPactId == pactId && m.MemberEmail == friendEmail).Select(m => m.Status).FirstAsync();
+        status.Should().Be(HabitPactMemberStatus.Left, "the rejected re-join must not have re-activated the member");
     }
 
     [Fact]
