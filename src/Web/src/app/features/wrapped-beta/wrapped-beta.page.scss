@@ -292,6 +292,29 @@
   }
 }
 
+// ---- STORY slide: the AI-written narrative read of the period (prose, no numeral) ----
+.wb-story__text {
+  margin: 14px 0 0;
+  font: 500 clamp(20px, 5.4vw, 28px)/1.42 var(--font-display);
+  letter-spacing: -.01em;
+  color: var(--ink);
+  max-width: 26ch;
+  text-wrap: balance;
+}
+.wb-story__insights {
+  margin: 22px 0 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 10px;
+  max-width: 34ch;
+  li {
+    display: flex; align-items: flex-start; gap: 9px;
+    font: 600 14px/1.4 var(--font-ui); color: var(--ink-dim);
+    mat-icon {
+      flex: 0 0 auto; font-size: 18px; width: 18px; height: 18px; margin-top: 1px;
+      color: var(--accent-a);
+    }
+  }
+}
+
 // ---- COVER slide (the first one): tri-tone wordmark + name ----
 .wb-cover {
   align-items: center;
@@ -422,6 +445,12 @@
 }
 .wb-recap__name { margin: 6px 0 0; position: relative; font: 600 14px/1.4 var(--font-ui); color: var(--ink-dim); }
 
+// The AI narrative one-liner, set under the brand band inside the share card.
+.wb-recap__story {
+  margin: 0; padding: 16px 20px 0;
+  font: 500 15px/1.5 var(--font-ui); color: var(--ink); text-wrap: pretty;
+}
+
 // The headline grid of the top stats inside the share card.
 .wb-recap__grid {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
@@ -466,6 +495,14 @@
   mat-icon { font-size: 20px; width: 20px; height: 20px; }
   &:active { transform: scale(.96); }
   &:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  &:disabled { opacity: .55; cursor: default; }
+
+  // Secondary "Share link" — glass/ghost, distinct from the gradient text-share button.
+  &--ghost {
+    background: color-mix(in srgb, var(--accent-a) 14%, var(--glass));
+    color: var(--ink); box-shadow: none;
+    border: 1px solid var(--glass-edge);
+  }
 }
 
 // A small "what's in this wrap" tail list of the remaining cards (below the share card).

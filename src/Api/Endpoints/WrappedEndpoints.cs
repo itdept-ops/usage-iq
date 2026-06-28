@@ -64,55 +64,65 @@ public static class WrappedEndpoints
             UsageQueries usage, WeeklyRecapComposer recap, CancellationToken ct) =>
         {
             var caller = (await me.GetUserAsync(ct))!;
-            var email = caller.Email;
-
             var today = await TrackerVisibility.DisplayTzTodayAsync(db, ct);
             var (norm, from, to) = ResolveWindow(period, today);
-
-            // (1) Tracker totals over the window — REUSE the recap composer (same numbers as the rest of the app).
-            var stats = await recap.LoadStatsAsync(db, email, from, to, today, ct);
-
-            // ---- Gaps the composer doesn't expose, as owner-scoped WINDOW reads (mirror existing patterns) ----
-            var (daysTracked, hydrationDays, hydrationBestStreak, weightDeltaKg, sleepAvgHours) =
-                await LoadWindowExtrasAsync(db, email, from, to, ct);
-
-            // (2) Trophies earned — LIFETIME/cumulative by design; reuse the trophy loader + composer.
-            var inputs = await TrophyEndpoints.LoadInputsAsync(db, email, today, ct);
-            var badges = TrophyComposer.Compose(inputs);
-            var trophiesEarned = TrophyComposer.EarnedCount(badges);
-
-            // (3) Usage cost/tokens/requests over the window — REUSE the summary, scoped to the caller's reported email.
-            var usageFilter = new UsageFilterQuery(from: from, to: to, projectId: null, model: null, source: null,
-                includeSidechain: null, machine: null, user: new[] { email });
-            var usageTotal = (await usage.SummaryAsync(usageFilter, "model", ct)).Total;
-
-            var owner = await db.Users.AsNoTracking()
-                .Where(u => u.Email == email)
-                .Select(u => new { u.Id, u.Name, u.DisplayNameMode, u.Nickname })
-                .FirstOrDefaultAsync(ct);
-
-            var hard = stats.Hard is { } h
-                ? new HardSlice(h.CurrentStreak, h.TotalPoints, h.WeekPoints, h.WeekCompletedDays)
-                : null;
-
-            var cards = BuildCards(stats, daysTracked, hydrationDays, hydrationBestStreak, weightDeltaKg,
-                sleepAvgHours, hard, trophiesEarned, badges.Count, usageTotal);
-
-            var resp = new WrappedResponse(
-                owner?.Id ?? 0,
-                owner is null ? DisplayName.Unknown : DisplayName.Format(owner.Name, owner.DisplayNameMode, owner.Nickname),
-                norm, from.ToString("yyyy-MM-dd"), to.ToString("yyyy-MM-dd"), DateTime.UtcNow.ToString("o"),
-                cards,
-                daysTracked, stats.Workouts, stats.WorkoutMinutes,
-                stats.CaloriesInTotal, stats.CaloriesOutTotal, stats.ProteinAvgG, stats.StepsTotal,
-                stats.HydrationGoalHits, hydrationDays, hydrationBestStreak,
-                stats.CoffeeCups, weightDeltaKg, sleepAvgHours,
-                hard,
-                trophiesEarned, badges.Count,
-                stats.BillsSettled,
-                usageTotal.CostUsd, usageTotal.TotalTokens, usageTotal.Records);
+            var resp = await BuildWrappedAsync(db, usage, recap, caller.Email, norm, from, to, ct);
             return Results.Ok(resp);
         });
+    }
+
+    /// <summary>
+    /// Build the DERIVED <see cref="WrappedResponse"/> for an arbitrary OWNER email over [from,to]. EVERY number
+    /// is computed SERVER-SIDE by reusing the same owner-scoped aggregations the caller's own Wrapped uses — so
+    /// the public-share path can rebuild a recap from a BAKED owner+window the holder can never widen. Nothing
+    /// here comes from any client. No email is ever placed in the response (owner is resolved to a display NAME).
+    /// </summary>
+    internal static async Task<WrappedResponse> BuildWrappedAsync(
+        UsageDbContext db, UsageQueries usage, WeeklyRecapComposer recap,
+        string email, string norm, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        // (1) Tracker totals over the window — REUSE the recap composer (same numbers as the rest of the app).
+        var stats = await recap.LoadStatsAsync(db, email, from, to, to, ct);
+
+        // ---- Gaps the composer doesn't expose, as owner-scoped WINDOW reads (mirror existing patterns) ----
+        var (daysTracked, hydrationDays, hydrationBestStreak, weightDeltaKg, sleepAvgHours) =
+            await LoadWindowExtrasAsync(db, email, from, to, ct);
+
+        // (2) Trophies earned — LIFETIME/cumulative by design; reuse the trophy loader + composer.
+        var inputs = await TrophyEndpoints.LoadInputsAsync(db, email, to, ct);
+        var badges = TrophyComposer.Compose(inputs);
+        var trophiesEarned = TrophyComposer.EarnedCount(badges);
+
+        // (3) Usage cost/tokens/requests over the window — REUSE the summary, scoped to the owner's reported email.
+        var usageFilter = new UsageFilterQuery(from: from, to: to, projectId: null, model: null, source: null,
+            includeSidechain: null, machine: null, user: new[] { email });
+        var usageTotal = (await usage.SummaryAsync(usageFilter, "model", ct)).Total;
+
+        var owner = await db.Users.AsNoTracking()
+            .Where(u => u.Email == email)
+            .Select(u => new { u.Id, u.Name, u.DisplayNameMode, u.Nickname })
+            .FirstOrDefaultAsync(ct);
+
+        var hard = stats.Hard is { } h
+            ? new HardSlice(h.CurrentStreak, h.TotalPoints, h.WeekPoints, h.WeekCompletedDays)
+            : null;
+
+        var cards = BuildCards(stats, daysTracked, hydrationDays, hydrationBestStreak, weightDeltaKg,
+            sleepAvgHours, hard, trophiesEarned, badges.Count, usageTotal);
+
+        return new WrappedResponse(
+            owner?.Id ?? 0,
+            owner is null ? DisplayName.Unknown : DisplayName.Format(owner.Name, owner.DisplayNameMode, owner.Nickname),
+            norm, from.ToString("yyyy-MM-dd"), to.ToString("yyyy-MM-dd"), DateTime.UtcNow.ToString("o"),
+            cards,
+            daysTracked, stats.Workouts, stats.WorkoutMinutes,
+            stats.CaloriesInTotal, stats.CaloriesOutTotal, stats.ProteinAvgG, stats.StepsTotal,
+            stats.HydrationGoalHits, hydrationDays, hydrationBestStreak,
+            stats.CoffeeCups, weightDeltaKg, sleepAvgHours,
+            hard,
+            trophiesEarned, badges.Count,
+            stats.BillsSettled,
+            usageTotal.CostUsd, usageTotal.TotalTokens, usageTotal.Records);
     }
 
     /// <summary>

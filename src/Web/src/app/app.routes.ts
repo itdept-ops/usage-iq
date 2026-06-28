@@ -32,7 +32,9 @@ const BETA_ROUTES: Routes = [
   { path: 'beta/home', loadChildren: () => import('./features/beta/beta-home.routes').then(m => m.BETA_HOME_ROUTES) },
   { path: 'beta/dashboard', loadChildren: () => import('./features/dashboard-beta/dashboard-beta.routes').then(m => m.DASHBOARD_BETA_ROUTES) },
   { path: 'beta/family', loadChildren: () => import('./features/family-beta/family-beta.routes').then(m => m.FAMILY_BETA_ROUTES) },
-  { path: 'beta/wrapped', loadChildren: () => import('./features/wrapped-beta/wrapped-beta.routes').then(m => m.WRAPPED_BETA_ROUTES) },
+  // Wrapped graduated to a first-class registry page (/wrapped, desktop + mobile twin); the old standalone
+  // beta route now redirects to the canonical path.
+  { path: 'beta/wrapped', redirectTo: 'wrapped', pathMatch: 'full' },
   { path: 'beta/settings', loadChildren: () => import('./features/beta-settings/beta-settings.routes').then(m => m.BETA_SETTINGS_ROUTES) },
   { path: 'beta/chat', loadChildren: () => import('./features/chat-beta/chat-beta.routes').then(m => m.CHAT_BETA_ROUTES) },
   { path: 'beta/ask', loadChildren: () => import('./features/ask-beta/ask-beta.routes').then(m => m.ASK_BETA_ROUTES) },
@@ -49,6 +51,7 @@ const TAIL_ROUTES: Routes = [
   { path: 'widget/:source', canActivate: [authGuard], loadComponent: () => import('./features/widget/widget').then(m => m.Widget), title: 'Usage IQ · Widget' },
   { path: 'share', loadChildren: () => import('./features/share-target/share-target.routes').then(m => m.SHARE_TARGET_ROUTES) },
   { path: 'share/:token', loadComponent: () => import('./features/share/public-share').then(m => m.PublicShareView), title: 'Usage IQ · Shared view' },
+  { path: 'w/:token', loadComponent: () => import('./features/wrapped/public-wrapped.page').then(m => m.PublicWrappedView), title: 'Usage IQ · Wrapped' },
   { path: 'bill/:token', loadComponent: () => import('./features/bills/public-bill').then(m => m.PublicBillView), title: 'Usage IQ · Bill' },
 ];
 

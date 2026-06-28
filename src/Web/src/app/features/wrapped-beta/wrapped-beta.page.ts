@@ -8,7 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { firstValueFrom } from 'rxjs';
 
 import { Api } from '../../core/api';
-import { WrappedCard, WrappedPeriod, WrappedResponse } from '../../core/models';
+import { WrappedCard, WrappedPeriod, WrappedResponse, WrappedNarrative } from '../../core/models';
 import {
   BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaToaster, ToastController,
   type Segment,
@@ -25,7 +25,7 @@ interface Spark {
  * active slide can count up to it, while `numPrefix`/`numSuffix`/`unit` hold the non-numeric trim.
  */
 interface Slide {
-  readonly kind: 'cover' | 'card';
+  readonly kind: 'cover' | 'card' | 'story';
   readonly key: string;
   readonly accent: string;          // accent key (maps to --grad-* / --pa-*/--pb-*)
   readonly icon: string;
@@ -38,6 +38,8 @@ interface Slide {
   readonly numGroup: boolean;       // whether to group thousands while counting
   readonly numSuffix: string;       // e.g. "k", "%", "h"
   readonly unit: string;            // a trailing word unit (the card label is the big caption)
+  readonly story?: string;          // the AI narrative text (story slides only)
+  readonly storyInsights?: readonly string[];
   readonly sparks: readonly Spark[];
 }
 
@@ -84,6 +86,10 @@ interface RecapCell { readonly num: string; readonly label: string; readonly acc
       @if (!loading() && !errored() && slides().length) {
         <span class="wb-top__count" aria-hidden="true">{{ active() + 1 }} / {{ slides().length }}</span>
       }
+      <button type="button" class="wb-top__share" aria-label="Create a public share link"
+              [disabled]="loading() || errored() || !cards().length || sharing()" (click)="createShareLink()">
+        <mat-icon aria-hidden="true">{{ sharing() ? 'hourglass_top' : 'link' }}</mat-icon>
+      </button>
       <button type="button" class="wb-top__share" aria-label="Share your Wrapped"
               [disabled]="loading() || errored() || !cards().length" (click)="share()">
         <mat-icon aria-hidden="true">ios_share</mat-icon>
@@ -151,7 +157,20 @@ interface RecapCell { readonly num: string; readonly label: string; readonly acc
                   }
                 </span>
 
-                @if (s.kind === 'cover') {
+                @if (s.kind === 'story') {
+                  <p class="wb-cover__kicker wb-reveal" [style.--ri]="0">
+                    <mat-icon aria-hidden="true" style="font-size:16px;width:16px;height:16px;vertical-align:-3px">auto_awesome</mat-icon>
+                    Your story
+                  </p>
+                  <p class="wb-story__text wb-reveal" [style.--ri]="1">{{ s.story }}</p>
+                  @if (s.storyInsights?.length) {
+                    <ul class="wb-story__insights wb-reveal" [style.--ri]="2">
+                      @for (ins of s.storyInsights; track ins) {
+                        <li><mat-icon aria-hidden="true">trending_up</mat-icon>{{ ins }}</li>
+                      }
+                    </ul>
+                  }
+                } @else if (s.kind === 'cover') {
                   <p class="wb-cover__kicker wb-reveal" [style.--ri]="0">Hub Wrapped</p>
                   <h1 class="wb-cover__word wb-reveal" [style.--ri]="1">{{ coverTitle() }}</h1>
                   <p class="wb-cover__name wb-reveal" [style.--ri]="2">
@@ -219,6 +238,9 @@ interface RecapCell { readonly num: string; readonly label: string; readonly acc
               <h2 class="wb-recap__title">{{ coverTitle() }}</h2>
               <p class="wb-recap__name">{{ data()?.userName }}</p>
             </div>
+            @if (narrative(); as n) {
+              <p class="wb-recap__story">{{ n.narrative }}</p>
+            }
             @if (recapCells().length) {
               <div class="wb-recap__grid">
                 @for (c of recapCells(); track c.label) {
@@ -234,6 +256,10 @@ interface RecapCell { readonly num: string; readonly label: string; readonly acc
                 <span class="wb-recap__brand-name">Usage IQ</span>
                 <span class="wb-recap__brand-sub">{{ cards().length }} highlights this {{ periodNoun() }}</span>
               </div>
+              <button type="button" class="wb-recap__share wb-recap__share--ghost"
+                      [disabled]="sharing()" (click)="createShareLink()">
+                <mat-icon aria-hidden="true">link</mat-icon> {{ sharing() ? 'Creating…' : 'Share link' }}
+              </button>
               <button type="button" class="wb-recap__share" (click)="share()">
                 <mat-icon aria-hidden="true">ios_share</mat-icon> Share
               </button>
@@ -281,9 +307,13 @@ export class WrappedBetaPage {
 
   readonly period = signal<WrappedPeriod>('month');
   readonly data = signal<WrappedResponse | null>(null);
+  /** The AI (or deterministic-floor) narrative for the caller's OWN recap — loaded best-effort alongside the data. */
+  readonly narrative = signal<WrappedNarrative | null>(null);
   readonly loading = signal(true);
   readonly errored = signal(false);
   readonly refreshing = signal(false);
+  /** True while a public share link is being created (debounces the buttons). */
+  readonly sharing = signal(false);
 
   /** Index of the slide currently snapped into view (drives the dots + count-up). */
   readonly active = signal(0);
@@ -344,7 +374,20 @@ export class WrappedBetaPage {
         sparks: WrappedBetaPage.SPARKS_BY_INDEX[idx % WrappedBetaPage.SPARKS_BY_INDEX.length],
       };
     });
-    return [cover, ...cardSlides];
+
+    // A narrative "story" slide (right after the cover) — the AI-written read of the period. Present
+    // only once the narrative has loaded; it carries no count-up numeral (it's prose, not a stat).
+    const n = this.narrative();
+    const storySlides: Slide[] = n?.narrative
+      ? [{
+          kind: 'story', key: '__story', accent: 'primary', icon: 'auto_awesome',
+          numPrefix: '', numText: '', numTarget: 0, numDecimals: 0, numGroup: false, numSuffix: '', unit: '',
+          story: n.narrative, storyInsights: n.insights ?? [],
+          sparks: WrappedBetaPage.SPARKS,
+        }]
+      : [];
+
+    return [cover, ...storySlides, ...cardSlides];
   });
 
   /** Top headline stats for the shareable recap grid (the first 4 card slides). */
@@ -389,17 +432,35 @@ export class WrappedBetaPage {
     const wasLoaded = !!this.data();
     if (wasLoaded) this.refreshing.set(true); else this.loading.set(true);
     this.errored.set(false);
+    this.narrative.set(null);
+    const period = this.period();
     try {
-      const res = await firstValueFrom(this.api.wrapped(this.period()));
+      const res = await firstValueFrom(this.api.wrapped(period));
       this.data.set(res);
       this.active.set(0);
       // After the new reel paints, ensure we're scrolled to the cover.
       queueMicrotask(() => this.scrollReelTo(0, 'auto'));
+      // Best-effort: load the AI narrative AFTER the reel is up (never blocks the page, never errors it).
+      if (res.cards.length) void this.loadNarrative(period);
     } catch {
       this.errored.set(true);
     } finally {
       this.loading.set(false);
       this.refreshing.set(false);
+    }
+  }
+
+  /**
+   * Fetch the recap narrative for a period and (if it's still the active period) fold it in as a story slide.
+   * The endpoint ALWAYS 200s (deterministic floor when AI is off/unconfigured), so a failure here is purely a
+   * transport hiccup — swallowed so the reel is never degraded.
+   */
+  private async loadNarrative(period: WrappedPeriod): Promise<void> {
+    try {
+      const n = await firstValueFrom(this.api.wrappedNarrative(period));
+      if (period === this.period()) this.narrative.set(n);
+    } catch {
+      // narrative is a progressive enhancement — leave the reel as-is.
     }
   }
 
@@ -519,6 +580,46 @@ export class WrappedBetaPage {
       this.toast.show('Highlights copied — paste them anywhere', { tone: 'success', durationMs: 2400 });
     } catch {
       this.toast.show('Couldn’t copy on this device', { tone: 'warn' });
+    }
+  }
+
+  /**
+   * Create a PUBLIC, PII-safe share link for the caller's OWN recap (server bakes owner/window/whitelist +
+   * a frozen narrative snapshot — sensitive cards are default-excluded and can never be widened in). On
+   * success, copy the absolute `/w/{token}` URL to the clipboard (or hand it to the native share sheet) so
+   * it can be pasted anywhere. The narrative the public viewer sees is generated server-side at create time.
+   */
+  async createShareLink(): Promise<void> {
+    const d = this.data();
+    if (!d || !this.cards().length || this.sharing()) return;
+    this.sharing.set(true);
+    try {
+      const created = await firstValueFrom(this.api.createWrappedShare({ period: this.period() }));
+      const origin = typeof location !== 'undefined' ? location.origin : '';
+      const url = `${origin}${created.path}`;
+
+      const nav: (Navigator & { share?: (d: ShareData) => Promise<void>; clipboard?: Clipboard }) | undefined =
+        typeof navigator !== 'undefined' ? navigator : undefined;
+
+      if (nav?.share) {
+        try {
+          await nav.share({ title: `My Hub Wrapped — ${this.coverTitle()}`, url });
+          this.toast.show('Share link ready', { tone: 'success', durationMs: 2000 });
+          return;
+        } catch {
+          // user dismissed the native sheet — fall through to clipboard so they still get the link.
+        }
+      }
+      try {
+        await nav?.clipboard?.writeText(url);
+        this.toast.show('Public link copied — paste it anywhere', { tone: 'success', durationMs: 2600 });
+      } catch {
+        this.toast.show('Link created — couldn’t copy on this device', { tone: 'warn' });
+      }
+    } catch {
+      this.toast.show('Couldn’t create a share link', { tone: 'warn' });
+    } finally {
+      this.sharing.set(false);
     }
   }
 

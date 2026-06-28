@@ -5103,6 +5103,85 @@ export interface WrappedResponse {
 /** The Wrapped period selector value. */
 export type WrappedPeriod = 'month' | 'year' | 'all';
 
+// ---- Hub Wrapped sharing (AI narrative + the public, anonymous, PII-safe /w/{token} link) ----
+// Mirrors the usage-share shapes but scoped to a Wrapped PERIOD. The owner/window/whitelist/narrative are
+// all BAKED server-side from the caller — nothing the holder sends can widen scope. Sensitive cards
+// (weight/sleep/finance) are DEFAULT-EXCLUDED and filtered server-side, and the public read serves a FROZEN
+// narrative snapshot (no live AI call). Owner is exposed as a display NAME — never an email.
+
+/** The AI (or deterministic-floor) narrative for the caller's OWN recap. `fellBackToPlain` ⇒ the floor was used. */
+export interface WrappedNarrative {
+  narrative: string;
+  insights: string[];
+  fellBackToPlain: boolean;
+}
+
+/** Create a public Wrapped share for the CALLER's OWN recap (owner/window/whitelist/narrative baked server-side). */
+export interface CreateWrappedShareRequest {
+  label?: string | null;
+  /** Clamped server-side to 1..2160 hours. Defaults to 168 (7 days). */
+  expiresInHours?: number;
+  /** month | year | all — the recap window. Defaults to month. */
+  period?: WrappedPeriod;
+  /** Optional explicit card-key subset (intersected with the default PII-safe whitelist; sensitive keys dropped). */
+  cardKeys?: string[];
+}
+
+/** Returned ONCE on creation — the only time the full token (inside `path`) is exposed. */
+export interface WrappedShareCreated {
+  id: number;
+  token: string;
+  path: string;        // /w/<token>
+  expiresUtc: string;
+  label: string | null;
+}
+
+/** A Wrapped share in the owner's management list (carries the copyable /w/ path). */
+export interface WrappedShareItem {
+  id: number;
+  label: string | null;
+  path: string | null; // /w/<token>, decrypted for re-copy (null for legacy links)
+  /** The creator's AppUser id, or null when unresolved. Never an email (email-privacy). */
+  createdByUserId: number | null;
+  /** The creator's display name (never an email). */
+  createdByName: string;
+  period: string;      // "month" | "year" | "all"
+  createdUtc: string;
+  expiresUtc: string;
+  expired: boolean;
+  accessCount: number;
+  lastAccessedUtc: string | null;
+  /** The whitelisted (PII-safe) card keys this link exposes. */
+  cards: string[];
+  scope: string;
+}
+
+/** One public Wrapped story card — a PII-safe subset of WrappedCard (no raw email/secret). */
+export interface PublicWrappedCard {
+  key: string;
+  headline: string;
+  label: string;
+  sub?: string | null;
+  accent?: string | null;
+}
+
+/**
+ * The read-only payload served to an ANONYMOUS viewer of a valid Wrapped link (`GET /api/share/wrapped/{token}`).
+ * Owner is a display NAME only; cards are the whitelisted (sensitive-filtered) set; narrative is the FROZEN snapshot.
+ */
+export interface PublicWrapped {
+  label: string | null;
+  ownerName: string;
+  period: string;      // "month" | "year" | "all"
+  fromDate: string;    // yyyy-MM-dd
+  toDate: string;      // yyyy-MM-dd
+  generatedAtUtc: string;
+  expiresUtc: string;
+  cards: PublicWrappedCard[];
+  narrative: string;
+  insights: string[];
+}
+
 /** Start-a-challenge payload (POST /api/challenge). `startDate` defaults to local today when omitted. */
 export interface StartChallengeRequest {
   startDate?: string | null;

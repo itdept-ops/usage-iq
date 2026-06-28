@@ -167,6 +167,101 @@ public sealed class PublicShareDto
     public SummaryResponse Models { get; set; } = new();
 }
 
+// ===================================================================================
+// Hub Wrapped sharing — DTOs for the /api/wrapped/narrative, /api/wrapped/shares CRUD,
+// and the public /api/share/wrapped/{token} read.
+// ===================================================================================
+
+/// <summary>The narrative payload for GET /api/wrapped/narrative: a warm 2–4 sentence <see cref="Narrative"/>
+/// of the caller's OWN period recap plus 0–5 celebratory <see cref="Insights"/>, both NARRATED from the same
+/// derived Wrapped numbers (the model invents nothing). <see cref="FellBackToPlain"/> is true when Gemini was
+/// off/unconfigured/errored and the deterministic template floor was returned. ALWAYS 200 — never a 503.</summary>
+public sealed class WrappedNarrativeDto
+{
+    public string Narrative { get; set; } = "";
+    public IReadOnlyList<string> Insights { get; set; } = Array.Empty<string>();
+    public bool FellBackToPlain { get; set; }
+}
+
+/// <summary>Create a public Wrapped share for the CALLER's OWN recap. The owner/window/whitelist/narrative
+/// are all BAKED server-side from the caller — nothing here can widen scope. <see cref="CardKeys"/> optionally
+/// narrows the public cards further to a subset of the default PII-safe whitelist (sensitive cards can never
+/// be added; any unknown/sensitive key is dropped server-side).</summary>
+public sealed class CreateWrappedShareRequest
+{
+    public string? Label { get; set; }
+    public int ExpiresInHours { get; set; } = 168; // default 7 days
+    /// <summary>month | year | all — the recap window. Defaults to month; unknown ⇒ month.</summary>
+    public string Period { get; set; } = "month";
+    /// <summary>Optional explicit card-key subset (intersected with the default safe whitelist). Null ⇒ all safe cards.</summary>
+    public string[]? CardKeys { get; set; }
+}
+
+/// <summary>Returned once on creation of a Wrapped share — the only time the full token is exposed.</summary>
+public sealed class WrappedShareCreatedDto
+{
+    public int Id { get; set; }
+    public string Token { get; set; } = "";
+    public string Path { get; set; } = "";   // e.g. /w/<token>
+    public DateTime ExpiresUtc { get; set; }
+    public string? Label { get; set; }
+}
+
+/// <summary>A Wrapped share in the management list (auth-only; carries the copyable /w/ path).</summary>
+public sealed class WrappedShareDto
+{
+    public int Id { get; set; }
+    public string? Label { get; set; }
+    public string? Path { get; set; }   // /w/<token>, decrypted for re-copy (null for legacy links)
+    /// <summary>The creator resolved to their AppUser id, or null when unresolved. The raw email is NEVER exposed.</summary>
+    public int? CreatedByUserId { get; set; }
+    /// <summary>The creator's display name (never an email).</summary>
+    public string CreatedByName { get; set; } = "";
+    public string Period { get; set; } = "month";
+    public DateTime CreatedUtc { get; set; }
+    public DateTime ExpiresUtc { get; set; }
+    public bool Expired { get; set; }
+    public int AccessCount { get; set; }
+    public DateTime? LastAccessedUtc { get; set; }
+    /// <summary>The PII-safe card keys this link exposes (the baked whitelist).</summary>
+    public IReadOnlyList<string> Cards { get; set; } = Array.Empty<string>();
+    public string Scope { get; set; } = "";
+}
+
+public sealed class UpdateWrappedShareRequest
+{
+    public int ExpiresInHours { get; set; }
+    public string? Label { get; set; }
+}
+
+/// <summary>One public Wrapped story card — a PII-safe subset of the authed WrappedCard (no raw email/secret).</summary>
+public sealed class PublicWrappedCardDto
+{
+    public string Key { get; set; } = "";
+    public string Headline { get; set; } = "";
+    public string Label { get; set; } = "";
+    public string? Sub { get; set; }
+    public string? Accent { get; set; }
+}
+
+/// <summary>The read-only payload served to an ANONYMOUS viewer of a valid Wrapped share link. Carries the
+/// owner's DISPLAY NAME only (never an email), the period window, the WHITELISTED cards (sensitive cards are
+/// filtered out server-side), and the CACHED narrative snapshot (no live Gemini call on this path).</summary>
+public sealed class PublicWrappedDto
+{
+    public string? Label { get; set; }
+    public string OwnerName { get; set; } = "";
+    public string Period { get; set; } = "month";
+    public string FromDate { get; set; } = "";   // yyyy-MM-dd
+    public string ToDate { get; set; } = "";      // yyyy-MM-dd
+    public DateTime GeneratedAtUtc { get; set; }
+    public DateTime ExpiresUtc { get; set; }
+    public IReadOnlyList<PublicWrappedCardDto> Cards { get; set; } = Array.Empty<PublicWrappedCardDto>();
+    /// <summary>The FROZEN narrative snapshot generated at create time against ONLY the whitelisted cards.</summary>
+    public string Narrative { get; set; } = "";
+    public IReadOnlyList<string> Insights { get; set; } = Array.Empty<string>();
+}
+
 /// <summary>One cell of the hour × weekday activity heatmap (local time).</summary>
 public sealed class HeatmapCellDto
 {

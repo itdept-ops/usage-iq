@@ -29,6 +29,7 @@ import {
   TrophiesResponse,
   WrappedPeriod,
   WrappedResponse,
+  WrappedNarrative, CreateWrappedShareRequest, WrappedShareCreated, WrappedShareItem, PublicWrapped,
   BillDto, BillItemRequest, BillShareToggleResult, CreateBillRequest, PaymentHandlesDto,
   PublicBillDto, ReceiptBreakdownDto, UpdateBillRequest,
   ProfilePrefs,
@@ -2593,6 +2594,45 @@ export class Api {
    */
   wrapped(period: WrappedPeriod = 'month'): Observable<WrappedResponse> {
     return this.http.get<WrappedResponse>(`${this.base}/wrapped`, { params: { period } });
+  }
+
+  /**
+   * The AI (or deterministic-floor) narrative for the caller's OWN recap. Gated server-side by tracker.self AND
+   * tracker.ai (token-spend); ALWAYS 200 — a caller without AI (or AI unconfigured/errored) gets the floor
+   * (`fellBackToPlain=true`). Grounded strictly in the same server-derived numbers — never invents a figure.
+   */
+  wrappedNarrative(period: WrappedPeriod = 'month'): Observable<WrappedNarrative> {
+    return this.http.get<WrappedNarrative>(`${this.base}/wrapped/narrative`, { params: { period } });
+  }
+
+  /** Create a public Wrapped share for the caller's OWN recap (owner/window/whitelist/narrative baked server-side). */
+  createWrappedShare(body: CreateWrappedShareRequest): Observable<WrappedShareCreated> {
+    return this.http.post<WrappedShareCreated>(`${this.base}/wrapped/shares`, body);
+  }
+
+  /** List the caller's OWN Wrapped shares. */
+  listWrappedShares(): Observable<WrappedShareItem[]> {
+    return this.http.get<WrappedShareItem[]>(`${this.base}/wrapped/shares`);
+  }
+
+  /** Update a Wrapped share's label/expiry (caller's OWN share only). */
+  updateWrappedShare(id: number, body: { expiresInHours: number; label?: string | null }): Observable<WrappedShareItem> {
+    return this.http.put<WrappedShareItem>(`${this.base}/wrapped/shares/${id}`, body);
+  }
+
+  /** Delete a Wrapped share (caller's OWN share only). */
+  deleteWrappedShare(id: number): Observable<unknown> {
+    return this.http.delete(`${this.base}/wrapped/shares/${id}`);
+  }
+
+  /** Per-view access detail for a Wrapped share (caller's OWN share only). */
+  wrappedShareAccesses(id: number): Observable<ShareAccessItem[]> {
+    return this.http.get<ShareAccessItem[]>(`${this.base}/wrapped/shares/${id}/accesses`);
+  }
+
+  /** ANONYMOUS read of a public Wrapped link by token. PII-safe (whitelisted cards + frozen narrative; no auth). */
+  publicWrapped(token: string): Observable<PublicWrapped> {
+    return this.http.get<PublicWrapped>(`${this.base}/share/wrapped/${encodeURIComponent(token)}`);
   }
 
   // ---- Family Hub F6: Google Calendar (OAuth code flow; the caller's own primary calendar) ----

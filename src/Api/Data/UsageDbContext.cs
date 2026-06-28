@@ -21,6 +21,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<NotificationSetting> NotificationSettings => Set<NotificationSetting>();
     public DbSet<DiscordRoute> DiscordRoutes => Set<DiscordRoute>();
     public DbSet<ShareLink> ShareLinks => Set<ShareLink>();
+    public DbSet<WrappedShareLink> WrappedShareLinks => Set<WrappedShareLink>();
     public DbSet<ShareAccess> ShareAccesses => Set<ShareAccess>();
     public DbSet<IngestKey> IngestKeys => Set<IngestKey>();
     public DbSet<SavedView> SavedViews => Set<SavedView>();
@@ -303,13 +304,33 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => x.TokenHash).IsUnique();
         });
 
+        b.Entity<WrappedShareLink>(e =>
+        {
+            e.Property(x => x.TokenHash).HasMaxLength(64);
+            e.Property(x => x.TokenEnc).HasMaxLength(256);
+            e.Property(x => x.Label).HasMaxLength(120);
+            e.Property(x => x.CreatedByEmail).HasMaxLength(256);
+            e.Property(x => x.OwnerEmail).HasMaxLength(256);
+            e.Property(x => x.Period).HasMaxLength(16);
+            // Card keys + insight bullets persist as Postgres text[] (mirrors ShareLink.Models).
+            e.Property(x => x.CardWhitelist).HasColumnType("text[]");
+            e.Property(x => x.InsightsSnapshot).HasColumnType("text[]");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.ExpiresUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.LastAccessedUtc).HasColumnType("timestamp with time zone");
+            e.HasIndex(x => x.TokenHash).IsUnique();
+        });
+
         b.Entity<ShareAccess>(e =>
         {
             e.Property(x => x.WhenUtc).HasColumnType("timestamp with time zone");
             e.Property(x => x.Ip).HasMaxLength(64);
             e.HasIndex(x => new { x.ShareLinkId, x.WhenUtc });
+            e.HasIndex(x => new { x.WrappedShareLinkId, x.WhenUtc });
             e.HasOne(x => x.ShareLink).WithMany()
                 .HasForeignKey(x => x.ShareLinkId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.WrappedShareLink).WithMany()
+                .HasForeignKey(x => x.WrappedShareLinkId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<Bill>(e =>

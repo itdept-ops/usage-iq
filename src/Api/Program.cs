@@ -554,6 +554,7 @@ app.MapGroceryEndpoints();
 app.MapHardChallengeEndpoints();
 app.MapTrophyEndpoints();
 app.MapWrappedEndpoints();
+app.MapWrappedShareEndpoints();
 app.MapFeedEndpoints();
 app.MapRulesEndpoints();
 app.MapAgentsEndpoints();

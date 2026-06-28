@@ -216,6 +216,13 @@ export const PAGE_REGISTRY: readonly PageDef[] = [
     home: { label: 'Resume Builder', icon: 'description' },
   },
   {
+    id: 'wrapped', path: 'wrapped', title: 'Usage IQ · Wrapped', perm: PERM.trackerSelf,
+    desktop: () => import('../features/wrapped/wrapped.page').then(m => m.WrappedPage),
+    mobile: () => import('../features/wrapped-beta/wrapped-beta.page').then(m => m.WrappedBetaPage),
+    nav: { group: 'Tools', label: 'Wrapped', icon: 'auto_awesome' },
+    home: { label: 'Wrapped', icon: 'auto_awesome' },
+  },
+  {
     id: 'search', path: 'search', title: 'Usage IQ · Search', perm: PERM.searchUse,
     desktop: () => import('../features/search/search').then(m => m.Search),
     mobile: () => import('../features/search-mobile/search-mobile.page').then(m => m.SearchMobilePage),
