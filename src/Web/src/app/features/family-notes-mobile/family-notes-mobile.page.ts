@@ -1,7 +1,9 @@
 import {
   ChangeDetectionStrategy, Component, computed, inject, signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MatIconModule } from '@angular/material/icon';
 import { catchError, firstValueFrom, of } from 'rxjs';
@@ -99,7 +101,7 @@ import {
             @for (note of board(); track note.id; let i = $index) {
               @if (note.canEdit) {
                 <!-- MANAGEABLE: swipe left to delete, right to pin/unpin -->
-                <app-bs-swipe-row class="nt-swipe nt-reveal" [style.--ni]="i"
+                <app-bs-swipe-row class="nt-swipe nt-reveal" [id]="'note-' + note.id" [style.--ni]="i"
                   leftLabel="Delete" [rightLabel]="note.pinned ? 'Unpin' : 'Pin'"
                   [disabled]="isBusy(note.id)" [label]="cardAria(note)"
                   (swipe)="onSwipe(note, $event)">
@@ -125,7 +127,8 @@ import {
                 </app-bs-swipe-row>
               } @else {
                 <!-- SHARED-IN read-only: tap for detail -->
-                <button type="button" class="nt-card nt-card--shared nt-reveal" [style.--ni]="i"
+                <button type="button" class="nt-card nt-card--shared nt-reveal"
+                        [id]="'note-' + note.id" [style.--ni]="i"
                         [class.is-pinned]="note.pinned" (click)="openDetail(note)"
                         [attr.aria-label]="cardAria(note)">
                   @if (note.pinned) {
@@ -295,6 +298,10 @@ export class FamilyNotesMobilePage {
   private api = inject(Api);
   private toast = inject(ToastController);
   private sanitizer = inject(DomSanitizer);
+  private route = inject(ActivatedRoute);
+
+  /** A pending #note-{id} fragment to scroll/flash once the board has loaded (deep-link from Search). */
+  private pendingFragment: string | null = null;
 
   /** The board, pinned-first then most-recently-updated (the server sorts; we keep it stable on local upserts). */
   readonly notes = signal<FamilyNote[]>([]);
@@ -345,6 +352,13 @@ export class FamilyNotesMobilePage {
   );
 
   constructor() {
+    // Deep-link from Search: #note-{id} scrolls + flashes that note once the board is loaded (parity with
+    // the desktop /family/notes consumer). An absent/non-matching fragment is a no-op, so a normal visit
+    // behaves exactly as before.
+    this.route.fragment.pipe(takeUntilDestroyed()).subscribe((frag) => {
+      this.pendingFragment = frag;
+      if (frag && !this.loading()) this.scrollToFragment(frag);
+    });
     void this.reload();
     // Member ids power the "is this a manageable household note?" check; failure is non-fatal.
     this.api
@@ -353,6 +367,17 @@ export class FamilyNotesMobilePage {
       .subscribe((h) => {
         if (h) this.memberIds.set(new Set(h.members.map((m) => m.userId)));
       });
+  }
+
+  /** Scroll a #note-{id} target into view and flash it (deep-link from Search). */
+  private scrollToFragment(frag: string): void {
+    setTimeout(() => {
+      const el = document.getElementById(frag);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('nt-card--flash');
+      setTimeout(() => el.classList.remove('nt-card--flash'), 1600);
+    });
   }
 
   // ─────────────── LOAD ───────────────
@@ -381,6 +406,8 @@ export class FamilyNotesMobilePage {
         this.toast.show('Notes refreshed', { tone: 'success', durationMs: 1600 });
       }
     }
+    // Apply any pending deep-link fragment now the board has its rows (the anchor exists).
+    if (this.pendingFragment) this.scrollToFragment(this.pendingFragment);
   }
 
   // ─────────────── helpers ───────────────

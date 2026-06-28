@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { firstValueFrom } from 'rxjs';
 
@@ -132,7 +133,7 @@ import { ReceiptReviewSheet, ReceiptReviewResult } from './ui/receipt-review-she
         } @else {
           <div class="bb-list">
             @for (b of visibleBills(); track b.id) {
-              <div class="rise" [style.--i]="$index">
+              <div class="rise" [id]="'bill-' + b.id" [style.--i]="$index">
                 <app-bill-card [bill]="b"
                                (open)="openDetail(b)"
                                (settle)="settleBill(b)"
@@ -186,6 +187,7 @@ export class BillsBetaPage {
   private api = inject(Api);
   private auth = inject(AuthService);
   private toasts = inject(ToastController);
+  private route = inject(ActivatedRoute);
 
   readonly bills = signal<BillDto[]>([]);
   readonly selectedId = signal<number | null>(null);
@@ -276,6 +278,7 @@ export class BillsBetaPage {
     try {
       const list = await firstValueFrom(this.api.bills());
       this.bills.set(list);
+      this.focusFromQuery(list);
       // Keep the open detail bill consistent if the list changed underneath it.
       if (this.selectedId() != null && !list.some(b => b.id === this.selectedId())) {
         this.selectedId.set(null);
@@ -286,6 +289,28 @@ export class BillsBetaPage {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /**
+   * Deep-link from Search: ?focus={id} selects + opens + scrolls to that bill (parity with the desktop
+   * /bills consumer, which selects + scrolls). We switch the filter to "All" first so the focused bill is
+   * guaranteed to render even if it's settled (the default tab is "Open"), open its detail sheet, then
+   * scroll its #bill-{id} anchor into view once it's painted. No-op when the param is absent/invalid, so a
+   * normal visit behaves exactly as before. Only acts once (consumes the snapshot param).
+   */
+  private focused = false;
+  private focusFromQuery(list: BillDto[]): void {
+    if (this.focused) return;
+    const raw = this.route.snapshot.queryParamMap.get('focus');
+    const id = raw ? Number(raw) : NaN;
+    if (!Number.isInteger(id) || !list.some(b => b.id === id)) return;
+    this.focused = true;
+    this.filter.set('all'); // ensure the target renders regardless of its open/settled status
+    this.selectedId.set(id);
+    this.detailOpen.set(true);
+    setTimeout(() => {
+      document.getElementById('bill-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   }
 
   /** Pull-to-refresh: re-pull the bills (and contacts), with a beat so the spinner reads as real work. */

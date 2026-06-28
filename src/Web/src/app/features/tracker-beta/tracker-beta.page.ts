@@ -4,7 +4,7 @@ import {
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { TrackerStore, toLocalDate } from '../../core/tracker-store';
 import { FoodEntryDto, Meal } from '../../core/models';
@@ -216,6 +216,7 @@ export class TrackerBetaPage {
   protected readonly store = inject(TrackerStore);
   protected readonly opt = inject(OptimisticTracker);
   protected readonly router = inject(Router);
+  private readonly activatedRoute = inject(ActivatedRoute);
   protected readonly units = inject(UnitService);
   private readonly snack = inject(MatSnackBar);
 
@@ -286,7 +287,15 @@ export class TrackerBetaPage {
 
   constructor() {
     // First paint + shared-user list (matches the existing /tracker route's init).
-    void this.store.load();
+    // Deep-link from Search: ?date=yyyy-MM-dd opens that logged day (parity with the desktop /tracker
+    // consumer). setDate() reloads the day, so it REPLACES the default load; an invalid/absent param
+    // falls back to the default (today / last-viewed) load so a normal visit behaves exactly as before.
+    const dateParam = this.activatedRoute.snapshot.queryParamMap.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      void this.store.setDate(dateParam);
+    } else {
+      void this.store.load();
+    }
     void this.store.loadShared();
 
     // Seed the central UnitService from the loaded profile's preference so every unit DISPLAY/INPUT in

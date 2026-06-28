@@ -1,7 +1,9 @@
 import {
   ChangeDetectionStrategy, Component, computed, inject, signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -117,7 +119,7 @@ import {
                 @for (l of list; track l.id; let i = $index) {
                   @if (canManage(l)) {
                     <!-- MANAGEABLE: swipe left to delete, right to complete -->
-                    <app-bs-swipe-row class="fl-swipe fl-reveal" [style.--ri]="i"
+                    <app-bs-swipe-row class="fl-swipe fl-reveal" [id]="'list-' + l.id" [style.--ri]="i"
                       leftLabel="Delete" [rightLabel]="l.isArchived ? 'Reopen' : 'Done'"
                       [disabled]="isBusy(l.id)" [label]="l.name"
                       (swipe)="onSwipe(l, $event)">
@@ -149,7 +151,8 @@ import {
                     </app-bs-swipe-row>
                   } @else {
                     <!-- SHARED-IN read-only: tap for detail (check-off still allowed if canEdit) -->
-                    <button type="button" class="fl-card fl-card--shared fl-reveal" [style.--ri]="i"
+                    <button type="button" class="fl-card fl-card--shared fl-reveal"
+                            [id]="'list-' + l.id" [style.--ri]="i"
                             (click)="openDetail(l)" [attr.aria-label]="cardAria(l)">
                       <span class="fl-card__glyph" aria-hidden="true">
                         <mat-icon>{{ l.kind === 'shopping' ? 'shopping_cart' : 'task_alt' }}</mat-icon>
@@ -341,6 +344,10 @@ import {
 export class FamilyListsMobilePage {
   private api = inject(Api);
   private toast = inject(ToastController);
+  private route = inject(ActivatedRoute);
+
+  /** A pending #list-{id} fragment to scroll/flash once the lists have loaded (deep-link from Search). */
+  private pendingFragment: string | null = null;
 
   /** All lists (active + archived) straight from the live endpoint. */
   readonly lists = signal<FamilyList[]>([]);
@@ -396,7 +403,35 @@ export class FamilyListsMobilePage {
   ]);
 
   constructor() {
+    // Deep-link from Search: #list-{id} scrolls + flashes that list once they're loaded (parity with the
+    // desktop /family/lists consumer). An absent/non-matching fragment is a no-op, so a normal visit
+    // behaves exactly as before.
+    this.route.fragment.pipe(takeUntilDestroyed()).subscribe((frag) => {
+      this.pendingFragment = frag;
+      if (frag && !this.loading()) this.scrollToFragment(frag);
+    });
     void this.reload();
+  }
+
+  /**
+   * Scroll a #list-{id} target into view and flash it (deep-link from Search). The target may be archived
+   * (hidden by default) or under the other tab, so we reveal completed lists + flip to the list's kind
+   * first to guarantee the anchor renders, then scroll.
+   */
+  private scrollToFragment(frag: string): void {
+    const id = Number(frag.replace(/^list-/, ''));
+    const target = Number.isInteger(id) ? this.lists().find((l) => l.id === id) : undefined;
+    if (target) {
+      if (target.isArchived) this.showArchived.set(true);
+      this.tab.set(target.kind);
+    }
+    setTimeout(() => {
+      const el = document.getElementById(frag);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('fl-card--flash');
+      setTimeout(() => el.classList.remove('fl-card--flash'), 1600);
+    });
   }
 
   // ─────────────── LOAD ───────────────
@@ -424,6 +459,8 @@ export class FamilyListsMobilePage {
         this.toast.show('Lists refreshed', { tone: 'success', durationMs: 1600 });
       }
     }
+    // Apply any pending deep-link fragment now the lists are loaded (the anchor exists).
+    if (this.pendingFragment) this.scrollToFragment(this.pendingFragment);
   }
 
   setTab(key: string): void {

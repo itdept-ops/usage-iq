@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -350,6 +351,7 @@ const SLOT_ORDER: FamilyMealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 export class FamilyMealsMobilePage {
   private api = inject(Api);
   private toast = inject(ToastController);
+  private route = inject(ActivatedRoute);
 
   readonly days = signal<FamilyMealDay[]>([]);
   readonly loading = signal(true);
@@ -458,6 +460,17 @@ export class FamilyMealsMobilePage {
   readonly canSave = computed(() => this.fTitle().trim().length > 0 && !this.saving());
 
   constructor() {
+    // Deep-link from Search: ?date=yyyy-MM-dd jumps the displayed week to the one containing that date AND
+    // focuses that day (parity with the desktop /family/meals consumer, which jumps the week to contain it).
+    // An invalid/absent param leaves the default (this week, today focused), so a normal visit is unchanged.
+    const dateParam = this.route.snapshot.queryParamMap.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const d = new Date(`${dateParam}T00:00:00`);
+      if (!Number.isNaN(d.getTime())) {
+        this.weekStart.set(this.mondayOf(d));
+        this.focusedDate.set(dateParam);
+      }
+    }
     void this.reload();
   }
 
@@ -748,7 +761,12 @@ export class FamilyMealsMobilePage {
   // ─────────────── DATE HELPERS (the household week starts Monday) ───────────────
 
   private thisMonday(): Date {
-    const d = new Date();
+    return this.mondayOf(new Date());
+  }
+
+  /** The local Monday (at local midnight) of the week containing `date`. */
+  private mondayOf(date: Date): Date {
+    const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     const offset = (d.getDay() + 6) % 7; // Sun=0..Sat=6 → Mon=0..Sun=6
     d.setDate(d.getDate() - offset);

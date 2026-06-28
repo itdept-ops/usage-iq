@@ -146,6 +146,14 @@
 }
 .nt-card--shared { background: color-mix(in srgb, var(--glass) 92%, var(--accent-b) 4%); }
 
+/* Deep-link highlight (#note-{id}) — a brief accent ring flash, mirroring the desktop note-flash. The
+   class is toggled on the #note-{id} anchor (the swipe-row wrapper on owned rows, the card on shared rows). */
+.nt-card--flash { animation: nt-card-flash 1.6s ease; }
+@keyframes nt-card-flash {
+  0%, 100% { box-shadow: none; }
+  20% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-a) 55%, transparent); }
+}
+
 .nt-card__pin {
   position: absolute; top: 10px; right: 12px;
   display: inline-flex; align-items: center; justify-content: center;

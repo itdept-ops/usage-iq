@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -121,7 +122,7 @@ interface IngredientRow {
                 @for (r of list; track r.id; let i = $index) {
                   @if (r.owned) {
                     <!-- OWNED: swipe left to delete, right to edit -->
-                    <app-bs-swipe-row class="rc-swipe rc-reveal" [style.--ri]="i"
+                    <app-bs-swipe-row class="rc-swipe rc-reveal" [id]="'recipe-' + r.id" [style.--ri]="i"
                       leftLabel="Delete" rightLabel="Edit" [disabled]="isBusy(r.id)"
                       [label]="r.title"
                       (swipe)="onSwipe(r, $event)">
@@ -148,7 +149,8 @@ interface IngredientRow {
                     </app-bs-swipe-row>
                   } @else {
                     <!-- SHARED-WITH-ME: read-only, tap for detail -->
-                    <button type="button" class="rc-card rc-card--shared rc-reveal" [style.--ri]="i"
+                    <button type="button" class="rc-card rc-card--shared rc-reveal"
+                            [id]="'recipe-' + r.id" [style.--ri]="i"
                             (click)="openDetail(r)" [attr.aria-label]="cardAria(r)">
                       <span class="rc-card__glyph" aria-hidden="true"><mat-icon>restaurant</mat-icon></span>
                       <span class="rc-card__body">
@@ -395,6 +397,7 @@ interface IngredientRow {
 export class RecipesMobilePage {
   private api = inject(Api);
   private toast = inject(ToastController);
+  private route = inject(ActivatedRoute);
 
   /** The caller's own recipes (newest-first from the server). */
   readonly mine = signal<Recipe[]>([]);
@@ -483,6 +486,30 @@ export class RecipesMobilePage {
         this.toast.show('Recipes refreshed', { tone: 'success', durationMs: 1600 });
       }
     }
+    this.focusFromQuery();
+  }
+
+  /**
+   * Deep-link from Search: ?focus={id} flips to the right tab (mine / shared), opens the recipe's detail
+   * sheet, and scrolls its card into view — parity with the desktop /recipes consumer (which expands +
+   * scrolls + flashes). The desktop card is an inline accordion; here detail is a bottom sheet, so we open
+   * it. No-op when the param is absent/invalid, so a normal visit behaves exactly as before. Only acts once.
+   */
+  private focused = false;
+  private focusFromQuery(): void {
+    if (this.focused) return;
+    const raw = this.route.snapshot.queryParamMap.get('focus');
+    const id = raw ? Number(raw) : NaN;
+    if (!Number.isInteger(id)) return;
+    const inMine = this.mine().find((r) => r.id === id);
+    const target = inMine ?? this.shared().find((r) => r.id === id);
+    if (!target) return;
+    this.focused = true;
+    this.tab.set(inMine ? 'mine' : 'shared'); // ensure the card renders under the active tab
+    this.openDetail(target);
+    setTimeout(() => {
+      document.getElementById('recipe-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   }
 
   setTab(key: string): void {

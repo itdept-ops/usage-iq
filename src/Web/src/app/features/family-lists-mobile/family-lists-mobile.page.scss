@@ -157,6 +157,14 @@
 }
 .fl-card--shared { background: color-mix(in srgb, var(--glass) 92%, var(--accent-a) 4%); }
 
+/* Deep-link highlight (#list-{id}) — a brief accent ring flash, mirroring the desktop list-card flash. The
+   class is toggled on the #list-{id} anchor (the swipe-row wrapper on owned rows, the card on shared rows). */
+.fl-card--flash { animation: fl-card-flash 1.6s ease; }
+@keyframes fl-card-flash {
+  0%, 100% { box-shadow: none; }
+  20% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-a) 55%, transparent); }
+}
+
 .fl-card__glyph {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;

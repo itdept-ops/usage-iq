@@ -129,6 +129,13 @@
   transition: opacity 0.12s ease, border-color 0.12s ease;
 
   &--busy { opacity: 0.6; pointer-events: none; }
+  /* Deep-link highlight (?focus=) — a brief accent box-shadow flash, mirroring the family note-flash. */
+  &--flash { animation: r-card-flash 2s ease; }
+}
+
+@keyframes r-card-flash {
+  0%, 100% { box-shadow: none; }
+  20% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--tech-accent) 55%, transparent); }
 }
 
 .r-card__summary {
