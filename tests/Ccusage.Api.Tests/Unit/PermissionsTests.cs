@@ -24,7 +24,7 @@ public class PermissionsTests
         "automations.use",
         "platform.mobile",
         "users.view", "users.manage", "activity.view", "ai.usage.view",
-        "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision",
+        "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision", "ai.act",
     };
 
     [Theory]
@@ -74,6 +74,7 @@ public class PermissionsTests
     [InlineData("finance.ai")]
     [InlineData("chat.ai")]
     [InlineData("ai.vision")]
+    [InlineData("ai.act")]
     public void IsValid_is_true_for_each_known_key(string key)
     {
         Permissions.IsValid(key).Should().BeTrue();
@@ -141,12 +142,13 @@ public class PermissionsTests
         Permissions.FinanceAi.Should().Be("finance.ai");
         Permissions.ChatAi.Should().Be("chat.ai");
         Permissions.AiVision.Should().Be("ai.vision");
+        Permissions.AiAct.Should().Be("ai.act");
     }
 
     [Fact]
-    public void All_contains_exactly_the_forty_nine_known_keys()
+    public void All_contains_exactly_the_fifty_known_keys()
     {
-        Permissions.All.Should().HaveCount(49);
+        Permissions.All.Should().HaveCount(50);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -157,9 +159,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_forty_nine_entries()
+    public void Catalog_has_fifty_entries()
     {
-        Permissions.Catalog.Should().HaveCount(49);
+        Permissions.Catalog.Should().HaveCount(50);
     }
 
     [Fact]
@@ -426,10 +428,10 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void IsAi_is_true_for_exactly_the_six_AI_keys_and_matches_the_AI_group()
+    public void IsAi_is_true_for_exactly_the_seven_AI_keys_and_matches_the_AI_group()
     {
-        // Exactly the six AI keys carry IsAi — nothing else.
-        Permissions.AiKeys.Should().HaveCount(6);
+        // Exactly the seven AI keys carry IsAi — nothing else.
+        Permissions.AiKeys.Should().HaveCount(7);
         Permissions.Catalog.Where(p => p.IsAi).Select(p => p.Key)
             .Should().BeEquivalentTo(Permissions.AiKeys);
 

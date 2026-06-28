@@ -88,6 +88,10 @@
                   <span>Copy</span>
                 </button>
               </div>
+
+              <!-- "Ask that Acts": confirm-chip ACTIONS for this answer (empty ⇒ renders nothing). Nothing
+                   writes on propose; each chip writes only on its own click, after any review dialog. -->
+              <app-ask-actions [actions]="turn.actions" />
             </div>
           </div>
 

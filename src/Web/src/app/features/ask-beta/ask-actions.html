@@ -1,0 +1,38 @@
+<!-- The confirm-chip ACTION stack under an answer. Renders nothing when the answer proposed no actions, so
+     with ai.act/AI off the page is exactly today's answer-only Ask. Nothing writes until a chip is clicked. -->
+@if (cards().length) {
+  <ul class="aa-cards" aria-label="Suggested actions">
+    @for (card of cards(); track $index) {
+      <li class="aa-card"
+          [class.aa-card--done]="card.status === 'done'"
+          [class.aa-card--error]="card.status === 'error'">
+        <span class="aa-card__icon" aria-hidden="true">
+          <mat-icon>{{ iconFor(card.action.type) }}</mat-icon>
+        </span>
+
+        <span class="aa-card__title">{{ card.action.title }}</span>
+
+        @if (card.status === 'done') {
+          <span class="aa-card__done">
+            <mat-icon aria-hidden="true">check_circle</mat-icon>
+            <span>{{ card.note || 'Done' }}</span>
+          </span>
+        } @else {
+          <button type="button" class="aa-card__btn" (click)="run(card)"
+                  [disabled]="card.status === 'running'">
+            @if (card.status === 'running') {
+              <span class="aa-spin" aria-hidden="true"></span>
+            } @else {
+              <mat-icon aria-hidden="true">{{ iconFor(card.action.type) }}</mat-icon>
+            }
+            <span>{{ buttonLabel(card.action.type) }}</span>
+          </button>
+        }
+
+        @if (card.status === 'error' && card.note) {
+          <span class="aa-card__err" role="alert">{{ card.note }}</span>
+        }
+      </li>
+    }
+  </ul>
+}

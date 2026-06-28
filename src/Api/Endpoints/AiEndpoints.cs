@@ -697,6 +697,59 @@ public static class AiEndpoints
             return Results.Ok(new AskResponse(ai.Answer, true, domains));
         });
 
+        // ---- "ASK THAT ACTS": /ask + PROPOSED confirm-chip actions the caller approves per-chip (ALWAYS 200) ----
+        // A SUPERSET of /ask: the SAME server-assembled, per-domain-perm-gated snapshot grounds the answer, and the
+        // AI additionally proposes 0..N actions, each mapping to an EXISTING already-gated write endpoint. CRITICAL:
+        //   * the propose step (token spend) is gated by ai.act (on the route) on top of tracker.ai (the group);
+        //   * each action's Endpoint is SERVER-issued — re-derived from its Type via AskActEndpointFor (a frozen
+        //     Type->route map), NEVER a model-emitted route;
+        //   * an action chip is emitted ONLY when the caller holds that action's OWN write permission (a per-type
+        //     gate at MAP time: calendar_event/reminder/timer/note -> family.use; grocery_add -> grocery.use; meal
+        //     -> meals.use; goal_tweak/tracker_log -> tracker.self). No finance write is ever in the set.
+        // Floors to PlainAskFloor(domains) + EMPTY actions on AI off / unconfigured / parse-fail / exception — so
+        // it NEVER 503s and, with ai.act/AI off, degrades to exactly today's answer-only Ask. Identity is the JWT
+        // caller; the question is read from the body and treated strictly as DATA.
+        g.MapPost("/ask-act", async (
+            ActAskRequest body, CurrentUserAccessor me, GeminiService gemini, UsageDbContext db,
+            CurrentHouseholdAccessor households, FamilyTodayService familyToday, UsageQueries usage,
+            CancellationToken ct) =>
+        {
+            var question = Snip(body?.Question, 1000);
+            if (question.Length == 0)
+                return Results.BadRequest(new { message = "Ask a question about your tracked data." });
+
+            var caller = (await me.GetUserAsync(ct))!;
+            var (snapshot, domains) = await BuildAskSnapshotAsync(
+                db, households, familyToday, usage, caller, ct);
+
+            var localNow = await NowLocalAsync(db, ct);
+            var tz = await ResolveTimeZoneAsync(db, ct);
+
+            // Prefer the grounded AI answer + proposed actions; fall back to the deterministic plain floor with NO
+            // actions so this never 503s (and degrades to answer-only when AI/ai.act is off).
+            AskActResult? ai = null;
+            if (gemini.IsConfigured)
+            {
+                try { ai = await gemini.AskActAsync(snapshot, question, localNow, tz, ct); }
+                catch { ai = null; }
+            }
+
+            if (ai is null || string.IsNullOrWhiteSpace(ai.Answer))
+                return Results.Ok(new ActAskResponse(
+                    PlainAskFloor(domains), false, domains, Array.Empty<ActAskActionDto>()));
+
+            // SERVER-issue each action's endpoint from its type, and emit a chip ONLY when the caller holds that
+            // action's OWN write permission (the write still re-gates server-side; this just hides chips the caller
+            // could never execute). A model-emitted route is never trusted.
+            var actions = ai.Actions
+                .Where(a => CallerMayAct(caller, a.Type))
+                .Select(a => new ActAskActionDto(a.Type, a.Title, AskActEndpointFor(a.Type), a.Params))
+                .Where(a => a.Endpoint.Length > 0) // unknown type -> dropped
+                .ToList();
+
+            return Results.Ok(new ActAskResponse(ai.Answer, true, domains, actions));
+        }).RequirePermission(Permissions.AiAct);
+
         // ---- A warm, read-only weekly recap of the caller's OWN last 7 local days (cached 6h, ALWAYS 200) ----
         // Unlike the other AI routes, this one is gated by tracker.self (NOT tracker.ai) and ALWAYS returns 200:
         // its deterministic plain floor needs no AI, so a tracker.self user always gets the recap (the warm AI
@@ -1012,6 +1065,25 @@ public static class AiEndpoints
     /// (<see cref="AiUsed"/> false ⇒ the deterministic plain floor was returned), and which DOMAINS the snapshot
     /// included (so the UI can hint what's covered). Carries NO email / secret / other-user data.</summary>
     public sealed record AskResponse(string Answer, bool AiUsed, IReadOnlyList<string> Domains);
+
+    /// <summary>The POST /api/ai/ask-act request: just the caller's free-text question (treated strictly as
+    /// DATA). Identity comes from the JWT, never the body. A superset surface of <see cref="AskRequest"/>.</summary>
+    public sealed record ActAskRequest(string? Question);
+
+    /// <summary>One PROPOSED confirm-chip action in the ask-act response. <see cref="Type"/> is one of the closed
+    /// action set; <see cref="Title"/> is a short human chip label; <see cref="Endpoint"/> is SERVER-issued (the
+    /// endpoint re-derives it from <see cref="Type"/> — a model-emitted route is NEVER trusted); <see cref="Params"/>
+    /// are the clamped, named values the FRONTEND feeds to that endpoint on confirm. Nothing is written until the
+    /// user approves the chip.</summary>
+    public sealed record ActAskActionDto(
+        string Type, string Title, string Endpoint, IReadOnlyDictionary<string, object?> Params);
+
+    /// <summary>The POST /api/ai/ask-act response: a superset of <see cref="AskResponse"/> — the grounded
+    /// <see cref="Answer"/>, whether AI produced it (<see cref="AiUsed"/>), the included <see cref="Domains"/>,
+    /// PLUS 0..N proposed <see cref="Actions"/> the user confirms per-chip. When ai.act/AI is off the actions list
+    /// is empty and the shape is exactly today's answer-only Ask.</summary>
+    public sealed record ActAskResponse(
+        string Answer, bool AiUsed, IReadOnlyList<string> Domains, IReadOnlyList<ActAskActionDto> Actions);
 
     /// <summary>
     /// Assemble the CALLER's cross-domain DATA snapshot for "Ask my life" from ONLY the domains the caller has
@@ -1754,12 +1826,57 @@ public static class AiEndpoints
     /// <summary>"Today" in the app's display timezone (UTC fallback on a bad/blank id), mirroring TrackerEndpoints.</summary>
     private static async Task<DateOnly> TodayAsync(UsageDbContext db, CancellationToken ct)
     {
-        var id = (await db.AppConfigs.AsNoTracking().FirstOrDefaultAsync(ct))?.DisplayTimeZone;
-        TimeZoneInfo tz;
-        if (string.IsNullOrWhiteSpace(id)) tz = TimeZoneInfo.Utc;
-        else { try { tz = TimeZoneInfo.FindSystemTimeZoneById(id); } catch { tz = TimeZoneInfo.Utc; } }
+        var tz = await ResolveTimeZoneAsync(db, ct);
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
     }
+
+    /// <summary>The configured display timezone (UTC when unset/invalid). The single resolver TodayAsync +
+    /// NowLocalAsync share so relative-time grounding ("tomorrow", "tonight") uses the same wall clock.</summary>
+    private static async Task<TimeZoneInfo> ResolveTimeZoneAsync(UsageDbContext db, CancellationToken ct)
+    {
+        var id = (await db.AppConfigs.AsNoTracking().FirstOrDefaultAsync(ct))?.DisplayTimeZone;
+        if (string.IsNullOrWhiteSpace(id)) return TimeZoneInfo.Utc;
+        try { return TimeZoneInfo.FindSystemTimeZoneById(id); } catch { return TimeZoneInfo.Utc; }
+    }
+
+    /// <summary>The current LOCAL wall-clock (offset-less) in the configured display timezone — the REFERENCE the
+    /// AI resolves relative dates/times against.</summary>
+    private static async Task<DateTime> NowLocalAsync(UsageDbContext db, CancellationToken ct)
+    {
+        var tz = await ResolveTimeZoneAsync(db, ct);
+        return DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz), DateTimeKind.Unspecified);
+    }
+
+    /// <summary>The FROZEN Type->route map for "Ask that Acts": each proposed action's endpoint is SERVER-issued
+    /// from its type here — a model-emitted route is NEVER trusted. tracker_log's concrete /api/tracker/{kind} is
+    /// re-derived by the FRONTEND from the (server-validated) "kind" param against its own frozen allow-list; the
+    /// chip carries the base /api/tracker path so an unknown type is dropped (returns "").</summary>
+    private static string AskActEndpointFor(string type) => type switch
+    {
+        "calendar_event" => "/api/family/events",
+        "grocery_add" => "/api/grocery/items",
+        "meal" => "/api/family/meals",
+        "goal_tweak" => "/api/tracker/profile",
+        "tracker_log" => "/api/tracker", // concrete /{kind} appended by the frontend from the validated kind param
+        "reminder" => "/api/family/quick-add",
+        "timer" => "/api/family/timers",
+        "note" => "/api/family/quick-add",
+        _ => "",
+    };
+
+    /// <summary>Per-TYPE permission gate at MAP time: a chip is emitted ONLY when the caller holds the action's
+    /// OWN write permission (the write itself still re-gates server-side — this just hides chips the caller could
+    /// never execute). family.use covers the family quick-add/create writes; grocery.use/meals.use their tools;
+    /// tracker.self the tracker writes (goal_tweak + tracker_log). An unknown type is denied.</summary>
+    private static bool CallerMayAct(CurrentUserAccessor.CurrentUser caller, string type) => type switch
+    {
+        // Each chip's MAP-time gate must match the gate of the EXISTING write it maps to, so a chip never
+        // appears that the caller's write would 403 (dead chip) nor hides one the write would accept.
+        "calendar_event" or "reminder" or "timer" or "note" or "meal" => caller.Permissions.Contains(Permissions.FamilyUse),
+        "grocery_add" => caller.Permissions.Contains(Permissions.FamilyUse) && caller.Permissions.Contains(Permissions.GroceryUse),
+        "goal_tweak" or "tracker_log" => caller.Permissions.Contains(Permissions.TrackerSelf),
+        _ => false,
+    };
 
     private static string Snip(string? s, int max)
     {

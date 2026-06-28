@@ -1,0 +1,119 @@
+// ============================================================================
+// ASK THAT ACTS — the confirm-chip ACTION stack under each answer bubble.
+// Reads the page's per-page accent cascade (--accent-a/--accent-b) + the shared Strata ink/glass/lift
+// tokens, so it re-skins with whatever page hosts it (indigo on Ask). Nothing writes on render; a card
+// writes only on its own click. idle / running / done / error states mirror the Family Assistant cards.
+// ============================================================================
+
+:host { display: block; }
+
+.aa-cards {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aa-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-tile, 18px);
+  background: var(--glass);
+  box-shadow: var(--lift-1);
+
+  &--done {
+    border-color: color-mix(in srgb, var(--signal, #34d399) 50%, var(--glass-edge));
+    background: color-mix(in srgb, var(--signal, #34d399) 9%, var(--glass));
+  }
+
+  &--error {
+    border-color: color-mix(in srgb, var(--warn, #f0a35a) 55%, var(--glass-edge));
+  }
+}
+
+.aa-card__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-a) 18%, transparent);
+  color: var(--accent-a);
+
+  mat-icon { width: 19px; height: 19px; font-size: 19px; }
+}
+
+.aa-card__title {
+  flex: 1 1 150px;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.aa-card__btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: var(--r-pill, 999px);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: var(--ink-on-accent, #0c0d12);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--lift-1);
+  transition: transform .12s var(--ease-out, ease), box-shadow .12s var(--ease-out, ease), opacity .12s ease;
+
+  &:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--lift-2); }
+  &:active:not(:disabled) { transform: translateY(0); }
+  &:disabled { opacity: .65; cursor: default; }
+
+  mat-icon { width: 17px; height: 17px; font-size: 17px; }
+}
+
+.aa-card__done {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--signal, #34d399);
+
+  mat-icon { width: 17px; height: 17px; font-size: 17px; }
+}
+
+.aa-card__err {
+  flex: 1 1 100%;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--warn, #f0a35a);
+}
+
+// A tiny inline spinner on the running button (no Material spinner dep; respects reduced-motion via the kit).
+.aa-spin {
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--ink-on-accent, #0c0d12) 35%, transparent);
+  border-top-color: var(--ink-on-accent, #0c0d12);
+  animation: aa-spin .7s linear infinite;
+}
+
+@keyframes aa-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .aa-spin { animation-duration: 1.4s; }
+  .aa-card__btn { transition: none; }
+}

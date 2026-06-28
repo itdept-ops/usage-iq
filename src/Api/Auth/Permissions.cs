@@ -115,6 +115,13 @@ public static class Permissions
     public const string FinanceAi = "finance.ai";
     public const string ChatAi = "chat.ai";
     public const string AiVision = "ai.vision";
+    /// <summary>"Ask that Acts": gates ONLY the propose step of the action-taking Ask box (the token spend) —
+    /// the AI answers over the caller's own snapshot AND proposes confirm-chip actions to approve. Mirrors the
+    /// <see cref="FamilyAiAssistant"/> precedent (an action-proposing AI capability) and the way
+    /// <see cref="TrackerAi"/> gates answering: the WRITE each action maps to stays gated by its own existing
+    /// permission (family.use/grocery.use/meals.use/tracker.self), checked at map time. IsAi=true, never
+    /// defaultable — granted deliberately, every account starts AI-off.</summary>
+    public const string AiAct = "ai.act";
 
     // ---- Automations ----
     /// <summary>Page-gate for the Automations builder + the <c>/api/automations</c> CRUD. A rule can carry the
@@ -140,7 +147,7 @@ public static class Permissions
     /// <summary>The six AI permission keys (group "AI"). NONE are defaultable.</summary>
     public static readonly string[] AiKeys =
     {
-        TrackerAi, FamilyAi, FamilyAiAssistant, FinanceAi, ChatAi, AiVision,
+        TrackerAi, FamilyAi, FamilyAiAssistant, FinanceAi, ChatAi, AiVision, AiAct,
     };
 
     /// <summary>The Location permission keys (GPS feature). NONE are defaultable.</summary>
@@ -216,6 +223,7 @@ public static class Permissions
         new PermissionInfo(FinanceAi, "AI", "Finance AI", "Use finance AI: the “where the money went” monthly explainer and the money-coach recurring-charge insights.", IsAi: true),
         new PermissionInfo(ChatAi, "AI", "Chat AI", "Use chat AI: catch-me-up summaries, smart replies, and the compose assistant.", IsAi: true),
         new PermissionInfo(AiVision, "AI", "Vision AI", "Use multimodal image/PDF AI: meal-photo and nutrition-label reading, and extracting events from a schedule image or PDF.", IsAi: true),
+        new PermissionInfo(AiAct, "AI", "Ask that Acts", "Let the Ask box propose actions to confirm alongside its answer (add a calendar event, grocery item, meal, tracker log, or family note/reminder/timer). Each action still needs the matching feature permission to run; nothing is written until you approve a chip.", IsAi: true),
     };
 
     public static readonly string[] All = Catalog.Select(p => p.Key).ToArray();

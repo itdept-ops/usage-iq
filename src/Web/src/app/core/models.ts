@@ -3709,6 +3709,66 @@ export interface AskResponse {
   domains: string[];
 }
 
+// ---- "Ask that Acts": /ask + PROPOSED confirm-chip actions the caller approves per-chip ----
+
+/**
+ * The POST /api/ai/ask-act request: just the caller's free-text `question` (treated strictly as DATA — the
+ * server never follows instructions inside it). Identity comes from the JWT, never the body. A superset of
+ * {@link AskRequest}. An empty question is guarded client-side (the server 400s on it).
+ */
+export interface ActAskRequest {
+  question: string;
+}
+
+/**
+ * The closed set of action TYPES "Ask that Acts" may propose. Each maps to ONE existing, already-gated write
+ * endpoint the SERVER re-derives by type (a model-emitted route is NEVER trusted) and the frontend calls on
+ * the user's confirm. Anything outside this set is dropped before it reaches the client. No finance write.
+ */
+export type AskActionType =
+  | 'calendar_event' | 'grocery_add' | 'meal' | 'goal_tweak' | 'tracker_log'
+  | 'reminder' | 'timer' | 'note';
+
+/** The closed tracker_log sub-kinds — each a distinct /api/tracker/{kind} write. Anything else is dropped. */
+export type AskActTrackerKind =
+  | 'food' | 'exercise' | 'hydration' | 'coffee' | 'weight' | 'supplement' | 'sleep';
+
+/**
+ * One PROPOSED confirm-chip action (mirrors the backend ActAskActionDto). `type` is one of the closed
+ * {@link AskActionType} set; `title` is a short human chip label; `endpoint` is SERVER-issued (re-derived
+ * from `type` server-side — NEVER a model-emitted route, NEVER trusted by us); `params` are the clamped,
+ * named values fed to the matching write on confirm. Nothing is written until the user approves the chip.
+ *
+ * Params per type (offset-less LOCAL wall-clock for all datetimes; "" = unset):
+ *  - calendar_event: { title, startLocal, endLocal, allDay, location, notes }
+ *  - grocery_add:    { items: string[] }
+ *  - meal:           { title, ingredients, mealDateLocal }
+ *  - goal_tweak:     { goal: 'lose'|'maintain'|'gain'|'', activityLevel: 'sedentary'|'light'|'moderate'|'active'|'very_active'|'', targetWeightKg: number (0 = unchanged) }
+ *  - tracker_log:    { kind: AskActTrackerKind, description, dateLocal }
+ *  - reminder:       { text, whenLocal }
+ *  - timer:          { label, durationSeconds }
+ *  - note:           { text }
+ */
+export interface AskActAction {
+  type: AskActionType;
+  title: string;
+  endpoint: string;
+  params: Record<string, unknown>;
+}
+
+/**
+ * The POST /api/ai/ask-act response (mirrors the backend ActAskResponse): a SUPERSET of {@link AskResponse}
+ * — the grounded `answer`, whether AI produced it (`aiUsed:false` ⇒ the deterministic plain floor), the
+ * `domains` the snapshot drew on, PLUS 0..N proposed `actions` the user confirms per-chip. When ai.act/AI is
+ * off (or on any parse-fail/floor) `actions` is empty and the shape is exactly today's answer-only Ask.
+ */
+export interface ActAskResponse {
+  answer: string;
+  aiUsed: boolean;
+  domains: string[];
+  actions: AskActAction[];
+}
+
 /**
  * "✨ What should I eat?" request (POST /api/ai/what-to-eat). Everything optional — on open we send an
  * empty body and the server reads the caller's own context. `craving`/`constraints` are a free-text refine
@@ -5213,6 +5273,9 @@ export const PERM = {
   platformMobile: 'platform.mobile',
   // ---- AI (group "AI"; token-spending; never default) ----
   trackerAi: 'tracker.ai',
+  /** "Ask that Acts" (group "AI"; token-spending; never default): gates ONLY the propose step — the AI may
+   *  suggest 0..N confirm-chip actions alongside its grounded answer; nothing writes until the user approves. */
+  aiAct: 'ai.act',
   familyAi: 'family.ai',
   familyAiAssistant: 'family.ai.assistant',
   financeAi: 'finance.ai',
@@ -5285,6 +5348,7 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   [PERM.sourcesManage]: 'Admin',
   // ---- AI ----
   [PERM.trackerAi]: 'AI',
+  [PERM.aiAct]: 'AI',
   [PERM.familyAi]: 'AI',
   [PERM.familyAiAssistant]: 'AI',
   [PERM.financeAi]: 'AI',

@@ -5,10 +5,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { firstValueFrom } from 'rxjs';
 
 import { Api } from '../../core/api';
-import { AskResponse } from '../../core/models';
+import { ActAskResponse, AskActAction } from '../../core/models';
 import { BetaPullRefresh, BetaToaster, ToastController } from '../beta-ui';
 
 import { AskComposer } from './composer/ask-composer';
+import { AskActions } from './ask-actions';
 
 /** One turn in the session-local Q&A thread (rendered as a question + answer bubble pair). */
 interface AskTurn {
@@ -22,6 +23,12 @@ interface AskTurn {
   aiUsed: boolean;
   /** Which domains the snapshot drew on — chips under the answer. */
   domains: string[];
+  /**
+   * 0..N PROPOSED confirm-chip actions for this answer ("Ask that Acts"). Empty when ai.act/AI is off (the
+   * answer-only floor) — the action stack then renders nothing, so the turn is exactly today's plain answer.
+   * NOTHING is written on propose; each chip writes only on its own click via the action child component.
+   */
+  actions: AskActAction[];
 }
 
 /** A seed prompt chip on the empty state — label + the question it asks. */
@@ -65,21 +72,24 @@ const DOMAIN_LABEL: Record<string, string> = {
  * ("Ask me anything about your life") + error states. Pull-to-refresh clears the thread; bubbles spring
  * in on a stagger.
  *
- * DATA PARITY: every answer comes from the SAME `Api.askMyLife` endpoint + `AskResponse` DTO the live
- * `/ask` page uses — the server assembles the perm-filtered, caller-scoped snapshot and answers strictly
- * from it (answer-only, never writes). The endpoint always returns 200 and floors to a deterministic plain
- * summary (`aiUsed:false`) when AI is off; we badge that plainly. A real network failure shows a gentle
- * inline error with retry — never a dead-end.
+ * ASK THAT ACTS: every answer comes from `Api.askAndAct` (POST /api/ai/ask-act) — a SUPERSET of the live
+ * `/ask` snapshot answer: the server assembles the SAME perm-filtered, caller-scoped snapshot, answers
+ * strictly from it, AND proposes 0..N confirm-chip ACTIONS the user approves per-chip (rendered by the
+ * `app-ask-actions` child under each answer bubble). NOTHING is written on propose; a chip writes only on
+ * its own click, via an EXISTING owner/household-scoped write. The endpoint always returns 200 and floors to
+ * a deterministic plain summary (`aiUsed:false`, `actions: []`) when AI/`ai.act` is off — so it degrades to
+ * exactly today's answer-only Ask. A real network failure shows a gentle inline error with retry.
  *
- * ISOLATION: gated by `platform.mobile` + `tracker.ai`; consumes the kit + the SAME read-only ask endpoint.
- * No live page is imported or modified; the flagship tracker-beta + the kit are consumed, never changed.
+ * ISOLATION: gated by `platform.mobile` + `tracker.ai` + `ai.act`; consumes the kit + the read-only-by-default
+ * ask-act endpoint (writes only on explicit per-chip confirm). No live page is imported or modified; the
+ * flagship tracker-beta + the kit are consumed, never changed.
  */
 @Component({
   selector: 'app-ask-beta',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ToastController],
-  imports: [MatIconModule, BetaPullRefresh, BetaToaster, AskComposer],
+  imports: [MatIconModule, BetaPullRefresh, BetaToaster, AskComposer, AskActions],
   templateUrl: './ask-beta.page.html',
   styleUrl: './ask-beta.page.scss',
 })
@@ -195,10 +205,13 @@ export class AskBetaPage {
     this.lastFailed = '';
     this.announce.set('Asking…');
     try {
-      const res: AskResponse = await firstValueFrom(this.api.askMyLife(q));
+      const res: ActAskResponse = await firstValueFrom(this.api.askAndAct(q));
       this.turns.update(t => [
         ...t,
-        { id: ++this.seq, question: q, answer: res.answer, aiUsed: res.aiUsed, domains: res.domains ?? [] },
+        {
+          id: ++this.seq, question: q, answer: res.answer, aiUsed: res.aiUsed,
+          domains: res.domains ?? [], actions: res.actions ?? [],
+        },
       ]);
       this.announce.set('Answer ready.');
     } catch {

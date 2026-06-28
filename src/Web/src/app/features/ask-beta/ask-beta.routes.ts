@@ -18,7 +18,11 @@ import { PERM } from '../../core/models';
 export const ASK_BETA_ROUTES: Routes = [
   {
     path: '',
-    canActivate: [permissionGuard(PERM.platformMobile), permissionGuard(PERM.trackerAi)],
+    canActivate: [
+      permissionGuard(PERM.platformMobile),
+      permissionGuard(PERM.trackerAi),
+      permissionGuard(PERM.aiAct),
+    ],
     loadComponent: () => import('./ask-beta.page').then(m => m.AskBetaPage),
     title: 'Usage IQ · Ask my life',
   },

@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, throwError } from 'rxjs';
+import { Observable, from, throwError } from 'rxjs';
+import { concatMap, last } from 'rxjs/operators';
 import {
   AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, UpdateFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatLocationShareDto, ChatMessageDto, ChatRepliesResult, StartLocationShareRequest, UpdateLocationShareRequest, ExtendLocationShareRequest, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
@@ -16,6 +17,7 @@ import {
   PlanMealsRequest, PlanMealsResult, PlanMealToWrite, PlanMealsToPlanResult,
   RefineMealRequest, RefineMealResponse,
   AskRequest, AskResponse,
+  ActAskRequest, ActAskResponse, AskActAction, AskActTrackerKind,
   VoiceParseRequest, VoiceParseResponse,
   CycleData, CyclePeriod, CycleNote, CycleSettings, CycleSettingsPatch, CycleOverlayMember,
   CycleDayLog, CycleDayLogPatch,
@@ -1090,6 +1092,187 @@ export class Api {
    */
   askMyLife(question: string): Observable<AskResponse> {
     return this.http.post<AskResponse>(`${this.base}/ai/ask`, { question } as AskRequest);
+  }
+
+  /**
+   * "ASK THAT ACTS" (POST /api/ai/ask-act): a SUPERSET of {@link askMyLife}. The server assembles the SAME
+   * perm-filtered, caller-scoped snapshot, answers from it, AND proposes 0..N confirm-chip `actions` the user
+   * approves per-chip (each carrying a SERVER-issued endpoint + clamped params). Gated tracker.ai + ai.act;
+   * rate-limited "ai". ALWAYS 200: AI off / ai.act off / unconfigured / parse-fail floors to the deterministic
+   * plain answer with `actions: []` — exactly today's answer-only Ask. Nothing is written here; a write only
+   * happens when the user confirms a chip, via {@link executeAskAction} (calendar_event/goal_tweak first open
+   * a prefilled review dialog in the page). A 400 is only returned for an empty question (guarded client-side).
+   */
+  askAndAct(question: string): Observable<ActAskResponse> {
+    return this.http.post<ActAskResponse>(`${this.base}/ai/ask-act`, { question } as ActAskRequest);
+  }
+
+  /**
+   * The FROZEN allow-list of "Ask that Acts" action types → the EXISTING write each maps to (mirrors the
+   * backend's `AskActEndpointFor`). {@link executeAskAction} re-validates `action.type` against this BEFORE
+   * invoking the matching Api.* write — so a tampered/unknown type is rejected client-side and we never aim a
+   * write at an arbitrary path (the write still re-gates server-side). `calendar_event` and `goal_tweak` are
+   * marked `dialog: true`: they must NOT be silently executed here — the page opens a PREFILLED review dialog
+   * and only then calls the underlying write ({@link createEvent} / {@link saveTrackerProfile}) on confirm.
+   */
+  static readonly ASK_ACTION_ENDPOINTS: Readonly<Record<AskActAction['type'], { endpoint: string; dialog: boolean }>> = {
+    calendar_event: { endpoint: '/api/family/events', dialog: true },
+    grocery_add:    { endpoint: '/api/grocery/items', dialog: false },
+    meal:           { endpoint: '/api/family/meals', dialog: false },
+    goal_tweak:     { endpoint: '/api/tracker/profile', dialog: true },
+    tracker_log:    { endpoint: '/api/tracker', dialog: false },
+    reminder:       { endpoint: '/api/family/quick-add', dialog: false },
+    timer:          { endpoint: '/api/family/timers', dialog: false },
+    note:           { endpoint: '/api/family/quick-add', dialog: false },
+  };
+
+  /** The closed tracker_log sub-kinds → their concrete /api/tracker/{kind} write (server-validated; re-checked here). */
+  private static readonly ASK_TRACKER_KINDS = new Set<AskActTrackerKind>([
+    'food', 'exercise', 'hydration', 'coffee', 'weight', 'supplement', 'sleep',
+  ]);
+
+  /**
+   * Execute ONE confirmed "Ask that Acts" action via the matching EXISTING owner/household-scoped write. The
+   * action's `type` is re-validated against the frozen {@link ASK_ACTION_ENDPOINTS} allow-list FIRST (mirrors
+   * {@link postVoiceIntent}) so an unknown/tampered type is rejected with NO request sent. The `dialog` types
+   * (calendar_event, goal_tweak) are NOT executed here — they require the page's prefilled review dialog, so
+   * calling this for them rejects (the page calls {@link createEvent}/{@link saveTrackerProfile} on confirm).
+   * Every body is built ONLY from the action's clamped `params` (the underlying write re-clamps + re-gates).
+   */
+  executeAskAction(action: AskActAction): Observable<unknown> {
+    const allow = Api.ASK_ACTION_ENDPOINTS[action.type];
+    if (!allow) return throwError(() => new Error('Unsupported action.'));
+    if (allow.dialog) {
+      return throwError(() => new Error('This action needs a review dialog (handle it in the page).'));
+    }
+    const p = action.params ?? {};
+    switch (action.type) {
+      case 'grocery_add': {
+        const items = Api.asStringList(p['items']);
+        if (items.length === 0) return throwError(() => new Error('Nothing to add.'));
+        // The Groceries endpoint adds one item per call (find-or-create + de-dupe); chain them.
+        return from(items).pipe(
+          concatMap(text => this.groceryAddItem(text)),
+          last(),
+        );
+      }
+      case 'meal': {
+        const title = Api.asStr(p['title']);
+        if (!title) return throwError(() => new Error('No meal title.'));
+        const date = Api.localDateOf(Api.asStr(p['mealDateLocal'])) || Api.todayLocalDate();
+        const ingredients = Api.asStr(p['ingredients']);
+        return this.createFamilyMeal({
+          localDate: date, slot: 'dinner', title,
+          ingredients: ingredients || undefined,
+        });
+      }
+      case 'tracker_log':
+        return this.execTrackerLog(p);
+      case 'reminder': {
+        const text = Api.asStr(p['text']);
+        if (!text) return throwError(() => new Error('No reminder text.'));
+        // quick-add files it as the right item; the time phrase rides inside the text when present.
+        const when = Api.asStr(p['whenLocal']);
+        return this.quickAdd(when ? `${text} ${when}` : text, 'reminder');
+      }
+      case 'timer': {
+        const seconds = Math.max(5, Math.min(86400, Math.round(Api.asNum(p['durationSeconds']) || 0)));
+        if (seconds < 5) return throwError(() => new Error('Invalid timer.'));
+        return this.createFamilyTimer({ label: Api.asStr(p['label']) || 'Timer', durationSeconds: seconds });
+      }
+      case 'note': {
+        const text = Api.asStr(p['text']);
+        if (!text) return throwError(() => new Error('No note text.'));
+        return this.quickAdd(text, 'note');
+      }
+      default:
+        return throwError(() => new Error('Unsupported action.'));
+    }
+  }
+
+  /** tracker_log → the right /api/tracker/{kind} write. `kind` is re-validated against the frozen set first. */
+  private execTrackerLog(p: Record<string, unknown>): Observable<unknown> {
+    const kind = Api.asStr(p['kind']).toLowerCase() as AskActTrackerKind;
+    if (!Api.ASK_TRACKER_KINDS.has(kind)) return throwError(() => new Error('Unsupported log type.'));
+    const description = Api.asStr(p['description']);
+    if (!description) return throwError(() => new Error('Nothing to log.'));
+    const date = Api.localDateOf(Api.asStr(p['dateLocal'])) || Api.todayLocalDate();
+    switch (kind) {
+      case 'food':
+        // A MANUAL food log: a description with zeroed macros (no provider/fdcId → auto-saved to "My foods").
+        return this.addFood({
+          date, meal: 'snack', description, quantity: 1,
+          calories: 0, proteinG: 0, carbG: 0, fatG: 0,
+        });
+      case 'exercise':
+        return this.addExercise({ date, name: description });
+      case 'supplement':
+        return this.addSupplement({ date, name: description });
+      case 'coffee':
+        // One cup with the free-text as its label (server clamps cups 1..20).
+        return this.addCoffee({ date, cups: 1, label: description.slice(0, 64) });
+      case 'hydration':
+        // A default glass (250 ml) labelled by the description (server clamps 1..5000 ml).
+        return this.addHydration({ date, amountMl: 250, label: description.slice(0, 64) });
+      case 'weight': {
+        const kg = Api.firstNumberIn(description);
+        if (kg == null) return throwError(() => new Error('No weight value found.'));
+        return this.logWeight({ date, weightKg: Math.max(1, Math.min(1000, kg)) });
+      }
+      case 'sleep': {
+        const hours = Api.firstNumberIn(description);
+        if (hours == null) return throwError(() => new Error('No sleep hours found.'));
+        return this.addSleep({ date, hours: Math.max(0, Math.min(24, hours)), note: description });
+      }
+    }
+  }
+
+  // ---- "Ask that Acts" param coercion helpers (the params come off the wire as unknown) ----
+
+  /** Coerce an unknown param to a trimmed string ("" when null/undefined/non-stringable). */
+  private static asStr(v: unknown): string {
+    return typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim();
+  }
+
+  /** Coerce an unknown param to a finite number (0 when not numeric). */
+  private static asNum(v: unknown): number {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /** Coerce an unknown param to a de-duped, non-empty string[] (caps at 30 to mirror the server). */
+  private static asStringList(v: unknown): string[] {
+    if (!Array.isArray(v)) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of v) {
+      const s = Api.asStr(raw);
+      const key = s.toLowerCase();
+      if (s && !seen.has(key)) { seen.add(key); out.push(s); if (out.length >= 30) break; }
+    }
+    return out;
+  }
+
+  /** A bare local date ("yyyy-MM-dd") from an offset-less local ISO string (date or datetime), or "" if unparseable. */
+  private static localDateOf(local: string): string {
+    const s = (local || '').trim();
+    if (s.length < 8) return '';
+    return s.slice(0, 10);
+  }
+
+  /** Today's local "yyyy-MM-dd" (browser zone). */
+  private static todayLocalDate(): string {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  /** The first number embedded in a free-text string (e.g. "82.5 kg" → 82.5), or null when none. */
+  private static firstNumberIn(text: string): number | null {
+    const m = (text || '').match(/-?\d+(?:\.\d+)?/);
+    if (!m) return null;
+    const n = Number(m[0]);
+    return Number.isFinite(n) ? n : null;
   }
 
   /** Quick verdict + healthier swaps on a free-text meal. */
