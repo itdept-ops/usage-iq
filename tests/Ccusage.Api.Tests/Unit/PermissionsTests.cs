@@ -21,7 +21,7 @@ public class PermissionsTests
         "bills.use", "recipes.use", "grocery.use", "meals.use", "resume.use",
         "family.use", "family.finance", "cycle.track", "chore.claim", "allowance.manage", "identity.map",
         "location.self", "location.share", "location.view-all",
-        "automations.use", "agents.use",
+        "automations.use", "agents.use", "search.use",
         "platform.mobile",
         "users.view", "users.manage", "activity.view", "ai.usage.view",
         "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision", "ai.act",
@@ -64,6 +64,7 @@ public class PermissionsTests
     [InlineData("location.view-all")]
     [InlineData("automations.use")]
     [InlineData("agents.use")]
+    [InlineData("search.use")]
     [InlineData("platform.mobile")]
     [InlineData("users.view")]
     [InlineData("users.manage")]
@@ -133,6 +134,7 @@ public class PermissionsTests
         Permissions.LocationViewAll.Should().Be("location.view-all");
         Permissions.AutomationsUse.Should().Be("automations.use");
         Permissions.AgentsUse.Should().Be("agents.use");
+        Permissions.SearchUse.Should().Be("search.use");
         Permissions.PlatformMobile.Should().Be("platform.mobile");
         Permissions.UsersView.Should().Be("users.view");
         Permissions.UsersManage.Should().Be("users.manage");
@@ -148,9 +150,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_fifty_one_known_keys()
+    public void All_contains_exactly_the_fifty_two_known_keys()
     {
-        Permissions.All.Should().HaveCount(51);
+        Permissions.All.Should().HaveCount(52);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -161,9 +163,26 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_fifty_one_entries()
+    public void Catalog_has_fifty_two_entries()
     {
-        Permissions.Catalog.Should().HaveCount(51);
+        Permissions.Catalog.Should().HaveCount(52);
+    }
+
+    [Fact]
+    public void SearchUse_is_in_the_Tools_group_non_ai_a_page_gate_defaultable_and_in_the_admin_member_and_viewer_presets()
+    {
+        // search.use gates the /search page + GET /api/search. It is a PAGE gate that grants NO data on its
+        // own (every result is re-gated by its own domain perm), so unlike the other Tools page-gates it IS
+        // defaultable — the box is harmless without the underlying data grants. It is NOT an AI key and not a
+        // *.view, and it ships in the family-member + viewer presets (and the administrator full catalog).
+        Permissions.Catalog.Single(p => p.Key == Permissions.SearchUse).Group.Should().Be("Tools");
+        Permissions.Catalog.Single(p => p.Key == Permissions.SearchUse).IsAi.Should().BeFalse();
+        Permissions.IsAi(Permissions.SearchUse).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.SearchUse).Should().BeTrue();
+        Permissions.Views.Should().NotContain(Permissions.SearchUse);
+        Permissions.Presets.Single(p => p.Key == "administrator").Permissions.Should().Contain(Permissions.SearchUse);
+        Permissions.Presets.Single(p => p.Key == "family-member").Permissions.Should().Contain(Permissions.SearchUse);
+        Permissions.Presets.Single(p => p.Key == "viewer").Permissions.Should().Contain(Permissions.SearchUse);
     }
 
     [Fact]

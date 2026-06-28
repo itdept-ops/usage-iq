@@ -39,6 +39,7 @@ import {
   ResumeState, ResumeDto, ResumeApplicationDto, ResumeData, ResumeSaveRequest, ParseResumeRequest,
   HeadshotRequest, NewApplicationRequest, ApplicationSaveRequest, TailorRequest, CoverLetterRequest,
   RefineRequest, ResumeChatRequest,
+  SearchResponse,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -2782,6 +2783,22 @@ export class Api {
    */
   familyAssistant(message: string): Observable<FamilyAssistantResult> {
     return this.http.post<FamilyAssistantResult>(`${this.base}/family/assistant`, { message });
+  }
+
+  // ---- Search Everything (GET /api/search) ----
+
+  /**
+   * "Search Everything": query every domain the caller can see in one shot. The endpoint unions hits
+   * server-side, permission-checks + scopes each one to what the caller may view, and returns typed results
+   * that deep-link into existing pages. `domains` (optional) is a comma-joined subset of the domain tokens to
+   * restrict to; omit for all. Gated by `search.use` (a page-gate only — every result is independently
+   * re-gated by its own domain's permission). Min query length 2; the caller should debounce.
+   */
+  search(q: string, domains?: readonly string[], limit?: number): Observable<SearchResponse> {
+    let params = new HttpParams().set('q', q);
+    if (domains && domains.length) params = params.set('domains', domains.join(','));
+    if (limit != null) params = params.set('limit', String(limit));
+    return this.http.get<SearchResponse>(`${this.base}/search`, { params });
   }
 
   // ---- Web Push (PWA background notifications) ----

@@ -35,7 +35,36 @@
               </button>
             }
           }
-        } @else {
+        }
+
+        <!-- Search your life — a debounced /api/search section below the command matches -->
+        @if (showSearch()) {
+          <div class="cmdp__group-head cmdp__group-head--search" role="presentation">
+            Search your life
+            @if (searchLoading()) { <span class="cmdp__spin" aria-label="Searching"></span> }
+          </div>
+          @for (row of searchRows(); track row.item.domain + row.item.id; let si = $index) {
+            @let idx = searchOffset() + si;
+            <button type="button" class="cmdp__row cmdp__row--search" [attr.data-index]="idx"
+                    [id]="'cmdp-opt-' + idx" role="option" [attr.aria-selected]="idx === activeIndex()"
+                    [class.cmdp__row--active]="idx === activeIndex()"
+                    (mouseenter)="activeIndex.set(idx)" (click)="runAt(idx)">
+              <mat-icon class="cmdp__row-icon" aria-hidden="true">{{ row.icon }}</mat-icon>
+              <span class="cmdp__row-main">
+                <span class="cmdp__row-label">{{ row.item.title }}</span>
+                @if (row.item.snippet) {
+                  <span class="cmdp__row-snippet">{{ row.item.snippet }}</span>
+                }
+              </span>
+              <span class="cmdp__row-group" aria-hidden="true">{{ row.domainLabel }}</span>
+            </button>
+          }
+          @if (!searchLoading() && searchRows().length === 0) {
+            <div class="cmdp__search-empty" role="status">No results in your data.</div>
+          }
+        }
+
+        @if (!hasResults() && !showSearch()) {
           <div class="cmdp__empty" role="status">
             <mat-icon class="cmdp__empty-icon" aria-hidden="true">search_off</mat-icon>
             <span>No commands match “{{ query() }}”.</span>

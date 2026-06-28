@@ -12,14 +12,29 @@ import {
 import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 
+import { firstValueFrom } from 'rxjs';
+
 import { AuthService } from '../../core/auth';
+import { Api } from '../../core/api';
 import { CommandPaletteService } from '../../core/command-palette';
 import { COMMAND_DEFS, CommandDef, scoreCommand } from '../../core/command-registry';
+import { PERM, SearchResultItem } from '../../core/models';
+import { metaFor } from '../../core/search-meta';
 
 /** A command resolved for display: the def plus its computed fuzzy score for the active query. */
 interface ScoredCommand extends CommandDef {
   score: number;
 }
+
+/** One "Search your life" row in the palette (a /api/search hit + its resolved icon). */
+interface SearchRow {
+  item: SearchResultItem;
+  icon: string;
+  domainLabel: string;
+}
+
+const SEARCH_DEBOUNCE_MS = 250;
+const SEARCH_MIN_QUERY = 2;
 
 /** A rendered section: a group header + its (flat-indexed) rows, used to draw the grouped list. */
 interface CommandGroup {
@@ -50,6 +65,7 @@ const GROUP_ORDER: readonly CommandDef['group'][] = ['Actions', 'Go to', 'Accoun
 })
 export class CommandPalette {
   private readonly auth = inject(AuthService);
+  private readonly api = inject(Api);
   private readonly palette = inject(CommandPaletteService);
   private readonly router = inject(Router);
   private readonly host = inject(ElementRef<HTMLElement>);
@@ -105,8 +121,57 @@ export class CommandPalette {
     return out;
   });
 
-  /** The same rows as {@link groups} but flattened — the keyboard cursor indexes into this. */
-  readonly flat = computed<ScoredCommand[]>(() => this.groups().flatMap((g) => g.items));
+  /** The command rows flattened (the command portion of the keyboard cursor range). */
+  private readonly flatCommands = computed<ScoredCommand[]>(() => this.groups().flatMap((g) => g.items));
+
+  // ---- "Search your life" — a debounced /api/search section below the command matches ----
+
+  /** Whether the caller may search at all (the `search.use` page-gate); search is hidden otherwise. */
+  private readonly canSearch = computed(() => {
+    this.auth.permissions();
+    return this.auth.hasPermission(PERM.searchUse);
+  });
+
+  /** The /api/search hits for the active (debounced) query. Cleared on close / short query. */
+  private readonly searchHits = signal<SearchResultItem[]>([]);
+  /** True while a /api/search request is in flight. */
+  readonly searchLoading = signal(false);
+  /** The query the current `searchHits` are for (so a stale response can be ignored). */
+  private readonly searchRanQuery = signal('');
+  /** Monotonic token so a slower /api/search response can't overwrite a newer one. */
+  private searchSeq = 0;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** The search rows to render (resolved icon + domain label per hit). */
+  readonly searchRows = computed<SearchRow[]>(() =>
+    this.searchHits().map((item) => {
+      const meta = metaFor(item.domain);
+      return { item, icon: meta.icon, domainLabel: meta.label };
+    }),
+  );
+
+  /** Whether the "Search your life" section should render (can search + a long-enough query). */
+  readonly showSearch = computed(
+    () => this.canSearch() && this.query().trim().length >= SEARCH_MIN_QUERY,
+  );
+
+  /**
+   * The full keyboard-navigable list: command rows first, then the search rows. The cursor (`activeIndex`)
+   * indexes into THIS, so ↑/↓ flows from the last command straight into the search results and Enter runs
+   * whichever kind the cursor is on.
+   */
+  readonly flat = computed<(ScoredCommand | SearchRow)[]>(() => {
+    const cmds = this.flatCommands();
+    return this.showSearch() ? [...cmds, ...this.searchRows()] : cmds;
+  });
+
+  /** The flat index at which the search rows begin (= command count), for template index mapping. */
+  readonly searchOffset = computed(() => this.flatCommands().length);
+
+  /** Type guard the template uses to tell a search row from a command row. */
+  isSearchRow(row: ScoredCommand | SearchRow): row is SearchRow {
+    return (row as SearchRow).item !== undefined;
+  }
 
   /** The flat index of the first row of each group, so the template can map a row to its global index. */
   readonly groupOffsets = computed<number[]>(() => {
@@ -122,13 +187,17 @@ export class CommandPalette {
   readonly hasResults = computed(() => this.flat().length > 0);
 
   constructor() {
-    // On open: reset query/cursor, remember the focus origin, and move focus into the search field.
+    // On open: reset query/cursor + clear any prior search, remember the focus origin, and move focus
+    // into the search field. On close, also clear the search results so they don't flash on re-open.
     effect(() => {
       if (this.visible()) {
         this.query.set('');
         this.activeIndex.set(0);
+        this.resetSearch();
         this.returnFocusEl = document.activeElement as HTMLElement | null;
         requestAnimationFrame(() => this.searchInput()?.nativeElement.focus());
+      } else {
+        this.resetSearch();
       }
     });
     // Keep the cursor in range whenever the result set shrinks (typing narrows the list).
@@ -145,6 +214,48 @@ export class CommandPalette {
   onQueryInput(value: string): void {
     this.query.set(value);
     this.activeIndex.set(0);
+    this.scheduleSearch(value);
+  }
+
+  /** (Re)arm the debounced /api/search for the current query (no-op when the caller can't search). */
+  private scheduleSearch(value: string): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    const q = value.trim();
+    if (!this.canSearch() || q.length < SEARCH_MIN_QUERY) {
+      this.searchHits.set([]);
+      this.searchRanQuery.set('');
+      this.searchLoading.set(false);
+      return;
+    }
+    this.searchLoading.set(true);
+    this.searchTimer = setTimeout(() => void this.runSearch(q), SEARCH_DEBOUNCE_MS);
+  }
+
+  /** Run a /api/search now; a monotonic token drops stale (slower) responses. */
+  private async runSearch(q: string): Promise<void> {
+    const seq = ++this.searchSeq;
+    this.searchLoading.set(true);
+    try {
+      const res = await firstValueFrom(this.api.search(q));
+      if (seq !== this.searchSeq) return;
+      this.searchHits.set(res.results);
+      this.searchRanQuery.set(q);
+    } catch {
+      if (seq !== this.searchSeq) return;
+      this.searchHits.set([]);
+    } finally {
+      if (seq === this.searchSeq) this.searchLoading.set(false);
+    }
+  }
+
+  /** Clear all "Search your life" state (on open/close + when the query drops below the threshold). */
+  private resetSearch(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = null;
+    this.searchSeq++;
+    this.searchHits.set([]);
+    this.searchRanQuery.set('');
+    this.searchLoading.set(false);
   }
 
   /** Map a (group, local) cell to its global flat index — used for hover highlight + click run. */
@@ -160,14 +271,19 @@ export class CommandPalette {
     if (el && document.contains(el)) requestAnimationFrame(() => el.focus());
   }
 
-  /** Run the command at the given flat index (Enter or click), record it as recent, then close. */
+  /** Run the row at the given flat index (Enter or click): a search hit deep-links; a command dispatches. */
   runAt(index: number): void {
-    const cmd = this.flat()[index];
-    if (!cmd) return;
-    this.remember(cmd.id);
+    const row = this.flat()[index];
+    if (!row) return;
     this.close();
+    if (this.isSearchRow(row)) {
+      const link = row.item.deepLink;
+      queueMicrotask(() => void this.router.navigateByUrl(link));
+      return;
+    }
+    this.remember(row.id);
     // Defer the side-effect a tick so close()/focus-restore settle before navigation/dialog open.
-    queueMicrotask(() => this.dispatch(cmd));
+    queueMicrotask(() => this.dispatch(row));
   }
 
   private dispatch(cmd: CommandDef): void {

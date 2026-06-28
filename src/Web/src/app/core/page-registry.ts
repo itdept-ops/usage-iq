@@ -215,6 +215,13 @@ export const PAGE_REGISTRY: readonly PageDef[] = [
     nav: { group: 'Tools', label: 'Resume Builder', icon: 'description' },
     home: { label: 'Resume Builder', icon: 'description' },
   },
+  {
+    id: 'search', path: 'search', title: 'Usage IQ · Search', perm: PERM.searchUse,
+    desktop: () => import('../features/search/search').then(m => m.Search),
+    mobile: () => import('../features/search-mobile/search-mobile.page').then(m => m.SearchMobilePage),
+    nav: { group: 'Tools', label: 'Search', icon: 'search' },
+    home: { label: 'Search', icon: 'search' },
+  },
 
   // ---- Social ----
   {

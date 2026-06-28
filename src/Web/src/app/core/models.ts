@@ -5289,6 +5289,53 @@ export interface ClaimItemRequest {
   name?: string;
 }
 
+// ============================================================================
+// Search Everything (GET /api/search) — typed mirror of Ccusage.Api.Dtos.
+// ============================================================================
+
+/**
+ * One typed hit from "Search Everything". Every field is already permission-checked + scoped to what the
+ * caller may view in its source domain; people are surfaced via display name + AppUser id, never an email,
+ * and sensitive fields (health-log content, finance amounts, location coordinates) never reach a snippet.
+ * Mirror of {@code SearchResultItem} (src/Api/Dtos/SearchDtos.cs).
+ */
+export interface SearchResultItem {
+  /** Stable per-row kind token the UI keys an icon/label off (e.g. "recipe", "chat", "note", "person"). */
+  type: string;
+  /** The result's identity WITHIN its domain, stringified (a person is the AppUser id). Never an email. */
+  id: string;
+  /** Primary line — already display-safe (a person's name is DisplayName.Format'd). */
+  title: string;
+  /** Short, sensitive-field-free secondary line (a redacted body excerpt, etc.); may be null. */
+  snippet: string | null;
+  /** Optional context line (e.g. the channel name, the list kind); may be null. */
+  subtitle: string | null;
+  /** App-relative route that opens the result in its existing page (always starts with '/'). */
+  deepLink: string;
+  /** The domain bucket this hit belongs to (matches a key in {@link SearchResponse.countsByDomain}). */
+  domain: string;
+  /** Coarse relevance hint (higher = stronger). Advisory only. */
+  scoreHint: number;
+  /** Optional timestamp for the row (created/updated), for recency labels; ISO string or null. */
+  whenUtc: string | null;
+}
+
+/**
+ * The "Search Everything" response: the echoed query, the unioned + permission-scoped results, a per-domain
+ * count (so the UI can render filter chips with totals), and whether any domain hit its per-domain cap.
+ * Mirror of {@code SearchResponse} (src/Api/Dtos/SearchDtos.cs).
+ */
+export interface SearchResponse {
+  /** The normalized query that was run (trimmed). */
+  query: string;
+  /** All hits across every domain the caller could see, capped overall. */
+  results: SearchResultItem[];
+  /** domain → number of returned results in that domain. */
+  countsByDomain: Record<string, number>;
+  /** True when at least one domain returned its per-domain limit (more may exist). */
+  truncated: boolean;
+}
+
 /** Canonical permission keys (mirror of the backend catalog). */
 export const PERM = {
   dashboardView: 'dashboard.view',
@@ -5347,6 +5394,9 @@ export const PERM = {
   mealsUse: 'meals.use',
   /** Resume Builder (group "Tools"; page-gate): build/parse/tailor resumes + cover letters with AI. Private, never default. */
   resumeUse: 'resume.use',
+  /** Search Everything (group "Tools"; PAGE-GATE only — grants NO data; every result is independently re-gated
+   *  by its own domain's permission). Defaultable. */
+  searchUse: 'search.use',
   // ---- Platform (the mobile-app gate; group "Platform"; never default) ----
   platformMobile: 'platform.mobile',
   // ---- AI (group "AI"; token-spending; never default) ----
@@ -5399,6 +5449,7 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   [PERM.recipesUse]: 'Tools',
   [PERM.mealsUse]: 'Tools',
   [PERM.resumeUse]: 'Tools',
+  [PERM.searchUse]: 'Tools',
   // ---- Platform (the mobile-app gate) ----
   [PERM.platformMobile]: 'Platform',
   // ---- Family ----

@@ -125,6 +125,53 @@
   white-space: nowrap;
 }
 
+/* Search rows: a two-line cell (title + snippet) so a hit reads like its source page. */
+.cmdp__group-head--search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: var(--tech-space-1);
+  border-top: 1px solid var(--tech-border);
+  padding-top: var(--tech-space-3);
+}
+
+.cmdp__row--search .cmdp__row-icon { color: var(--tech-text-secondary); }
+
+.cmdp__row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+
+  .cmdp__row-label { flex: 0 0 auto; }
+}
+
+.cmdp__row-snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  color: var(--tech-text-secondary);
+}
+
+.cmdp__spin {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+  border-top-color: var(--tech-accent);
+  animation: cmdp-spin 0.7s linear infinite;
+}
+
+.cmdp__search-empty {
+  padding: var(--tech-space-3) var(--tech-space-3);
+  font-size: 0.8rem;
+  color: var(--tech-text-tertiary);
+}
+
+@keyframes cmdp-spin { to { transform: rotate(360deg); } }
+
 .cmdp__row-group {
   flex: none;
   font-size: 0.7rem;
@@ -191,4 +238,5 @@
   .cmdp,
   .cmdp__panel { animation: none; }
   .cmdp__row { transition: none; }
+  .cmdp__spin { animation: none; }
 }

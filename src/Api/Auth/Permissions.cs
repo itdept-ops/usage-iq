@@ -130,6 +130,14 @@ public static class Permissions
     /// Not a *.view (a page gate, like <see cref="TrackerSelf"/>).</summary>
     public const string AutomationsUse = "automations.use";
 
+    /// <summary>Page-gate for "Search Everything" (the <c>/search</c> page + <c>GET /api/search</c>): one box that
+    /// queries every domain the caller can see and unions the hits server-side. This key is a PAGE-GATE ONLY — it
+    /// grants access to NO data on its own; every result is independently re-gated by its own domain's permission
+    /// (a recipe hit needs recipes.use, a chat hit needs chat.read, etc.), so a caller holding only search.use sees
+    /// an empty result set. Defaultable (group "Tools") + included in the family-member and viewer presets — the
+    /// box is harmless without the underlying data grants. Not a *.view (a page gate, like <see cref="AutomationsUse"/>).</summary>
+    public const string SearchUse = "search.use";
+
     /// <summary>Page-gate for the Proactive Agents settings page + the <c>/api/agents</c> CRUD. Gates per-user
     /// server-side agents that run on a cadence and ACT/NUDGE (morning briefing, streak rescue, budget alert,
     /// low staples), delivered via the bell + opt-in web-push. Granted deliberately — never default. The AI
@@ -212,6 +220,7 @@ public static class Permissions
         // ---- Tools (continued) ----
         new PermissionInfo(AutomationsUse, "Tools", "Use Automations", "Create rules that react to your own activity and notify you in-app or to your own Discord webhook."),
         new PermissionInfo(AgentsUse, "Tools", "Use Proactive Agents", "Turn on per-agent assistants that run on a schedule and nudge you (morning briefing, streak rescue, budget alert, low staples) in your notification bell and on opt-in web push."),
+        new PermissionInfo(SearchUse, "Tools", "Use Search Everything", "Search across everything you can already see — recipes, your tracker, family notes/lists/meals/chores, chat, automations, bills, and people — from one box. It only ever surfaces data you already have access to."),
 
         // ---- Platform (the mobile-app gate) ----
         new PermissionInfo(PlatformMobile, "Platform", "Mobile app (beta)", "Use the mobile app — the mobile-first UI of every page on a phone. Off by default; the desktop UI needs no grant."),
@@ -273,6 +282,8 @@ public static class Permissions
                 ChatRead, ChatSend,
                 TrackerSelf,
                 CalendarView, DashboardView,
+                // Search Everything (a page gate; harmless — every result re-gated by its own domain perm).
+                SearchUse,
                 // AI (the full member gets the lot)
                 TrackerAi, FamilyAi, FamilyAiAssistant, FinanceAi, ChatAi, AiVision,
             }),
@@ -294,8 +305,8 @@ public static class Permissions
             new[] { TrackerSelf, ChatRead }),
 
         new PermissionPreset("viewer", "Viewer",
-            "Read-only usage: the dashboard, their own reporter keys, and share links.",
-            new[] { DashboardView, ReporterSelf, SharesView }),
+            "Read-only usage: the dashboard, their own reporter keys, share links, and the search box.",
+            new[] { DashboardView, ReporterSelf, SharesView, SearchUse }),
     };
 
     /// <summary>

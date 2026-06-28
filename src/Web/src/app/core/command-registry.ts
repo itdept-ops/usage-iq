@@ -53,6 +53,7 @@ export const COMMAND_DEFS: readonly CommandDef[] = [
   { id: 'nav-automations', label: 'Automations', group: 'Go to', icon: 'bolt', route: '/automations', perm: [PERM.automationsUse], keywords: ['rules', 'triggers', 'webhook', 'discord', 'notify'] },
   { id: 'nav-agents', label: 'Agents', group: 'Go to', icon: 'smart_toy', route: '/agents', perm: [PERM.agentsUse], keywords: ['agent', 'briefing', 'streak', 'budget', 'staples', 'nudge', 'schedule', 'proactive'] },
   { id: 'nav-bills', label: 'Bill Splitter', group: 'Go to', icon: 'receipt_long', route: '/bills', perm: [PERM.billsUse], keywords: ['bill', 'split', 'receipt', 'expense'] },
+  { id: 'nav-search', label: 'Search everything', group: 'Go to', icon: 'search', route: '/search', perm: [PERM.searchUse], keywords: ['find', 'search', 'lookup', 'everything'] },
   { id: 'nav-beta', label: 'Beta', group: 'Go to', icon: 'science', route: '/beta', perm: [PERM.platformMobile], keywords: ['experimental'] },
   { id: 'nav-family', label: 'Family', group: 'Go to', icon: 'cottage', route: '/family', perm: [PERM.familyUse], keywords: ['hub', 'household'] },
   { id: 'nav-chat', label: 'Chat', group: 'Go to', icon: 'forum', route: '/chat', perm: [PERM.chatRead], keywords: ['message', 'dm'] },

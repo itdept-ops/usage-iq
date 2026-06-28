@@ -374,6 +374,11 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy(TrackerEndpoints.GifRateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: http.User.FindFirst("email")?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 30, QueueLimit = 0 }));
+    // "Search Everything" fans out across every domain per query; cap per-email (~30/min) so the box can't be
+    // used to hammer the DB with cross-domain scans.
+    o.AddPolicy(SearchEndpoints.RateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: http.User.FindFirst("email")?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 30, QueueLimit = 0 }));
 });
 
 var app = builder.Build();
@@ -538,6 +543,7 @@ app.MapChatEndpoints();
 app.MapChatLocationShareEndpoints();
 app.MapContactsEndpoints();
 app.MapPeopleEndpoints();
+app.MapSearchEndpoints();
 app.MapNudgeEndpoints();
 app.MapInboxEndpoints();
 app.MapPushEndpoints();

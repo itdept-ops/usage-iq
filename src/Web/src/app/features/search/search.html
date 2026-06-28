@@ -1,0 +1,124 @@
+<div class="search">
+  <!-- ─────────────────────────── header ─────────────────────────── -->
+  <header class="search__head">
+    <span class="search__glyph" aria-hidden="true"><mat-icon>search</mat-icon></span>
+    <div class="search__id">
+      <h1 class="search__title">Search everything</h1>
+      <p class="search__sub">
+        One box across your recipes, meals, notes, lists, chores, messages, people, bills and more —
+        you only ever see what you're allowed to.
+      </p>
+    </div>
+  </header>
+
+  <!-- ─────────────────────────── search box ─────────────────────────── -->
+  <form class="search__box" (submit)="submit(); $event.preventDefault()" role="search">
+    <mat-icon class="search__box-ic" aria-hidden="true">search</mat-icon>
+    <input class="search__input" type="search" name="q" [value]="query()"
+           (input)="onInput($any($event.target).value)"
+           placeholder="Search your life…  (e.g. a recipe, a person, a note)"
+           autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+           aria-label="Search everything" />
+    @if (loading()) {
+      <span class="search__spin" aria-label="Searching"></span>
+    }
+  </form>
+
+  <!-- ─────────────────────────── filter chips ─────────────────────────── -->
+  @if (searched() && chips().length) {
+    <div class="search__chips" role="group" aria-label="Filter by type">
+      <button type="button" class="search__chip" [class.is-on]="activeDomain() === null"
+              (click)="setDomain(null)">
+        All <span class="search__chip-n">{{ totalCount() }}</span>
+      </button>
+      @for (c of chips(); track c.meta.key) {
+        <button type="button" class="search__chip" [class.is-on]="activeDomain() === c.meta.key"
+                (click)="setDomain(c.meta.key)">
+          <mat-icon aria-hidden="true">{{ c.meta.icon }}</mat-icon>
+          {{ c.meta.label }} <span class="search__chip-n">{{ c.count }}</span>
+        </button>
+      }
+    </div>
+  }
+
+  <!-- ─────────────────────────── body ─────────────────────────── -->
+  @if (errored()) {
+    <div class="search__state">
+      <mat-icon class="search__state-ic" aria-hidden="true">error_outline</mat-icon>
+      <h2 class="search__state-title">Something went wrong</h2>
+      <p class="search__state-body">We couldn't run that search. Try again in a moment.</p>
+    </div>
+
+  } @else if (tooShort()) {
+    <div class="search__state">
+      <mat-icon class="search__state-ic" aria-hidden="true">keyboard</mat-icon>
+      <p class="search__state-body">Keep typing — at least 2 characters.</p>
+    </div>
+
+  } @else if (!searched()) {
+    <!-- pristine intro: what you can search -->
+    <div class="search__state search__state--intro">
+      <mat-icon class="search__state-ic" aria-hidden="true">travel_explore</mat-icon>
+      <h2 class="search__state-title">Search across everything you can see</h2>
+      <p class="search__state-body">
+        Start typing above. Results are grouped by where they live and link straight to the page that owns
+        them. Health, exact amounts and locations are never shown here.
+      </p>
+      <div class="search__domains" aria-hidden="true">
+        @for (d of domains; track d.key) {
+          <span class="search__domain"><mat-icon>{{ d.icon }}</mat-icon> {{ d.label }}</span>
+        }
+      </div>
+    </div>
+
+  } @else if (totalCount() === 0) {
+    <div class="search__state">
+      <mat-icon class="search__state-ic" aria-hidden="true">search_off</mat-icon>
+      <h2 class="search__state-title">No matches</h2>
+      <p class="search__state-body">Nothing you can see matches “{{ query() }}”. Try a different word.</p>
+    </div>
+
+  } @else {
+    <div class="search__results" aria-live="polite">
+      @for (g of groups(); track g.meta.key) {
+        <section class="search__group">
+          <div class="search__group-head">
+            <mat-icon class="search__group-ic" aria-hidden="true">{{ g.meta.icon }}</mat-icon>
+            <h2 class="search__group-title">{{ g.meta.label }}</h2>
+            <span class="search__group-n">{{ g.items.length }}</span>
+          </div>
+
+          <ul class="search__list" role="list">
+            @for (r of g.items; track r.domain + r.id) {
+              <li>
+                <button type="button" class="search__row" (click)="open(r)">
+                  <mat-icon class="search__row-ic" aria-hidden="true">{{ g.meta.icon }}</mat-icon>
+                  <span class="search__row-main">
+                    <span class="search__row-title">{{ r.title }}</span>
+                    @if (r.snippet) {
+                      <span class="search__row-snippet">{{ r.snippet }}</span>
+                    }
+                    @if (r.subtitle) {
+                      <span class="search__row-subtitle">{{ r.subtitle }}</span>
+                    }
+                  </span>
+                  @if (whenLabel(r.whenUtc); as w) {
+                    <span class="search__row-when">{{ w }}</span>
+                  }
+                  <mat-icon class="search__row-go" aria-hidden="true">chevron_right</mat-icon>
+                </button>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (truncated()) {
+        <p class="search__more">
+          <mat-icon aria-hidden="true">more_horiz</mat-icon>
+          Showing the top matches — refine your search to narrow things down.
+        </p>
+      }
+    </div>
+  }
+</div>
