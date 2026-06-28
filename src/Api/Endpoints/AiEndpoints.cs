@@ -468,6 +468,23 @@ public static class AiEndpoints
             return result is null ? Unavailable() : Results.Ok(result);
         });
 
+        // ---- Sleep & recovery insight from the caller's OWN sleep/recovery snapshot (cached ~6h) ----
+        // OWNER-ONLY: the snapshot derives from sleep (owner-only data) and is the CALLER's own, so tracker.ai
+        // (the group gate) is sufficient. Floors to the 503 friendly path when AI off/unconfigured/error.
+        g.MapGet("/sleep-insight", async (
+            CurrentUserAccessor me, GeminiService gemini, UsageDbContext db, CancellationToken ct) =>
+        {
+            if (!gemini.IsConfigured) return Unconfigured();
+            var caller = (await me.GetUserAsync(ct))!;
+            var today = await TodayAsync(db, ct);
+            var summary = await BuildSleepSummaryAsync(db, caller.Email, today, ct);
+            // No sleep logged in the window -> nothing to narrate; floor (same friendly path as a failed call).
+            if (summary is null) return Unavailable();
+            var result = await gemini.SleepInsightAsync(
+                caller.Email, today.ToString("yyyy-MM-dd"), summary, ct);
+            return result is null ? Unavailable() : Results.Ok(result);
+        });
+
         // ============================ Hydration ============================
 
         // ---- Suggest a hydration target from the caller's OWN profile (read server-side) ----
@@ -1231,9 +1248,14 @@ public static class AiEndpoints
     }
 
     /// <summary>
-    /// The caller's OWN sleep summary for "Ask my life": last-night hours/quality + the rolling 7-day averages,
-    /// mirroring the owner-only read in TrackerEndpoints (caller-only; NEVER another user's). Returns null when
-    /// the caller has logged no sleep in the window (the section is then simply absent from the snapshot).
+    /// The caller's OWN sleep + RECOVERY summary for "Ask my life" AND the sleep-insight endpoint: last-night
+    /// hours/quality, the rolling 7-day averages, the day's caffeine + training load, and the DETERMINISTIC
+    /// recovery score + sub-scores + label (TrackerStats.ComputeRecovery — the AI narrates this, never computes
+    /// it). Caller-only; NEVER another user's. Returns null when the caller has logged no sleep in the window
+    /// (the section is then simply absent from the snapshot / the insight endpoint floors).
+    ///
+    /// CAFFEINE SOURCE matches BuildDayAsync exactly: each CoffeeEntry's CaffeineMg (or cups * 95 mg fallback)
+    /// plus 95 mg per "Coffee"-labelled hydration drink — so the score here is identical to the day DTO's.
     /// </summary>
     private static async Task<string?> BuildSleepSummaryAsync(
         UsageDbContext db, string email, DateOnly date, CancellationToken ct)
@@ -1256,6 +1278,60 @@ public static class AiEndpoints
         }
         sb.Append("avg_hours_7d: ").Append(Math.Round(window.Average(s => (double)s.Hours), 1)).Append('\n');
         sb.Append("avg_quality_7d: ").Append(Math.Round(window.Average(s => (double)s.Quality), 1)).Append('\n');
+
+        // ---- RECOVERY (only when the SCORED day itself has a sleep entry — mirrors BuildDayAsync's gate) ----
+        if (lastNight.Count > 0)
+        {
+            const int defaultCaffeineMgPerCup = 95; // matches TrackerEndpoints.DefaultCaffeineMgPerCup
+
+            var coffeeCaffeine = await db.CoffeeEntries.AsNoTracking()
+                .Where(c => c.UserEmail == email && c.LocalDate == date)
+                .SumAsync(c => c.CaffeineMg ?? c.Cups * defaultCaffeineMgPerCup, ct);
+            var hydrationCoffeeCups = await db.HydrationEntries.AsNoTracking()
+                .Where(h => h.UserEmail == email && h.LocalDate == date
+                    && h.Label != null && h.Label.ToLower() == "coffee")
+                .CountAsync(ct);
+            var caffeineMg = coffeeCaffeine + hydrationCoffeeCups * defaultCaffeineMgPerCup;
+
+            var exerciseCalories = await db.ExerciseEntries.AsNoTracking()
+                .Where(x => x.UserEmail == email && x.LocalDate == date)
+                .SumAsync(x => x.CaloriesBurned, ct);
+            var activeCalories = await db.DailyActivities.AsNoTracking()
+                .Where(a => a.UserEmail == email && a.LocalDate == date)
+                .Select(a => a.ActiveCalories)
+                .FirstOrDefaultAsync(ct) ?? 0;
+
+            // Calories in + the date-active calorie goal (so FUEL is judged the same way as BuildDayAsync).
+            var caloriesIn = await db.FoodEntries.AsNoTracking()
+                .Where(f => f.UserEmail == email && f.LocalDate == date)
+                .SumAsync(f => f.Calories, ct)
+                + await db.SupplementEntries.AsNoTracking()
+                    .Where(s => s.UserEmail == email && s.LocalDate == date)
+                    .SumAsync(s => s.Calories, ct);
+            var profile = await db.TrackerProfiles.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserEmail == email, ct);
+            // Resolve the DATE-ACTIVE goal exactly as BuildDayAsync does, so the AI snapshot's recovery score
+            // can't diverge from the displayed ring when the active GoalPlan differs from the live profile goal.
+            var targets = await TrackerEndpoints.ResolveTargetsAsync(db, email, date, profile, ct);
+            int? calorieGoal = targets.DailyCalorieGoal;
+
+            var rec = TrackerStats.ComputeRecovery(new TrackerStats.RecoveryInputs(
+                SleepHours: lastNight.Sum(s => (double)s.Hours),
+                SleepQuality: lastNight.Max(s => s.Quality),
+                CaffeineMg: caffeineMg,
+                ExerciseCalories: exerciseCalories,
+                ActiveCalories: activeCalories,
+                CaloriesIn: caloriesIn,
+                CalorieGoal: calorieGoal));
+
+            sb.Append("caffeine_mg_today: ").Append(caffeineMg).Append('\n');
+            sb.Append("training_burn_today: ").Append(exerciseCalories + activeCalories).Append('\n');
+            sb.Append("recovery_score: ").Append(rec.Score).Append(" (").Append(rec.Label).Append(")\n");
+            sb.Append("recovery_subscores: sleep=").Append(rec.SleepScore)
+              .Append(" fuel=").Append(rec.FuelScore)
+              .Append(" caffeine=").Append(rec.CaffeineScore)
+              .Append(" training=").Append(rec.TrainingScore).Append('\n');
+        }
         return sb.ToString();
     }
 

@@ -7,7 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../core/api';
 import { AuthService } from '../../../core/auth';
 import {
-  AddCoffeeRequest, AddExerciseRequest, AddSupplementRequest, CustomExerciseDto,
+  AddCoffeeRequest, AddExerciseRequest, AddSleepRequest, AddSupplementRequest, CustomExerciseDto,
   ExerciseLibraryDto, PERM, SupplementKind,
 } from '../../../core/models';
 import { OptimisticTracker } from '../state/optimistic-tracker';
@@ -295,6 +295,137 @@ export class CoffeeSheet {
     try {
       await this.tracker.addCoffee(body);
       this.announce.set(`Logged ${body.cups} ${body.cups === 1 ? 'cup' : 'cups'} of coffee.`);
+      this.open.set(false);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+}
+
+// ── SLEEP ─────────────────────────────────────────────────────────────────────
+
+/** A quality rating chip for the sleep sheet (1..5). */
+interface SleepQuality { value: number; label: string; }
+const SLEEP_QUALITIES: readonly SleepQuality[] = [
+  { value: 1, label: 'Poor' },
+  { value: 2, label: 'Fair' },
+  { value: 3, label: 'Okay' },
+  { value: 4, label: 'Good' },
+  { value: 5, label: 'Great' },
+];
+
+/**
+ * Sleep add sheet — log last night in a tap or two: dial HOURS with the stepper (half-hour steps),
+ * tap a QUALITY chip, optionally name the bed/wake times, then Add. Commits via OptimisticTracker.addSleep
+ * so the Recovery card + sleep total tick immediately (the deterministic recovery score refreshes on the
+ * next authoritative day load — it's server-computed, never on the client). OWN tracker only (owner-only
+ * data). Mirrors the CoffeeSheet shape.
+ */
+@Component({
+  selector: 'app-sleep-sheet',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, BottomSheet],
+  template: `
+    <app-bottom-sheet [(open)]="open" detent="half" label="Log sleep">
+      <div class="qs-head" style="--accent-edge: var(--sleep-b);">
+        <h2 class="qs-title">Sleep</h2>
+        <span class="qs-sub">{{ tracker.date() }}</span>
+      </div>
+
+      <div class="qs-form" style="--cta-a: var(--sleep-a); --cta-b: var(--sleep-b); --accent-edge: var(--sleep-b);">
+        <div>
+          <span class="qs-label" id="sl-hours-lbl">Hours slept</span>
+          <div class="qs-stepper" role="group" aria-labelledby="sl-hours-lbl">
+            <button type="button" class="qs-step-btn" (click)="bump(-0.5)" [disabled]="hours() <= 0.5" aria-label="Less sleep">−</button>
+            <div class="qs-step-val" aria-live="polite">{{ hours() }}</div>
+            <button type="button" class="qs-step-btn" (click)="bump(0.5)" [disabled]="hours() >= 24" aria-label="More sleep">+</button>
+          </div>
+        </div>
+
+        <div>
+          <span class="qs-label" id="sl-q-lbl">Quality</span>
+          <div class="qs-chips" role="group" aria-labelledby="sl-q-lbl">
+            @for (q of qualities; track q.value) {
+              <button type="button" class="qs-chip" (click)="quality.set(q.value)"
+                      [attr.aria-pressed]="quality() === q.value"
+                      [attr.aria-label]="q.label + ' quality, ' + q.value + ' of 5'">
+                {{ q.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="qs-macros">
+          <div class="qs-macro">
+            <label class="qs-label" for="sl-bed">Bedtime (optional)</label>
+            <input id="sl-bed" class="qs-input" type="time"
+                   [ngModel]="bedTime()" (ngModelChange)="bedTime.set($event)" />
+          </div>
+          <div class="qs-macro">
+            <label class="qs-label" for="sl-wake">Wake (optional)</label>
+            <input id="sl-wake" class="qs-input" type="time"
+                   [ngModel]="wakeTime()" (ngModelChange)="wakeTime.set($event)" />
+          </div>
+        </div>
+
+        <div class="qs-actions">
+          <button type="button" class="qs-cta" (click)="add()" [disabled]="busy() || tracker.readOnly()">
+            @if (busy()) { <span class="qs-spin" aria-hidden="true"></span> } @else { Log sleep }
+          </button>
+        </div>
+        <span class="qs-sr" role="status" aria-live="polite">{{ announce() }}</span>
+      </div>
+    </app-bottom-sheet>
+  `,
+  styles: [SHEET_STYLES],
+})
+export class SleepSheet {
+  protected readonly tracker = inject(OptimisticTracker);
+
+  readonly open = model<boolean>(false);
+
+  protected readonly qualities = SLEEP_QUALITIES;
+  protected readonly hours = signal(8);
+  protected readonly quality = signal(3);
+  protected readonly bedTime = signal('');
+  protected readonly wakeTime = signal('');
+  protected readonly busy = signal(false);
+  protected readonly announce = signal('');
+
+  constructor() {
+    // Reset to a sensible default each time the sheet opens.
+    effect(() => {
+      if (this.open()) {
+        this.hours.set(8);
+        this.quality.set(3);
+        this.bedTime.set('');
+        this.wakeTime.set('');
+        this.announce.set('');
+      }
+    });
+  }
+
+  protected bump(delta: number): void {
+    this.hours.update(h => Math.min(24, Math.max(0.5, Math.round((h + delta) * 2) / 2)));
+  }
+
+  protected async add(): Promise<void> {
+    if (this.busy() || this.tracker.readOnly()) return;
+    const bed = this.bedTime().trim();
+    const wake = this.wakeTime().trim();
+    const body: AddSleepRequest = {
+      date: this.tracker.date(),
+      hours: this.hours(),
+      quality: this.quality(),
+      bedTime: bed || undefined,
+      wakeTime: wake || undefined,
+    };
+    this.busy.set(true);
+    this.announce.set('Logging sleep…');
+    try {
+      await this.tracker.addSleep(body);
+      this.announce.set(`Logged ${body.hours} hours of sleep.`);
       this.open.set(false);
     } finally {
       this.busy.set(false);

@@ -61,6 +61,7 @@ import {
 import { CalorieRing } from './calorie-ring';
 import { HydrationRing } from './hydration-ring';
 import { CoffeeRing } from './coffee-ring';
+import { RecoveryRing } from './recovery-ring';
 import { ActivityRing } from './activity-ring';
 import { AddFoodDialog, AddFoodData } from './add-food-dialog';
 import { AddExerciseDialog, AddExerciseData } from './add-exercise-dialog';
@@ -222,6 +223,7 @@ const QUICK_FOOD_TILES: QuickFoodTile[] = [
     CalorieRing,
     HydrationRing,
     CoffeeRing,
+    RecoveryRing,
     ActivityRing,
     WeightTrend,
     WeightStats,

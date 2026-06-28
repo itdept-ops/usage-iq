@@ -208,4 +208,65 @@ public class TrackerStatsTests
         s.SuggestedCarbG.Should().BeNull();
         s.SuggestedFatG.Should().BeNull();
     }
+
+    // ---- Recovery (Sleep & Recovery vertical): deterministic, bounded, well-ordered ----
+
+    private static TrackerStats.RecoveryInputs RecInputs(
+        double sleepHours = 8, int sleepQuality = 4, int caffeineMg = 0,
+        int exerciseCalories = 200, int activeCalories = 0, int caloriesIn = 2000, int? calorieGoal = 2000)
+        => new(sleepHours, sleepQuality, caffeineMg, exerciseCalories, activeCalories, caloriesIn, calorieGoal);
+
+    [Fact]
+    public void Recovery_is_deterministic_and_bounded()
+    {
+        var a = TrackerStats.ComputeRecovery(RecInputs());
+        var b = TrackerStats.ComputeRecovery(RecInputs());
+        // Same inputs -> identical output (pure function), every field within range.
+        a.Should().Be(b);
+        a.Score.Should().BeInRange(0, 100);
+        a.SleepScore.Should().BeInRange(0, 100);
+        a.CaffeineScore.Should().BeInRange(0, 100);
+        a.TrainingScore.Should().BeInRange(0, 100);
+        a.FuelScore.Should().BeInRange(0, 100);
+        a.Label.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public void Recovery_rewards_good_sleep_and_penalises_poor_sleep()
+    {
+        // 8h, quality-5, no caffeine, moderate training, on-goal fuel = a strong, "Primed"-band score.
+        var great = TrackerStats.ComputeRecovery(RecInputs(sleepHours: 8, sleepQuality: 5, exerciseCalories: 300));
+        great.Score.Should().BeGreaterThanOrEqualTo(80);
+        great.Label.Should().Be("Primed");
+
+        // 4h, quality-1, heavy caffeine, way off-goal fuel = a far lower score.
+        var poor = TrackerStats.ComputeRecovery(RecInputs(
+            sleepHours: 4, sleepQuality: 1, caffeineMg: 600, exerciseCalories: 1400, caloriesIn: 3500, calorieGoal: 2000));
+        poor.Score.Should().BeLessThan(great.Score);
+        poor.SleepScore.Should().BeLessThan(great.SleepScore);
+    }
+
+    [Fact]
+    public void Recovery_caffeine_subscore_is_perfect_under_200mg_and_zero_at_600mg()
+    {
+        TrackerStats.ComputeRecovery(RecInputs(caffeineMg: 0)).CaffeineScore.Should().Be(100);
+        TrackerStats.ComputeRecovery(RecInputs(caffeineMg: 200)).CaffeineScore.Should().Be(100);
+        TrackerStats.ComputeRecovery(RecInputs(caffeineMg: 600)).CaffeineScore.Should().Be(0);
+    }
+
+    [Fact]
+    public void Recovery_fuel_is_neutral_when_no_goal_set()
+    {
+        var r = TrackerStats.ComputeRecovery(RecInputs(calorieGoal: null));
+        r.FuelScore.Should().Be(70);
+    }
+
+    [Fact]
+    public void Recovery_never_throws_on_extreme_or_zero_inputs()
+    {
+        var z = TrackerStats.ComputeRecovery(new TrackerStats.RecoveryInputs(0, 0, 0, 0, 0, 0, null));
+        z.Score.Should().BeInRange(0, 100);
+        var big = TrackerStats.ComputeRecovery(new TrackerStats.RecoveryInputs(24, 5, 9999, 99999, 99999, 99999, 2000));
+        big.Score.Should().BeInRange(0, 100);
+    }
 }

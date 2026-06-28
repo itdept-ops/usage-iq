@@ -2318,6 +2318,88 @@ public class TrackerIntegrationTests(WebAppFactory factory)
     }
 
     [Fact]
+    public async Task Move_redates_sleep_so_recovery_follows_the_day()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        // A night logged on MoveFrom (with the food it's scored against) — recovery is present on that day.
+        await user.PostAsJsonAsync("/api/tracker/sleep", new { date = MoveFrom, hours = 8.0, quality = 5 });
+        await user.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = MoveFrom, meal = "breakfast", description = "Eggs", quantity = 1.0,
+            calories = 500, proteinG = 30.0, carbG = 10.0, fatG = 20.0,
+        });
+
+        var before = await Json(await user.GetAsync($"/api/tracker/day?date={MoveFrom}"));
+        before.GetProperty("sleep").EnumerateArray().Should().ContainSingle();
+        before.GetProperty("recoveryScore").ValueKind.Should().Be(JsonValueKind.Number);
+
+        // Move ONLY sleep MoveFrom -> MoveTo.
+        var res = await user.PostAsJsonAsync("/api/tracker/day/move", new
+        {
+            fromDate = MoveFrom, toDate = MoveTo, categories = new[] { "sleep" },
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(res)).GetProperty("moved").GetProperty("sleep").GetInt32().Should().Be(1);
+
+        // Source no longer has the sleep entry (so no recovery there); target now carries it.
+        var from = await Json(await user.GetAsync($"/api/tracker/day?date={MoveFrom}"));
+        from.GetProperty("sleep").EnumerateArray().Should().BeEmpty();
+        from.GetProperty("recoveryScore").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var to = await Json(await user.GetAsync($"/api/tracker/day?date={MoveTo}"));
+        to.GetProperty("sleep").EnumerateArray().Should().ContainSingle();
+        to.GetProperty("sleepHours").GetDouble().Should().Be(8.0);
+        to.GetProperty("recoveryScore").ValueKind.Should().Be(JsonValueKind.Number);
+    }
+
+    [Fact]
+    public async Task Recovery_fields_are_present_only_with_a_sleep_entry_and_bounded()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        // No sleep yet -> recovery absent (null).
+        var none = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        none.GetProperty("recoveryScore").ValueKind.Should().Be(JsonValueKind.Null);
+        none.GetProperty("recoveryLabel").ValueKind.Should().Be(JsonValueKind.Null);
+
+        // Log a solid night -> recovery present, score in [0,100], label non-empty, sub-scores present.
+        await user.PostAsJsonAsync("/api/tracker/sleep", new { date = Today, hours = 8.0, quality = 5 });
+        var day = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        day.GetProperty("recoveryScore").GetInt32().Should().BeInRange(0, 100);
+        day.GetProperty("recoverySleepScore").GetInt32().Should().BeInRange(0, 100);
+        day.GetProperty("recoveryCaffeineScore").GetInt32().Should().BeInRange(0, 100);
+        day.GetProperty("recoveryTrainingScore").GetInt32().Should().BeInRange(0, 100);
+        day.GetProperty("recoveryFuelScore").GetInt32().Should().BeInRange(0, 100);
+        day.GetProperty("recoveryLabel").GetString().Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Recovery_is_owner_only_and_never_leaks_to_a_viewer()
+    {
+        // Alice shares her tracker with Bob (mutual contact). Recovery derives from sleep, so it must stay
+        // owner-only just like the sleep entries — null for any viewer.
+        var (aliceEmail, alice) = await ProvisionUser("tracker.self");
+        var (bobEmail, bob) = await ProvisionUser("tracker.self");
+        await MakeContacts(aliceEmail, bobEmail);
+
+        await alice.PutAsJsonAsync("/api/tracker/profile", new { goal = "Maintain", shareWithContacts = true });
+        await alice.PostAsJsonAsync("/api/tracker/sleep", new { date = Today, hours = 8.0, quality = 5 });
+
+        // Alice sees her own recovery.
+        var own = await Json(await alice.GetAsync($"/api/tracker/day?date={Today}"));
+        own.GetProperty("recoveryScore").ValueKind.Should().Be(JsonValueKind.Number);
+
+        // Bob viewing Alice's day gets NO sleep and NO recovery (owner-only).
+        var aliceId = await UserIdFor(aliceEmail);
+        var viewed = await Json(await bob.GetAsync($"/api/tracker/day?date={Today}&user={aliceId}"));
+        viewed.GetProperty("readOnly").GetBoolean().Should().BeTrue();
+        viewed.GetProperty("sleep").EnumerateArray().Should().BeEmpty();
+        viewed.GetProperty("recoveryScore").ValueKind.Should().Be(JsonValueKind.Null);
+        viewed.GetProperty("recoveryLabel").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Move_weight_with_a_target_slot_conflict_replaces_the_target_and_reports_it()
     {
         var (_, user) = await ProvisionUser("tracker.self");

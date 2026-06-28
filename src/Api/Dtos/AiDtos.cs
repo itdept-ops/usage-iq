@@ -580,6 +580,16 @@ public sealed class WeightInsightResponse
     public string Trend { get; set; } = "";
 }
 
+/// <summary>A short NARRATION of the caller's recovery (sleep + caffeine + training + the deterministic
+/// recovery score) plus one or two short, actionable tips. The score itself is computed server-side
+/// (TrackerStats.ComputeRecovery) — the AI never produces the number, only narrates it.</summary>
+public sealed class SleepInsightResponse
+{
+    public string Insight { get; set; } = "";
+    /// <summary>One or two short, actionable recovery tips (e.g. "Cut caffeine after 2pm").</summary>
+    public string Tips { get; set; } = "";
+}
+
 // ===================================================================================
 // hydration-suggest (reads profile) / parse-hydration / natural-goal
 // ===================================================================================

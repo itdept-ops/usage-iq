@@ -915,6 +915,11 @@
   .tracker__meal-title mat-icon { color: var(--tech-accent-2); }
 }
 
+.tracker__recovery {
+  padding: var(--tech-space-4);
+  border-bottom: 1px solid var(--tech-border);
+}
+
 .tracker__sleep-body {
   display: flex;
   flex-direction: column;

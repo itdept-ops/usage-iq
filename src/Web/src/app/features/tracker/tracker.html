@@ -893,6 +893,22 @@
             </span>
           </div>
 
+          <!-- Recovery score: deterministic 0..100 fused from last night's sleep + the day's caffeine,
+             training, and fuel adherence. OWNER-ONLY and present only when a sleep entry exists, so it's
+             gated on day.recoveryScore != null. The AI insight line inside is itself gated on tracker.ai. -->
+          @if (day.recoveryScore != null) {
+            <div class="tracker__recovery">
+              <app-recovery-ring
+                [score]="day.recoveryScore"
+                [sleep]="day.recoverySleepScore ?? 0"
+                [fuel]="day.recoveryFuelScore ?? 0"
+                [caffeine]="day.recoveryCaffeineScore ?? 0"
+                [training]="day.recoveryTrainingScore ?? 0"
+                [label]="day.recoveryLabel ?? ''"
+              />
+            </div>
+          }
+
           <div class="tracker__sleep-body">
             <button
               mat-stroked-button

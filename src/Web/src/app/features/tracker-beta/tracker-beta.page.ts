@@ -17,13 +17,14 @@ import { FuelCard } from './cards/fuel-card';
 import { WaterCard } from './cards/water-card';
 import { MoveCard } from './cards/move-card';
 import { CoffeeCard } from './cards/coffee-card';
+import { SleepCard } from './cards/sleep-card';
 import { WeightCard } from './cards/weight-card';
 import { LogMenuSheet, LogTarget } from './sheets/log-menu-sheet';
 import { FoodSheet } from './sheets/food-sheet';
 import { FoodEditSheet } from './sheets/food-edit-sheet';
 import { WeightSheet } from './sheets/weight-sheet';
 import { WatchSheet } from './sheets/watch-sheet';
-import { CoffeeSheet, ExerciseSheet, SupplementSheet } from './sheets/quick-sheets';
+import { CoffeeSheet, ExerciseSheet, SleepSheet, SupplementSheet } from './sheets/quick-sheets';
 import { LeftoversSheet, LeftoversLogged } from './sheets/leftovers-sheet';
 import { currentStreak, dayHasAnyLog } from './util/streak';
 
@@ -56,8 +57,8 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
   imports: [
     MatIconModule,
     HeroRing, QuickRail,
-    FuelCard, WaterCard, MoveCard, CoffeeCard, WeightCard,
-    LogMenuSheet, FoodSheet, FoodEditSheet, WeightSheet, WatchSheet, CoffeeSheet, ExerciseSheet, SupplementSheet,
+    FuelCard, WaterCard, MoveCard, CoffeeCard, SleepCard, WeightCard,
+    LogMenuSheet, FoodSheet, FoodEditSheet, WeightSheet, WatchSheet, CoffeeSheet, ExerciseSheet, SleepSheet, SupplementSheet,
     LeftoversSheet,
   ],
   template: `
@@ -114,6 +115,7 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
         <app-tb-water-card />
         <app-move-card (addExercise)="exerciseOpen.set(true)" (editWatch)="watchOpen.set(true)" />
         <app-tracker-beta-coffee-card />
+        <app-tracker-beta-sleep-card (log)="sleepOpen.set(true)" />
         <div class="tb-defer">
           <app-weight-card #weightCard (weigh)="weightOpen.set(true)" />
         </div>
@@ -144,6 +146,7 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
     <app-food-edit-sheet [(open)]="foodEditOpen" [(entry)]="editingFood" />
     <app-coffee-sheet [(open)]="coffeeOpen" />
     <app-exercise-sheet [(open)]="exerciseOpen" />
+    <app-sleep-sheet [(open)]="sleepOpen" />
     <app-supplement-sheet [(open)]="supplementOpen" />
     <app-weight-sheet [(open)]="weightOpen" (logged)="onWeighed()" />
     <app-watch-sheet [(open)]="watchOpen" (logged)="onWatchSaved()" />
@@ -232,6 +235,7 @@ export class TrackerBetaPage {
   protected readonly editingFood = signal<FoodEntryDto | null>(null);
   protected readonly coffeeOpen = signal(false);
   protected readonly exerciseOpen = signal(false);
+  protected readonly sleepOpen = signal(false);
   protected readonly supplementOpen = signal(false);
   protected readonly weightOpen = signal(false);
   protected readonly watchOpen = signal(false);
@@ -266,6 +270,7 @@ export class TrackerBetaPage {
     return [
       { key: 'water', icon: 'water_drop', label: waterLabel, accentA: 'var(--water-a)', accentB: 'var(--water-b)' },
       { key: 'coffee', icon: 'local_cafe', label: 'Coffee', accentA: 'var(--coffee-a)', accentB: 'var(--coffee-b)' },
+      { key: 'sleep', icon: 'bedtime', label: 'Sleep', accentA: 'var(--sleep-a)', accentB: 'var(--sleep-b)' },
       { key: 'weigh', icon: 'monitor_weight', label: 'Weigh', accentA: 'var(--pro-a)', accentB: 'var(--pro-b)' },
       { key: 'meal', icon: 'restaurant', label: 'Meal +', accentA: 'var(--cal-a)', accentB: 'var(--cal-b)' },
     ];
@@ -357,6 +362,10 @@ export class TrackerBetaPage {
         // The "usual" cup — matches the classic tracker's quick-coffee preset (95 mg).
         void this.opt.addCoffee({ date, cups: 1, caffeineMg: 95, label: 'Cup' });
         break;
+      case 'sleep':
+        // Sleep needs hours/quality — there's no sensible one-tap default, so open the sheet.
+        this.sleepOpen.set(true);
+        break;
       case 'weigh':
         this.weightOpen.set(true);
         break;
@@ -372,6 +381,7 @@ export class TrackerBetaPage {
     switch (key) {
       case 'water': this.openWater(); break;
       case 'coffee': this.coffeeOpen.set(true); break;
+      case 'sleep': this.sleepOpen.set(true); break;
       case 'weigh': this.weightOpen.set(true); break;
       case 'meal': this.openFood('breakfast'); break;
     }

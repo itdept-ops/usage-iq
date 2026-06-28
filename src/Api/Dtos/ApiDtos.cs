@@ -1407,6 +1407,24 @@ public sealed class TrackerDayDto
     /// <summary>Rolling 7-day average sleep quality (1..5), over days that have an entry, or null. OWNER-ONLY.</summary>
     public double? SleepAvgQuality7d { get; set; }
 
+    /// <summary>Deterministic RECOVERY score 0..100 (higher = better recovered), fused from last night's sleep,
+    /// the day's caffeine load, training load, and calorie adherence. OWNER-ONLY and present ONLY when the day
+    /// has a sleep entry (null/absent otherwise — it derives from sleep, which is owner-only). Computed, never
+    /// stored (see <see cref="TrackerStats.ComputeRecovery"/>).</summary>
+    public int? RecoveryScore { get; set; }
+    /// <summary>Recovery SLEEP sub-score 0..100 (duration vs a 7.5h target blended with quality). Present with
+    /// <see cref="RecoveryScore"/>.</summary>
+    public int? RecoverySleepScore { get; set; }
+    /// <summary>Recovery CAFFEINE sub-score 0..100 (full to 200 mg, penalised toward 600 mg).</summary>
+    public int? RecoveryCaffeineScore { get; set; }
+    /// <summary>Recovery TRAINING sub-score 0..100 (U-shaped on the day's total burn; ~300 kcal ideal).</summary>
+    public int? RecoveryTrainingScore { get; set; }
+    /// <summary>Recovery FUEL sub-score 0..100 (calorie adherence vs goal; neutral 70 with no goal).</summary>
+    public int? RecoveryFuelScore { get; set; }
+    /// <summary>Short deterministic recovery band: "Primed" (>=80) / "Steady" (>=65) / "Run down" (>=45) /
+    /// "Depleted". Present with <see cref="RecoveryScore"/>.</summary>
+    public string? RecoveryLabel { get; set; }
+
     /// <summary>The day's recorded watch stats (steps/distance/active calories + mode), or null when none
     /// recorded. Visible to a permitted viewer too (read-only).</summary>
     public WatchActivityDto? Activity { get; set; }
@@ -1808,7 +1826,7 @@ public sealed class MoveDayRequest
     public string FromDate { get; set; } = "";
     /// <summary>The target local date (yyyy-MM-dd) to move entries ONTO.</summary>
     public string ToDate { get; set; } = "";
-    /// <summary>Subset of ["food","exercise","hydration","weight","activity"]; null/empty = all categories.</summary>
+    /// <summary>Subset of ["food","exercise","hydration","coffee","sleep","weight","activity"]; null/empty = all.</summary>
     public string[]? Categories { get; set; }
 }
 
@@ -1829,6 +1847,8 @@ public sealed class MoveDayCounts
     public int Exercise { get; set; }
     public int Hydration { get; set; }
     public int Coffee { get; set; }
+    /// <summary>How many SLEEP rows were re-dated (owner-only; no uniqueness — naps/split sleep allowed).</summary>
+    public int Sleep { get; set; }
     public int Weight { get; set; }
     /// <summary>True when the source date had an activity row that was moved onto the target.</summary>
     public bool Activity { get; set; }

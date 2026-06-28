@@ -1354,6 +1354,13 @@ public static class TrackerEndpoints
                     .Where(c => c.UserEmail == email && c.LocalDate == fromDate)
                     .ExecuteUpdateAsync(s => s.SetProperty(c => c.LocalDate, toDate), ct);
 
+            // sleep (OWNER-ONLY; no uniqueness — naps/split sleep allowed): re-date every matching row, like
+            // food/coffee. Without this branch a moved day strands its SleepEntry on the old date.
+            if (Wants("sleep"))
+                moved.Sleep = await db.SleepEntries
+                    .Where(s => s.UserEmail == email && s.LocalDate == fromDate)
+                    .ExecuteUpdateAsync(u => u.SetProperty(s => s.LocalDate, toDate), ct);
+
             // weight (UNIQUE per user+date+slot): the moved value wins per slot. Delete any target rows
             // whose slot also exists on the source, THEN re-date the source rows. Wrapped in the retrying
             // execution strategy's transaction so the delete+re-date is atomic (a naive BeginTransaction
@@ -1748,6 +1755,41 @@ public static class TrackerEndpoints
         // The resolved coffee CAP: the profile's goal when set, else the 3-cup default.
         var coffeeGoalCups = profile?.CoffeeGoalCups ?? DefaultCoffeeGoalCups;
 
+        // ---- RECOVERY (Sleep & Recovery vertical) — deterministic, owner-only, computed only when a sleep
+        // entry exists for the day (recovery derives from sleep, which is owner-only). null/absent otherwise. ----
+        int? recoveryScore = null, recoverySleep = null, recoveryCaffeine = null, recoveryTraining = null, recoveryFuel = null;
+        string? recoveryLabel = null;
+        if (!readOnly && sleep.Count > 0)
+        {
+            // Last night = the scored day's sleep: total hours (sum over rows, naps allowed) + the best-rated
+            // quality recorded (the primary night's rating; 0 when none rated).
+            var nightHours = sleep.Sum(s => (double)s.Hours);
+            var nightQuality = sleep.Max(s => s.Quality);
+
+            // CAFFEINE SOURCE (precise + stable): the day's coffee mg — each CoffeeEntry's CaffeineMg, or a
+            // cups * 95 mg fallback when null — PLUS 95 mg per "Coffee"-labelled hydration drink (case-insensitive).
+            var coffeeCaffeine = coffee.Sum(c => c.CaffeineMg ?? c.Cups * DefaultCaffeineMgPerCup);
+            var hydrationCoffeeCaffeine = hydration
+                .Count(h => string.Equals(h.Label, "Coffee", StringComparison.OrdinalIgnoreCase))
+                * DefaultCaffeineMgPerCup;
+            var recoveryCaffeineMg = coffeeCaffeine + hydrationCoffeeCaffeine;
+
+            var rec = TrackerStats.ComputeRecovery(new TrackerStats.RecoveryInputs(
+                SleepHours: nightHours,
+                SleepQuality: nightQuality,
+                CaffeineMg: recoveryCaffeineMg,
+                ExerciseCalories: exerciseCalories,
+                ActiveCalories: activity?.ActiveCalories ?? 0,
+                CaloriesIn: caloriesIn,
+                CalorieGoal: goal));
+            recoveryScore = rec.Score;
+            recoverySleep = rec.SleepScore;
+            recoveryCaffeine = rec.CaffeineScore;
+            recoveryTraining = rec.TrainingScore;
+            recoveryFuel = rec.FuelScore;
+            recoveryLabel = rec.Label;
+        }
+
         // Resolve the day owner's email -> {AppUser.Id, Name}; the raw owner email is NEVER put on the wire
         // (email-privacy). db.Users.Email is stored lower-cased.
         var owner = await db.Users.AsNoTracking()
@@ -1790,6 +1832,12 @@ public static class TrackerEndpoints
             SleepHours = Math.Round(sleep.Sum(s => (double)s.Hours), 1),
             SleepAvgHours7d = sleepAvgHours,
             SleepAvgQuality7d = sleepAvgQuality,
+            RecoveryScore = recoveryScore,
+            RecoverySleepScore = recoverySleep,
+            RecoveryCaffeineScore = recoveryCaffeine,
+            RecoveryTrainingScore = recoveryTraining,
+            RecoveryFuelScore = recoveryFuel,
+            RecoveryLabel = recoveryLabel,
             Activity = activity is null ? null : ToActivityDto(activity),
             StepGoal = profile?.StepGoal,
         };
@@ -1814,6 +1862,11 @@ public static class TrackerEndpoints
 
     /// <summary>The fallback daily coffee CAP (cups) when a user's profile has none set. A limit, not a target.</summary>
     private const int DefaultCoffeeGoalCups = 3;
+
+    /// <summary>Default caffeine estimate (mg) for one cup of coffee — used by the RECOVERY caffeine load when a
+    /// <see cref="CoffeeEntry.CaffeineMg"/> is null (cups * this) and per "Coffee"-labelled hydration drink. A
+    /// typical 8 oz brewed coffee is ≈ 95 mg.</summary>
+    private const int DefaultCaffeineMgPerCup = 95;
 
     // ===================================================================================
     // Profile helpers
@@ -1866,7 +1919,8 @@ public static class TrackerEndpoints
     /// <summary>Resolve the targets to score a date against: the active plan's, else the profile fallback.
     /// After the backfill every existing user has a 0001-01-01 plan, so the plan branch covers all historical
     /// dates; the profile fallback is the safety net for the transient gap before the first goal is saved.</summary>
-    private static async Task<TrackerStats.GoalTargets> ResolveTargetsAsync(
+    // internal so the AI snapshot (BuildSleepSummaryAsync) resolves the SAME date-active goal the day view does.
+    internal static async Task<TrackerStats.GoalTargets> ResolveTargetsAsync(
         UsageDbContext db, string email, DateOnly date, TrackerProfile? profile, CancellationToken ct)
     {
         var plan = await ActivePlanForDateAsync(db, email, date, ct);

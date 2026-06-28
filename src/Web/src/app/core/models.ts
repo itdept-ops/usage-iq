@@ -1916,6 +1916,12 @@ export interface WeightInsightResponse {
   trend: string;
 }
 
+/** A short recovery insight + actionable tips from the caller's sleep/recovery snapshot (GET /api/ai/sleep-insight; cached). Mirrors SleepInsightResponse. */
+export interface SleepInsightResponse {
+  insight: string;
+  tips: string;
+}
+
 /** A suggested daily hydration target in ml (clamped 0..10000) + rationale (POST /api/ai/hydration-suggest; reads profile, empty body). Mirrors HydrationSuggestResponse. */
 export interface HydrationSuggestResponse {
   targetMl: number;
@@ -2311,6 +2317,22 @@ export interface TrackerDayDto {
   sleepAvgHours7d?: number | null;
   /** Rolling 7-day average sleep quality (1..5), over days that have an entry, or null. OWNER-ONLY. */
   sleepAvgQuality7d?: number | null;
+  /**
+   * Deterministic recovery score (0..100, higher = better recovered), fused from last night's sleep,
+   * the day's caffeine, training load, and calorie adherence. OWNER-ONLY and present ONLY when a sleep
+   * entry exists for the day — null/absent otherwise (and always null for a viewer).
+   */
+  recoveryScore?: number | null;
+  /** Recovery sub-score (0..100) for sleep duration + quality. OWNER-ONLY; null when no sleep logged. */
+  recoverySleepScore?: number | null;
+  /** Recovery sub-score (0..100) for the day's caffeine load. OWNER-ONLY; null when no sleep logged. */
+  recoveryCaffeineScore?: number | null;
+  /** Recovery sub-score (0..100) for training load. OWNER-ONLY; null when no sleep logged. */
+  recoveryTrainingScore?: number | null;
+  /** Recovery sub-score (0..100) for calorie/fuel adherence. OWNER-ONLY; null when no sleep logged. */
+  recoveryFuelScore?: number | null;
+  /** Short deterministic label: "Primed"/"Steady"/"Run down"/"Depleted". OWNER-ONLY; null when no sleep. */
+  recoveryLabel?: string | null;
 }
 
 /** Someone whose tracker the caller may view read-only (GET /api/tracker/shared). Mirrors SharedUserDto. */

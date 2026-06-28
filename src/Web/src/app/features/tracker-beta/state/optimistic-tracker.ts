@@ -5,10 +5,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Api } from '../../../core/api';
 import { TrackerStore } from '../../../core/tracker-store';
 import {
-  AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AddSupplementRequest,
-  CoffeeEntryDto, ExerciseEntryDto, FoodEntryDto, HydrationEntryDto, LogWeightRequest,
-  SupplementEntryDto, TrackerDayDto, TrackerProfileDto, UpdateFoodRequest, UpsertActivityRequest,
-  WatchActivityDto,
+  AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AddSleepRequest,
+  AddSupplementRequest, CoffeeEntryDto, ExerciseEntryDto, FoodEntryDto, HydrationEntryDto,
+  LogWeightRequest, SleepEntryDto, SupplementEntryDto, TrackerDayDto, TrackerProfileDto,
+  UpdateFoodRequest, UpsertActivityRequest, WatchActivityDto,
 } from '../../../core/models';
 
 /**
@@ -205,6 +205,43 @@ export class OptimisticTracker {
     );
   }
 
+  // ── SLEEP ────────────────────────────────────────────────────────────────────
+
+  /**
+   * Log a night of sleep OPTIMISTICALLY (OWN tracker only; sleep is owner-only data). Patches the sleep
+   * array + sleepHours roll-up so the Sleep card ticks instantly, then POSTs and reconciles with the
+   * server entity. The deterministic recovery score (recoveryScore + sub-scores) is server-computed and
+   * is NOT recomputed locally — it refreshes on the next authoritative day load; the card renders the
+   * latest score it has. On failure we roll the row back and offer a Retry.
+   */
+  async addSleep(body: AddSleepRequest): Promise<void> {
+    const tempId = this.tempSeq--;
+    const provisional: SleepEntryDto = {
+      id: tempId, hours: body.hours, quality: body.quality ?? 3,
+      bedTime: body.bedTime, wakeTime: body.wakeTime, note: body.note,
+      createdUtc: new Date().toISOString(),
+    };
+    this.patch(d => this.recomputeSleep({ ...d, sleep: [...d.sleep, provisional] }));
+    try {
+      const real = await firstValueFrom(this.api.addSleep(body));
+      this.patch(d => this.recomputeSleep({ ...d, sleep: d.sleep.map(s => (s.id === tempId ? real : s)) }));
+    } catch {
+      this.rollback(d => this.recomputeSleep({ ...d, sleep: d.sleep.filter(s => s.id !== tempId) }),
+        'Couldn’t log sleep', () => this.addSleep(body));
+    }
+  }
+
+  async deleteSleep(id: number): Promise<void> {
+    const removed = this.day()?.sleep.find(s => s.id === id);
+    if (!removed) return;
+    this.patch(d => this.recomputeSleep({ ...d, sleep: d.sleep.filter(s => s.id !== id) }));
+    this.commitDelete(
+      () => firstValueFrom(this.api.deleteSleep(id)),
+      d => this.recomputeSleep({ ...d, sleep: [...d.sleep, removed].sort((a, b) => a.id - b.id) }),
+      'Deleted sleep',
+    );
+  }
+
   // ── SUPPLEMENT ───────────────────────────────────────────────────────────────
 
   async addSupplement(body: AddSupplementRequest): Promise<void> {
@@ -361,6 +398,16 @@ export class OptimisticTracker {
         void this.store.load();
       });
     });
+  }
+
+  /**
+   * Recompute the sleep roll-up (sleepHours) after a local sleep mutation so the patched day() stays
+   * consistent. The 7-day averages and the deterministic recovery score are server-derived — they're left
+   * as-is locally and refresh on the next authoritative load (the card shows the latest it has).
+   */
+  private recomputeSleep(d: TrackerDayDto): TrackerDayDto {
+    const sleepHours = Math.round(d.sleep.reduce((a, s) => a + (s.hours || 0), 0) * 10) / 10;
+    return { ...d, sleepHours };
   }
 
   /**
