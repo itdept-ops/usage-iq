@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -92,6 +92,10 @@ export class FamilyNotes {
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private sanitizer = inject(DomSanitizer);
+  private route = inject(ActivatedRoute);
+
+  /** A pending #note-{id} fragment to scroll/flash once the board has loaded (deep-link from Search). */
+  private pendingFragment: string | null = null;
 
   readonly notes = signal<FamilyNote[]>([]);
   readonly loading = signal(true);
@@ -126,6 +130,11 @@ export class FamilyNotes {
   readonly board = computed(() => this.notes());
 
   constructor() {
+    // Deep-link from Search: #note-{id} scrolls + flashes that note once the board is loaded.
+    this.route.fragment.pipe(takeUntilDestroyed()).subscribe((frag) => {
+      this.pendingFragment = frag;
+      if (frag && !this.loading()) this.scrollToFragment(frag);
+    });
     this.reload(true);
     this.api
       .getHousehold()
@@ -169,7 +178,19 @@ export class FamilyNotes {
       .subscribe((list) => {
         this.notes.set(list);
         this.loading.set(false);
+        if (this.pendingFragment) this.scrollToFragment(this.pendingFragment);
       });
+  }
+
+  /** Scroll a #note-{id} target into view and flash it (shared by openSource + the deep-link fragment). */
+  private scrollToFragment(frag: string): void {
+    setTimeout(() => {
+      const el = document.getElementById(frag);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('note-card--flash');
+      setTimeout(() => el.classList.remove('note-card--flash'), 1600);
+    });
   }
 
   /** Render a note body to safe HTML (renderMarkdown escapes the source first). */

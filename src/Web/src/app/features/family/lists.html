@@ -74,7 +74,7 @@
     } @else {
       <div class="list-grid">
         @for (list of lists; track list.id) {
-          <article class="list-card">
+          <article class="list-card" [id]="'list-' + list.id">
             <header class="list-card__head">
               <div class="list-card__id">
                 <h2 class="list-card__name">{{ list.name }}</h2>

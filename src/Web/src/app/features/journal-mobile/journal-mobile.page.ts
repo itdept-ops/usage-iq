@@ -97,7 +97,7 @@ interface MoodChoice { value: string; label: string; emoji: string; }
                     <span class="jr-row__emoji" aria-hidden="true">{{ moodEmoji(e.mood) || '·' }}</span>
                     <span class="jr-row__date">{{ friendlyDate(e.date) }}</span>
                     @if (e.mood) { <span class="jr-row__mood">{{ moodLabel(e.mood) }}</span> }
-                    @if (e.tags.length) { <span class="jr-row__tags">{{ e.tags.length }} tag{{ e.tags.length === 1 ? '' : 's' }}</span> }
+                    @if (e.tags?.length) { <span class="jr-row__tags">{{ e.tags?.length }} tag{{ e.tags?.length === 1 ? '' : 's' }}</span> }
                   </button>
                 }
               </div>

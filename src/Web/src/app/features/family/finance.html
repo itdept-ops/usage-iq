@@ -428,7 +428,7 @@
            Mirrors the "Explain this month" card: the floor (over/near counts + net-worth direction) always
            renders once there's a budget; the warm narrative + tips appear only when the model narrated. -->
       @if (budgetCheck(); as bc) {
-        @if (bc.budgets.length > 0) {
+        @if (bc.budgets?.length) {
           <article class="briefing fin-ai__card fin-budgetcheck" [class.briefing--plain]="bc.fellBackToPlain"
                    aria-label="Budget check-in">
             <mat-icon class="briefing__spark" aria-hidden="true">{{ bc.fellBackToPlain ? 'fact_check' : 'auto_awesome' }}</mat-icon>
@@ -467,7 +467,7 @@
         </div>
 
         @if (budgets(); as bg) {
-          @if (bg.budgets.length > 0) {
+          @if (bg.budgets?.length) {
             <ul class="fin-budget-list">
               @for (b of bg.budgets; track b.id) {
                 <li class="fin-budget" [attr.data-status]="b.status">
@@ -579,7 +579,7 @@
           }
 
           <!-- per-account balance editor -->
-          @if (nw.accounts.length > 0) {
+          @if (nw.accounts?.length) {
             <ul class="fin-nw-accts">
               @for (a of nw.accounts; track a.accountId) {
                 <li class="fin-nw-acct">
@@ -632,7 +632,7 @@
         </div>
 
         @if (savings(); as sv) {
-          @if (sv.goals.length > 0) {
+          @if (sv.goals?.length) {
             <div class="fin-goal-grid">
               @for (g of sv.goals; track g.id) {
                 <div class="fin-goal" [class.is-archived]="g.archived">

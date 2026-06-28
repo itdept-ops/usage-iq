@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { MatIconModule } from '@angular/material/icon';
@@ -241,6 +241,7 @@ export class Tracker {
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
 
   readonly mealSections = MEAL_SECTIONS;
@@ -363,7 +364,14 @@ export class Tracker {
   readonly imperial = computed(() => this.store.profile()?.unitSystem === 'Imperial');
 
   constructor() {
-    void this.store.load();
+    // Deep-link from Search: ?date=yyyy-MM-dd opens that logged day. setDate() reloads, so it replaces the
+    // default load; an invalid/absent param falls back to the default (today / last-viewed) load.
+    const dateParam = this.route.snapshot.queryParamMap.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      void this.store.setDate(dateParam);
+    } else {
+      void this.store.load();
+    }
     void this.store.loadShared();
 
     // Seed the central UnitService from the loaded profile's preference so every unit DISPLAY below

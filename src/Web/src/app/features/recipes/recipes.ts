@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { MatIconModule } from '@angular/material/icon';
@@ -45,6 +46,10 @@ export class Recipes {
   private api = inject(Api);
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
+  private route = inject(ActivatedRoute);
+
+  /** Recipe id to briefly highlight after a deep-link (?focus=) lands and scrolls. */
+  readonly flashId = signal<number | null>(null);
 
   /** The caller's own recipes (newest-first from the server). */
   readonly mine = signal<Recipe[]>([]);
@@ -83,6 +88,24 @@ export class Recipes {
     } finally {
       this.loading.set(false);
     }
+    this.focusFromQuery();
+  }
+
+  /** Deep-link from Search: ?focus={id} expands + scrolls to that recipe (mine or shared) and flashes it. */
+  private focusFromQuery(): void {
+    const raw = this.route.snapshot.queryParamMap.get('focus');
+    const id = raw ? Number(raw) : NaN;
+    if (!Number.isInteger(id)) return;
+    const exists = this.mine().some((r) => r.id === id) || this.shared().some((r) => r.id === id);
+    if (!exists) return;
+    this.expanded.update((set) => new Set(set).add(id));
+    // Wait for the expanded card to render, then scroll + flash.
+    setTimeout(() => {
+      const el = document.getElementById('recipe-' + id);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.flashId.set(id);
+      setTimeout(() => this.flashId.set(null), 2000);
+    });
   }
 
   // ─────────────────────────────────────────── helpers ─────────────────────────────────────────

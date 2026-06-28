@@ -32,7 +32,7 @@ public static class FeedEndpoints
     /// toggle button) — no reactor identity beyond the count is ever exposed.</summary>
     public sealed record FeedItemDto(
         long Id, int ActorUserId, string ActorName, string Kind, int? IntValue, string? Label, DateTime CreatedUtc,
-        int ClapCount, bool IReacted);
+        int ClapCount, bool IReacted, int CommentCount);
 
     /// <summary>The toggle result for <c>POST /api/feed/{id}/react</c>: the row's fresh cheer count and whether the
     /// caller now has a cheer on it (true after an add, false after a remove). Lets the SPA converge after races.</summary>
@@ -120,6 +120,17 @@ public static class FeedEndpoints
                     .ToListAsync(ct))
                     .ToHashSet();
 
+            // Batch-load the (non-deleted) comment count per event in ONE grouped query (no N+1) — the closed
+            // comment pill shows the count without opening the thread.
+            var commentCounts = eventIds.Length == 0
+                ? new Dictionary<long, int>()
+                : (await db.ActivityComments.AsNoTracking()
+                    .Where(c => c.DeletedUtc == null && eventIds.Contains(c.ActivityEventId))
+                    .GroupBy(c => c.ActivityEventId)
+                    .Select(g => new { EventId = g.Key, Count = g.Count() })
+                    .ToListAsync(ct))
+                    .ToDictionary(x => x.EventId, x => x.Count);
+
             var items = rows.Select(r =>
             {
                 var actor = actors.GetValueOrDefault(r.ActorEmail.ToLowerInvariant());
@@ -129,7 +140,8 @@ public static class FeedEndpoints
                     string.IsNullOrEmpty(actor.Name) ? DisplayName.Unknown : actor.Name,
                     r.Kind, r.IntValue, r.Label, r.CreatedUtc,
                     clapCounts.GetValueOrDefault(r.Id, 0),
-                    myReactions.Contains(r.Id));
+                    myReactions.Contains(r.Id),
+                    commentCounts.GetValueOrDefault(r.Id, 0));
             }).ToList();
 
             // Keyset cursor: a full page implies there may be more (oldest id on this page).

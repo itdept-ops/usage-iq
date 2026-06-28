@@ -593,8 +593,8 @@ a.tile:focus-visible {
   span, & { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
-/* A soft flash when "From your notes" links the user to a source note. */
-.note-card--flash { animation: note-flash 1.6s ease; }
+/* A soft flash when "From your notes" links the user to a source note, or a Search deep-link lands. */
+.note-card--flash, .list-card--flash { animation: note-flash 1.6s ease; }
 @keyframes note-flash {
   0%, 100% { box-shadow: none; }
   20% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--tech-accent) 55%, transparent); }

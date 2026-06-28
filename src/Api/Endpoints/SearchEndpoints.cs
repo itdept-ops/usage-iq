@@ -86,7 +86,7 @@ public static class SearchEndpoints
                         .ToListAsync(ct);
                     foreach (var r in rows)
                         results.Add(new SearchResultItem("recipe", r.Id.ToString(), Blank(r.Title, "Untitled recipe"),
-                            Excerpt(r.Notes, query), null, $"/recipes/{r.Id}", Domains.Recipe,
+                            Excerpt(r.Notes, query), null, $"/recipes?focus={r.Id}", Domains.Recipe,
                             TitleMatch(r.Title, query) ? TitleScore : BodyScore, r.UpdatedUtc));
                     Note(rows.Count);
                 }
@@ -120,7 +120,7 @@ public static class SearchEndpoints
                         .ToListAsync(ct);
                     foreach (var bl in rows)
                         results.Add(new SearchResultItem("bill", bl.Id.ToString(), Blank(bl.Title, "Bill"),
-                            null, bl.Status, $"/bills/{bl.Id}", Domains.Bill, TitleScore, bl.CreatedUtc));
+                            null, bl.Status, $"/bills?focus={bl.Id}", Domains.Bill, TitleScore, bl.CreatedUtc));
                     Note(rows.Count);
                 }
 
@@ -174,7 +174,7 @@ public static class SearchEndpoints
                             .ToListAsync(ct);
                         foreach (var n in rows)
                             results.Add(new SearchResultItem("note", n.Id.ToString(), Blank(n.Title, "Note"),
-                                Excerpt(n.Body, query), null, $"/family/notes#{n.Id}", Domains.FamilyNote,
+                                Excerpt(n.Body, query), null, $"/family/notes#note-{n.Id}", Domains.FamilyNote,
                                 TitleMatch(n.Title, query) ? TitleScore : BodyScore, n.UpdatedUtc));
                         Note(rows.Count);
                     }
@@ -190,7 +190,7 @@ public static class SearchEndpoints
                             .ToListAsync(ct);
                         foreach (var l in rows)
                             results.Add(new SearchResultItem("list", l.Id.ToString(), Blank(l.Name, "List"),
-                                null, l.Kind, $"/family/lists#{l.Id}", Domains.FamilyList, TitleScore, l.UpdatedUtc));
+                                null, l.Kind, $"/family/lists#list-{l.Id}", Domains.FamilyList, TitleScore, l.UpdatedUtc));
                         Note(rows.Count);
                     }
 
@@ -256,7 +256,7 @@ public static class SearchEndpoints
                             : (string.IsNullOrWhiteSpace(msg.ChannelName) ? "Channel" : msg.ChannelName);
                         results.Add(new SearchResultItem("chat", msg.Id.ToString(),
                             Excerpt(msg.Body, query) ?? "Message", null, subtitle,
-                            $"/chat?channel={msg.ChannelId}", Domains.Chat, BodyScore, msg.CreatedUtc));
+                            $"/chat?c={msg.ChannelId}&m={msg.Id}", Domains.Chat, BodyScore, msg.CreatedUtc));
                     }
                     Note(rows.Count);
                 }

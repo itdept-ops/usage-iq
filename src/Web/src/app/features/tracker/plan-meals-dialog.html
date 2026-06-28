@@ -186,18 +186,18 @@
 
                 <!-- Per-dish macros. -->
                 <div class="wte-macros">
-                  <span class="wte-macro wte-macro--cal mono-num">{{ s.macros.calories | number }} <small>kcal</small></span>
-                  <span class="wte-macro mono-num">{{ s.macros.proteinG | number:'1.0-0' }}<small>P</small></span>
-                  <span class="wte-macro mono-num">{{ s.macros.carbsG | number:'1.0-0' }}<small>C</small></span>
-                  <span class="wte-macro mono-num">{{ s.macros.fatG | number:'1.0-0' }}<small>F</small></span>
+                  <span class="wte-macro wte-macro--cal mono-num">{{ s.macros?.calories | number }} <small>kcal</small></span>
+                  <span class="wte-macro mono-num">{{ s.macros?.proteinG | number:'1.0-0' }}<small>P</small></span>
+                  <span class="wte-macro mono-num">{{ s.macros?.carbsG | number:'1.0-0' }}<small>C</small></span>
+                  <span class="wte-macro mono-num">{{ s.macros?.fatG | number:'1.0-0' }}<small>F</small></span>
                 </div>
 
                 <!-- Full ingredient list; each row badged "On your list" (with qty) vs "Need", + a per-item add. -->
-                @if (s.ingredients.length) {
+                @if (s.ingredients?.length) {
                   <div class="wte-ings">
                     <span class="wte-ing-label"><mat-icon aria-hidden="true">list_alt</mat-icon> Ingredients</span>
                     <ul class="wte-ings-list">
-                      @for (ing of s.ingredients; track $index; let ii = $index) {
+                      @for (ing of (s.ingredients ?? []); track $index; let ii = $index) {
                         <li class="wte-ing" [class.wte-ing--have]="ing.onList" [class.wte-ing--need]="!ing.onList">
                           <span class="wte-ing-name">
                             {{ ing.name }}@if (ing.quantity) { <span class="wte-ing-qty">· {{ ing.quantity }}</span> }

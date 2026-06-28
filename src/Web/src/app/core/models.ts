@@ -470,6 +470,8 @@ export interface FeedItem {
   clapCount: number;
   /** Whether the CALLER has cheered this row (drives the toggle button's pressed state). */
   iReacted: boolean;
+  /** Non-deleted comment count on this row, so the closed comment pill shows a number without a fetch. */
+  commentCount: number;
 }
 
 /** A page of feed items + the keyset cursor for the next (older) page; nextBefore is null at the end. */

@@ -7,7 +7,7 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -129,6 +129,7 @@ export class FamilyMeals {
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
 
   readonly days = signal<FamilyMealDay[]>([]);
@@ -305,6 +306,12 @@ export class FamilyMeals {
   readonly hasWeekMacros = computed(() => this.weekRollup().hasMacros);
 
   constructor() {
+    // Deep-link from Search: ?date=yyyy-MM-dd jumps the displayed week to the one containing that date.
+    const dateParam = this.route.snapshot.queryParamMap.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const d = new Date(`${dateParam}T00:00:00`);
+      if (!Number.isNaN(d.getTime())) this.weekStart.set(this.mondayOf(d));
+    }
     this.reload(true);
     // Load the caller's tracker goals once, for the goal-aware rollups (best-effort; silent on failure).
     if (this.canTrack()) {
@@ -1178,7 +1185,12 @@ export class FamilyMeals {
 
   /** Today's local Monday, at local midnight. */
   private thisMonday(): Date {
-    const d = new Date();
+    return this.mondayOf(new Date());
+  }
+
+  /** The local Monday (at local midnight) of the week containing `date`. */
+  private mondayOf(date: Date): Date {
+    const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     const offset = (d.getDay() + 6) % 7; // Sun=0..Sat=6 → Mon=0..Sun=6
     d.setDate(d.getDate() - offset);

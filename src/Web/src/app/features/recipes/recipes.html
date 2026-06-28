@@ -83,7 +83,8 @@
 
 <!-- ─────────────────────────── recipe card template ─────────────────────────── -->
 <ng-template #card let-r let-owned="owned">
-  <article class="r-card" [class.r-card--busy]="isBusy(r.id)">
+  <article class="r-card" [id]="'recipe-' + r.id" [class.r-card--busy]="isBusy(r.id)"
+           [class.r-card--flash]="flashId() === r.id">
 
     <!-- summary row (click to expand) -->
     <button type="button" class="r-card__summary" (click)="toggleExpanded(r.id)"

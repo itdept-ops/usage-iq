@@ -164,7 +164,7 @@ interface FeedDayGroup {
                         }
                       </button>
 
-                      <app-feed-comments class="fm-row__comments" [eventId]="item.id" />
+                      <app-feed-comments class="fm-row__comments" [eventId]="item.id" [initialCount]="item.commentCount" />
                     </li>
                   }
                 </ul>

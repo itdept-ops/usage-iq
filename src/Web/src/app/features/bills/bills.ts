@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
@@ -66,6 +67,7 @@ export class Bills {
   private auth = inject(AuthService);
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
+  private route = inject(ActivatedRoute);
 
   readonly bills = signal<BillDto[]>([]);
   readonly selectedId = signal<number | null>(null);
@@ -113,7 +115,19 @@ export class Bills {
     try {
       const list = await firstValueFrom(this.api.bills());
       this.bills.set(list);
-      if (selectFirst && list.length && this.selectedId() == null) this.selectedId.set(list[0].id);
+      // Deep-link from Search: ?focus={id} selects + scrolls to that bill (takes precedence over selectFirst).
+      const focusRaw = this.route.snapshot.queryParamMap.get('focus');
+      const focusId = focusRaw ? Number(focusRaw) : NaN;
+      if (Number.isInteger(focusId) && list.some((b) => b.id === focusId)) {
+        this.selectedId.set(focusId);
+        setTimeout(() => {
+          document
+            .getElementById('bill-' + focusId)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      } else if (selectFirst && list.length && this.selectedId() == null) {
+        this.selectedId.set(list[0].id);
+      }
       // Keep the current selection valid (e.g. after a delete).
       if (this.selectedId() != null && !list.some((b) => b.id === this.selectedId())) {
         this.selectedId.set(list[0]?.id ?? null);

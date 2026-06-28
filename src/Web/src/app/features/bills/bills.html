@@ -24,7 +24,8 @@
           </div>
         }
         @for (b of bills(); track b.id) {
-          <button type="button" class="bill-row" [class.bill-row--active]="b.id === selectedId()"
+          <button type="button" class="bill-row" [id]="'bill-' + b.id"
+                  [class.bill-row--active]="b.id === selectedId()"
                   (click)="select(b.id)">
             <span class="bill-row__id">
               <span class="bill-row__title">{{ b.title }}</span>

@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CurrencyPipe, NgTemplateOutlet } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -117,6 +117,10 @@ export class FamilyLists {
   private api = inject(Api);
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
+  private route = inject(ActivatedRoute);
+
+  /** A pending #list-{id} fragment to scroll/flash once the lists have loaded (deep-link from Search). */
+  private pendingFragment: string | null = null;
 
   readonly lists = signal<FamilyList[]>([]);
   readonly loading = signal(true);
@@ -143,6 +147,11 @@ export class FamilyLists {
   readonly todoLists = computed(() => this.lists().filter((l) => l.kind === 'todo'));
 
   constructor() {
+    // Deep-link from Search: #list-{id} scrolls + flashes that list once it's loaded.
+    this.route.fragment.pipe(takeUntilDestroyed()).subscribe((frag) => {
+      this.pendingFragment = frag;
+      if (frag && !this.loading()) this.scrollToFragment(frag);
+    });
     this.reload(true);
     // Household members drive the to-do assignee picker (display identity only).
     this.api
@@ -170,7 +179,19 @@ export class FamilyLists {
       .subscribe((list) => {
         this.lists.set(list);
         this.loading.set(false);
+        if (this.pendingFragment) this.scrollToFragment(this.pendingFragment);
       });
+  }
+
+  /** Scroll a #list-{id} target into view and flash it (deep-link from Search). */
+  private scrollToFragment(frag: string): void {
+    setTimeout(() => {
+      const el = document.getElementById(frag);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('list-card--flash');
+      setTimeout(() => el.classList.remove('list-card--flash'), 1600);
+    });
   }
 
   initials(name: string): string {
