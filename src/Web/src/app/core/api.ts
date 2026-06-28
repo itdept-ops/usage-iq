@@ -34,6 +34,7 @@ import {
   ProfilePrefs,
   FeedPage, ReactResult,
   AutomationRule, AutomationRuleInput,
+  ScheduledAgentDto, ScheduledAgentInput, AgentPreviewResult, AgentTestResult,
   VapidPublicKey, PushSubscribeRequest,
   ResumeState, ResumeDto, ResumeApplicationDto, ResumeData, ResumeSaveRequest, ParseResumeRequest,
   HeadshotRequest, NewApplicationRequest, ApplicationSaveRequest, TailorRequest, CoverLetterRequest,
@@ -783,6 +784,24 @@ export class Api {
   }
   deleteAutomation(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/automations/${id}`);
+  }
+
+  // ---- Proactive scheduled agents (the caller's OWN per-kind prefs; strictly owner-scoped server-side) ----
+  /** List the caller's agent prefs (one row per kind; upserts disabled defaults on first read). */
+  agents(): Observable<ScheduledAgentDto[]> {
+    return this.http.get<ScheduledAgentDto[]>(`${this.base}/agents`);
+  }
+  /** Upsert one agent kind's prefs (enabled/deliver-hour/quiet-hours/timezone). */
+  updateAgent(kind: string, body: ScheduledAgentInput): Observable<ScheduledAgentDto> {
+    return this.http.put<ScheduledAgentDto>(`${this.base}/agents/${kind}`, body);
+  }
+  /** Render the deterministic floor NOW (ignores quiet-hours/idempotency; never delivers). */
+  previewAgent(kind: string): Observable<AgentPreviewResult> {
+    return this.http.post<AgentPreviewResult>(`${this.base}/agents/${kind}/preview`, {});
+  }
+  /** Deliver a real one-off AgentNudge (does NOT touch the idempotency stamps). */
+  testAgent(kind: string): Observable<AgentTestResult> {
+    return this.http.post<AgentTestResult>(`${this.base}/agents/${kind}/test`, {});
   }
 
   // ---- Access policy (open sign-up + default permissions; requires users.manage to edit) ----

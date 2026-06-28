@@ -522,6 +522,58 @@ export interface AutomationRuleInput {
   webhookUrl?: string | null;
 }
 
+// ---- Proactive scheduled agents (the caller's OWN per-kind agent prefs; gated agents.use) ----------
+// Per-user server-side assistants that run on a daily cadence and nudge via the in-app bell + opt-in
+// web-push. Strictly self-scoped server-side: a prefs row only ever belongs to the caller. AI narratives
+// (briefing/budget) stay gated on the EXISTING AI keys (family.ai/finance.ai) — agents.use is the page gate.
+
+/** The four agent kinds. Wire string values, used verbatim as the `{kind}` route param. */
+export type ScheduledAgentKind = 'morningBriefing' | 'streakRescue' | 'budgetAlert' | 'lowStaples';
+
+/**
+ * The caller's OWN preference row for one agent kind (GET /api/agents returns one per kind; PUT returns
+ * the updated one). Mirrors ScheduledAgentDto. Email is server-resolved — never on the wire.
+ */
+export interface ScheduledAgentDto {
+  kind: string;
+  enabled: boolean;
+  /** The local hour (0–23) the agent fires at. */
+  deliverHourLocal: number;
+  /** Quiet-hours window start hour (0–23), or null when no quiet hours are set (both bounds or neither). */
+  quietStartLocalHour: number | null;
+  quietEndLocalHour: number | null;
+  /** The IANA timezone the local hour + quiet hours are evaluated in. */
+  timeZone: string;
+}
+
+/** Create/update body for an agent kind (PUT /api/agents/{kind}). Kind comes from the route; email is the caller. */
+export interface ScheduledAgentInput {
+  enabled: boolean;
+  /** 0–23. */
+  deliverHourLocal: number;
+  /** 0–23; both bounds or neither (the server 400s a half-set window). */
+  quietStartLocalHour: number | null;
+  quietEndLocalHour: number | null;
+  /** IANA timezone; null => the server defaults to "America/New_York". */
+  timeZone: string | null;
+}
+
+/** POST /api/agents/{kind}/preview result: the deterministic floor rendered NOW (never delivers). */
+export interface AgentPreviewResult {
+  text: string;
+  link: string;
+  /** True when the AI narrative was unavailable and the deterministic baseline was returned instead. */
+  fellBackToPlain: boolean;
+}
+
+/** POST /api/agents/{kind}/test result: whether a real one-off AgentNudge was delivered. */
+export interface AgentTestResult {
+  delivered: boolean;
+  /** The delivered text (when delivered), or a reason message (when not). */
+  text?: string;
+  message?: string;
+}
+
 // ---- Location / GPS (privacy-sensitive: PRIVATE by default, capture is OPT-IN) ----------------------
 // Mirrors the API's LocationDtos.cs. The precise lat/lng is only ever returned to the SHARER (their own
 // history, GET /api/location/me) or to an admin holding location.view-all (GET /api/location/admin);
@@ -5261,6 +5313,10 @@ export const PERM = {
   locationViewAll: 'location.view-all',
   // ---- Automations (group "Tools"; page-gate; deliberate grant — a rule may carry a Discord webhook) ----
   automationsUse: 'automations.use',
+  /** Proactive Agents (group "Tools"; page-gate; deliberate grant): per-kind scheduled assistants that nudge
+   *  you (morning briefing, streak rescue, budget alert, low staples). AI narratives stay gated on the
+   *  EXISTING AI keys (family.ai / finance.ai), not this key. Never default. */
+  agentsUse: 'agents.use',
   /** Grocery list (group "Tools"; page-gate): the household's shared shopping list. Private, never default. */
   groceryUse: 'grocery.use',
   /** My Recipes (group "Tools"; page-gate): save/organize your own recipes, optionally share read-only. */
@@ -5316,6 +5372,7 @@ export const PERM_GROUP_OF: Readonly<Record<string, string>> = {
   // ---- Tools ----
   [PERM.billsUse]: 'Tools',
   [PERM.automationsUse]: 'Tools',
+  [PERM.agentsUse]: 'Tools',
   [PERM.groceryUse]: 'Tools',
   [PERM.recipesUse]: 'Tools',
   [PERM.mealsUse]: 'Tools',

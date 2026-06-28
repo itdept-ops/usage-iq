@@ -36,6 +36,7 @@ public sealed class ChatNotificationService(
         NotificationType.FamilyTimer => "Timer finished",
         NotificationType.FamilyBriefing => "Daily briefing",
         NotificationType.FamilyHeadsUp => "Heads up",
+        NotificationType.AgentNudge => "Your assistant",
         _ => "Usage IQ",
     };
 
@@ -230,7 +231,10 @@ public sealed class ChatNotificationService(
         foreach (var email in emails)
         {
             var pref = prefs.GetValueOrDefault(email) ?? Defaults(email);
-            if (!pref.NotifySystemEvents) continue;
+            // AgentNudge is USER-SCHEDULED (the per-agent Enabled toggle + agents.use is the consent), so it is
+            // delivered regardless of the global "system events" preference — like NotifyFamily, which is also
+            // ungated for the same reason. Other system events still honor the global opt-out.
+            if (type != NotificationType.AgentNudge && !pref.NotifySystemEvents) continue;
 
             var n = new Notification
             {
@@ -684,6 +688,7 @@ public sealed class ChatNotificationService(
         NotificationType.SystemAutomation => "systemAutomation",
         NotificationType.Cheer => "cheer",
         NotificationType.SystemNudge => "systemNudge",
+        NotificationType.AgentNudge => "agentNudge",
         _ => "channelMessage",
     };
 }

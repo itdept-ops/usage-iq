@@ -174,6 +174,13 @@ export const PAGE_REGISTRY: readonly PageDef[] = [
     home: { label: 'Automations', icon: 'bolt' },
   },
   {
+    id: 'agents', path: 'agents', title: 'Usage IQ · Agents', perm: PERM.agentsUse,
+    desktop: () => import('../features/agents/agents').then(m => m.Agents),
+    mobile: () => import('../features/agents-mobile/agents-mobile.page').then(m => m.AgentsMobilePage),
+    nav: { group: 'Tools', label: 'Agents', icon: 'smart_toy' },
+    home: { label: 'Agents', icon: 'smart_toy' },
+  },
+  {
     id: 'bills', path: 'bills', title: 'Usage IQ · Bill Splitter', perm: PERM.billsUse,
     desktop: () => import('../features/bills/bills').then(m => m.Bills),
     mobile: () => import('../features/bills-beta/bills-beta.page').then(m => m.BillsBetaPage),

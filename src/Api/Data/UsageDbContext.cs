@@ -84,6 +84,7 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
     public DbSet<ActivityReaction> ActivityReactions => Set<ActivityReaction>();
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
+    public DbSet<ScheduledAgent> ScheduledAgents => Set<ScheduledAgent>();
     public DbSet<Recipe> Recipes => Set<Recipe>();
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
     public DbSet<Resume> Resumes => Set<Resume>();
@@ -538,6 +539,20 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => new { x.OwnerEmail, x.TriggerKind });
             // The CRUD list: an owner's own rules.
             e.HasIndex(x => x.OwnerEmail);
+        });
+
+        b.Entity<ScheduledAgent>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.TimeZone).HasMaxLength(64).HasDefaultValue("America/New_York");
+            e.Property(x => x.LastFiredKey).HasMaxLength(64);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // At most one preference row per (user, kind); also the GET upsert-defaults key.
+            e.HasIndex(x => new { x.UserEmail, x.Kind }).IsUnique();
+            // The scheduler's bounded per-tick candidate read scans enabled agents not yet fired this local
+            // date; the Enabled prefix narrows the scan to live agents (idempotency is re-checked in memory).
+            e.HasIndex(x => new { x.Enabled, x.LastFiredLocalDate });
         });
 
         b.Entity<NotificationPreference>(e =>

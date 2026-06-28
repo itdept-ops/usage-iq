@@ -21,7 +21,7 @@ public class PermissionsTests
         "bills.use", "recipes.use", "grocery.use", "meals.use", "resume.use",
         "family.use", "family.finance", "cycle.track", "chore.claim", "allowance.manage", "identity.map",
         "location.self", "location.share", "location.view-all",
-        "automations.use",
+        "automations.use", "agents.use",
         "platform.mobile",
         "users.view", "users.manage", "activity.view", "ai.usage.view",
         "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision", "ai.act",
@@ -63,6 +63,7 @@ public class PermissionsTests
     [InlineData("location.share")]
     [InlineData("location.view-all")]
     [InlineData("automations.use")]
+    [InlineData("agents.use")]
     [InlineData("platform.mobile")]
     [InlineData("users.view")]
     [InlineData("users.manage")]
@@ -131,6 +132,7 @@ public class PermissionsTests
         Permissions.LocationShare.Should().Be("location.share");
         Permissions.LocationViewAll.Should().Be("location.view-all");
         Permissions.AutomationsUse.Should().Be("automations.use");
+        Permissions.AgentsUse.Should().Be("agents.use");
         Permissions.PlatformMobile.Should().Be("platform.mobile");
         Permissions.UsersView.Should().Be("users.view");
         Permissions.UsersManage.Should().Be("users.manage");
@@ -146,9 +148,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_fifty_known_keys()
+    public void All_contains_exactly_the_fifty_one_known_keys()
     {
-        Permissions.All.Should().HaveCount(50);
+        Permissions.All.Should().HaveCount(51);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -159,9 +161,25 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_fifty_entries()
+    public void Catalog_has_fifty_one_entries()
     {
-        Permissions.Catalog.Should().HaveCount(50);
+        Permissions.Catalog.Should().HaveCount(51);
+    }
+
+    [Fact]
+    public void AgentsUse_is_in_the_Tools_group_non_ai_not_defaultable_a_page_gate_and_in_the_administrator_preset()
+    {
+        // agents.use gates the Proactive Agents settings page + /api/agents. It is a DELIBERATE grant: the
+        // "Tools" group, NOT an AI key (the AI narratives stay gated on the existing family.ai/finance.ai keys),
+        // never defaultable, and a PAGE gate (absent from Views) — mirroring automations.use.
+        Permissions.Catalog.Single(p => p.Key == Permissions.AgentsUse).Group.Should().Be("Tools");
+        Permissions.Catalog.Single(p => p.Key == Permissions.AgentsUse).IsAi.Should().BeFalse();
+        Permissions.IsAi(Permissions.AgentsUse).Should().BeFalse();
+        Permissions.IsDefaultable(Permissions.AgentsUse).Should().BeFalse();
+        Permissions.Views.Should().NotContain(Permissions.AgentsUse);
+        // It is part of the administrator preset (the full catalog).
+        Permissions.Presets.Single(p => p.Key == "administrator")
+            .Permissions.Should().Contain(Permissions.AgentsUse);
     }
 
     [Fact]

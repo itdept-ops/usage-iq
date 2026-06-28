@@ -37,6 +37,7 @@ export const HOME_OPTIONS: readonly HomeOption[] = [
   { route: '/trophies', label: 'Trophies', icon: '♛', perms: [PERM.trackerSelf] },
   { route: '/feed', label: 'Activity feed', icon: '≋', perms: [PERM.trackerSelf] },
   { route: '/automations', label: 'Automations', icon: '⚡', perms: [PERM.automationsUse] },
+  { route: '/agents', label: 'Agents', icon: '🤖', perms: [PERM.agentsUse] },
   { route: '/bills', label: 'Bill Splitter', icon: '⊟', perms: [PERM.billsUse] },
   { route: '/grocery', label: 'Grocery list', icon: '☑', perms: [PERM.groceryUse] },
   { route: '/recipes', label: 'My Recipes', icon: '✎', perms: [PERM.recipesUse] },

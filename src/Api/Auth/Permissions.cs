@@ -130,6 +130,14 @@ public static class Permissions
     /// Not a *.view (a page gate, like <see cref="TrackerSelf"/>).</summary>
     public const string AutomationsUse = "automations.use";
 
+    /// <summary>Page-gate for the Proactive Agents settings page + the <c>/api/agents</c> CRUD. Gates per-user
+    /// server-side agents that run on a cadence and ACT/NUDGE (morning briefing, streak rescue, budget alert,
+    /// low staples), delivered via the bell + opt-in web-push. Granted deliberately — never default. The AI
+    /// narratives a kind may use stay gated on the EXISTING AI keys (family.ai for the briefing, finance.ai for
+    /// the budget alert), not this key. Auto-included in the administrator preset (the full catalog). Not a
+    /// *.view (a page gate, like <see cref="AutomationsUse"/>).</summary>
+    public const string AgentsUse = "agents.use";
+
     // ---- Platform (the mobile-app gate) ----
     /// <summary>The MOBILE PLATFORM gate: use the mobile app — the Strata mobile-first UI of every page on a phone
     /// (kept under the "beta" framing for now). A platform-level capability, not a feature *.view; auto-included in
@@ -203,6 +211,7 @@ public static class Permissions
 
         // ---- Tools (continued) ----
         new PermissionInfo(AutomationsUse, "Tools", "Use Automations", "Create rules that react to your own activity and notify you in-app or to your own Discord webhook."),
+        new PermissionInfo(AgentsUse, "Tools", "Use Proactive Agents", "Turn on per-agent assistants that run on a schedule and nudge you (morning briefing, streak rescue, budget alert, low staples) in your notification bell and on opt-in web push."),
 
         // ---- Platform (the mobile-app gate) ----
         new PermissionInfo(PlatformMobile, "Platform", "Mobile app (beta)", "Use the mobile app — the mobile-first UI of every page on a phone. Off by default; the desktop UI needs no grant."),
@@ -329,6 +338,7 @@ public static class Permissions
         && key != TrackerViewAll && key != FamilyUse && key != FamilyFinance && key != CycleTrack
         && key != ChoreClaim && key != AllowanceManage && key != IdentityMap
         && key != AiUsageView && key != BillsUse && key != PlatformMobile && key != AutomationsUse
+        && key != AgentsUse
         && key != RecipesUse && key != GroceryUse && key != MealsUse && key != ResumeUse
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }

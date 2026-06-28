@@ -41,6 +41,11 @@ public enum NotificationType
     /// <see cref="Cheer"/> — circle-gated + cooldowned at the endpoint, carrying the sender as actor; the
     /// text is a FIXED server-side template keyed by the nudge kind (never client free-text).</summary>
     SystemNudge = 12,
+
+    /// <summary>A per-user PROACTIVE SCHEDULED AGENT fired (morning briefing / streak rescue / budget alert /
+    /// low staples). Self-scoped — it only ever pings its own owner's bell + opt-in web push. Gated, like a
+    /// system event, on <see cref="NotificationPreference.NotifySystemEvents"/> at delivery (NotifySystem).</summary>
+    AgentNudge = 13,
 }
 
 /// <summary>
@@ -91,6 +96,9 @@ public static class DiscordCategoryMap
 
         NotificationType.Cheer => DiscordForwardCategory.Cheers,
         NotificationType.SystemNudge => DiscordForwardCategory.Nudges,
+
+        // A scheduled agent is a self-scoped automation; forward it under the user-toggleable System bucket.
+        NotificationType.AgentNudge => DiscordForwardCategory.SystemEvents,
 
         // Any future type defaults to SystemEvents (a safe, user-toggleable bucket) until mapped explicitly.
         _ => DiscordForwardCategory.SystemEvents,

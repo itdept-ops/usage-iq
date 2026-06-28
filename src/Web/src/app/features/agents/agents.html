@@ -1,0 +1,119 @@
+<header class="head">
+  <span class="head-eyebrow mono-num">~/agents</span>
+  <h2>Proactive Agents</h2>
+  <p class="sub">Per-you assistants that run on a daily schedule and nudge you — a morning briefing, a
+    late-day streak rescue, a budget alert, and a low-staples reminder. Each lands in your in-app bell (and
+    on your devices if you've enabled web-push). Agents only ever watch your own data and only ever nudge
+    you; AI summaries use your existing AI access — the deterministic version is always there without it.</p>
+</header>
+
+@if (loading()) {
+  <div class="state" role="status" aria-live="polite">
+    <mat-progress-spinner mode="indeterminate" diameter="36" />
+    <p>Loading your agents…</p>
+  </div>
+} @else if (error()) {
+  <div class="state state--error" role="alert">
+    <mat-icon aria-hidden="true">cloud_off</mat-icon>
+    <p>We couldn't load your agents just now.</p>
+    <button mat-stroked-button type="button" (click)="load()">
+      <mat-icon aria-hidden="true">refresh</mat-icon> Try again
+    </button>
+  </div>
+} @else if (isEmpty()) {
+  <div class="state state--empty">
+    <mat-icon aria-hidden="true">smart_toy</mat-icon>
+    <p>No agents are available right now.</p>
+  </div>
+} @else {
+  <ul class="agents">
+    @for (r of rows(); track trackRow($index, r)) {
+      <li class="card agent" [class.agent--off]="!r.enabled">
+        <div class="agent__head">
+          <span class="agent__ic" aria-hidden="true"><mat-icon>{{ r.icon }}</mat-icon></span>
+          <div class="agent__id">
+            <p class="agent__name">{{ r.label }}</p>
+            <p class="agent__blurb">{{ r.blurb }}</p>
+            @if (r.aiHint) {
+              <p class="agent__ai"><mat-icon aria-hidden="true">auto_awesome</mat-icon>
+                AI summary uses your <code>{{ r.aiHint }}</code> access; otherwise a plain version is sent.</p>
+            }
+          </div>
+          <mat-slide-toggle [checked]="r.enabled" (change)="setEnabled(r, $event.checked)"
+                            [disabled]="r.saving" [attr.aria-label]="'Enable ' + r.label" />
+        </div>
+
+        @if (r.enabled) {
+          <div class="agent__controls">
+            <label class="field field--narrow">
+              <span class="field__label">Deliver at</span>
+              <select class="input" [value]="r.deliverHour" [disabled]="r.saving"
+                      (change)="setDeliverHour(r, $any($event.target).value)">
+                @for (h of hours; track h.value) {
+                  <option [value]="h.value">{{ h.label }}</option>
+                }
+              </select>
+            </label>
+
+            <label class="field field--quiet-toggle">
+              <span class="field__label">Quiet hours</span>
+              <mat-slide-toggle [checked]="r.quietOn" (change)="setQuietOn(r, $event.checked)"
+                                [disabled]="r.saving" aria-label="Use quiet hours" />
+            </label>
+
+            @if (r.quietOn) {
+              <label class="field field--narrow">
+                <span class="field__label">From</span>
+                <select class="input" [value]="r.quietStart" [disabled]="r.saving"
+                        (change)="setQuietStart(r, $any($event.target).value)">
+                  @for (h of hours; track h.value) {
+                    <option [value]="h.value">{{ h.label }}</option>
+                  }
+                </select>
+              </label>
+              <label class="field field--narrow">
+                <span class="field__label">Until</span>
+                <select class="input" [value]="r.quietEnd" [disabled]="r.saving"
+                        (change)="setQuietEnd(r, $any($event.target).value)">
+                  @for (h of hours; track h.value) {
+                    <option [value]="h.value">{{ h.label }}</option>
+                  }
+                </select>
+              </label>
+            }
+          </div>
+        }
+
+        <div class="agent__actions">
+          <button mat-stroked-button type="button" (click)="preview(r)" [disabled]="r.previewing">
+            <mat-icon aria-hidden="true">visibility</mat-icon>
+            @if (r.previewing) { Rendering… } @else { Preview }
+          </button>
+          <button mat-stroked-button type="button" (click)="test(r)" [disabled]="r.testing">
+            <mat-icon aria-hidden="true">send</mat-icon>
+            @if (r.testing) { Sending… } @else { Send a test }
+          </button>
+          @if (r.saving) { <span class="agent__saving" aria-live="polite">Saving…</span> }
+        </div>
+
+        @if (r.error) {
+          <p class="agent__error" role="alert">{{ r.error }}</p>
+        }
+        @if (r.testMsg) {
+          <p class="agent__toast" aria-live="polite"><mat-icon aria-hidden="true">check_circle</mat-icon> {{ r.testMsg }}</p>
+        }
+        @if (r.preview) {
+          <div class="agent__preview">
+            <p class="agent__preview-head">
+              <mat-icon aria-hidden="true">visibility</mat-icon> Preview
+              @if (r.preview.fellBackToPlain) {
+                <span class="chip chip--plain" title="The AI narrative wasn't available, so the deterministic version is shown">Plain</span>
+              }
+            </p>
+            <p class="agent__preview-text">{{ r.preview.text }}</p>
+          </div>
+        }
+      </li>
+    }
+  </ul>
+}

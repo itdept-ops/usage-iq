@@ -158,6 +158,13 @@ builder.Services.AddScoped<WeatherService>();
 builder.Services.AddScoped<FamilyTodayService>();
 builder.Services.AddScoped<FamilyBriefingService>();
 
+// Proactive scheduled agents: the per-kind composer (deterministic floor + optional AI upgrade gated on the
+// EXISTING AI keys) backing both the background tick and the preview/test endpoints, plus the minute-tick
+// AgentScheduler that fires every DUE agent (stamp-first idempotency, bounded query, per-user timezone +
+// quiet-hours) and delivers it to the owner's bell + opt-in web push via ChatNotificationService.
+builder.Services.AddScoped<AgentComposer>();
+builder.Services.AddHostedService<AgentScheduler>();
+
 // Location (GPS): two free, keyless geocoders, both with FIXED hosts (no SSRF), cached (IMemoryCache),
 // rate-limited, and graceful-null so they NEVER throw into the request/ingest path.
 //   - ip-api.com  (IP -> coarse geo, ~45/min)        : gives desktops a "fleet location" via their PublicIp.
@@ -543,6 +550,7 @@ app.MapTrophyEndpoints();
 app.MapWrappedEndpoints();
 app.MapFeedEndpoints();
 app.MapRulesEndpoints();
+app.MapAgentsEndpoints();
 app.MapAiEndpoints();
 app.MapFamilyEndpoints();
 app.MapFamilyLocationsEndpoints();
