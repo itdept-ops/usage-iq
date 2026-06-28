@@ -79,11 +79,11 @@
   <div class="chore-edit__points">
     <span class="chore-edit__points-label"><mat-icon aria-hidden="true">star</mat-icon> Stars per finish</span>
     <div class="chore-edit__stepper">
-      <button mat-icon-button type="button" matTooltip="Fewer" [disabled]="points() <= 0" (click)="stepPoints(-1)">
+      <button mat-icon-button type="button" matTooltip="Fewer" aria-label="Fewer points" [disabled]="points() <= 0" (click)="stepPoints(-1)">
         <mat-icon aria-hidden="true">remove</mat-icon>
       </button>
       <span class="chore-edit__points-value">{{ points() }}</span>
-      <button mat-icon-button type="button" matTooltip="More" [disabled]="points() >= 1000" (click)="stepPoints(1)">
+      <button mat-icon-button type="button" matTooltip="More" aria-label="More points" [disabled]="points() >= 1000" (click)="stepPoints(1)">
         <mat-icon aria-hidden="true">add</mat-icon>
       </button>
     </div>

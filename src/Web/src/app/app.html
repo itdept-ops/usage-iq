@@ -1,3 +1,7 @@
+<!-- Skip-to-content: first in the tab order; visually-hidden until keyboard-focused (see .skip-link in
+     styles.scss). Lets keyboard/SR users jump past the brand + grouped nav straight to <main>. -->
+<a class="skip-link" href="#main-content">Skip to content</a>
+
 <!-- Slim OFFLINE banner: a fixed bottom strip shown only while the browser reports no connection. It
      auto-dismisses on reconnect (the @if drops it when pwa.online() flips back to true). Pinned to the
      bottom + safe-area aware so it stays clear of the sticky top toolbar. -->
@@ -699,7 +703,7 @@
     }
   </mat-menu>
 
-<main class="content" [class.content--bare]="bareLayout()"
+<main id="main-content" tabindex="-1" class="content" [class.content--bare]="bareLayout()"
       [class.content--mobile]="shellMode() === 'mobile'">
   <router-outlet />
 </main>

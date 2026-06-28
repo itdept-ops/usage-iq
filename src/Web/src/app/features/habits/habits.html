@@ -88,14 +88,14 @@
               <button mat-button type="button" class="hcard__act" (click)="toggleSkip(h)">
                 {{ h.today.skip ? 'Unskip' : 'Skip' }}
               </button>
-              <button mat-button type="button" class="hcard__act" (click)="openCalendar(h)">
-                <mat-icon>calendar_month</mat-icon>
+              <button mat-button type="button" class="hcard__act" aria-label="Habit calendar" (click)="openCalendar(h)">
+                <mat-icon aria-hidden="true">calendar_month</mat-icon>
               </button>
               <button mat-button type="button" class="hcard__act" (click)="pauseHabit(h)">
                 {{ h.status === 'Paused' ? 'Resume' : 'Pause' }}
               </button>
-              <button mat-button type="button" class="hcard__act hcard__act--danger" (click)="archiveHabit(h)">
-                <mat-icon>archive</mat-icon>
+              <button mat-button type="button" class="hcard__act hcard__act--danger" aria-label="Archive habit" (click)="archiveHabit(h)">
+                <mat-icon aria-hidden="true">archive</mat-icon>
               </button>
             </div>
           </article>
@@ -137,8 +137,9 @@
 
 <!-- ───────────────── CREATE / EDIT SHEET ───────────────── -->
 @if (sheetOpen()) {
-  <div class="hsheet__scrim" (click)="closeSheet()"></div>
-  <aside class="hsheet" role="dialog" aria-label="Habit editor">
+  <div class="hsheet__scrim" (click)="closeSheet()" aria-hidden="true"></div>
+  <aside class="hsheet" role="dialog" aria-modal="true" aria-label="Habit editor"
+         dialogA11y (dismiss)="closeSheet()">
     <div class="hsheet__head">
       <h3>{{ draft().id == null ? 'New habit' : 'Edit habit' }}</h3>
       <button mat-icon-button type="button" (click)="closeSheet()" aria-label="Close"><mat-icon>close</mat-icon></button>
@@ -239,8 +240,9 @@
 
 <!-- ───────────────── PER-HABIT STREAK CALENDAR ───────────────── -->
 @if (calHabit(); as ch) {
-  <div class="hsheet__scrim" (click)="closeCalendar()"></div>
-  <aside class="hcal" role="dialog" aria-label="Streak calendar">
+  <div class="hsheet__scrim" (click)="closeCalendar()" aria-hidden="true"></div>
+  <aside class="hcal" role="dialog" aria-modal="true" aria-label="Streak calendar"
+         dialogA11y (dismiss)="closeCalendar()">
     <div class="hsheet__head">
       <h3>{{ ch.title }} · streak</h3>
       <button mat-icon-button type="button" (click)="closeCalendar()" aria-label="Close"><mat-icon>close</mat-icon></button>

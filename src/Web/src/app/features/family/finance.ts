@@ -44,6 +44,7 @@ import {
   FinanceBudgetCheckDto,
 } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
+import { DialogA11yDirective } from '../../core/dialog-a11y.directive';
 
 /** The closed category set the review dropdown offers (the AI's enum + the household's ledger categories). */
 export const FINANCE_DEFAULT_CATEGORIES: readonly string[] = [
@@ -134,6 +135,7 @@ interface GoalDraft {
     MatProgressSpinnerModule,
     MatSnackBarModule,
     ChartComponent,
+    DialogA11yDirective,
   ],
   templateUrl: './finance.html',
   changeDetection: ChangeDetectionStrategy.Eager,

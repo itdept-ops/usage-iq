@@ -139,7 +139,7 @@
               @if (busyId() === r.id) {
                 <mat-spinner [diameter]="20" />
               } @else {
-                <button mat-icon-button matTooltip="Snooze" [matMenuTriggerFor]="snoozeMenu">
+                <button mat-icon-button matTooltip="Snooze" aria-label="Snooze reminder" [matMenuTriggerFor]="snoozeMenu">
                   <mat-icon aria-hidden="true">snooze</mat-icon>
                 </button>
                 <mat-menu #snoozeMenu="matMenu">
@@ -147,10 +147,10 @@
                     <button mat-menu-item (click)="snooze(r, s.minutes)">{{ s.label }}</button>
                   }
                 </mat-menu>
-                <button mat-icon-button matTooltip="Edit" (click)="edit(r)">
+                <button mat-icon-button matTooltip="Edit" aria-label="Edit reminder" (click)="edit(r)">
                   <mat-icon aria-hidden="true">edit</mat-icon>
                 </button>
-                <button mat-icon-button matTooltip="Delete" class="reminder__delete" (click)="remove(r)">
+                <button mat-icon-button matTooltip="Delete" aria-label="Delete reminder" class="reminder__delete" (click)="remove(r)">
                   <mat-icon aria-hidden="true">delete_outline</mat-icon>
                 </button>
               }
@@ -185,10 +185,10 @@
                 @if (busyId() === r.id) {
                   <mat-spinner [diameter]="20" />
                 } @else {
-                  <button mat-icon-button matTooltip="Reschedule" (click)="edit(r)">
+                  <button mat-icon-button matTooltip="Reschedule" aria-label="Reschedule reminder" (click)="edit(r)">
                     <mat-icon aria-hidden="true">event_repeat</mat-icon>
                   </button>
-                  <button mat-icon-button matTooltip="Delete" class="reminder__delete" (click)="remove(r)">
+                  <button mat-icon-button matTooltip="Delete" aria-label="Delete reminder" class="reminder__delete" (click)="remove(r)">
                     <mat-icon aria-hidden="true">delete_outline</mat-icon>
                   </button>
                 }

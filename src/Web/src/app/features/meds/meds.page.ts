@@ -13,6 +13,7 @@ import {
   VitalsResponse, VitalTrend,
 } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
+import { DialogA11yDirective } from '../../core/dialog-a11y.directive';
 import { BetaErrorState } from '../beta-ui';
 
 /** A vital kind's UI descriptor — label, unit, icon, accent, range hint, and whether it carries a 2nd value. */
@@ -55,7 +56,7 @@ interface WindowOpt { value: number; label: string; }
   selector: 'app-meds',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatIconModule, ChartComponent, BetaErrorState],
+  imports: [FormsModule, MatIconModule, ChartComponent, BetaErrorState, DialogA11yDirective],
   styleUrl: './meds.page.scss',
   template: `
     <div class="md">
@@ -307,8 +308,9 @@ interface WindowOpt { value: number; label: string; }
 
       <!-- ─────────── ADD / EDIT MEDICATION SHEET ─────────── -->
       @if (medSheetOpen()) {
-        <div class="md-scrim" (click)="closeMedSheet()"></div>
-        <div class="md-sheet" role="dialog" aria-modal="true" aria-label="Medication">
+        <div class="md-scrim" (click)="closeMedSheet()" aria-hidden="true"></div>
+        <div class="md-sheet" role="dialog" aria-modal="true" aria-label="Medication"
+             dialogA11y (dismiss)="closeMedSheet()">
           <div class="md-sheet__head">
             <h3 class="md-sheet__title">{{ editingId() ? 'Edit' : 'Add' }} medication</h3>
             <button type="button" class="md-icon-btn" (click)="closeMedSheet()" aria-label="Close">

@@ -487,10 +487,10 @@
                     </span>
                     <span class="fin-budget__pace">Projected {{ money(b.projected) }}</span>
                     <span class="fin-budget__actions">
-                      <button type="button" class="fin-linkbtn" (click)="editBudgetLimit(b)" matTooltip="Edit limit">
+                      <button type="button" class="fin-linkbtn" (click)="editBudgetLimit(b)" matTooltip="Edit limit" aria-label="Edit budget limit">
                         <mat-icon aria-hidden="true">edit</mat-icon>
                       </button>
-                      <button type="button" class="fin-linkbtn" (click)="deleteBudget(b)" matTooltip="Remove budget">
+                      <button type="button" class="fin-linkbtn" (click)="deleteBudget(b)" matTooltip="Remove budget" aria-label="Remove budget">
                         <mat-icon aria-hidden="true">delete_outline</mat-icon>
                       </button>
                     </span>
@@ -655,10 +655,10 @@
                       <button mat-flat-button color="primary" class="fin-goal__contribute" (click)="contributeToGoal(g)">
                         <mat-icon aria-hidden="true">add</mat-icon> Contribute
                       </button>
-                      <button type="button" class="fin-linkbtn" (click)="openEditGoal(g)" matTooltip="Edit goal">
+                      <button type="button" class="fin-linkbtn" (click)="openEditGoal(g)" matTooltip="Edit goal" aria-label="Edit savings goal">
                         <mat-icon aria-hidden="true">edit</mat-icon>
                       </button>
-                      <button type="button" class="fin-linkbtn" (click)="deleteGoal(g)" matTooltip="Delete goal">
+                      <button type="button" class="fin-linkbtn" (click)="deleteGoal(g)" matTooltip="Delete goal" aria-label="Delete savings goal">
                         <mat-icon aria-hidden="true">delete_outline</mat-icon>
                       </button>
                     </div>
@@ -674,7 +674,8 @@
 
       <!-- ── Savings goal add/edit dialog (lightweight inline modal) ── -->
       @if (goalDraft(); as gd) {
-        <div class="fin-modal" role="dialog" aria-modal="true" aria-label="Savings goal">
+        <div class="fin-modal" role="dialog" aria-modal="true" aria-label="Savings goal"
+             dialogA11y (dismiss)="cancelGoalDraft()">
           <div class="fin-modal__panel">
             <h2 class="fin-card__title">{{ gd.id == null ? 'New savings goal' : 'Edit goal' }}</h2>
             <label class="fin-field">

@@ -11,6 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
+import { DialogA11yDirective } from '../../core/dialog-a11y.directive';
 import {
   CreateHabitRequest, HabitCadence, HabitCoachDto, HabitDayDto, HabitDto,
   HabitLeaderboardRowDto, PERM, UpdateHabitRequest,
@@ -70,7 +71,7 @@ interface HabitCalCell { iso: string; dayNum: number; inMonth: boolean; isToday:
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, MatIconModule, MatButtonModule, MatSnackBarModule, MatProgressSpinnerModule,
-    BetaEmptyState, BetaErrorState,
+    BetaEmptyState, BetaErrorState, DialogA11yDirective,
   ],
   templateUrl: './habits.html',
   styleUrl: './habits.scss',
