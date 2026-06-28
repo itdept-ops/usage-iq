@@ -14,6 +14,7 @@ import { AuthService } from '../../core/auth';
 import {
   JournalDto, JournalEntryDto, JournalReflectionDto, JournalSummaryDto, PERM,
 } from '../../core/models';
+import { BetaErrorState } from '../beta-ui';
 
 interface MoodChoice { value: string; label: string; emoji: string; }
 
@@ -36,6 +37,7 @@ interface MoodChoice { value: string; label: string; emoji: string; }
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, MatIconModule, MatButtonModule, MatSnackBarModule, MatProgressSpinnerModule,
+    BetaErrorState,
   ],
   templateUrl: './journal.html',
   styleUrl: './journal.scss',

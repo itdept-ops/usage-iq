@@ -21,10 +21,10 @@
       <span>Checking your calendar…</span>
     </div>
   } @else if (statusError()) {
-    <div class="family__error">
-      <mat-icon aria-hidden="true">error_outline</mat-icon>
-      <p>We couldn't reach the calendar just now. Please try again in a moment.</p>
-    </div>
+    <app-bs-error
+      title="We couldn't reach the calendar just now"
+      body="Please try again in a moment."
+      (retry)="retryStatus()" />
   } @else if (!configured()) {
     <!-- Server has no OAuth secret yet -->
     <article class="cal-connect">
@@ -395,10 +395,10 @@
     </section>
 
     @if (eventsError()) {
-      <div class="family__error">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <p>We couldn't load this week's events. Try the navigation again in a moment.</p>
-      </div>
+      <app-bs-error
+        title="We couldn't load this week's events"
+        body="Try the navigation again in a moment."
+        (retry)="retryEvents()" />
     }
 
     @if (view() === 'week') {
@@ -535,13 +535,13 @@
           }
         </div>
       } @else {
-        <div class="cal-empty">
-          <mat-icon aria-hidden="true">event_available</mat-icon>
-          <p>Nothing on the calendar this week. Add an event to get started.</p>
-          <button mat-stroked-button (click)="create()">
-            <mat-icon aria-hidden="true">add</mat-icon> New event
-          </button>
-        </div>
+        <app-bs-empty
+          icon="event_available"
+          title="Nothing on the calendar this week"
+          body="Add an event to get started."
+          ctaLabel="New event"
+          ctaIcon="add"
+          (action)="create()" />
       }
     }
   }

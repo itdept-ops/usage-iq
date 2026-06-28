@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy, Component, computed, inject, signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { catchError, firstValueFrom, of } from 'rxjs';
 
@@ -9,7 +8,7 @@ import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { FeedItem } from '../../core/models';
 import { timeAgo } from '../../shared/format';
-import { BetaPullRefresh, BetaSkeleton } from '../beta-ui';
+import { BetaPullRefresh, BetaSkeleton, BetaEmptyState, BetaErrorState } from '../beta-ui';
 import { FeedComments } from '../feed/feed-comments';
 
 /** A feed row enriched with the derived bits the mobile template needs. */
@@ -58,7 +57,7 @@ interface FeedDayGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './feed-mobile.page.scss',
-  imports: [MatIconModule, RouterLink, BetaPullRefresh, BetaSkeleton, FeedComments],
+  imports: [MatIconModule, BetaPullRefresh, BetaSkeleton, BetaEmptyState, BetaErrorState, FeedComments],
   template: `
     <app-bs-pull-refresh class="fm-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="fm-scroll" aria-live="polite">
@@ -97,35 +96,27 @@ interface FeedDayGroup {
           </div>
 
         } @else if (errored()) {
-          <div class="fm-state">
-            <span class="fm-state__orb"><mat-icon aria-hidden="true">cloud_off</mat-icon></span>
-            <h2 class="fm-state__title">Couldn't load your feed</h2>
-            <p class="fm-state__body">Something went wrong fetching your circle's activity. Give it another go.</p>
-            <button type="button" class="fm-state__cta" (click)="reload()">
-              <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-            </button>
-          </div>
+          <app-bs-error
+            icon="cloud_off"
+            title="Couldn't load your feed"
+            body="Something went wrong fetching your circle's activity. Give it another go."
+            (retry)="reload()" />
 
         } @else if (isEmpty()) {
-          <div class="fm-state">
-            <span class="fm-state__orb"><mat-icon aria-hidden="true">bolt</mat-icon></span>
-            @if (viewsCircle()) {
-              <h2 class="fm-state__title">Quiet for now</h2>
-              <p class="fm-state__body">
-                As you and the people in your circle log workouts, complete challenge days, or hit goals,
-                they'll show up here.
-              </p>
-            } @else {
-              <h2 class="fm-state__title">Only seeing yourself</h2>
-              <p class="fm-state__body">
-                Turn on <strong>Show me my circle's feed</strong> in your profile to see what the people
-                you're connected with are up to.
-              </p>
-              <a class="fm-state__cta" routerLink="/profile">
-                <mat-icon aria-hidden="true">tune</mat-icon> Profile settings
-              </a>
-            }
-          </div>
+          @if (viewsCircle()) {
+            <app-bs-empty
+              icon="bolt"
+              title="Quiet for now"
+              body="As you and the people in your circle log workouts, complete challenge days, or hit goals, they'll show up here." />
+          } @else {
+            <app-bs-empty
+              icon="bolt"
+              title="Only seeing yourself"
+              body="Turn on “Show me my circle's feed” in your profile to see what the people you're connected with are up to."
+              ctaLabel="Profile settings"
+              ctaIcon="tune"
+              ctaLink="/profile" />
+          }
 
         } @else {
           <!-- ─── THE FEED: reverse-chron, grouped by day, sticky headers ─── -->

@@ -13,6 +13,7 @@ import {
   AgentPreviewResult,
   AgentTestResult,
 } from '../../core/models';
+import { BetaEmptyState, BetaErrorState } from '../beta-ui';
 
 /** Static catalog metadata for one agent kind: the wire kind + how it presents in the UI. */
 interface AgentMeta {
@@ -101,6 +102,8 @@ interface AgentRow extends AgentMeta {
     MatIconModule,
     MatProgressSpinnerModule,
     MatSlideToggleModule,
+    BetaEmptyState,
+    BetaErrorState,
   ],
   templateUrl: './agents.html',
   changeDetection: ChangeDetectionStrategy.Eager,

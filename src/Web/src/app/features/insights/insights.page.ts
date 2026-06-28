@@ -10,6 +10,7 @@ import {
   InsightCard, InsightKind, InsightWindow, InsightsNarrateResponse, InsightsResponse,
 } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
+import { BetaEmptyState, BetaErrorState } from '../beta-ui';
 
 /** A grid section: one closed `kind` group (Correlations / Trends / Streaks / Anomalies / Best & worst). */
 interface KindGroup {
@@ -47,7 +48,7 @@ interface KindGroup {
   selector: 'app-insights',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule, ChartComponent],
+  imports: [MatIconModule, ChartComponent, BetaEmptyState, BetaErrorState],
   styleUrl: './insights.page.scss',
   template: `
     <div class="iq">
@@ -101,27 +102,17 @@ interface KindGroup {
           }
         </div>
       } @else if (errored()) {
-        <div class="iq-state">
-          <span class="iq-state__orb"><mat-icon aria-hidden="true">error_outline</mat-icon></span>
-          <h2 class="iq-state__title">Couldn't load your insights</h2>
-          <p class="iq-state__body">Something went wrong crunching the numbers. Give it another go.</p>
-          <button type="button" class="iq-state__cta" (click)="reload()">
-            <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-          </button>
-        </div>
+        <app-bs-error
+          title="Couldn't load your insights"
+          body="Something went wrong crunching the numbers. Give it another go."
+          (retry)="reload()" />
       } @else if (!hasData()) {
-        <div class="iq-state">
-          <span class="iq-state__orb"><mat-icon aria-hidden="true">query_stats</mat-icon></span>
-          <h2 class="iq-state__title">Keep logging — insights appear once there's enough data</h2>
-          <p class="iq-state__body">
-            The engine needs a steady run of days across a couple of domains (sleep, food, activity, water,
-            weight, coffee, AI spend …) before correlations and trends become statistically honest. Log a few
-            more days and your first insights will surface here.
-          </p>
-          <a class="iq-state__cta" href="/tracker">
-            <mat-icon aria-hidden="true">arrow_forward</mat-icon> Open the tracker
-          </a>
-        </div>
+        <app-bs-empty
+          icon="query_stats"
+          title="Keep logging — insights appear once there's enough data"
+          body="The engine needs a steady run of days across a couple of domains (sleep, food, activity, water, weight, coffee, AI spend …) before correlations and trends become statistically honest. Log a few more days and your first insights will surface here."
+          ctaLabel="Open the tracker"
+          ctaLink="/tracker" />
       } @else {
         @for (g of groups(); track g.kind) {
           @if (g.cards.length) {

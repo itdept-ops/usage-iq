@@ -5,10 +5,10 @@
       <span>Opening the front door…</span>
     </div>
   } @else if (error()) {
-    <div class="family__error">
-      <mat-icon aria-hidden="true">error_outline</mat-icon>
-      <p>We couldn't reach the Family Hub just now. Please try again in a moment.</p>
-    </div>
+    <app-bs-error
+      title="We couldn't reach the Family Hub just now"
+      body="Please try again in a moment."
+      ctaLabel="" />
   } @else if (household(); as home) {
     <!-- Today hero: a warm, time-of-day greeting + the local date + a doorway to settings -->
     <header class="family__hero family__hero--today">

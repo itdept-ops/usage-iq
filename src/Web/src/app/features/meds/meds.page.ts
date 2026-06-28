@@ -13,6 +13,7 @@ import {
   VitalsResponse, VitalTrend,
 } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
+import { BetaErrorState } from '../beta-ui';
 
 /** A vital kind's UI descriptor — label, unit, icon, accent, range hint, and whether it carries a 2nd value. */
 interface VitalMeta {
@@ -54,7 +55,7 @@ interface WindowOpt { value: number; label: string; }
   selector: 'app-meds',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatIconModule, ChartComponent],
+  imports: [FormsModule, MatIconModule, ChartComponent, BetaErrorState],
   styleUrl: './meds.page.scss',
   template: `
     <div class="md">
@@ -88,14 +89,11 @@ interface WindowOpt { value: number; label: string; }
           @for (s of [1,2,3,4]; track s) { <div class="md-skel"></div> }
         </div>
       } @else if (errored()) {
-        <div class="md-state">
-          <span class="md-state__orb"><mat-icon aria-hidden="true">cloud_off</mat-icon></span>
-          <h2 class="md-state__title">Couldn't load your health log</h2>
-          <p class="md-state__body">Something went wrong fetching your data. Give it another go.</p>
-          <button type="button" class="md-state__cta" (click)="reload()">
-            <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-          </button>
-        </div>
+        <app-bs-error
+          icon="cloud_off"
+          title="Couldn't load your health log"
+          body="Something went wrong fetching your data. Give it another go."
+          (retry)="reload()" />
       } @else {
 
         <!-- ─────────── OPTIONAL ✨ INSIGHT (tracker.ai; floors otherwise) ─────────── -->

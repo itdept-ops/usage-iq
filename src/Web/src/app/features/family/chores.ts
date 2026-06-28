@@ -34,6 +34,7 @@ import {
 } from '../../core/models';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { ChoreEditorDialog, ChoreEditorData, ChoreEditorResult } from './chore-editor-dialog';
+import { BetaEmptyState, BetaErrorState } from '../beta-ui';
 
 /** Friendly labels for the recurrence chip. */
 const RECURRENCE_LABEL: Record<FamilyChoreRecurrence, string> = {
@@ -99,6 +100,8 @@ interface ValueRow {
     MatFormFieldModule,
     MatInputModule,
     MatSnackBarModule,
+    BetaEmptyState,
+    BetaErrorState,
   ],
   templateUrl: './chores.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -227,6 +230,12 @@ export class FamilyChores {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((s) => this.summary.set(s));
+  }
+
+  /** Public retry for the error-state CTA: clear the error flag and re-run the initial load. */
+  retryLoad(): void {
+    this.error.set(false);
+    this.reload(true);
   }
 
   private reload(initial = false): void {

@@ -12,7 +12,7 @@ import {
 } from '../../core/models';
 import {
   BetaPullRefresh, BetaSegmentedControl, BetaBottomSheet, BetaSkeleton, BetaFab,
-  BetaToaster, ToastController, type Segment,
+  BetaToaster, ToastController, BetaEmptyState, BetaErrorState, type Segment,
 } from '../beta-ui';
 
 const CADENCE_INT: Record<HabitCadence, number> = { Daily: 0, Weekly: 1, CustomDaysOfWeek: 2, XTimesPerPeriod: 3 };
@@ -67,6 +67,7 @@ function emptyDraft(): HabitDraft {
   imports: [
     FormsModule, MatIconModule,
     BetaPullRefresh, BetaSegmentedControl, BetaBottomSheet, BetaSkeleton, BetaFab, BetaToaster,
+    BetaEmptyState, BetaErrorState,
   ],
   template: `
     <app-bs-pull-refresh class="hm-ptr" [busy]="refreshing()" (refresh)="reload()">
@@ -93,12 +94,11 @@ function emptyDraft(): HabitDraft {
           <div class="hm-card" aria-hidden="true"><app-bs-skeleton height="140px" radius="var(--r-tile)" /></div>
 
         } @else if (errored()) {
-          <div class="hm-state">
-            <span class="hm-state__orb"><mat-icon aria-hidden="true">cloud_off</mat-icon></span>
-            <h2 class="hm-state__title">Couldn't load your habits</h2>
-            <p class="hm-state__body">Pull to retry.</p>
-            <button type="button" class="hm-state__cta" (click)="reload()"><mat-icon aria-hidden="true">refresh</mat-icon> Try again</button>
-          </div>
+          <app-bs-error
+            icon="cloud_off"
+            title="Couldn't load your habits"
+            body="Pull to retry."
+            (retry)="reload()" />
 
         } @else {
           <div class="hm-seg-wrap">
@@ -145,18 +145,18 @@ function emptyDraft(): HabitDraft {
                 }
               </section>
             } @else {
-              <div class="hm-empty">
-                <span class="hm-empty__orb"><mat-icon aria-hidden="true">checklist</mat-icon></span>
-                <p class="hm-empty__body">No habits yet. Tap + to create your first one.</p>
-              </div>
+              <app-bs-empty
+                icon="checklist"
+                title="No habits yet"
+                body="Tap + to create your first one." />
             }
           } @else {
             <section class="hm-board">
               @if (leaderboard().length <= 1) {
-                <div class="hm-empty">
-                  <span class="hm-empty__orb"><mat-icon aria-hidden="true">leaderboard</mat-icon></span>
-                  <p class="hm-empty__body">No one on the board yet — share your tracker with contacts to compare.</p>
-                </div>
+                <app-bs-empty
+                  icon="leaderboard"
+                  title="No one on the board yet"
+                  body="Share your tracker with contacts to compare." />
               } @else {
                 @for (row of leaderboard(); track row.userId; let i = $index) {
                   <div class="hm-row hm-reveal" [class.is-self]="row.isSelf" [style.--ri]="i">

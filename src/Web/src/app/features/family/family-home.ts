@@ -29,6 +29,7 @@ import {
 import { FamilyTimerWidget } from './timer';
 import { FamilyAssistantPanel } from './family-assistant-panel';
 import { FamilyLeaderboard } from './family-leaderboard';
+import { BetaErrorState } from '../beta-ui';
 
 /** One feature tile on the Family home grid. `route` is null for a not-yet-built ("Coming soon") tile. */
 interface FeatureTile {
@@ -164,6 +165,7 @@ const TILES: FeatureTile[] = [
     FamilyTimerWidget,
     FamilyAssistantPanel,
     FamilyLeaderboard,
+    BetaErrorState,
   ],
   templateUrl: './family-home.html',
   changeDetection: ChangeDetectionStrategy.Eager,

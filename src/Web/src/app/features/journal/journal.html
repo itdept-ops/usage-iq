@@ -13,14 +13,11 @@
     </div>
 
   } @else if (errored()) {
-    <div class="journal__state">
-      <mat-icon aria-hidden="true">cloud_off</mat-icon>
-      <h2>Couldn't load your journal</h2>
-      <p>Something went wrong fetching your entries. Give it another go.</p>
-      <button mat-stroked-button type="button" (click)="reload()">
-        <mat-icon>refresh</mat-icon> Try again
-      </button>
-    </div>
+    <app-bs-error
+      icon="cloud_off"
+      title="Couldn't load your journal"
+      body="Something went wrong fetching your entries. Give it another go."
+      (retry)="reload()" />
 
   } @else {
     <!-- ── WEEKLY REFLECTION (floored AI) ── -->

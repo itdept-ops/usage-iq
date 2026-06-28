@@ -9,7 +9,7 @@ import {
   ScheduledAgentDto, ScheduledAgentInput, AgentPreviewResult, AgentTestResult,
 } from '../../core/models';
 import {
-  BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaToaster, ToastController,
+  BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaToaster, ToastController, BetaErrorState,
 } from '../beta-ui';
 
 /** Static catalog metadata for one agent kind. */
@@ -91,7 +91,7 @@ interface PickerState {
   providers: [ToastController],
   imports: [
     MatIconModule,
-    BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaToaster,
+    BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaToaster, BetaErrorState,
   ],
   template: `
     <app-bs-pull-refresh class="ag-ptr" [busy]="refreshing()" [disabled]="loading()" (refresh)="reload()">
@@ -114,14 +114,11 @@ interface PickerState {
           </div>
 
         } @else if (errored()) {
-          <div class="ag-state">
-            <span class="ag-state__orb"><mat-icon aria-hidden="true">cloud_off</mat-icon></span>
-            <h2 class="ag-state__title">Couldn't load agents</h2>
-            <p class="ag-state__body">Something went wrong fetching your agents. Give it another go.</p>
-            <button type="button" class="ag-state__cta" (click)="reload()">
-              <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-            </button>
-          </div>
+          <app-bs-error
+            icon="cloud_off"
+            title="Couldn't load agents"
+            body="Something went wrong fetching your agents. Give it another go."
+            (retry)="reload()" />
 
         } @else {
           @for (r of rows(); track r.kind) {

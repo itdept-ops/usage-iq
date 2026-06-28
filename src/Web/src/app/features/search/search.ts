@@ -9,6 +9,7 @@ import { firstValueFrom } from 'rxjs';
 import { Api } from '../../core/api';
 import { SearchResultItem } from '../../core/models';
 import { SEARCH_DOMAINS, SearchDomainMeta, metaFor } from '../../core/search-meta';
+import { BetaEmptyState, BetaErrorState } from '../beta-ui';
 
 /** A rendered section: a domain's meta + its hits, in backend score order. */
 interface ResultGroup {
@@ -31,7 +32,7 @@ const DEBOUNCE_MS = 250;
  */
 @Component({
   selector: 'app-search',
-  imports: [FormsModule, MatIconModule],
+  imports: [FormsModule, MatIconModule, BetaEmptyState, BetaErrorState],
   templateUrl: './search.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './search.scss',

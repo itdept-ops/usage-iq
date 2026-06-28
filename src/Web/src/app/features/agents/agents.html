@@ -13,18 +13,14 @@
     <p>Loading your agents…</p>
   </div>
 } @else if (error()) {
-  <div class="state state--error" role="alert">
-    <mat-icon aria-hidden="true">cloud_off</mat-icon>
-    <p>We couldn't load your agents just now.</p>
-    <button mat-stroked-button type="button" (click)="load()">
-      <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-    </button>
-  </div>
+  <app-bs-error
+    icon="cloud_off"
+    title="We couldn't load your agents just now"
+    (retry)="load()" />
 } @else if (isEmpty()) {
-  <div class="state state--empty">
-    <mat-icon aria-hidden="true">smart_toy</mat-icon>
-    <p>No agents are available right now.</p>
-  </div>
+  <app-bs-empty
+    icon="smart_toy"
+    title="No agents are available right now" />
 } @else {
   <ul class="agents">
     @for (r of rows(); track trackRow($index, r)) {

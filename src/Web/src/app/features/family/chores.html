@@ -53,10 +53,10 @@
       <span>Tidying up the board…</span>
     </div>
   } @else if (error()) {
-    <div class="family__error">
-      <mat-icon aria-hidden="true">error_outline</mat-icon>
-      <p>We couldn't load the chore board just now. Please try again in a moment.</p>
-    </div>
+    <app-bs-error
+      title="We couldn't load the chore board just now"
+      body="Please try again in a moment."
+      (retry)="retryLoad()" />
   } @else if (isChild()) {
     <!-- ════════════════════════ KID-SAFE SCOPED VIEW ════════════════════════ -->
     <!-- Only the child's own chores + their own balance. No other members, no emails, no admin/finance nav. -->
@@ -477,14 +477,13 @@
     }
 
     @if (chores().length === 0) {
-      <div class="family__empty">
-        <mat-icon aria-hidden="true">checklist</mat-icon>
-        <h2>No chores yet</h2>
-        <p>Add a chore — assign it to a child, or post it to the marketplace for any kid to claim — and set how many stars and how much allowance it's worth.</p>
-        <button mat-flat-button color="primary" (click)="create()">
-          <mat-icon aria-hidden="true">add</mat-icon> New chore
-        </button>
-      </div>
+      <app-bs-empty
+        icon="checklist"
+        title="No chores yet"
+        body="Add a chore — assign it to a child, or post it to the marketplace for any kid to claim — and set how many stars and how much allowance it's worth."
+        ctaLabel="New chore"
+        ctaIcon="add"
+        (action)="create()" />
     } @else {
       <!-- ── Marketplace: open pool chores any kid can claim ─────────────── -->
       @if (poolOpen().length > 0) {

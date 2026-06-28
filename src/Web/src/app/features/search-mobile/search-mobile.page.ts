@@ -9,7 +9,7 @@ import { firstValueFrom } from 'rxjs';
 import { Api } from '../../core/api';
 import { SearchResultItem } from '../../core/models';
 import { SEARCH_DOMAINS, SearchDomainMeta, metaFor } from '../../core/search-meta';
-import { BetaSkeleton } from '../beta-ui';
+import { BetaSkeleton, BetaEmptyState, BetaErrorState } from '../beta-ui';
 
 /** A rendered section: a domain's meta + its hits. */
 interface ResultGroup {
@@ -42,7 +42,7 @@ const DEBOUNCE_MS = 250;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './search-mobile.page.scss',
-  imports: [FormsModule, MatIconModule, BetaSkeleton],
+  imports: [FormsModule, MatIconModule, BetaSkeleton, BetaEmptyState, BetaErrorState],
   template: `
     <div class="sm-scroll" aria-live="polite">
 
@@ -87,14 +87,10 @@ const DEBOUNCE_MS = 250;
         </div>
 
       } @else if (errored()) {
-        <div class="sm-state">
-          <span class="sm-state__orb"><mat-icon aria-hidden="true">error_outline</mat-icon></span>
-          <h2 class="sm-state__title">Something went wrong</h2>
-          <p class="sm-state__body">We couldn't run that search. Give it another go.</p>
-          <button type="button" class="sm-state__cta" (click)="submit()">
-            <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-          </button>
-        </div>
+        <app-bs-error
+          title="Something went wrong"
+          body="We couldn't run that search. Give it another go."
+          (retry)="submit()" />
 
       } @else if (tooShort()) {
         <div class="sm-state">
@@ -118,11 +114,10 @@ const DEBOUNCE_MS = 250;
         </div>
 
       } @else if (totalCount() === 0) {
-        <div class="sm-state">
-          <span class="sm-state__orb"><mat-icon aria-hidden="true">search_off</mat-icon></span>
-          <h2 class="sm-state__title">No matches</h2>
-          <p class="sm-state__body">Nothing you can see matches “{{ query() }}”. Try a different word.</p>
-        </div>
+        <app-bs-empty
+          icon="search_off"
+          title="No matches"
+          [body]="'Nothing you can see matches “' + query() + '”. Try a different word.'" />
 
       } @else {
         @for (g of groups(); track g.meta.key) {

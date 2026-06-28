@@ -15,7 +15,7 @@ import {
 import { ChartComponent } from '../../shared/chart';
 import {
   BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaFab, BetaToaster, ToastController,
-  BetaSvgRing, BetaSegmentedControl, type Segment,
+  BetaSvgRing, BetaSegmentedControl, BetaErrorState, type Segment,
 } from '../beta-ui';
 
 interface VitalMeta {
@@ -56,6 +56,7 @@ interface VitalMeta {
   imports: [
     FormsModule, MatIconModule, ChartComponent,
     BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaFab, BetaToaster, BetaSvgRing, BetaSegmentedControl,
+    BetaErrorState,
   ],
   template: `
     <app-bs-pull-refresh class="mv-ptr" [busy]="refreshing()" (refresh)="reload()">
@@ -73,14 +74,11 @@ interface VitalMeta {
           <app-bs-skeleton height="150px" radius="var(--r-tile)" />
           <app-bs-skeleton height="220px" radius="var(--r-tile)" />
         } @else if (errored()) {
-          <div class="mv-state">
-            <span class="mv-state__orb"><mat-icon aria-hidden="true">cloud_off</mat-icon></span>
-            <h2 class="mv-state__title">Couldn't load your log</h2>
-            <p class="mv-state__body">Something went wrong. Give it another go.</p>
-            <button type="button" class="mv-state__cta" (click)="reload()">
-              <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-            </button>
-          </div>
+          <app-bs-error
+            icon="cloud_off"
+            title="Couldn't load your log"
+            body="Something went wrong. Give it another go."
+            (retry)="reload()" />
         } @else {
 
           <!-- ─── OPTIONAL ✨ INSIGHT ─── -->

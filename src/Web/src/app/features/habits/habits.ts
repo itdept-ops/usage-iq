@@ -15,6 +15,7 @@ import {
   CreateHabitRequest, HabitCadence, HabitCoachDto, HabitDayDto, HabitDto,
   HabitLeaderboardRowDto, PERM, UpdateHabitRequest,
 } from '../../core/models';
+import { BetaEmptyState, BetaErrorState } from '../beta-ui';
 
 /** Cadence enum int values (mirror HabitCadence: Daily=0, Weekly=1, CustomDaysOfWeek=2, XTimesPerPeriod=3). */
 const CADENCE_INT: Record<HabitCadence, number> = {
@@ -69,6 +70,7 @@ interface HabitCalCell { iso: string; dayNum: number; inMonth: boolean; isToday:
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, MatIconModule, MatButtonModule, MatSnackBarModule, MatProgressSpinnerModule,
+    BetaEmptyState, BetaErrorState,
   ],
   templateUrl: './habits.html',
   styleUrl: './habits.scss',

@@ -13,28 +13,26 @@
   </div>
 } @else if (error()) {
   <!-- Load error -->
-  <div class="state state--error" role="alert">
-    <mat-icon aria-hidden="true">cloud_off</mat-icon>
-    <p>We couldn't load your feed just now.</p>
-    <button mat-stroked-button type="button" (click)="load()">
-      <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-    </button>
-  </div>
+  <app-bs-error
+    icon="cloud_off"
+    title="We couldn't load your feed just now"
+    (retry)="load()" />
 } @else if (isEmpty()) {
   <!-- Empty -->
-  <div class="state state--empty">
-    <mat-icon aria-hidden="true">bolt</mat-icon>
-    @if (viewsCircle()) {
-      <p>No activity yet. As you and the people in your circle log workouts, complete challenge days, or
-        hit goals, they'll show up here.</p>
-    } @else {
-      <p>You're only seeing your own activity. Turn on <strong>Show me my circle's feed</strong> in your
-        profile to see what the people you're connected with are up to.</p>
-      <a mat-stroked-button routerLink="/profile">
-        <mat-icon aria-hidden="true">tune</mat-icon> Profile settings
-      </a>
-    }
-  </div>
+  @if (viewsCircle()) {
+    <app-bs-empty
+      icon="bolt"
+      title="No activity yet"
+      body="As you and the people in your circle log workouts, complete challenge days, or hit goals, they'll show up here." />
+  } @else {
+    <app-bs-empty
+      icon="bolt"
+      title="You're only seeing your own activity"
+      body="Turn on “Show me my circle's feed” in your profile to see what the people you're connected with are up to."
+      ctaLabel="Profile settings"
+      ctaIcon="tune"
+      ctaLink="/profile" />
+  }
 } @else {
   <!-- The feed: reverse-chron, grouped by day -->
   <div class="feed" role="feed" aria-label="Activity feed">

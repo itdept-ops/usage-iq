@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy, Component, computed, inject, signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { firstValueFrom } from 'rxjs';
 
@@ -10,7 +9,7 @@ import {
   InsightCard, InsightKind, InsightWindow, InsightsNarrateResponse, InsightsResponse,
 } from '../../core/models';
 import {
-  BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, type Segment,
+  BetaEmptyState, BetaErrorState, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, type Segment,
 } from '../beta-ui';
 
 /** One feed card augmented with its kind-section label so the swipe stack reads as grouped. */
@@ -43,8 +42,8 @@ interface FeedCard extends InsightCard {
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './insights.page.scss',
   imports: [
-    RouterLink, MatIconModule,
-    BetaPullRefresh, BetaSegmentedControl, BetaSkeleton,
+    MatIconModule,
+    BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaEmptyState, BetaErrorState,
   ],
   template: `
     <!-- ─────────── STICKY GLASS TOP: window switcher ─────────── -->
@@ -68,28 +67,18 @@ interface FeedCard extends InsightCard {
           </div>
 
         } @else if (errored()) {
-          <div class="im-state">
-            <span class="im-state__orb"><mat-icon aria-hidden="true">error_outline</mat-icon></span>
-            <h2 class="im-state__title">Couldn't load insights</h2>
-            <p class="im-state__body">Something went wrong crunching the numbers. Give it another go.</p>
-            <button type="button" class="im-state__cta" (click)="reload()">
-              <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-            </button>
-          </div>
+          <app-bs-error
+            title="Couldn't load insights"
+            body="Something went wrong crunching the numbers. Give it another go."
+            (retry)="reload()" />
 
         } @else if (!hasData()) {
-          <div class="im-state">
-            <span class="im-state__orb"><mat-icon aria-hidden="true">query_stats</mat-icon></span>
-            <h2 class="im-state__title">Keep logging</h2>
-            <p class="im-state__body">
-              Insights appear once there's enough data. Log a steady run of days across a few domains —
-              sleep, food, activity, water, weight, coffee, AI spend — and your first correlations &amp;
-              trends surface here.
-            </p>
-            <a class="im-state__cta" routerLink="/tracker-beta">
-              <mat-icon aria-hidden="true">arrow_forward</mat-icon> Open the tracker
-            </a>
-          </div>
+          <app-bs-empty
+            icon="query_stats"
+            title="Keep logging"
+            body="Insights appear once there's enough data. Log a steady run of days across a few domains — sleep, food, activity, water, weight, coffee, AI spend — and your first correlations & trends surface here."
+            ctaLabel="Open the tracker"
+            ctaLink="/tracker-beta" />
 
         } @else {
           <!-- ─── optional AI narrative banner (tracker.ai only) ─── -->

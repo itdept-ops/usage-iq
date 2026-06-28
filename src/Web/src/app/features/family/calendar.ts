@@ -42,6 +42,7 @@ import { downscaleToJpeg, readFileAsBase64 } from '../tracker/ai-image';
 import { FamilyConfirmDialog, ConfirmData } from './confirm-dialog';
 import { EventEditorDialog, EventEditorData, EventEditorResult } from './event-editor-dialog';
 import { FindTimeData, FindTimeDialog, FindTimeResultSlot } from './find-time-dialog';
+import { BetaEmptyState, BetaErrorState } from '../beta-ui';
 
 /* The Google OAuth code client (loaded via the GIS script in index.html). */
 declare const google: any;
@@ -145,6 +146,8 @@ type ViewMode = 'week' | 'agenda' | 'month';
     MatFormFieldModule,
     MatInputModule,
     MatSnackBarModule,
+    BetaEmptyState,
+    BetaErrorState,
   ],
   templateUrl: './calendar.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -546,6 +549,12 @@ export class FamilyCalendar implements OnDestroy {
   }
 
   // ---- Status + connection lifecycle ----
+
+  /** Public retry for the status error-state CTA. */
+  retryStatus(): void { void this.loadStatus(); }
+
+  /** Public retry for the week-events error-state CTA. */
+  retryEvents(): void { void this.loadEvents(); }
 
   private async loadStatus(): Promise<void> {
     this.loadingStatus.set(true);

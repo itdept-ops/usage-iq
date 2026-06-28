@@ -43,11 +43,10 @@
 
   <!-- ─────────────────────────── body ─────────────────────────── -->
   @if (errored()) {
-    <div class="search__state">
-      <mat-icon class="search__state-ic" aria-hidden="true">error_outline</mat-icon>
-      <h2 class="search__state-title">Something went wrong</h2>
-      <p class="search__state-body">We couldn't run that search. Try again in a moment.</p>
-    </div>
+    <app-bs-error
+      title="Something went wrong"
+      body="We couldn't run that search. Try again in a moment."
+      (retry)="submit()" />
 
   } @else if (tooShort()) {
     <div class="search__state">
@@ -72,11 +71,10 @@
     </div>
 
   } @else if (totalCount() === 0) {
-    <div class="search__state">
-      <mat-icon class="search__state-ic" aria-hidden="true">search_off</mat-icon>
-      <h2 class="search__state-title">No matches</h2>
-      <p class="search__state-body">Nothing you can see matches “{{ query() }}”. Try a different word.</p>
-    </div>
+    <app-bs-empty
+      icon="search_off"
+      title="No matches"
+      [body]="'Nothing you can see matches “' + query() + '”. Try a different word.'" />
 
   } @else {
     <div class="search__results" aria-live="polite">

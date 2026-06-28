@@ -12,6 +12,7 @@ import {
 } from '../../core/models';
 import {
   BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaFab, BetaToaster, ToastController,
+  BetaEmptyState, BetaErrorState,
 } from '../beta-ui';
 
 interface MoodChoice { value: string; label: string; emoji: string; }
@@ -40,6 +41,7 @@ interface MoodChoice { value: string; label: string; emoji: string; }
   imports: [
     FormsModule, MatIconModule,
     BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaFab, BetaToaster,
+    BetaEmptyState, BetaErrorState,
   ],
   template: `
     <app-bs-pull-refresh class="jr-ptr" [busy]="refreshing()" (refresh)="reload()">
@@ -57,14 +59,11 @@ interface MoodChoice { value: string; label: string; emoji: string; }
           <div class="jr-card" aria-hidden="true"><app-bs-skeleton height="240px" radius="var(--r-tile)" /></div>
 
         } @else if (errored()) {
-          <div class="jr-state">
-            <span class="jr-state__orb"><mat-icon aria-hidden="true">cloud_off</mat-icon></span>
-            <h2 class="jr-state__title">Couldn't load your journal</h2>
-            <p class="jr-state__body">Something went wrong fetching your entries. Give it another go.</p>
-            <button type="button" class="jr-state__cta" (click)="reload()">
-              <mat-icon aria-hidden="true">refresh</mat-icon> Try again
-            </button>
-          </div>
+          <app-bs-error
+            icon="cloud_off"
+            title="Couldn't load your journal"
+            body="Something went wrong fetching your entries. Give it another go."
+            (retry)="reload()" />
 
         } @else {
           <!-- weekly reflection -->
@@ -102,10 +101,10 @@ interface MoodChoice { value: string; label: string; emoji: string; }
                 }
               </div>
             } @else {
-              <div class="jr-empty">
-                <span class="jr-empty__orb"><mat-icon aria-hidden="true">edit_note</mat-icon></span>
-                <p class="jr-empty__body">No entries yet. Tap + to write your first one.</p>
-              </div>
+              <app-bs-empty compact
+                icon="edit_note"
+                title="No entries yet"
+                body="Tap + to write your first one." />
             }
           </section>
         }
