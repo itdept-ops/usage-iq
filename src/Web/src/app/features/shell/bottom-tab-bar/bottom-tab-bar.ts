@@ -4,6 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 
 import { AuthService } from '../../../core/auth';
 import { PlatformService } from '../../../core/platform';
+import { SnapRouteService } from '../../../core/snap-route';
 import { bottomTabs, navGroups, type NavItem } from '../../../core/nav-model';
 import { BetaBottomSheet } from '../../beta-ui';
 
@@ -34,6 +35,16 @@ import { BetaBottomSheet } from '../../beta-ui';
   styleUrl: './bottom-tab-bar.scss',
   imports: [RouterLink, RouterLinkActive, MatIconModule, BetaBottomSheet],
   template: `
+    <!-- The GLOBAL "+ Snap" capture FAB: a persistent raised circular rear-camera button anchored above the
+         bar center (the primary capture affordance on mobile). It opens the OS rear camera via the shared
+         Snap & Route orchestrator (captureImage → classify → route-review). Shown only when the caller can
+         capture (ai.vision + at least one writable destination — see SnapRouteService.canCapture). -->
+    @if (canSnap()) {
+      <button type="button" class="snapfab" (click)="snap()" aria-label="Snap a photo and route it">
+        <mat-icon aria-hidden="true">photo_camera</mat-icon>
+      </button>
+    }
+
     <nav class="tabbar" aria-label="Primary">
       @for (t of tabs(); track t.id) {
         <a class="tab" [routerLink]="t.path" routerLinkActive="active"
@@ -115,6 +126,15 @@ export class BottomTabBar {
   private readonly auth = inject(AuthService);
   private readonly platform = inject(PlatformService);
   private readonly router = inject(Router);
+  private readonly snapRoute = inject(SnapRouteService);
+
+  /** Whether to show the global "+ Snap" capture FAB (ai.vision + ≥1 writable destination; reactive to /me). */
+  protected readonly canSnap = this.snapRoute.canCapture;
+
+  /** Open the OS rear camera → classify → route-review via the shared Snap & Route orchestrator. */
+  protected snap(): void {
+    this.snapRoute.request();
+  }
 
   /** routerLinkActiveOptions — '/' must match exactly (else it's active on every route); the rest prefix-match. */
   protected readonly exact = { exact: true } as const;

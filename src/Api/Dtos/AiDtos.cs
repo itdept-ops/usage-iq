@@ -271,6 +271,56 @@ public sealed class ScanPantryResponse
 }
 
 // ===================================================================================
+// classify-photo — "Snap & Route" thin orchestrator: classify ONE photo into a domain
+// ===================================================================================
+
+/// <summary>
+/// The classification of a single captured photo for the "Snap &amp; Route" capture surface. <see cref="Kind"/>
+/// is the CLOSED set the frontend routes on — one of <c>receipt | label | meal | pantry | schedule | note |
+/// unknown</c> — and it is a HINT ONLY: every actual write still flows through the matching destination
+/// endpoint's own clamps + write-permission gate, so a misclassification can NEVER bypass a gate. On the
+/// always-200 floor (AI off / unconfigured / unreadable / low-confidence) <see cref="Kind"/> is
+/// <c>unknown</c> so the frontend shows a manual route picker. <see cref="Confidence"/> is 0..1;
+/// <see cref="Hint"/> is a SHORT human-readable note (e.g. "Looks like a grocery receipt"). The image is
+/// digested in-memory only and NEVER stored.
+/// </summary>
+public sealed class ClassifyPhotoResponse
+{
+    /// <summary>The detected domain — one of receipt|label|meal|pantry|schedule|note|unknown.</summary>
+    public string Kind { get; set; } = "unknown";
+
+    /// <summary>The model's self-reported confidence, clamped 0..1 (0 on the floor).</summary>
+    public double Confidence { get; set; }
+
+    /// <summary>A short human-readable hint about what the photo appears to be (&lt;=200 chars), or null.</summary>
+    public string? Hint { get; set; }
+}
+
+// ===================================================================================
+// photo-to-note — multimodal transcription of a whiteboard / handwritten / printed note
+// ===================================================================================
+
+/// <summary>
+/// The transcription of a whiteboard / handwritten / printed-note photo into a reviewable note for the
+/// "Snap &amp; Route" note destination. <see cref="Body"/> is markdown. INJECTION-GUARDED: the photo's text is
+/// treated strictly as DATA — instructions written inside it are never followed (same guard as the schedule
+/// reader). On the always-200 floor (AI off / unconfigured / unreadable) both fields are empty so the frontend
+/// degrades to a blank note editor. The frontend posts the CONFIRMED note to the EXISTING POST
+/// <c>/api/family/notes</c> (which re-gates on family.use). The image is digested in-memory only and NEVER stored.
+/// </summary>
+public sealed class PhotoToNoteResponse
+{
+    /// <summary>A short title for the note (&lt;=200 chars), or "" on the floor / when none could be read.</summary>
+    public string Title { get; set; } = "";
+
+    /// <summary>The transcribed note body as markdown (&lt;=4000 chars), or "" on the floor.</summary>
+    public string Body { get; set; } = "";
+
+    /// <summary>False on the friendly floor (AI off / unconfigured / unreadable); true when the model transcribed.</summary>
+    public bool AiUsed { get; set; }
+}
+
+// ===================================================================================
 // suggest-foods — from the caller's remaining calories/macros today (read server-side)
 // ===================================================================================
 

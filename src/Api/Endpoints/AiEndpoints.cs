@@ -147,6 +147,72 @@ public static class AiEndpoints
             return Results.Ok(new ScanPantryResponse { AiUsed = true, Ingredients = list });
         }).RequirePermission(Permissions.AiVision).RequireRateLimiting(PhotoRateLimitPolicy);
 
+        // ---- SNAP & ROUTE: classify ONE captured photo into a domain so the frontend can route it ----
+        // The thin ORCHESTRATOR for the unified "+ Snap" capture: it ONLY classifies (cheap, low-token) into the
+        // closed set receipt|label|meal|pantry|schedule|note|unknown; the per-route EXTRACTION is the matching
+        // EXISTING reader's job (photo-meal/read-label/scan-pantry/receipt/from-image/photo-to-note). The kind is
+        // a HINT ONLY — every real write still flows through its destination endpoint's own clamps + write gate,
+        // so a misclassification can NEVER bypass a gate. Same ai.vision gate + same image validation (jpeg/png/
+        // webp, <=5 MB) + same in-memory-only, never-stored handling as the other photo readers. Like /scan-pantry
+        // it NEVER 503s: AI off / unconfigured / unreadable / low-confidence floors to 200 {kind:"unknown"} so the
+        // surface degrades to a manual route picker. The ONLY non-200 is a bad/oversized image (400). The image
+        // text is treated strictly as DATA.
+        g.MapPost("/classify-photo", async (
+            ImageRequest body, GeminiService gemini, CancellationToken ct) =>
+        {
+            // Validate the image FIRST so a bad/oversized upload is a clear 400 regardless of config.
+            if (!TryValidateImage(body, out var base64, out var mime, out var bad)) return bad;
+
+            // Friendly always-200 floor when AI is off/unconfigured (NEVER a 503 from the capture surface).
+            if (!gemini.IsConfigured) return Results.Ok(new ClassifyPhotoResponse());
+
+            (string Kind, double Confidence, string? Hint)? result;
+            try { result = await gemini.ClassifyPhotoAsync(base64, mime, ct); }
+            catch { result = null; }
+
+            // Unavailable / unreadable -> the same friendly floor (200 {kind:"unknown"}), not a 503.
+            if (result is null) return Results.Ok(new ClassifyPhotoResponse());
+            return Results.Ok(new ClassifyPhotoResponse
+            {
+                Kind = result.Value.Kind,
+                Confidence = result.Value.Confidence,
+                Hint = result.Value.Hint,
+            });
+        }).RequirePermission(Permissions.AiVision).RequireRateLimiting(PhotoRateLimitPolicy);
+
+        // ---- SNAP & ROUTE: transcribe a whiteboard/handwritten/printed-note photo into a reviewable note ----
+        // The note destination of the capture surface: it transcribes the photo's text into {title, body}
+        // (markdown) for the user to review. INJECTION-GUARDED (same as the schedule reader): the photo's text is
+        // strictly DATA — instructions written inside it are NEVER followed. WRITES NOTHING: the frontend posts the
+        // CONFIRMED note to the EXISTING POST /api/family/notes (which re-gates on family.use). Gated by the group's
+        // tracker.ai PLUS family.ai (the Family-Hub AI gate, checked here since the route group is /ai) ON TOP of
+        // ai.vision (the multimodal gate). Same image validation + in-memory-only, never-stored handling. Like
+        // /scan-pantry it NEVER 503s: AI off / unconfigured / unreadable floors to 200 with empty fields so the
+        // frontend opens a blank note editor. The ONLY non-200 is a bad/oversized image (400).
+        g.MapPost("/photo-to-note", async (
+            ImageRequest body, GeminiService gemini, CancellationToken ct) =>
+        {
+            // Validate the image FIRST so a bad/oversized upload is a clear 400 regardless of config.
+            if (!TryValidateImage(body, out var base64, out var mime, out var bad)) return bad;
+
+            // Friendly always-200 floor when AI is off/unconfigured (NEVER a 503 from the capture surface).
+            if (!gemini.IsConfigured) return Results.Ok(new PhotoToNoteResponse());
+
+            (string Title, string Body)? result;
+            try { result = await gemini.PhotoToNoteAsync(base64, mime, ct); }
+            catch { result = null; }
+
+            // Unavailable / unreadable -> the same friendly floor (200, empty fields), not a 503.
+            if (result is null) return Results.Ok(new PhotoToNoteResponse());
+            return Results.Ok(new PhotoToNoteResponse
+            {
+                AiUsed = true,
+                Title = result.Value.Title,
+                Body = result.Value.Body,
+            });
+        }).RequirePermission(Permissions.AiVision).RequirePermission(Permissions.FamilyAi)
+          .RequireRateLimiting(PhotoRateLimitPolicy);
+
         // ---- Quick feedback (verdict + swaps) on a free-text meal ----
         g.MapPost("/meal-feedback", async (
             MealFeedbackRequest body, CurrentUserAccessor me, GeminiService gemini, UsageDbContext db,

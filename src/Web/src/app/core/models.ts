@@ -2021,6 +2021,42 @@ export interface ImageRequest {
   mimeType: string;
 }
 
+// ---- Snap & Route: photo-anything capture (POST /api/ai/classify-photo + /api/ai/photo-to-note) ----
+
+/**
+ * The closed set of domains the "Snap & Route" classifier maps a photo to. `unknown` means the AI was
+ * off / unconfigured / unreadable / low-confidence — the surface degrades to a manual route picker. The
+ * kind is a HINT ONLY: every actual write still flows through its destination endpoint's own clamps +
+ * write-permission gate, so a misclassification can NEVER bypass a gate. Mirrors the backend's closed set.
+ */
+export type PhotoKind = 'receipt' | 'label' | 'meal' | 'pantry' | 'schedule' | 'note' | 'unknown';
+
+/**
+ * The classify-photo result (POST /api/ai/classify-photo; mirrors ClassifyPhotoResponse). ALWAYS 200: on
+ * the floor (AI off / unconfigured / unreadable / low-confidence) `kind` is `'unknown'` and `confidence`
+ * is 0, so the frontend shows a manual route picker. `confidence` is 0..1; `hint` is a short human-readable
+ * note (e.g. "Looks like a grocery receipt"), or null. The image is digested in-memory only and NEVER stored.
+ */
+export interface ClassifyPhotoResponse {
+  kind: PhotoKind;
+  confidence: number;
+  hint?: string | null;
+}
+
+/**
+ * The photo-to-note transcription (POST /api/ai/photo-to-note; mirrors PhotoToNoteResponse). `body` is
+ * markdown. INJECTION-GUARDED server-side: the photo's text is strictly DATA — instructions written inside
+ * it are never followed. ALWAYS 200: on the floor (AI off / unconfigured / unreadable) both fields are
+ * empty (and `aiUsed` is false) so the frontend opens a blank note editor. WRITES NOTHING — the frontend
+ * posts the CONFIRMED note to the EXISTING POST /api/family/notes (which re-gates on family.use). The image
+ * is digested in-memory only and NEVER stored.
+ */
+export interface PhotoToNoteResponse {
+  title: string;
+  body: string;
+  aiUsed: boolean;
+}
+
 /** A single nutrition-label read from a photo (POST /api/ai/read-label; clamped server-side). Mirrors ReadLabelResponse. */
 export interface ReadLabelResponse {
   description: string;

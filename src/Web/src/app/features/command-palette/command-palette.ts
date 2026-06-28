@@ -295,6 +295,10 @@ export class CommandPalette {
       this.quickAddHandler();
       return;
     }
+    if (cmd.action === 'snap') {
+      this.snapHandler();
+      return;
+    }
     if (cmd.route) void this.router.navigateByUrl(cmd.route);
   }
 
@@ -305,11 +309,15 @@ export class CommandPalette {
    */
   private quickAddHandler: () => void = () => {};
   private logoutHandler: () => void = () => {};
+  private snapHandler: () => void = () => {};
   setQuickAddHandler(fn: () => void): void {
     this.quickAddHandler = fn;
   }
   setLogoutHandler(fn: () => void): void {
     this.logoutHandler = fn;
+  }
+  setSnapHandler(fn: () => void): void {
+    this.snapHandler = fn;
   }
 
   // ---- keyboard ----

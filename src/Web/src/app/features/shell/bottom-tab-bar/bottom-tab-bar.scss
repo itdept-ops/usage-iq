@@ -40,6 +40,31 @@
   box-shadow: var(--lift-3);
 }
 
+// The global "+ Snap" capture FAB — a raised circular rear-camera button centered above the bar edge.
+// Floats just over the top border so it reads as the primary affordance without stealing a tab slot.
+.snapfab {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 26px); // sit half-over the top edge of the bar
+  transform: translateX(-50%);
+  z-index: 1;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--bg-base, #0a0e14);
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: var(--ink-on-accent, #fff);
+  box-shadow: var(--lift-3);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms var(--ease-spring), box-shadow 120ms var(--ease-out);
+}
+.snapfab:active { transform: translateX(-50%) scale(.94); box-shadow: var(--press); }
+.snapfab mat-icon { width: 26px; height: 26px; font-size: 26px; line-height: 26px; }
+.snapfab:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+
 // One tab — a routerLink anchor (or the "More" button). Flex column: icon over label.
 .tab {
   flex: 1 1 0;

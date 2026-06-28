@@ -27,8 +27,8 @@ export interface CommandDef {
    * component maps the `action` id to a shell method (kept declarative so the registry has no Angular deps).
    */
   route?: string;
-  /** Named shell action (mapped in the component): 'quickAdd' | 'logout' | 'profile'. */
-  action?: 'quickAdd' | 'logout';
+  /** Named shell action (mapped in the component): 'quickAdd' | 'logout' | 'snap'. */
+  action?: 'quickAdd' | 'logout' | 'snap';
 }
 
 /**
@@ -80,6 +80,7 @@ export const COMMAND_DEFS: readonly CommandDef[] = [
 
   // ---- Actions (one-call paths the scout confirmed safe from the shell) ----
   { id: 'act-quick-add', label: 'Quick add (list / reminder / note)', group: 'Actions', icon: 'bolt', action: 'quickAdd', perm: [PERM.familyUse], keywords: ['new', 'capture', 'add', 'q'] },
+  { id: 'act-snap', label: 'Snap a photo (route it anywhere)', group: 'Actions', icon: 'photo_camera', action: 'snap', perm: [PERM.aiVision], keywords: ['snap', 'photo', 'camera', 'receipt', 'label', 'meal', 'pantry', 'schedule', 'note', 'scan', 'capture'] },
   { id: 'act-log-food', label: 'Log food', group: 'Actions', icon: 'restaurant', route: '/tracker', perm: [PERM.trackerSelf], keywords: ['eat', 'meal', 'calories', 'macros'] },
   { id: 'act-log-water', label: 'Log water / hydration', group: 'Actions', icon: 'water_drop', route: '/tracker', perm: [PERM.trackerSelf], keywords: ['drink', 'fluid', 'hydration'] },
   { id: 'act-log-coffee', label: 'Log coffee', group: 'Actions', icon: 'local_cafe', route: '/tracker', perm: [PERM.trackerSelf], keywords: ['caffeine', 'espresso'] },

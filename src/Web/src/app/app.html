@@ -414,6 +414,17 @@
       </button>
     }
 
+    <!-- Snap & route: the DESKTOP capture entry (the mobile primary is the bottom-tab camera FAB). Opens a
+         file-drop/upload modal that classifies the photo and routes it to the matching destination. Shown
+         only when the caller can capture (ai.vision + ≥1 writable destination). -->
+    @if (showSnap()) {
+      <button mat-icon-button type="button" class="snap-trigger" (click)="openSnap()"
+              matTooltip="Snap & route a photo" matTooltipClass="axon-tip"
+              aria-label="Snap a photo and route it to the right place">
+        <mat-icon>photo_camera</mat-icon>
+      </button>
+    }
+
     <!-- Command palette trigger: opens the global search/commands overlay (⌘K / Ctrl-K, or "/").
          A single icon so it survives the mobile nav-burger collapse and stays reachable on phones. -->
     <button mat-icon-button type="button" class="cmdp-trigger" (click)="palette.show()"
@@ -699,3 +710,8 @@
 <!-- Global command palette overlay: mounted once for the whole shell. Renders nothing unless opened AND
      the caller is authenticated (it's inert on the bare/public chrome). Driven by CommandPaletteService. -->
 <app-command-palette />
+
+<!-- Snap & Route capture surface: mounted once for the whole shell. Inert until a trigger (the mobile
+     bottom-tab camera FAB, the desktop top-bar button, or the ⌘K palette action) calls SnapRouteService.
+     One capture → classify → route-review flow, reusing the existing per-destination readers + writes. -->
+<app-snap-route />

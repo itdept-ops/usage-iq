@@ -13,7 +13,7 @@ import {
   AddSleepRequest, SleepEntryDto, SleepInsightResponse, ClientInfoRequest,
   CoffeeEntryDto, GoalPlanDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
   AiUsageFilter, AiUsageResponse,
-  NotificationUpdate, DiscordRoute, DiscordRouteUpdate, MyDiscord, MyDiscordUpdate, RecapPreview, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, ParseMealResultDto, PermissionItem, PermissionPreset, Presence, PersonDto, NudgeKind, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, ScanPantryResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
+  NotificationUpdate, DiscordRoute, DiscordRouteUpdate, MyDiscord, MyDiscordUpdate, RecapPreview, PagedResult, ParseExerciseRequest, ParseExerciseResponse, ParseHydrationRequest, ParseHydrationResponse, ParseMealRequest, ParseMealResponse, ParseMealResultDto, PermissionItem, PermissionPreset, Presence, PersonDto, NudgeKind, Pricing, ProjectDto, PublicShare, ReactionGroupDto, ReadLabelResponse, ScanPantryResponse, ClassifyPhotoResponse, PhotoToNoteResponse, RecipeMacrosRequest, RecipeMacrosResponse, RequestLogEntry, SavedView, ScheduleAiResult, ScheduleFromImageRequest, ScheduleImageFile,
   SavedViewUpsertRequest, SessionDetail, Settings, ShareAccessItem, ShareCreated, ShareListItem, SharedUserDto, SuggestGoalResponse, SuggestWorkoutRequest, SuggestWorkoutResponse, SummaryResponse,
   SyncResult, SyncStatus, TrackerDayDto, TrackerProfileDto, TrackerRecapResult, UpsertActivityRequest, UsageFilter, UsageRecord, UsageStats,
   WatchActivityDto, WeeklyReviewResponse, WeightInsightResponse, WeightPointDto, WeightStatsDto, WhatToEatRequest, WhatToEatResult, WorkoutXSearchResultDto,
@@ -1158,6 +1158,29 @@ export class Api {
    */
   scanPantry(body: ImageRequest): Observable<ScanPantryResponse> {
     return this.http.post<ScanPantryResponse>(`${this.base}/ai/scan-pantry`, body);
+  }
+
+  /**
+   * SNAP & ROUTE: classify ONE captured photo into a domain (receipt|label|meal|pantry|schedule|note|unknown)
+   * so the capture surface can route it to the matching existing reader. CHEAP classify-only call — the per-route
+   * EXTRACTION is the destination endpoint's job. `imageBase64` is raw base64 (no `data:` prefix). ALWAYS 200:
+   * AI off/unconfigured/unreadable/low-confidence → `{ kind:'unknown', confidence:0 }` so the surface degrades to
+   * a manual route picker (never a 503). The ONLY non-200 is a bad/oversized image (400). The kind is a HINT —
+   * every write re-gates downstream. ai.vision + tracker.ai gated server-side; rate-limited "ai-photo". Image never stored.
+   */
+  classifyPhoto(body: ImageRequest): Observable<ClassifyPhotoResponse> {
+    return this.http.post<ClassifyPhotoResponse>(`${this.base}/ai/classify-photo`, body);
+  }
+
+  /**
+   * SNAP & ROUTE: transcribe a whiteboard/handwritten/printed-note photo into a reviewable `{ title, body }`
+   * (markdown). `imageBase64` is raw base64 (no `data:` prefix). INJECTION-GUARDED server-side (the photo's text
+   * is strictly DATA). WRITES NOTHING — the caller posts the CONFIRMED note to {@link createFamilyNote}. ALWAYS 200:
+   * AI off/unconfigured/unreadable → `{ aiUsed:false, title:'', body:'' }` (a blank editor); the ONLY non-200 is a
+   * bad/oversized image (400). ai.vision + family.ai gated server-side; rate-limited "ai-photo". Image never stored.
+   */
+  photoToNote(body: ImageRequest): Observable<PhotoToNoteResponse> {
+    return this.http.post<PhotoToNoteResponse>(`${this.base}/ai/photo-to-note`, body);
   }
 
   /**

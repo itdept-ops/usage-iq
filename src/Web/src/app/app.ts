@@ -42,6 +42,8 @@ import { NotificationBell } from './features/notifications/notification-bell';
 import { BETA_EXPERIMENTS, BetaExperiment, canSeeExperiment } from './features/beta/beta-experiments';
 import { MobileTopbar } from './features/shell/mobile-topbar/mobile-topbar';
 import { BottomTabBar } from './features/shell/bottom-tab-bar/bottom-tab-bar';
+import { SnapRouteOrchestrator } from './features/snap-route/snap-route-orchestrator';
+import { SnapRouteService } from './core/snap-route';
 
 /** A teammate online, enriched with the initials + "you" flag the indicator needs to render. */
 interface OnlineUser extends Presence {
@@ -75,6 +77,7 @@ interface QuickLink {
     CommandPalette,
     MobileTopbar,
     BottomTabBar,
+    SnapRouteOrchestrator,
   ],
   templateUrl: './app.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -103,6 +106,15 @@ export class App implements AfterViewInit {
   readonly palette = inject(CommandPaletteService);
   readonly theme = inject(ThemeService);
   readonly platform = inject(PlatformService);
+  readonly snapRoute = inject(SnapRouteService);
+
+  /** Whether to show the desktop "+ Snap" top-bar capture entry (ai.vision + ≥1 writable destination; reactive). */
+  readonly showSnap = computed(() => !this.bareLayout() && this.snapRoute.canCapture());
+
+  /** Open the Snap & Route capture surface (desktop top-bar button / ⌘K palette action). */
+  openSnap(): void {
+    this.snapRoute.request();
+  }
 
   /** Quick theme picker shown in the account menu (mirrors /preferences). */
   readonly themeModes: readonly { value: ThemeMode; label: string; icon: string }[] = [
@@ -608,6 +620,7 @@ export class App implements AfterViewInit {
     if (!p) return;
     p.setQuickAddHandler(() => this.openQuickAdd());
     p.setLogoutHandler(() => this.logout());
+    p.setSnapHandler(() => this.openSnap());
   }
 
   /**
