@@ -103,6 +103,9 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
     public DbSet<Resume> Resumes => Set<Resume>();
     public DbSet<ResumeApplication> ResumeApplications => Set<ResumeApplication>();
+    public DbSet<Medication> Medications => Set<Medication>();
+    public DbSet<MedicationLog> MedicationLogs => Set<MedicationLog>();
+    public DbSet<VitalReading> VitalReadings => Set<VitalReading>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -1230,6 +1233,54 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
             // One day-log per (user, local date); also the per-date upsert/lookup + the recent read.
             e.HasIndex(x => new { x.UserEmail, x.LocalDate }).IsUnique();
+        });
+
+        // ---- Meds & Vitals (owner-only health vertical; mirrors the Sleep/Cycle owner-only patterns) ----
+        b.Entity<Medication>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.Dose).HasMaxLength(60);
+            e.Property(x => x.Notes).HasMaxLength(300);
+            e.Property(x => x.Form).HasConversion<int>();
+            e.Property(x => x.Active).HasDefaultValue(true);
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.UpdatedUtc).HasColumnType("timestamp with time zone");
+            // The structured cadence persists as a single JSON column (replaced wholesale on edit).
+            e.Property(x => x.Schedule).HasColumnType("jsonb").HasConversion(
+                v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                v => System.Text.Json.JsonSerializer.Deserialize<MedicationSchedule>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new MedicationSchedule());
+            // The owner's med list (active filter + name order) reads by email; the index serves it.
+            e.HasIndex(x => new { x.UserEmail, x.Active });
+        });
+
+        b.Entity<MedicationLog>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Notes).HasMaxLength(200);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.Property(x => x.TakenAtUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // Cascade: deleting a medication removes its adherence logs.
+            e.HasOne<Medication>().WithMany().HasForeignKey(x => x.MedicationId).OnDelete(DeleteBehavior.Cascade);
+            // The day's adherence read scans one user's logs for one local date (many per day for multi-dose meds).
+            e.HasIndex(x => new { x.UserEmail, x.LocalDate });
+            // The per-med adherence window read.
+            e.HasIndex(x => new { x.MedicationId, x.LocalDate });
+        });
+
+        b.Entity<VitalReading>(e =>
+        {
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Unit).HasMaxLength(16);
+            e.Property(x => x.Notes).HasMaxLength(200);
+            e.Property(x => x.Kind).HasConversion<int>();
+            e.Property(x => x.Value1).HasPrecision(8, 2);
+            e.Property(x => x.Value2).HasPrecision(8, 2);
+            e.Property(x => x.MeasuredAtUtc).HasColumnType("timestamp with time zone");
+            e.Property(x => x.CreatedUtc).HasColumnType("timestamp with time zone");
+            // The per-kind trend/list read filters by (user, kind) and orders by date.
+            e.HasIndex(x => new { x.UserEmail, x.Kind, x.LocalDate });
         });
 
         // ---- Journal & Mood (owner-scoped day-log; sibling of CycleDayLog) ----

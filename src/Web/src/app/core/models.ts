@@ -6332,6 +6332,155 @@ export interface InsightsNarrateResponse {
   fellBackToPlain: boolean;  // true ⇒ hide the AI banner
 }
 
+// ---- Meds & Vitals (/api/meds, /api/vitals) ----------------------------------------------------
+// A PRIVATE, OWNER-ONLY, NON-MEDICAL health vertical. STRICTLY OWNER-SCOPED (only the caller's own rows —
+// never shared to a coach / family / contact, never in the activity feed, no household path), mirroring the
+// Sleep/Cycle owner-only patterns. Gated by tracker.self for the data; the optional vitals insight ALSO needs
+// tracker.ai. Adherence % + vital trends are PURE deterministic server math (always render); the insight is a
+// floored, AGGREGATE-only, NON-DIAGNOSTIC one-liner. NO new permission; NO household exposure.
+
+/** Medication form (mirrors the API `MedicationForm` enum; serialised as its int 0..8). */
+export type MedicationForm = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+// Pill | Capsule | Tablet | Liquid | Injection | Inhaler | Topical | Drops | Other
+
+/** A logged dose's adherence status (mirrors the API `MedicationLogStatus` enum; int 0..2). */
+export type MedicationLogStatus = 0 | 1 | 2; // Taken | Skipped | Missed
+
+/** The six vital kinds (mirrors the API `VitalKind` enum; serialised as its int 0..5). */
+export type VitalKind = 0 | 1 | 2 | 3 | 4 | 5;
+// BloodPressure | HeartRate | Glucose | Temperature | OxygenSaturation | BodyWeight
+
+/** The structured dosing cadence. `daysOfWeek` is 0=Sun..6=Sat; [] = every day. `timesOfDay` are "HH:mm". */
+export interface MedicationSchedule {
+  timesPerDay: number;
+  timesOfDay: string[];
+  daysOfWeek: number[];
+}
+
+/** One of today's due doses for a med + whether it's been logged (`status` null ⇒ still unlogged). */
+export interface DoseSlot {
+  slot: number;
+  time: string | null;       // "HH:mm" when the cadence pins a time
+  status: MedicationLogStatus | null;
+  logId: number | null;
+}
+
+/** A medication + its cadence + TODAY's per-slot adherence checklist (so the page renders without a 2nd call). */
+export interface Medication {
+  id: number;
+  name: string;
+  dose: string;              // free text, e.g. "10 mg"
+  schedule: MedicationSchedule;
+  form: MedicationForm | null;
+  notes: string | null;
+  active: boolean;
+  startDate: string;         // yyyy-MM-dd
+  endDate: string | null;
+  remindersEnabled: boolean;
+  todaySlots: DoseSlot[];
+  updatedUtc: string;
+}
+
+/** GET /api/meds — the caller's active meds + today's checklist (owner-scoped). */
+export interface MedsResponse {
+  medications: Medication[];
+  today: string;             // yyyy-MM-dd
+}
+
+/** Body for POST/PUT /api/meds. */
+export interface MedicationInput {
+  name: string;
+  dose: string;
+  schedule: MedicationSchedule;
+  form?: MedicationForm | null;
+  notes?: string | null;
+  active?: boolean | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  remindersEnabled?: boolean | null;
+}
+
+/** Body for POST /api/meds/{id}/log — record one dose's adherence (upsert per (date, slot)). */
+export interface LogDoseInput {
+  date: string;              // yyyy-MM-dd
+  slot?: number | null;
+  status: MedicationLogStatus;
+  takenAt?: string | null;   // ISO-8601; stamped server-side for Taken when omitted
+  notes?: string | null;
+}
+
+/** A single adherence log row. */
+export interface DoseLog {
+  id: number;
+  medicationId: number;
+  date: string;
+  slot: number | null;
+  status: MedicationLogStatus;
+  takenAtUtc: string | null;
+  notes: string | null;
+}
+
+/** GET /api/meds/adherence — deterministic taken/scheduled % over the window (taken capped per day). */
+export interface AdherenceResponse {
+  windowDays: number;
+  taken: number;
+  scheduled: number;
+  percent: number;
+}
+
+/** A single vital reading (owner-scoped). `value2` is kept only for BloodPressure (diastolic). */
+export interface VitalReading {
+  id: number;
+  kind: VitalKind;
+  value1: number;
+  value2: number | null;
+  unit: string;
+  localDate: string;         // yyyy-MM-dd
+  measuredAtUtc: string | null;
+  notes: string | null;
+}
+
+/** Body for POST/PUT /api/vitals. */
+export interface VitalInput {
+  kind: VitalKind;
+  value1: number;
+  value2?: number | null;
+  unit: string;
+  localDate: string;
+  measuredAt?: string | null;
+  notes?: string | null;
+}
+
+/** Deterministic per-kind trend over the window (avg/min/max + a bounded least-squares slope/day). */
+export interface VitalTrend {
+  count: number;
+  avg: number;
+  min: number;
+  max: number;
+  avg2: number | null;       // secondary average (BP diastolic) when present
+  slopePerDay: number;
+  firstDate: string | null;
+  lastDate: string | null;
+}
+
+/** GET /api/vitals — readings newest-first + a deterministic trend (owner-scoped). */
+export interface VitalsResponse {
+  kind: VitalKind | null;
+  windowDays: number;
+  readings: VitalReading[];
+  trend: VitalTrend;
+}
+
+/**
+ * GET /api/vitals/insight — the gentle, NON-MEDICAL one-liner over AGGREGATE stats only. ALWAYS 200;
+ * `fellBackToPlain=true` when tracker.ai is absent OR Gemini is off/errored (the UI then shows the
+ * deterministic floor text without the ✨ AI affordance). Writes nothing.
+ */
+export interface VitalsInsightResponse {
+  note: string;
+  fellBackToPlain: boolean;
+}
+
 // ---- Web Push (PWA background notifications) ----------------------------------------------------
 
 /** Public VAPID key for the browser to subscribe with. 404 from the API means web-push is unconfigured. */

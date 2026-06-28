@@ -155,6 +155,7 @@ public static class AgentsEndpoints
         ScheduledAgentKind.StreakRescue => "streakRescue",
         ScheduledAgentKind.BudgetAlert => "budgetAlert",
         ScheduledAgentKind.LowStaples => "lowStaples",
+        ScheduledAgentKind.MedicationDue => "medicationDue",
         _ => k.ToString(),
     };
 
@@ -191,6 +192,7 @@ public static class AgentsEndpoints
         ScheduledAgentKind.StreakRescue => 20,
         ScheduledAgentKind.BudgetAlert => 9,
         ScheduledAgentKind.LowStaples => 17,
+        ScheduledAgentKind.MedicationDue => 9,
         _ => 9,
     };
 
@@ -200,6 +202,7 @@ public static class AgentsEndpoints
         ScheduledAgentKind.StreakRescue => "/challenge",
         ScheduledAgentKind.BudgetAlert => "/family/finance",
         ScheduledAgentKind.LowStaples => "/grocery",
+        ScheduledAgentKind.MedicationDue => "/meds",
         _ => "/",
     };
 
@@ -210,6 +213,7 @@ public static class AgentsEndpoints
         ScheduledAgentKind.StreakRescue => "Nothing to rescue — today's tasks are done (or no active challenge).",
         ScheduledAgentKind.BudgetAlert => "No spending recorded this month yet.",
         ScheduledAgentKind.LowStaples => "Your shopping list is all stocked up.",
+        ScheduledAgentKind.MedicationDue => "No medication doses due right now (or reminders are off).",
         _ => "Nothing to share right now.",
     };
 

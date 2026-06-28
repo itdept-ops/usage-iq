@@ -37,6 +37,8 @@ import {
   WrappedResponse,
   WrappedNarrative, CreateWrappedShareRequest, WrappedShareCreated, WrappedShareItem, PublicWrapped,
   InsightsResponse, InsightsNarrateResponse, InsightWindow,
+  MedsResponse, MedicationInput, Medication, LogDoseInput, DoseLog, AdherenceResponse,
+  VitalsResponse, VitalInput, VitalReading, VitalsInsightResponse, VitalKind,
   BillDto, BillItemRequest, BillShareToggleResult, CreateBillRequest, PaymentHandlesDto,
   PublicBillDto, ReceiptBreakdownDto, UpdateBillRequest,
   ProfilePrefs,
@@ -3286,6 +3288,76 @@ export class Api {
   pushUnsubscribe(endpoint: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/push/subscribe`, {
       params: new HttpParams().set('endpoint', endpoint),
+    });
+  }
+
+  // ---- Meds & Vitals (/api/meds, /api/vitals) — a PRIVATE, OWNER-ONLY, NON-MEDICAL health vertical ----
+  // STRICTLY owner-scoped server-side (only the caller's own rows; cross-user {id} → 404; never shared to a
+  // coach / family / contact, never in the activity feed). Gated by tracker.self; the vitals insight ALSO
+  // needs tracker.ai. Adherence % + trends are deterministic (always render). No new permission.
+
+  /** The caller's active meds + TODAY's per-slot dose checklist (owner-scoped). */
+  meds(): Observable<MedsResponse> {
+    return this.http.get<MedsResponse>(`${this.base}/meds`);
+  }
+
+  /** Add a medication (owner-scoped). Returns the new med + today's empty checklist. */
+  addMed(input: MedicationInput): Observable<Medication> {
+    return this.http.post<Medication>(`${this.base}/meds`, input);
+  }
+
+  /** Edit / activate / deactivate / toggle reminders on a medication (owner-scoped; cross-user → 404). */
+  updateMed(id: number, input: MedicationInput): Observable<Medication> {
+    return this.http.put<Medication>(`${this.base}/meds/${id}`, input);
+  }
+
+  /** SOFT-deactivate a medication (Active=false; owner-scoped; cross-user → 404). */
+  deleteMed(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/meds/${id}`);
+  }
+
+  /** Record one dose's adherence (upsert per (date, slot); owner-scoped; cross-user → 404). */
+  logDose(id: number, input: LogDoseInput): Observable<DoseLog> {
+    return this.http.post<DoseLog>(`${this.base}/meds/${id}/log`, input);
+  }
+
+  /** Deterministic taken/scheduled % over the window (1..365, default 30; owner-scoped). */
+  medsAdherence(window = 30): Observable<AdherenceResponse> {
+    return this.http.get<AdherenceResponse>(`${this.base}/meds/adherence`, {
+      params: { window: String(window) },
+    });
+  }
+
+  /** Vital readings newest-first + a deterministic trend; optionally filtered by `kind` (owner-scoped). */
+  vitals(kind?: VitalKind, window = 30): Observable<VitalsResponse> {
+    let params = new HttpParams().set('window', String(window));
+    if (kind != null) params = params.set('kind', String(kind));
+    return this.http.get<VitalsResponse>(`${this.base}/vitals`, { params });
+  }
+
+  /** Log a vital reading (owner-scoped). `value2` is kept only for BloodPressure. */
+  addVital(input: VitalInput): Observable<VitalReading> {
+    return this.http.post<VitalReading>(`${this.base}/vitals`, input);
+  }
+
+  /** Edit a vital reading (owner-scoped; cross-user → 404). */
+  updateVital(id: number, input: VitalInput): Observable<VitalReading> {
+    return this.http.put<VitalReading>(`${this.base}/vitals/${id}`, input);
+  }
+
+  /** Delete a vital reading (owner-scoped; cross-user → 404). */
+  deleteVital(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/vitals/${id}`);
+  }
+
+  /**
+   * The OPTIONAL gentle, NON-MEDICAL insight over AGGREGATE vitals/adherence stats. ALWAYS 200 —
+   * `fellBackToPlain=true` when tracker.ai is absent OR Gemini is off/errored (the UI hides the ✨ AI
+   * affordance and shows the deterministic floor text). Sends only computed aggregates; writes nothing.
+   */
+  vitalsInsight(window = 30): Observable<VitalsInsightResponse> {
+    return this.http.get<VitalsInsightResponse>(`${this.base}/vitals/insight`, {
+      params: { window: String(window) },
     });
   }
 }

@@ -48,8 +48,58 @@ public sealed class AgentComposer(
             ScheduledAgentKind.StreakRescue => await StreakRescueAsync(email, localDate, ct),
             ScheduledAgentKind.BudgetAlert => await BudgetAlertAsync(email, localDate, ct),
             ScheduledAgentKind.LowStaples => await LowStaplesAsync(email, ct),
+            ScheduledAgentKind.MedicationDue => await MedicationDueAsync(email, localDate, ct),
             _ => null,
         };
+    }
+
+    // ---- MedicationDue: an OWNER-ONLY reminder when a reminders-enabled med's due dose is still unlogged ----
+
+    /// <summary>
+    /// Look at the OWNER's reminders-enabled, active medications scheduled for <paramref name="localDate"/>:
+    /// any whose due doses for today are not yet fully logged (Taken/Skipped) are surfaced as a gentle nudge.
+    /// STRICTLY OWNER-SCOPED — reads ONLY the owner's own meds + logs (keyed by their lower-cased email); this
+    /// private health data is NEVER shared and NEVER sent to the AI (deterministic only, NO token spend — the
+    /// nudge just names the med). Returns null when nothing's due/unlogged (idempotent stamp still applies).
+    /// </summary>
+    private async Task<Nudge?> MedicationDueAsync(string email, DateOnly localDate, CancellationToken ct)
+    {
+        var meds = await db.Medications.AsNoTracking()
+            .Where(m => m.UserEmail == email && m.Active && m.RemindersEnabled)
+            .ToListAsync(ct);
+        if (meds.Count == 0) return null;
+
+        // Only meds actually scheduled today.
+        var dueToday = meds.Where(m => MedsVitalsMath.DosesDueOn(m, localDate) > 0).ToList();
+        if (dueToday.Count == 0) return null;
+
+        var medIds = dueToday.Select(m => m.Id).ToList();
+        var todayLogs = await db.MedicationLogs.AsNoTracking()
+            .Where(l => l.UserEmail == email && l.LocalDate == localDate && medIds.Contains(l.MedicationId))
+            .ToListAsync(ct);
+
+        // A med is "outstanding" if the count of its slots logged as Taken/Skipped is below its doses-due today.
+        var outstanding = new List<string>();
+        foreach (var m in dueToday)
+        {
+            var due = MedsVitalsMath.DosesDueOn(m, localDate);
+            var resolved = todayLogs
+                .Where(l => l.MedicationId == m.Id
+                    && (l.Status == MedicationLogStatus.Taken || l.Status == MedicationLogStatus.Skipped))
+                .Select(l => l.ScheduledSlot ?? 0)
+                .Distinct()
+                .Count();
+            if (resolved < due) outstanding.Add(m.Name);
+        }
+        if (outstanding.Count == 0) return null; // everything due today is logged — nothing to nudge
+
+        var shown = outstanding.Take(4).ToList();
+        var more = outstanding.Count - shown.Count;
+        var list = string.Join(", ", shown) + (more > 0 ? $", and {more} more" : "");
+        var n = outstanding.Count;
+        var plain = Clamp(
+            $"You have {n} {Plural(n, "medication", "medications")} still to log today: {list}.");
+        return new Nudge(plain, "/meds", true); // deterministic only — owner-only health data, no AI, no token spend
     }
 
     // ---- MorningBriefing: a per-USER wrapper of the household morning briefing ----

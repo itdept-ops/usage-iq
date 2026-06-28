@@ -144,6 +144,13 @@ export const PAGE_REGISTRY: readonly PageDef[] = [
     home: { label: 'Wearable sync', icon: 'watch' },
   },
   {
+    id: 'meds', path: 'meds', title: 'Usage IQ · Meds & Vitals', perm: PERM.trackerSelf,
+    desktop: () => import('../features/meds/meds.page').then(m => m.MedsPage),
+    mobile: () => import('../features/meds-mobile/meds-mobile.page').then(m => m.MedsMobilePage),
+    nav: { group: 'Fitness', label: 'Meds & Vitals', icon: 'medication' },
+    home: { label: 'Meds & Vitals', icon: 'medication' },
+  },
+  {
     id: 'challenge', path: 'challenge', title: 'Usage IQ · 75 Hard', perm: PERM.trackerSelf,
     desktop: () => import('../features/challenge/challenge').then(m => m.Challenge),
     mobile: () => import('../features/challenge-mobile/challenge-mobile.page').then(m => m.ChallengeMobilePage),

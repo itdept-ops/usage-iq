@@ -598,6 +598,7 @@ app.MapFamilyQuickAddEndpoints();
 app.MapFamilyAssistantEndpoints();
 app.MapCycleEndpoints();
 app.MapCycleOverlayEndpoints();
+app.MapMedsEndpoints();
 app.MapIdentityEndpoints();
 app.MapHub<ChatHub>("/api/hubs/chat");
 app.MapGet("/", () => app.Environment.IsDevelopment()

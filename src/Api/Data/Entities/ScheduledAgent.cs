@@ -7,6 +7,8 @@ namespace Ccusage.Api.Data.Entities;
 ///   <item><see cref="StreakRescue"/> — a late-day nudge when today's 75-Hard / hydration tasks are incomplete.</item>
 ///   <item><see cref="BudgetAlert"/> — a heads-up on the month's household spend pace.</item>
 ///   <item><see cref="LowStaples"/> — a nudge when shopping-list staples are running low.</item>
+///   <item><see cref="MedicationDue"/> — an OWNER-ONLY reminder when a reminders-enabled medication's due
+///   dose for today is still unlogged at/after the deliver hour. Private health data; self-scoped only.</item>
 /// </list>
 /// </summary>
 public enum ScheduledAgentKind
@@ -15,6 +17,7 @@ public enum ScheduledAgentKind
     StreakRescue = 1,
     BudgetAlert = 2,
     LowStaples = 3,
+    MedicationDue = 4,
 }
 
 /// <summary>
