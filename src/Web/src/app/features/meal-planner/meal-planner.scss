@@ -7,3 +7,72 @@
 .meal-planner {
   .family__hero--page { margin-top: 0; }
 }
+
+// ── On-hand ingredient chips (the Snap & Route pantry handoff) ───────────────────────────────────
+// A slim banner of removable chips between the hero and the week grid; these bias "Plan my day & week".
+.mp-onhand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--tech-border, #26303f);
+  border-radius: var(--tech-r-panel, 12px);
+  background: color-mix(in srgb, var(--tech-accent, #3d8bff) 7%, var(--tech-panel, #111722));
+
+  &__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--tech-fs-body, 13px);
+    font-weight: 600;
+    color: var(--tech-text-secondary, #9ba9bd);
+
+    mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--tech-accent, #3d8bff); }
+  }
+
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px 4px 12px;
+    border: 1px solid var(--tech-border-strong, #33425a);
+    border-radius: var(--tech-r-pill, 999px);
+    background: var(--tech-panel-raised, #161d2a);
+    color: var(--tech-text, #e6edf6);
+    font-size: var(--tech-fs-body, 13px);
+    line-height: 1.2;
+  }
+
+  &__remove {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--tech-text-tertiary, #8492a8);
+    cursor: pointer;
+    transition: color 140ms ease, background-color 140ms ease;
+
+    mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+    &:hover {
+      color: var(--tech-text, #e6edf6);
+      background: color-mix(in srgb, var(--tech-error, #ff5c6c) 18%, transparent);
+    }
+    &:focus-visible { outline: none; box-shadow: var(--tech-focus-ring); }
+  }
+}

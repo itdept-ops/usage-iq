@@ -40,6 +40,12 @@ export interface PlanMealsData {
   weekStart: string;
   /** Whether the caller holds meals.use — gates the add-to-plan writes (else only the grocery action shows). */
   canPlan: boolean;
+  /**
+   * Optional "on hand" ingredients to seed the pantry bias (e.g. handed off from the Snap & Route pantry
+   * capture via the meal-planner page). When present the dialog pre-fills its pantry chips with these; still
+   * editable + extendable via the pantry scan. Null/absent leaves the pantry empty.
+   */
+  ingredientsOnHand?: string[] | null;
 }
 
 /** The dialog's lifecycle phases. */
@@ -111,8 +117,9 @@ export class PlanMealsDialog {
   readonly constraints = signal('');
 
   // ---- pantry (on-hand ingredients) ----
-  /** The on-hand ingredients (from a pantry scan and/or manual entry), threaded into the plan request. */
-  readonly pantry = signal<string[]>([]);
+  /** The on-hand ingredients — seeded from data.ingredientsOnHand (e.g. the Snap & Route pantry handoff), then
+   *  editable + extendable via a pantry scan and/or manual entry — threaded into the plan request. */
+  readonly pantry = signal<string[]>(this.data.ingredientsOnHand ?? []);
   /** True while a pantry-scan photo is being read by AI (drives the scan button's spinner/disabled state). */
   readonly pantryScanning = signal(false);
 

@@ -33,6 +33,27 @@
     </div>
   </header>
 
+  <!-- ── On-hand ingredients (from a Snap & Route pantry capture) — bias the plan ──────── -->
+  @if (onHand().length) {
+    <div class="mp-onhand" role="group" aria-label="On-hand ingredients from your pantry snap">
+      <span class="mp-onhand__label">
+        <mat-icon aria-hidden="true">kitchen</mat-icon>
+        On hand — your plan will lean on these
+      </span>
+      <ul class="mp-onhand__chips">
+        @for (ing of onHand(); track ing) {
+          <li class="mp-onhand__chip">
+            <span class="mp-onhand__name">{{ ing }}</span>
+            <button type="button" class="mp-onhand__remove" (click)="removeOnHand(ing)"
+                    [attr.aria-label]="'Remove ' + ing">
+              <mat-icon aria-hidden="true">close</mat-icon>
+            </button>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
   <!-- ── Week navigator ──────────────────────────────────────────────── -->
   <div class="week-nav">
     <button mat-icon-button matTooltip="Previous week" aria-label="Previous week" (click)="shiftWeek(-1)">

@@ -143,6 +143,13 @@ export class MealPlanner {
   /** The Monday (local) of the week being viewed. */
   readonly weekStart = signal<Date>(this.thisMonday());
 
+  /**
+   * "On hand" ingredients handed off from the Snap & Route pantry capture (sessionStorage, read + cleared on
+   * init). When present they show as removable chips and bias the "Plan my day & week" AI plan toward what the
+   * caller already has — see the constructor for the read/clear + openPlanMyWeek for the handoff into the dialog.
+   */
+  readonly onHand = signal<string[]>([]);
+
   /** "YYYY-MM-DD" for the API, derived from the viewed week's Monday. */
   private readonly weekStartIso = computed(() => this.toIso(this.weekStart()));
 
@@ -209,6 +216,7 @@ export class MealPlanner {
 
   constructor() {
     this.reload(true);
+    this.consumePantryHandoff();
     if (this.canTrack()) {
       this.api
         .trackerProfile()
@@ -218,6 +226,37 @@ export class MealPlanner {
         )
         .subscribe((p) => this.trackerProfile.set(p));
     }
+  }
+
+  /**
+   * Read (and immediately CLEAR) the Snap & Route pantry handoff from sessionStorage. Clearing on consume means
+   * the on-hand chips only appear on the visit right after a pantry snap — a later normal visit won't re-apply
+   * stale chips. Malformed JSON / non-array / unavailable storage all degrade silently to no chips.
+   */
+  private consumePantryHandoff(): void {
+    try {
+      const raw = sessionStorage.getItem('usage_iq_pantry_on_hand');
+      if (!raw) return;
+      sessionStorage.removeItem('usage_iq_pantry_on_hand');
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const items = Array.from(
+        new Set(
+          parsed
+            .filter((x): x is string => typeof x === 'string')
+            .map((x) => x.trim())
+            .filter((x) => x.length > 0),
+        ),
+      );
+      if (items.length) this.onHand.set(items);
+    } catch {
+      /* malformed JSON or sessionStorage unavailable → no on-hand chips, non-fatal. */
+    }
+  }
+
+  /** Remove one on-hand chip (it then drops from the next "Plan my day & week" request's bias). */
+  removeOnHand(ingredient: string): void {
+    this.onHand.update((list) => list.filter((x) => x !== ingredient));
   }
 
   /** Sum a day's meals' PER-SERVING macros (one planned portion each); flags whether any had macros set. */
@@ -498,6 +537,7 @@ export class MealPlanner {
       today: this.toIso(new Date()),
       weekStart: this.weekStartIso(),
       canPlan: this.auth.hasPermission(PERM.mealsUse),
+      ingredientsOnHand: this.onHand().length ? this.onHand() : null,
     };
     this.dialog
       .open<PlanMealsDialog, PlanMealsData, PlanMealsDialogResult>(PlanMealsDialog, {
