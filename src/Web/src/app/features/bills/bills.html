@@ -28,7 +28,7 @@
                   [class.bill-row--active]="b.id === selectedId()"
                   (click)="select(b.id)">
             <span class="bill-row__id">
-              <span class="bill-row__title">{{ b.title }}</span>
+              <span class="bill-row__title" [title]="b.title">{{ b.title }}</span>
               <span class="bill-row__meta">{{ b.createdUtc | date: 'MMM d' }} · {{ b.items.length }} item{{ b.items.length === 1 ? '' : 's' }}</span>
             </span>
             <span class="bill-row__right">

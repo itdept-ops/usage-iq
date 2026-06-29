@@ -33,7 +33,7 @@
       </button>
       @for (c of chips(); track c.meta.key) {
         <button type="button" class="search__chip" [class.is-on]="activeDomain() === c.meta.key"
-                (click)="setDomain(c.meta.key)">
+                [title]="c.meta.label" (click)="setDomain(c.meta.key)">
           <mat-icon aria-hidden="true">{{ c.meta.icon }}</mat-icon>
           {{ c.meta.label }} <span class="search__chip-n">{{ c.count }}</span>
         </button>
@@ -92,12 +92,12 @@
                 <button type="button" class="search__row" (click)="open(r)">
                   <mat-icon class="search__row-ic" aria-hidden="true">{{ g.meta.icon }}</mat-icon>
                   <span class="search__row-main">
-                    <span class="search__row-title">{{ r.title }}</span>
+                    <span class="search__row-title" [title]="r.title">{{ r.title }}</span>
                     @if (r.snippet) {
-                      <span class="search__row-snippet">{{ r.snippet }}</span>
+                      <span class="search__row-snippet" [title]="r.snippet">{{ r.snippet }}</span>
                     }
                     @if (r.subtitle) {
-                      <span class="search__row-subtitle">{{ r.subtitle }}</span>
+                      <span class="search__row-subtitle" [title]="r.subtitle">{{ r.subtitle }}</span>
                     }
                   </span>
                   @if (whenLabel(r.whenUtc); as w) {

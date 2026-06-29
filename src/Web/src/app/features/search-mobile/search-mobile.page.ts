@@ -71,7 +71,7 @@ const DEBOUNCE_MS = 250;
                     (click)="setDomain(null)">All <span class="sm-chip__n">{{ totalCount() }}</span></button>
             @for (c of chips(); track c.meta.key) {
               <button type="button" class="sm-chip" [class.is-on]="activeDomain() === c.meta.key"
-                      (click)="setDomain(c.meta.key)">
+                      [title]="c.meta.label" (click)="setDomain(c.meta.key)">
                 <mat-icon aria-hidden="true">{{ c.meta.icon }}</mat-icon>
                 {{ c.meta.label }} <span class="sm-chip__n">{{ c.count }}</span>
               </button>
@@ -132,9 +132,9 @@ const DEBOUNCE_MS = 250;
                 <button type="button" class="sm-row" (click)="open(r)">
                   <mat-icon class="sm-row__ic" aria-hidden="true">{{ g.meta.icon }}</mat-icon>
                   <span class="sm-row__main">
-                    <span class="sm-row__title">{{ r.title }}</span>
-                    @if (r.snippet) { <span class="sm-row__snippet">{{ r.snippet }}</span> }
-                    @if (r.subtitle) { <span class="sm-row__subtitle">{{ r.subtitle }}</span> }
+                    <span class="sm-row__title" [title]="r.title">{{ r.title }}</span>
+                    @if (r.snippet) { <span class="sm-row__snippet" [title]="r.snippet">{{ r.snippet }}</span> }
+                    @if (r.subtitle) { <span class="sm-row__subtitle" [title]="r.subtitle">{{ r.subtitle }}</span> }
                   </span>
                   <mat-icon class="sm-row__go" aria-hidden="true">chevron_right</mat-icon>
                 </button>
