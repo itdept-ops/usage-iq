@@ -130,8 +130,8 @@ export class FamilyAllowance {
   }
 
   private apply(a: AllowanceDto): void {
-    this.children.set(a.children);
-    this.recent.set(a.recent);
+    this.children.set(a?.children ?? []);
+    this.recent.set(a?.recent ?? []);
   }
 
   initials(name: string): string {

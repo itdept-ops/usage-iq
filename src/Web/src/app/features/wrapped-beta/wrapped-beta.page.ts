@@ -436,12 +436,15 @@ export class WrappedBetaPage {
     const period = this.period();
     try {
       const res = await firstValueFrom(this.api.wrapped(period));
-      this.data.set(res);
+      // Coalesce cards defensively: a sparse/no-data recap (or a thin payload) must degrade to the
+      // graceful "Nothing to wrap… yet" empty state, never the hard error card — the cards() computed
+      // already falls back to [], so an absent array here is a no-data case, not a failure.
+      this.data.set(res ? { ...res, cards: res.cards ?? [] } : res);
       this.active.set(0);
       // After the new reel paints, ensure we're scrolled to the cover.
       queueMicrotask(() => this.scrollReelTo(0, 'auto'));
       // Best-effort: load the AI narrative AFTER the reel is up (never blocks the page, never errors it).
-      if (res.cards.length) void this.loadNarrative(period);
+      if (this.cards().length) void this.loadNarrative(period);
     } catch {
       this.errored.set(true);
     } finally {

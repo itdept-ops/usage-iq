@@ -287,11 +287,11 @@ export class FamilyChoresMobilePage {
   // ── Buckets (mirror the live page's lifecycle splits) ──
   /** Open marketplace (pool) chores anyone can claim. */
   readonly pool = computed(() =>
-    this.chores().filter((c) => c.source === 'pool' && c.status === 'open'),
+    (this.chores() ?? []).filter((c) => c.source === 'pool' && c.status === 'open'),
   );
   /** The caller's in-progress chores: claimed / rejected (retry) / assigned-still-open. */
   readonly mine = computed(() =>
-    this.chores().filter(
+    (this.chores() ?? []).filter(
       (c) =>
         c.status === 'claimed' ||
         c.status === 'rejected' ||
@@ -299,13 +299,13 @@ export class FamilyChoresMobilePage {
     ),
   );
   /** Submitted chores awaiting a parent's nod (the approval queue / the child's pending list). */
-  readonly queue = computed(() => this.chores().filter((c) => c.status === 'submitted'));
+  readonly queue = computed(() => (this.chores() ?? []).filter((c) => c.status === 'submitted'));
 
   readonly poolCount = computed(() => this.pool().length);
   readonly mineCount = computed(() => this.mine().length);
   readonly queueCount = computed(() => this.queue().length);
 
-  readonly totalStars = computed(() => this.tally().reduce((n, t) => n + t.points, 0));
+  readonly totalStars = computed(() => (this.tally() ?? []).reduce((n, t) => n + t.points, 0));
   readonly myBalance = computed(() => this.myAllowance()?.balance ?? 0);
   /** The child's most-recent ledger rows (kid view), newest first, capped for a tidy strip. */
   readonly myLedger = computed<FamilyCreditEntry[]>(() => (this.myAllowance()?.ledger ?? []).slice(0, 6));
@@ -364,12 +364,13 @@ export class FamilyChoresMobilePage {
 
   /** Push a fresh board into state + keep the open detail sheet in sync (drop it if the chore is gone). */
   private applyBoard(board: FamilyChoresDto): void {
-    this.chores.set(board.chores);
-    this.tally.set(board.tally);
-    this.role.set(board.role);
+    const chores = board.chores ?? [];
+    this.chores.set(chores);
+    this.tally.set(board.tally ?? []);
+    this.role.set(board.role ?? 'adult');
     const sel = this.selected();
     if (sel) {
-      const next = board.chores.find((c) => c.id === sel.id);
+      const next = chores.find((c) => c.id === sel.id);
       this.selected.set(next ?? null);
       if (!next) this.detailOpen.set(false);
     }

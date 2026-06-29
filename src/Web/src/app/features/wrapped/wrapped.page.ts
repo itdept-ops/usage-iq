@@ -185,8 +185,11 @@ export class WrappedPage {
     const period = this.period();
     try {
       const res = await firstValueFrom(this.api.wrapped(period));
-      this.data.set(res);
-      if (res.cards.length) void this.loadNarrative(period);
+      // Coalesce cards defensively: a sparse/no-data recap (or a thin payload) must degrade to the
+      // graceful "Nothing to wrap… yet" empty state, never the hard error card — the cards() computed
+      // already falls back to [], so an absent array here is a no-data case, not a failure.
+      this.data.set(res ? { ...res, cards: res.cards ?? [] } : res);
+      if (this.cards().length) void this.loadNarrative(period);
     } catch {
       this.errored.set(true);
     } finally {

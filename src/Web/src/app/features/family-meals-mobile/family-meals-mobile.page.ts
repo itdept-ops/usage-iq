@@ -146,6 +146,15 @@ const SLOT_ORDER: FamilyMealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
             (retry)="reload()" />
 
         } @else {
+          @if (cells().length === 0) {
+            <!-- UNSEEDED week: no day cells came back — show a guidance card like the desktop twin
+                 (the day-strip @for below would otherwise render nothing and leave the body blank). -->
+            <app-bs-empty
+              icon="restaurant_menu"
+              title="No meals planned yet"
+              body="Plan the week's meals here — each dish's ingredients can flow straight to your grocery list. Tap + to add your first meal."
+              ctaLabel="Plan a meal" ctaIcon="add" (action)="openCreate()" />
+          } @else {
           <!-- ─── WEEKDAY STRIP: swipe the week, tap a day to focus it ─── -->
           <div class="fm-strip" role="tablist" aria-label="Days this week">
             @for (c of cells(); track c.localDate) {
@@ -238,6 +247,7 @@ const SLOT_ORDER: FamilyMealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
               }
             </button>
           }
+          } <!-- /@if (cells().length === 0) … @else -->
         }
       </div>
     </app-bs-pull-refresh>
