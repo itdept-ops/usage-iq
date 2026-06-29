@@ -14,6 +14,7 @@ import { AuthService } from '../../core/auth';
 import {
   ChatContactDto, CreatePactRequest, PactDto, PactKind, PactProgressRowDto,
 } from '../../core/models';
+import { BetaEmptyState, BetaErrorState } from '../beta-ui';
 
 /** The three pact kinds, with the humane label + glyph the create form + cards use. */
 const KINDS: readonly { key: PactKind; label: string; icon: string; unit: string }[] = [
@@ -37,7 +38,7 @@ const KINDS: readonly { key: PactKind; label: string; icon: string; unit: string
   selector: 'app-pacts',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule],
+  imports: [FormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule, BetaEmptyState, BetaErrorState],
   templateUrl: './pacts.html',
   styleUrl: './pacts.scss',
 })

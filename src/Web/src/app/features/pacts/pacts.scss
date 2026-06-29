@@ -35,7 +35,6 @@
 
   p { margin: 0; max-width: 48ch; }
   mat-icon { width: 40px; height: 40px; font-size: 40px; color: var(--tech-text-tertiary); }
-  &--error mat-icon { color: var(--tech-warn, #f5a623); }
   a, button { margin-top: var(--tech-space-1, 8px); }
 }
 
@@ -102,7 +101,7 @@
   font-size: var(--tech-fs-small, 13px);
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+  transition: border-color var(--tech-t-fast) ease, background-color var(--tech-t-fast) ease, color var(--tech-t-fast) ease;
 
   mat-icon { width: 16px; height: 16px; font-size: 16px; line-height: 16px; }
 
@@ -161,7 +160,7 @@
     display: inline-flex; align-items: center; justify-content: center;
     border: none; border-radius: 8px; background: transparent;
     color: var(--tech-text-tertiary, #6b7688); cursor: pointer;
-    transition: color 120ms ease, background-color 120ms ease;
+    transition: color var(--tech-t-fast) ease, background-color var(--tech-t-fast) ease;
     mat-icon { width: 18px; height: 18px; font-size: 18px; line-height: 18px; }
     &:hover { color: var(--tech-text-secondary); background: var(--tech-panel-2, #1a2230); }
   }

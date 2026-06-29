@@ -109,7 +109,7 @@
     font-size: 12px;
     font-weight: 700;
     color: var(--tech-text-on-accent);
-    background: linear-gradient(135deg, #3d8bff 0%, #8b7cff 52%, #3fd8d0 100%);
+    background: var(--tech-gradient-accent);
   }
   &__dot {
     position: absolute;
@@ -119,7 +119,7 @@
     height: 9px;
     border-radius: 50%;
     background: var(--tech-success);
-    box-shadow: 0 0 0 2px var(--tech-bg-sunken), 0 0 6px 0 rgba(61, 214, 140, 0.6);
+    box-shadow: 0 0 0 2px var(--tech-bg-sunken), 0 0 6px 0 color-mix(in srgb, var(--tech-success) 60%, transparent);
   }
 
   &__id {

@@ -100,7 +100,7 @@
   padding: 8px 14px;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  transition: border-color var(--tech-t-fast), background var(--tech-t-fast), transform var(--tech-t-fast);
 
   &:hover:not(:disabled) {
     border-color: var(--tech-border-strong, #33425a);

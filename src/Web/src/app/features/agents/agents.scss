@@ -35,10 +35,6 @@
   color: var(--tech-text-secondary);
 
   p { margin: 0; max-width: 48ch; }
-
-  mat-icon { font-size: 36px; width: 36px; height: 36px; color: var(--tech-text-accent); }
-
-  &--error mat-icon { color: var(--tech-danger, #ff5c6c); }
 }
 
 .card {

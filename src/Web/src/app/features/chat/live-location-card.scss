@@ -25,7 +25,7 @@
   flex: 0 0 auto;
   border-radius: 50%;
   color: var(--tech-text-on-accent, #fff);
-  background: linear-gradient(135deg, #3d8bff 0%, #8b7cff 52%, #3fd8d0 100%);
+  background: var(--tech-gradient-accent);
 
   mat-icon { font-size: 20px; width: 20px; height: 20px; }
 
