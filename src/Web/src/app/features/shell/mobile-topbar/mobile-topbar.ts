@@ -101,37 +101,36 @@ import { bottomTabs } from '../../../core/nav-model';
           class="mtb__logo"
           width="20"
           height="20"
-          viewBox="0 0 32 32"
+          viewBox="0 0 64 64"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
-            <linearGradient
-              id="uiq-logo-grad-mtb"
-              x1="3"
-              y1="29"
-              x2="29"
-              y2="3"
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop stop-color="#3D8BFF" />
-              <stop offset="0.52" stop-color="#8B7CFF" />
-              <stop offset="1" stop-color="#3FD8D0" />
+            <radialGradient id="ic_core-mtb" cx="50%" cy="36%" r="68%">
+              <stop offset="0%" stop-color="#fbf3ff" />
+              <stop offset="34%" stop-color="#c79bff" />
+              <stop offset="68%" stop-color="#7e63f4" />
+              <stop offset="100%" stop-color="#4a37c4" />
+            </radialGradient>
+            <linearGradient id="ic_sq-mtb" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#241c52" />
+              <stop offset="100%" stop-color="#0a081e" />
             </linearGradient>
           </defs>
           <rect
-            x="1.25"
-            y="1.25"
-            width="29.5"
-            height="29.5"
-            rx="7.5"
-            fill="#0B1019"
-            stroke="url(#uiq-logo-grad-mtb)"
-            stroke-width="1.5"
+            x="4"
+            y="4"
+            width="56"
+            height="56"
+            rx="16"
+            fill="url(#ic_sq-mtb)"
+            stroke="rgba(176,107,255,.42)"
+            stroke-width="1.2"
           />
-          <rect x="7" y="18" width="3.6" height="7" rx="1.3" fill="url(#uiq-logo-grad-mtb)" />
-          <rect x="14.2" y="13" width="3.6" height="12" rx="1.3" fill="url(#uiq-logo-grad-mtb)" />
-          <rect x="21.4" y="8" width="3.6" height="17" rx="1.3" fill="url(#uiq-logo-grad-mtb)" />
+          <ellipse cx="32" cy="32" rx="19" ry="19" fill="none" stroke="rgba(176,107,255,.28)" stroke-width="1.4" />
+          <ellipse cx="32" cy="32" rx="12.5" ry="12.5" fill="none" stroke="rgba(52,227,232,.20)" stroke-width="1.1" />
+          <circle cx="32" cy="32" r="8.5" fill="url(#ic_core-mtb)" />
+          <circle cx="45.5" cy="18.5" r="2.7" fill="#34e3e8" />
         </svg>
         @if (showBeta()) {
           <span class="mtb__beta">BETA</span>
