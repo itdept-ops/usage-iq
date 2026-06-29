@@ -25,7 +25,7 @@
 // `.js-reveal` only once JS confirms IntersectionObserver + motion is allowed;
 // it then arms the hidden→rise state, toggled to `.in` per element.
 :host(.js-reveal) {
-  .hero-copy, .hero-demo, .scattered, .stats, .section-head, .constellation,
+  .hero-copy, .hero-demo, .hero-proof, .scattered, .stats, .section-head, .constellation,
   .domain, .agent, .agents-leash, .proof, .proof-foot, .builder, .cta-card {
     opacity: 0;
     transform: translateY(16px);
@@ -51,9 +51,20 @@
   padding-left: clamp(20px, 5vw, 48px);
   padding-right: clamp(20px, 5vw, 48px);
 }
-.hero, .scattered-section, .domains-section, .stats, .agents-section,
+.hero, .hero-proof, .scattered-section, .domains-section, .stats, .agents-section,
 .proof-section, .builder-section, .final-cta {
   @extend %section-shell;
+}
+
+// ───────────────────────── Slim live proof strip (under the hero) ─────────────────────────
+// The built-with-badge carries its own glass styling; this just seats it as a
+// centered, slim strip directly beneath the hero for instant "it's real" proof.
+.hero-proof {
+  display: flex;
+  justify-content: center;
+  padding-bottom: clamp(8px, 2vw, 24px);
+
+  app-built-with-badge { width: 100%; max-width: 920px; }
 }
 
 // ═════════════════════════════ Hero ═════════════════════════════
@@ -174,6 +185,13 @@
 
   mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--aur-ink-dim); }
   &:hover { transform: translateY(-1px); }
+}
+
+// the multi-color Google "G" glyph riding inside the sign-in CTAs
+.g-mark {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
 }
 
 .cta-foot {
@@ -843,6 +861,15 @@
   .ghost-link { position: relative; }
 }
 
+.builder-links {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 32px;
+}
+
 .ghost-link {
   display: inline-flex;
   align-items: center;
@@ -946,6 +973,7 @@
   .agent-pulse { left: 0 !important; width: 100% !important; opacity: .5; }
 
   :host(.js-reveal) .hero-copy, :host(.js-reveal) .hero-demo,
+  :host(.js-reveal) .hero-proof,
   :host(.js-reveal) .scattered, :host(.js-reveal) .stats,
   :host(.js-reveal) .section-head, :host(.js-reveal) .constellation,
   :host(.js-reveal) .domain, :host(.js-reveal) .agent,

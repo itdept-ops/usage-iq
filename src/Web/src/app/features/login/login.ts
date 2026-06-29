@@ -66,131 +66,132 @@ export class Login {
 
   /** The hero "boot sequence" — monospace status lines that type in one at a time,
    *  ending on the kernel coming fully online. Ties the OS metaphor to the real
-   *  reporter terminal the product actually runs. */
+   *  system the product actually runs. */
   readonly boot: string[] = [
     '$ usage-iq --boot',
     '  kernel: online',
-    '  mounting work · body · home',
-    '  mounting people · place · growth',
+    '  mounting body · home · money',
+    '  mounting people · mind · comms',
     '  agents: armed · permission-gated',
-    '  ✓ one system · your entire life',
+    '  ✓ one OS · your entire life',
   ];
 
-  /** The six life-domains that boot under the kernel — the breadth payload.
-   *  Rendered both as the constellation satellites and the domain panels. */
+  /** The six life-modules that boot under the kernel — the breadth payload.
+   *  Rendered both as the constellation satellites and the module panels. */
   readonly domains: Domain[] = [
-    {
-      key: 'work',
-      icon: 'monitoring',
-      boot: 'work module: mounted',
-      title: 'Work',
-      text: 'AI cost intelligence: Claude Code + Codex spend, priced to the token, sliced any way you think — plus fleet leaderboards, share links and digests.',
-      accent: 'blue',
-    },
     {
       key: 'body',
       icon: 'fitness_center',
       boot: 'body module: mounted',
       title: 'Body',
-      text: 'Food + macros, a WorkoutX exercise library, BMI/BMR/TDEE, weight trend, hydration, watch activity, coffee, 75-Hard and trophies.',
+      text: 'Food + macros, an exercise library, sleep & recovery, meds & vitals, hydration, coffee, weight trend, 75-Hard — and a daily “Day in the Life” recap.',
       accent: 'cyan',
     },
     {
       key: 'home',
       icon: 'home',
       boot: 'home module: mounted',
-      title: 'Home',
-      text: 'The Family Hub: shared calendar, lists, notes, reminders, polls, chores + allowance, bills + budget, and a meal planner that builds the grocery list.',
+      title: 'Home & Family',
+      text: 'The shared Hub: calendar, lists, notes, chores + allowance, recipes and a meal planner that builds the grocery list for the whole household.',
       accent: 'violet',
     },
     {
-      key: 'people',
-      icon: 'forum',
-      boot: 'people module: mounted',
-      title: 'People',
-      text: 'Real-time chat: channels and DMs with reactions, curated contacts and circles, and notifications across an in-app bell, toasts and the browser.',
+      key: 'money',
+      icon: 'account_balance',
+      boot: 'money module: mounted',
+      title: 'Money',
+      text: 'A full finance vertical: budgets, bills, net-worth and savings tracking, with bank-statement import to keep the whole picture current.',
       accent: 'blue',
     },
     {
-      key: 'place',
-      icon: 'location_on',
-      boot: 'place module: mounted',
-      title: 'Place',
-      text: "Locations and a private “where’s everyone” map — opt-in, on your own infrastructure, never shared outward.",
+      key: 'people',
+      icon: 'groups',
+      boot: 'people module: mounted',
+      title: 'People & Place',
+      text: 'Contacts, family and fleet on one identity spine, plus opt-in location maps and history replay — a private “where’s everyone”, hosted by you.',
       accent: 'cyan',
     },
     {
-      key: 'growth',
-      icon: 'trending_up',
-      boot: 'growth module: mounted',
-      title: 'Growth',
-      text: 'A resume builder that tailors to a job description and exports ATS-clean, plus goals that the OS tracks against the rest of your life.',
+      key: 'mind',
+      icon: 'self_improvement',
+      boot: 'mind module: mounted',
+      title: 'Mind',
+      text: 'Journal and mood, habit streaks and the 75-Hard challenge — the inner-life layer the rest of your life is finally measured against.',
       accent: 'violet',
+    },
+    {
+      key: 'comms',
+      icon: 'forum',
+      boot: 'comms module: mounted',
+      title: 'Comms',
+      text: 'Real-time chat — channels and DMs with reactions — and notifications across an in-app bell, toasts and the browser. The OS talks to you.',
+      accent: 'blue',
     },
   ];
 
-  /** The agentic layer — assists that turn a sentence or a photo into a logged
-   *  action, then hand you the pen. Every one is off by default, prefills only. */
+  /** The agentic layer — the OS working FOR you. Proactive agents, ask-that-acts,
+   *  the insight engine, the daily recap, and search. Every one is off by default,
+   *  permission-gated, and prefills only. */
   readonly agents: Agent[] = [
     {
-      icon: 'photo_camera',
-      cue: 'Snap a photo of your dinner',
-      act: 'and it returns estimated macros, ready to log.',
+      icon: 'schedule',
+      cue: 'Proactive agents work while you sleep',
+      act: '— running on a cadence and dropping what matters into the Agent Inbox.',
     },
     {
-      icon: 'mic',
-      cue: '“Jogged two miles”',
-      act: 'becomes a structured workout, scaled to your weight.',
+      icon: 'bolt',
+      cue: 'Ask that acts',
+      act: '— “jogged two miles”, “add milk to the list” becomes a confirm-chip action across any domain.',
     },
     {
-      icon: 'event',
-      cue: 'Drop a photo of a schedule',
-      act: 'and a week of calendar events drafts itself.',
-    },
-    {
-      icon: 'restaurant',
-      cue: '“What can I eat with 500 calories left?”',
-      act: 'gets answers that fit your day — not another chart.',
+      icon: 'insights',
+      cue: 'The Insight engine reads across domains',
+      act: '— spend, macros, calendar, goals — and turns the patterns into plain language.',
     },
     {
       icon: 'auto_awesome',
-      cue: 'A daily coach reads your day',
-      act: 'and a weekly review reads your week.',
+      cue: 'A Day-in-the-Life recap reads your day',
+      act: 'and hands back a clear summary — not another chart to decode.',
     },
     {
-      icon: 'calculate',
-      cue: 'Set a goal',
-      act: 'and a deterministic baseline is refined into a plan.',
+      icon: 'search',
+      cue: 'Search Everything',
+      act: 'spans every module at once, so one box finds anything in your life.',
+    },
+    {
+      icon: 'photo_camera',
+      cue: 'Snap a photo or speak an intent',
+      act: 'and the OS drafts the structured entry, ready for you to confirm.',
     },
   ];
 
-  /** The trust spine — back the breadth with verifiable substance. */
+  /** One platform — the trust + craft spine under the whole OS. */
   readonly proofs: Proof[] = [
     {
-      icon: 'shield_person',
-      title: '49 server-enforced capabilities',
-      text: 'Granular permissions re-checked on the server every request — not hidden in the UI. Google-pinned identity, full audit log, real-time force-logout.',
+      icon: 'vpn_key',
+      title: 'One login for everything',
+      text: 'A single Google-pinned identity opens every module — no twenty accounts, no twenty passwords. 50+ capabilities, re-checked on the server every request.',
     },
     {
       icon: 'dns',
-      title: 'Self-hosted, no telemetry',
-      text: 'Angular + .NET 9 + PostgreSQL, Docker-composed to run anywhere, deployed keylessly to AWS. No seat pricing. Nothing phones home.',
+      title: 'Your data on your servers',
+      text: 'Self-hosted and open source — Angular + .NET 9 + PostgreSQL, Docker-composed to run anywhere. No seat pricing, no telemetry, nothing phones home.',
+    },
+    {
+      icon: 'install_mobile',
+      title: 'A deep installable PWA',
+      text: 'Install it like a native app and keep working offline — the OS is built to live on your home screen, not just a browser tab.',
     },
     {
       icon: 'devices',
-      title: 'Desktop and native mobile',
-      text: 'One system, two first-class platforms — the same data on a grand desktop surface and a native mobile shell.',
-    },
-    {
-      icon: 'lock',
-      title: 'Agents on a leash you hold',
-      text: 'Every assist is off by default, permission-gated, sees only the minimum, and never auto-logs. It prefills; you confirm.',
+      title: 'Desktop + full mobile, real-time',
+      text: 'Two first-class platforms — every page twinned for the phone — over one live database, with real-time chat, notifications and force-logout.',
     },
   ];
 
   readonly stats: Stat[] = [
-    { value: 6, suffix: '', label: 'Life-domains, one OS' },
-    { value: 49, suffix: '', label: 'Server-enforced caps' },
+    { value: 6, suffix: '', label: 'Life modules, one OS' },
+    { value: 50, suffix: '+', label: 'Server-enforced caps' },
     { value: 2, suffix: '', label: 'First-class platforms' },
     { value: 100, suffix: '%', label: 'Self-hosted, yours' },
   ];

@@ -10,24 +10,23 @@
     <div class="noise"></div>
   </div>
 
-  <!-- ───────────────────────── Hero ───────────────────────── -->
+  <!-- ───────────────────────── 1 · Hero ───────────────────────── -->
   <section class="hero">
     <div class="hero-copy" #reveal>
       <a class="eyebrow" href="https://github.com/itdept-ops/usage-iq" target="_blank" rel="noopener">
-        <span class="dot"></span> One system. Your entire life.
+        <span class="dot"></span> One OS. Your entire life.
         <span class="eyebrow-sep" aria-hidden="true">·</span>
         <span class="eyebrow-os">Open source · self-hosted</span>
         <span class="eyebrow-arrow">→</span>
       </a>
       <h1 class="hero-title">
-        The <span class="grad">operating system</span><br />
-        for your life.
+        The <span class="grad">Agentic Life OS</span>
       </h1>
       <p class="hero-sub">
-        Your code spend, your body, your family, your money, your day —
-        unified into one self-hosted system, run by a team of
-        <strong>AI agents</strong> that don’t just chart the past. <strong>They act.</strong>
-        Permission-gated, nothing phoning home, all of it yours.
+        One system for your whole life — <strong>body, home, money, people, mind</strong> —
+        with agents that don’t just chart the past. <strong>They act.</strong>
+        Your life is scattered across twenty apps; this is the one OS that tracks everything,
+        connects it, and works for you.
       </p>
 
       <div class="hero-cta">
@@ -37,12 +36,18 @@
           [queryParams]="signinParams()"
         >
           <span class="cta-shine" aria-hidden="true"></span>
-          Enter the OS
+          <svg class="g-mark" viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+            <path fill="#fff" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" opacity=".9"/>
+            <path fill="#fff" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" opacity=".55"/>
+            <path fill="#fff" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z" opacity=".4"/>
+            <path fill="#fff" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" opacity=".75"/>
+          </svg>
+          Sign in with Google
           <span class="cta-arrow" aria-hidden="true">→</span>
         </a>
-        <a class="cta-secondary" routerLink="/features">
-          Tour the domains
-          <mat-icon aria-hidden="true">grid_view</mat-icon>
+        <a class="cta-secondary" routerLink="/inside">
+          Look inside
+          <mat-icon aria-hidden="true">arrow_outward</mat-icon>
         </a>
       </div>
       <p class="cta-foot"><mat-icon aria-hidden="true">lock</mat-icon> Access is restricted to approved accounts.</p>
@@ -63,50 +68,55 @@
         <!-- floating "agents online" chip for product-mock energy -->
         <div class="float-chip">
           <span class="fc-spark" aria-hidden="true"></span>
-          <span class="fc-num">6 domains</span>
+          <span class="fc-num">6 modules</span>
           <span class="fc-lbl">agents · online</span>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ───────────────────────── Scattered life (the problem) ───────────────────────── -->
+  <!-- ─── Slim LIVE proof strip: anonymous owner-scoped aggregate figures — instant "it's real & running" ─── -->
+  <section class="hero-proof" #reveal>
+    <app-built-with-badge />
+  </section>
+
+  <!-- ───────────────────────── 2 · Your life, one OS (manifesto) ───────────────────────── -->
   <section class="scattered-section">
     <div class="scattered panel" #reveal>
       <div class="scattered-copy">
-        <span class="section-eyebrow">$ the problem</span>
-        <h2>Your life runs in fifteen apps that have never met.</h2>
+        <span class="section-eyebrow">$ your life, one OS</span>
+        <h2>Your life runs in twenty apps that have never met.</h2>
         <p>
-          Your AI spend lives in a terminal. Your calories live in an app that forgot you.
-          Your family’s week is screenshots in a group chat; your budget is a spreadsheet you avoid.
-          Every tool is a silo, and <strong>you are the integration layer</strong> —
+          Your calories live in an app that forgot you. Your family’s week is screenshots in a group chat.
+          Your budget is a spreadsheet you avoid; your habits, your journal, your people — each in its own silo.
+          Every tool is an island, and <strong>you are the integration layer</strong> —
           re-typing, cross-checking, remembering.
         </p>
         <p class="scattered-punch">
-          An operating system doesn’t make you the glue. It makes the parts one thing.
+          An operating system doesn’t make you the glue. It makes the parts one thing — then puts agents on top.
         </p>
       </div>
       <!-- scattered, disconnected silo tiles -->
       <div class="silos" aria-hidden="true">
-        <span class="silo s1">spend.terminal</span>
-        <span class="silo s2">calories.app</span>
-        <span class="silo s3">family.chat</span>
-        <span class="silo s4">budget.xlsx</span>
+        <span class="silo s1">calories.app</span>
+        <span class="silo s2">family.chat</span>
+        <span class="silo s3">budget.xlsx</span>
+        <span class="silo s4">journal.txt</span>
         <span class="silo s5">calendar.ics</span>
-        <span class="silo s6">notes.txt</span>
+        <span class="silo s6">habits.app</span>
       </div>
     </div>
   </section>
 
-  <!-- ───────────────────────── Domains constellation ───────────────────────── -->
+  <!-- ───────────────────────── 3 · Life modules constellation ───────────────────────── -->
   <section class="domains-section">
     <header class="section-head" #reveal>
-      <span class="section-eyebrow">$ the surface area</span>
-      <h2>One <span class="grad">OS</span>. Every domain of your life.</h2>
-      <p>Six bootable modules under one kernel. One login, one database, one system that finally knows the whole picture.</p>
+      <span class="section-eyebrow">$ the modules</span>
+      <h2>One <span class="grad">OS</span>. Every part of your life.</h2>
+      <p>Six modules boot under one kernel. One login, one database, one system that finally knows the whole picture.</p>
     </header>
 
-    <!-- the life-domains constellation: kernel at center, six labeled satellites -->
+    <!-- the life-module constellation: kernel at center, six labeled satellites -->
     <div class="constellation" #reveal aria-hidden="true">
       <span class="orbit-ring r-1"></span>
       <span class="orbit-ring r-2"></span>
@@ -145,17 +155,14 @@
     }
   </section>
 
-  <!-- ─── Live "Built with Usage IQ" proof strip: anonymous owner-scoped aggregate figures ─── -->
-  <app-built-with-badge />
-
-  <!-- ───────────────────────── Agents that act ───────────────────────── -->
+  <!-- ───────────────────────── 4 · Agents that act ───────────────────────── -->
   <section class="agents-section">
     <header class="section-head" #reveal>
       <span class="section-eyebrow">$ the agentic layer</span>
-      <h2>Agents that don’t just report. <span class="grad">They act.</span></h2>
+      <h2>The OS works <span class="grad">for you</span>.</h2>
       <p>
-        Not chatbots bolted on — assists wired into the OS that turn a sentence or a photo into a logged
-        action, then hand you the pen.
+        Not chatbots bolted on — agents wired into the OS that run while you sleep, act across domains,
+        and read your whole life so you don’t have to.
       </p>
     </header>
     <div class="agents">
@@ -178,12 +185,12 @@
     </p>
   </section>
 
-  <!-- ───────────────────────── Proof / trust spine ───────────────────────── -->
+  <!-- ───────────────────────── 5 · One platform (trust + craft) ───────────────────────── -->
   <section class="proof-section">
     <header class="section-head" #reveal>
-      <span class="section-eyebrow">$ the trust spine</span>
-      <h2>It’s all real. It’s all <span class="grad">yours</span>.</h2>
-      <p>Breadth this wide only earns trust when every claim has a floor. Here is the floor.</p>
+      <span class="section-eyebrow">$ one platform</span>
+      <h2>One login. It’s all <span class="grad">yours</span>.</h2>
+      <p>Breadth this wide only earns trust when every claim has a floor. Here is the floor — and the craft.</p>
     </header>
     <div class="proofs">
       @for (p of proofs; track p.title; let i = $index) {
@@ -201,34 +208,45 @@
     </p>
   </section>
 
-  <!-- ───────────────────────── The builder ───────────────────────── -->
+  <!-- ───────────────────────── 6 · The builder ───────────────────────── -->
   <section class="builder-section">
     <div class="builder panel" #reveal>
       <div class="builder-glow" aria-hidden="true"></div>
       <span class="section-eyebrow">$ the builder</span>
-      <h2>A life-sized platform, built by one person and a team of machines.</h2>
+      <h2>A life-sized OS, built by one person and a team of machines.</h2>
       <p>
-        Usage IQ is the proof of its own pitch: a life-sized platform engineered end to end by one person
+        Usage IQ is the proof of its own pitch: a life-sized operating system engineered end to end by one person
         orchestrating a team of AI agents. <strong>Junior Fortunato</strong> — founder, U.S. Army veteran,
-        full-stack engineer, and agentic-AI builder — architects the intent and lets the machines do the grind.
+        full-stack engineer and agentic-AI builder — architects the intent and lets the machines do the grind.
         The best résumé is a running product.
       </p>
-      <a class="ghost-link" routerLink="/about">Meet the builder <span>→</span></a>
+      <div class="builder-links">
+        <a class="ghost-link" routerLink="/about">The story <span>→</span></a>
+        <a class="ghost-link" routerLink="/inside">How it’s built <span>→</span></a>
+      </div>
     </div>
   </section>
 
-  <!-- ───────────────────────── Final CTA ───────────────────────── -->
+  <!-- ───────────────────────── 7 · Final CTA ───────────────────────── -->
   <section class="final-cta">
     <div class="cta-card panel" #reveal>
       <div class="cta-glow" aria-hidden="true"></div>
       <div class="cta-grid" aria-hidden="true"></div>
       <h2>Boot the operating system for your life.</h2>
       <p>
-        One system for your work, your body, your home, your money, and your day —
+        One OS for your body, your home, your money, your people and your mind —
         run by agents, hosted by you.
       </p>
       <div class="cta-actions">
-        <a class="cta-pill" routerLink="/signin" [queryParams]="signinParams()">Enter the OS <span>→</span></a>
+        <a class="cta-pill" routerLink="/signin" [queryParams]="signinParams()">
+          <svg class="g-mark" viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+            <path fill="#fff" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" opacity=".9"/>
+            <path fill="#fff" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" opacity=".55"/>
+            <path fill="#fff" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z" opacity=".4"/>
+            <path fill="#fff" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" opacity=".75"/>
+          </svg>
+          Sign in with Google <span>→</span>
+        </a>
         <a class="cta-link" href="#top" (click)="scrollTop($event)">Back to top <span>↑</span></a>
       </div>
       <p class="cta-foot center"><mat-icon aria-hidden="true">lock</mat-icon> Access is restricted to approved accounts.</p>
