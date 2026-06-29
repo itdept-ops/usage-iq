@@ -211,6 +211,15 @@ export class FamilyHome implements OnDestroy {
     return this.isChild() ? visible.filter((t) => t.key === 'chores') : visible;
   });
 
+  /**
+   * The Family Assistant panel is gated on the permission its endpoint requires — without family.ai.assistant
+   * the panel would render but every ask 403s, a try-it-and-it-breaks dead end. Hide it for those users.
+   */
+  readonly canUseFamilyAssistant = computed(() => {
+    this.auth.permissions(); // re-run on permission changes
+    return this.auth.hasPermission(PERM.familyAiAssistant);
+  });
+
   /** The household's members in server order (owner first), or empty until loaded. */
   readonly members = computed<HouseholdMember[]>(() => this.household()?.members ?? []);
 

@@ -395,6 +395,9 @@ export class FamilyAssistantPanel {
   ): string {
     if (e instanceof EventEditorDismissed) return '';
     const err = e as { status?: number; error?: { message?: string; detail?: string } };
+    if (err?.status === 403)
+      // Permanently unavailable for this user (no family.ai.assistant) — never leak the raw ProblemDetails.
+      return "The family assistant isn't available on your account.";
     if (err?.status === 503)
       return "The assistant isn't available right now. You can do this manually.";
     if (err?.status === 400)

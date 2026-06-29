@@ -33,8 +33,11 @@
     </header>
 
     <!-- ✨ Family Assistant: one ask-anything box over the whole household. Answers (aria-live) + proposed
-         action cards the user EXECUTES on click via the existing create flows (nothing writes until clicked). -->
-    <app-family-assistant-panel [home]="home" />
+         action cards the user EXECUTES on click via the existing create flows (nothing writes until clicked).
+         Gated on family.ai.assistant — without it the endpoint only ever 403s, so we hide the box entirely. -->
+    @if (canUseFamilyAssistant()) {
+      <app-family-assistant-panel [home]="home" />
+    }
 
     <!-- AI morning narrative: a warm card at the top of Today. When it falls back to the plain deterministic
          briefing we render the same text without the "AI" flourish. The structured cards below stay available
