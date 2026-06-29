@@ -250,6 +250,12 @@ public static class FamilyFinanceEndpoints
     private const int DefaultPageSize = 50;
     private const int MaxPageSize = 200;
 
+    /// <summary>Upper magnitude for any persisted money amount. The numeric(18,2) money columns top out near
+    /// 1e16; this cap sits comfortably under that so an oversized input is rejected with a clean 400 instead of
+    /// overflowing the column into an unhandled Postgres 22003 (NumericValueOutOfRange) 500. Applies to budget /
+    /// savings-target limits, manual balance entries, and savings contributions (incl. the running total).</summary>
+    private const decimal MoneyCap = 1e14m;
+
     public static void MapFamilyFinanceEndpoints(this WebApplication app)
     {
         // BOTH gates: family.use AND family.finance. Chaining two RequirePermission filters ANDs them — a
@@ -1743,13 +1749,16 @@ public static class FamilyFinanceEndpoints
         return c.Length == 0 ? null : Clamp(c, 120);
     }
 
-    /// <summary>Validate + normalize a budget/limit amount: required, non-negative, finite.</summary>
+    /// <summary>Validate + normalize a budget/limit/target amount: required, non-negative, finite, and within the
+    /// <see cref="MoneyCap"/> so it can't overflow the numeric(18,2) column into an unhandled 500. Shared by the
+    /// budget LimitAmount (POST/PUT /budgets) and the savings TargetAmount (POST/PUT /savings) paths.</summary>
     private static bool TryNormalizeLimit(decimal? amount, out decimal limit, out string error)
     {
         limit = 0m;
         error = "";
         if (amount is not decimal a) { error = "A limit amount is required."; return false; }
         if (a < 0) { error = "A limit can't be negative."; return false; }
+        if (Math.Abs(a) > MoneyCap) { error = "That amount is too large."; return false; }
         limit = decimal.Round(a, 2);
         return true;
     }
@@ -1789,6 +1798,9 @@ public static class FamilyFinanceEndpoints
 
             if (req.Balance is not decimal balance)
                 return Results.BadRequest(new { message = "A balance is required." });
+            // Bound the SIGNED balance both ways so it can't overflow the numeric(18,2) column into a 500.
+            if (Math.Abs(balance) > MoneyCap)
+                return Results.BadRequest(new { message = "That amount is too large." });
 
             var asOf = await TrackerVisibility.DisplayTzTodayAsync(db, ct);
             if (!string.IsNullOrWhiteSpace(req.AsOfDate))
@@ -2034,8 +2046,14 @@ public static class FamilyFinanceEndpoints
 
             if (req.Amount is not decimal amount || amount == 0m)
                 return Results.BadRequest(new { message = "A non-zero contribution amount is required." });
+            // Bound BOTH the single contribution AND the resulting running total so neither the input nor the
+            // accumulated SavedAmount can overflow the numeric(18,2) column into an unhandled 500. The floor at 0
+            // is applied after the guard, mirroring the persisted value.
+            var newSaved = Math.Max(0m, decimal.Round(goal.SavedAmount + amount, 2));
+            if (Math.Abs(amount) > MoneyCap || newSaved > MoneyCap)
+                return Results.BadRequest(new { message = "That amount is too large." });
 
-            goal.SavedAmount = Math.Max(0m, decimal.Round(goal.SavedAmount + amount, 2));
+            goal.SavedAmount = newSaved;
             goal.UpdatedUtc = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToSavingsDto(goal));

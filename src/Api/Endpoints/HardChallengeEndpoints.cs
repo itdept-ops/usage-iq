@@ -502,7 +502,7 @@ public static class HardChallengeEndpoints
             var today = await TrackerVisibility.DisplayTzTodayAsync(db, ct);
 
             // The set of people to rank: the caller + everyone whose tracker they may view (sharing contacts /
-            // viewall). Build a lookup of (email → user) so we can compute each one's challenge stats.
+            // viewall, capped). Build the roster so we can compute each one's challenge stats.
             var others = (await SharingUsersQuery(db, caller)
                     .Select(u => new { u.Id, u.Email, u.Name, u.DisplayNameMode, u.Nickname, u.Picture })
                     .ToListAsync(ct))
@@ -512,25 +512,32 @@ public static class HardChallengeEndpoints
                 .Select(u => new { u.Id, u.Email, u.Name, u.DisplayNameMode, u.Nickname, u.Picture }).FirstAsync(ct);
             var self = new { selfRow.Id, selfRow.Email, Name = DisplayName.Format(selfRow.Name, selfRow.DisplayNameMode, selfRow.Nickname), selfRow.Picture };
 
-            var rows = new List<LeaderboardRowDto>();
-
-            async Task AddRowAsync(int id, string email, string? name, string? picture, bool isSelf)
-            {
-                var challenge = await db.HardChallenges.AsNoTracking()
-                    .FirstOrDefaultAsync(c => c.UserEmail == email && c.Status == HardChallengeStatus.Active, ct);
-                if (challenge is null) return; // no active challenge ⇒ omitted
-
-                var stats = await ComputeStatsAsync(db, challenge, email, today, ct);
-                rows.Add(new LeaderboardRowDto(
-                    id,
-                    string.IsNullOrEmpty(name) ? "Unknown user" : name!,
-                    picture,
-                    stats.CurrentDay, stats.CurrentStreak, stats.TotalPoints, stats.TodayPoints, isSelf));
-            }
-
-            await AddRowAsync(self.Id, self.Email, self.Name, self.Picture, isSelf: true);
+            // The full ranked roster (self first, then the sharing users). De-dupe by email so a caller who is
+            // also returned by the sharing query is counted once (self wins).
+            var people = new List<(int Id, string Email, string Name, string? Picture, bool IsSelf)>
+                { (self.Id, self.Email, self.Name, self.Picture, true) };
+            var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { self.Email };
             foreach (var u in others)
-                await AddRowAsync(u.Id, u.Email, u.Name, u.Picture, isSelf: false);
+                if (seenEmails.Add(u.Email))
+                    people.Add((u.Id, u.Email, u.Name, u.Picture, false));
+
+            // BATCH: load every ranked person's active challenge + the per-table tracker facts in a CONSTANT
+            // number of queries (one per table, filtered by emails.Contains over the union span) instead of
+            // ~9 queries PER person. Each person's slice is then fed to the SAME in-memory scorer a per-person
+            // scan would use, so the scores are IDENTICAL — this is purely a query-shape change.
+            var emails = people.Select(p => p.Email).ToList();
+            var statsByEmail = await ComputeStatsBatchAsync(db, emails, today, ct);
+
+            var rows = new List<LeaderboardRowDto>(people.Count);
+            foreach (var p in people)
+            {
+                if (!statsByEmail.TryGetValue(p.Email, out var stats)) continue; // no active challenge ⇒ omitted
+                rows.Add(new LeaderboardRowDto(
+                    p.Id,
+                    string.IsNullOrEmpty(p.Name) ? "Unknown user" : p.Name,
+                    p.Picture,
+                    stats.CurrentDay, stats.CurrentStreak, stats.TotalPoints, stats.TodayPoints, p.IsSelf));
+            }
 
             var ranked = rows
                 .OrderByDescending(r => r.TotalPoints)
@@ -585,10 +592,20 @@ public static class HardChallengeEndpoints
     private static IQueryable<AppUser> SharingUsersQuery(UsageDbContext db, CurrentUserAccessor.CurrentUser caller)
     {
         if (caller.Permissions.Contains(Permissions.TrackerViewAll))
-            return db.Users.AsNoTracking().Where(u => u.IsEnabled && u.Email != caller.Email);
+            // A viewall caller could otherwise enumerate EVERY enabled user; cap the roster (ordered for a
+            // deterministic slice) so the leaderboard / shared list stay bounded. Sharing-contacts callers are
+            // already naturally bounded by the contact graph, so only the viewall path needs the cap.
+            return db.Users.AsNoTracking()
+                .Where(u => u.IsEnabled && u.Email != caller.Email)
+                .OrderBy(u => u.Email)
+                .Take(MaxLeaderboardPeople);
 
         return ContactGraph.SharingUsers(db, caller.Email);
     }
+
+    /// <summary>The viewall roster cap for <see cref="SharingUsersQuery"/> — a sane upper bound so the
+    /// leaderboard / shared list can never enumerate every enabled user.</summary>
+    private const int MaxLeaderboardPeople = 200;
 
     // =====================================================================================
     // Building the challenge + day DTOs (auto scoring recomputed LIVE from the tracker)
@@ -773,6 +790,86 @@ public static class HardChallengeEndpoints
         return map;
     }
 
+    /// <summary>
+    /// The BATCHED tracker-facts load for MANY emails over [from, to]: one query per source table filtered by
+    /// <c>emails.Contains(...)</c>, then assembled per email IN MEMORY into the SAME (date → <see cref="DayFacts"/>)
+    /// shape the single-email <see cref="LoadTrackerFactsAsync"/> produces (same grouping, same rounding, same
+    /// merge order). Used by the leaderboard batch so the per-person facts are identical to the per-person read.
+    /// </summary>
+    private static async Task<Dictionary<string, Dictionary<DateOnly, DayFacts>>> LoadTrackerFactsBatchAsync(
+        UsageDbContext db, IReadOnlyCollection<string> emails, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        var result = new Dictionary<string, Dictionary<DateOnly, DayFacts>>(StringComparer.Ordinal);
+        if (emails.Count == 0) return result;
+
+        var foods = await db.FoodEntries.AsNoTracking()
+            .Where(f => emails.Contains(f.UserEmail) && f.LocalDate >= from && f.LocalDate <= to)
+            .GroupBy(f => new { f.UserEmail, f.LocalDate })
+            .Select(grp => new
+            {
+                grp.Key.UserEmail,
+                Date = grp.Key.LocalDate,
+                Calories = grp.Sum(f => f.Calories),
+                Protein = grp.Sum(f => f.ProteinG),
+                Carb = grp.Sum(f => f.CarbG),
+                Fat = grp.Sum(f => f.FatG),
+            })
+            .ToListAsync(ct);
+
+        var workouts = await db.ExerciseEntries.AsNoTracking()
+            .Where(x => emails.Contains(x.UserEmail) && x.LocalDate >= from && x.LocalDate <= to && x.DurationMin != null)
+            .Select(x => new { x.UserEmail, x.LocalDate, Dur = x.DurationMin!.Value })
+            .ToListAsync(ct);
+
+        var hydration = await db.HydrationEntries.AsNoTracking()
+            .Where(h => emails.Contains(h.UserEmail) && h.LocalDate >= from && h.LocalDate <= to)
+            .GroupBy(h => new { h.UserEmail, h.LocalDate })
+            .Select(grp => new { grp.Key.UserEmail, Date = grp.Key.LocalDate, Ml = grp.Sum(h => h.AmountMl) })
+            .ToListAsync(ct);
+
+        var activity = await db.DailyActivities.AsNoTracking()
+            .Where(a => emails.Contains(a.UserEmail) && a.LocalDate >= from && a.LocalDate <= to && a.ActiveCalories != null)
+            .Select(a => new { a.UserEmail, a.LocalDate, a.ActiveCalories })
+            .ToListAsync(ct);
+
+        Dictionary<DateOnly, DayFacts> MapFor(string email)
+        {
+            if (!result.TryGetValue(email, out var m))
+                result[email] = m = new Dictionary<DateOnly, DayFacts>();
+            return m;
+        }
+        static DayFacts Get(Dictionary<DateOnly, DayFacts> map, DateOnly d) =>
+            map.TryGetValue(d, out var f) ? f : new DayFacts(0, 0, 0, 0, 0, new List<int>());
+
+        foreach (var f in foods)
+        {
+            var map = MapFor(f.UserEmail);
+            map[f.Date] = Get(map, f.Date) with
+            {
+                CaloriesIn = f.Calories,
+                ProteinG = Math.Round(f.Protein, 1),
+                CarbG = Math.Round(f.Carb, 1),
+                FatG = Math.Round(f.Fat, 1),
+            };
+        }
+        foreach (var grp in workouts.GroupBy(w => new { w.UserEmail, w.LocalDate }))
+        {
+            var map = MapFor(grp.Key.UserEmail);
+            map[grp.Key.LocalDate] = Get(map, grp.Key.LocalDate) with { WorkoutDurationsMin = grp.Select(x => x.Dur).ToList() };
+        }
+        foreach (var h in hydration)
+        {
+            var map = MapFor(h.UserEmail);
+            map[h.Date] = Get(map, h.Date) with { HydrationMl = h.Ml };
+        }
+        foreach (var a in activity)
+        {
+            var map = MapFor(a.UserEmail);
+            map[a.LocalDate] = Get(map, a.LocalDate) with { ActiveCalories = a.ActiveCalories };
+        }
+        return result;
+    }
+
     /// <summary>Load the manual per-task progress for [from, to] as a (date → (taskId → manual)) lookup.</summary>
     private static async Task<Dictionary<DateOnly, Dictionary<int, HardChallengeScoring.DayManual>>> LoadManualProgressAsync(
         UsageDbContext db, string email, DateOnly from, DateOnly to, CancellationToken ct)
@@ -790,6 +887,33 @@ public static class HardChallengeEndpoints
             inner[r.TaskId] = new HardChallengeScoring.DayManual(r.Value, r.Done);
         }
         return map;
+    }
+
+    /// <summary>The BATCHED manual-progress load for MANY emails over [from, to] in ONE query, assembled per
+    /// email into the SAME (date → (taskId → manual)) lookup the single-email <see cref="LoadManualProgressAsync"/>
+    /// produces. Used by the leaderboard batch.</summary>
+    private static async Task<Dictionary<string, Dictionary<DateOnly, Dictionary<int, HardChallengeScoring.DayManual>>>>
+        LoadManualProgressBatchAsync(
+            UsageDbContext db, IReadOnlyCollection<string> emails, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        var result = new Dictionary<string, Dictionary<DateOnly, Dictionary<int, HardChallengeScoring.DayManual>>>(
+            StringComparer.Ordinal);
+        if (emails.Count == 0) return result;
+
+        var rows = await db.HardChallengeDayTasks.AsNoTracking()
+            .Where(x => emails.Contains(x.UserEmail) && x.LocalDate >= from && x.LocalDate <= to)
+            .Select(x => new { x.UserEmail, x.LocalDate, x.TaskId, x.Value, x.Done })
+            .ToListAsync(ct);
+
+        foreach (var r in rows)
+        {
+            if (!result.TryGetValue(r.UserEmail, out var byDate))
+                result[r.UserEmail] = byDate = new Dictionary<DateOnly, Dictionary<int, HardChallengeScoring.DayManual>>();
+            if (!byDate.TryGetValue(r.LocalDate, out var inner))
+                byDate[r.LocalDate] = inner = new Dictionary<int, HardChallengeScoring.DayManual>();
+            inner[r.TaskId] = new HardChallengeScoring.DayManual(r.Value, r.Done);
+        }
+        return result;
     }
 
     /// <summary>Build one day's DTO + score in memory from the loaded facts/manual progress/task set.</summary>
@@ -866,34 +990,91 @@ public static class HardChallengeEndpoints
 
     private readonly record struct ChallengeStats(int CurrentDay, int CurrentStreak, decimal TotalPoints, decimal TodayPoints);
 
-    private static async Task<ChallengeStats> ComputeStatsAsync(
-        UsageDbContext db, HardChallenge challenge, string email, DateOnly today, CancellationToken ct)
+    /// <summary>
+    /// The BATCHED leaderboard stats: compute <see cref="ChallengeStats"/> for EVERY email that has an active
+    /// challenge in ONE constant set of queries (one per table, filtered by <c>emails.Contains(...)</c>) instead
+    /// of ~9 queries per person. The per-table reads are grouped by email IN MEMORY and each person's slice is
+    /// fed to the SAME <see cref="BuildDayInMemory"/> scorer the per-day weekly-recap path uses, so the resulting
+    /// scores are byte-for-byte identical to a per-person scan — this is purely a query-shape change. Emails with
+    /// no active challenge are simply absent from the returned dictionary (the caller omits them).
+    /// </summary>
+    private static async Task<Dictionary<string, ChallengeStats>> ComputeStatsBatchAsync(
+        UsageDbContext db, IReadOnlyCollection<string> emails, DateOnly today, CancellationToken ct)
     {
-        var windowEnd = challenge.StartDate.AddDays(TotalDays - 1);
-        var tasks = await LoadTasksAsync(db, challenge.Id, ct);
-        var rows = await db.HardChallengeDays.AsNoTracking()
-            .Where(x => x.UserEmail == email && x.LocalDate >= challenge.StartDate && x.LocalDate <= windowEnd)
-            .ToListAsync(ct);
-        var rowByDate = rows.ToDictionary(r => r.LocalDate);
-        var profile = await db.TrackerProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserEmail == email, ct);
-        var facts = await LoadTrackerFactsAsync(db, email, challenge.StartDate, windowEnd, ct);
-        var manual = await LoadManualProgressAsync(db, email, challenge.StartDate, windowEnd, ct);
+        var result = new Dictionary<string, ChallengeStats>(StringComparer.Ordinal);
+        if (emails.Count == 0) return result;
 
-        decimal total = 0m, todayPoints = 0m;
-        var streakDays = new List<HardChallengeScoring.StreakDay>();
-        for (var i = 0; i < TotalDays; i++)
+        // One query: the active challenge per email (the window start/end is derived from each one's StartDate).
+        var challenges = await db.HardChallenges.AsNoTracking()
+            .Where(c => emails.Contains(c.UserEmail) && c.Status == HardChallengeStatus.Active)
+            .ToListAsync(ct);
+        if (challenges.Count == 0) return result;
+
+        // The set of (active-challenge) emails + the union span [min start, max windowEnd] to bound the reads.
+        // Per-person scoring still walks each challenge's OWN 75-day window from its StartDate; the span only
+        // bounds the batched table reads (every per-person window is a subset of it).
+        var challengeByEmail = challenges.ToDictionary(c => c.UserEmail, StringComparer.Ordinal);
+        var activeEmails = challengeByEmail.Keys.ToList();
+        var spanStart = challenges.Min(c => c.StartDate);
+        var spanEnd = challenges.Max(c => c.StartDate.AddDays(TotalDays - 1));
+
+        // One query per table over the union span, grouped by email in memory.
+        var tasksByChallenge = (await db.HardChallengeTasks.AsNoTracking()
+                .Where(t => challenges.Select(c => c.Id).Contains(t.ChallengeId))
+                .ToListAsync(ct))
+            .GroupBy(t => t.ChallengeId)
+            .ToDictionary(grp => grp.Key,
+                grp => (IReadOnlyList<HardChallengeTask>)grp
+                    .OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToList());
+
+        var daysByEmail = (await db.HardChallengeDays.AsNoTracking()
+                .Where(x => activeEmails.Contains(x.UserEmail) && x.LocalDate >= spanStart && x.LocalDate <= spanEnd)
+                .ToListAsync(ct))
+            .GroupBy(x => x.UserEmail, StringComparer.Ordinal)
+            .ToDictionary(grp => grp.Key, grp => grp.ToList(), StringComparer.Ordinal);
+
+        var profileByEmail = (await db.TrackerProfiles.AsNoTracking()
+                .Where(p => activeEmails.Contains(p.UserEmail))
+                .ToListAsync(ct))
+            .GroupBy(p => p.UserEmail, StringComparer.Ordinal)
+            .ToDictionary(grp => grp.Key, grp => grp.First(), StringComparer.Ordinal);
+
+        var factsByEmail = await LoadTrackerFactsBatchAsync(db, activeEmails, spanStart, spanEnd, ct);
+        var manualByEmail = await LoadManualProgressBatchAsync(db, activeEmails, spanStart, spanEnd, ct);
+
+        var emptyTasks = (IReadOnlyList<HardChallengeTask>)Array.Empty<HardChallengeTask>();
+        var emptyFacts = new Dictionary<DateOnly, DayFacts>();
+        var emptyManual = new Dictionary<DateOnly, Dictionary<int, HardChallengeScoring.DayManual>>();
+
+        foreach (var (email, challenge) in challengeByEmail)
         {
-            var date = challenge.StartDate.AddDays(i);
-            rowByDate.TryGetValue(date, out var row);
-            var (_, score) = BuildDayInMemory(date, i + 1, row, tasks, profile, facts, manual, readOnly: true);
-            total += score.DayPoints;
-            if (date == today) todayPoints = score.DayPoints;
-            if (date <= today)
-                streakDays.Add(new HardChallengeScoring.StreakDay(
-                    score.Complete, row?.IsCheatDay ?? false, row?.Confession is not null));
+            var tasks = tasksByChallenge.TryGetValue(challenge.Id, out var t) ? t : emptyTasks;
+            var rowList = daysByEmail.TryGetValue(email, out var rl) ? rl : new List<HardChallengeDay>();
+            var rowByDate = rowList.ToDictionary(r => r.LocalDate);
+            var profile = profileByEmail.TryGetValue(email, out var p) ? p : null;
+            var facts = factsByEmail.TryGetValue(email, out var f) ? f : emptyFacts;
+            var manual = manualByEmail.TryGetValue(email, out var m) ? m : emptyManual;
+
+            // Same loop a per-person scan runs — same scorer, same accumulation, same streak fold.
+            decimal total = 0m, todayPoints = 0m;
+            var streakDays = new List<HardChallengeScoring.StreakDay>();
+            for (var i = 0; i < TotalDays; i++)
+            {
+                var date = challenge.StartDate.AddDays(i);
+                rowByDate.TryGetValue(date, out var row);
+                var (_, score) = BuildDayInMemory(date, i + 1, row, tasks, profile, facts, manual, readOnly: true);
+                total += score.DayPoints;
+                if (date == today) todayPoints = score.DayPoints;
+                if (date <= today)
+                    streakDays.Add(new HardChallengeScoring.StreakDay(
+                        score.Complete, row?.IsCheatDay ?? false, row?.Confession is not null));
+            }
+            var streak = HardChallengeScoring.RelaxedStreak(streakDays);
+            result[email] = new ChallengeStats(
+                CurrentDay(challenge.StartDate, today), streak.CurrentStreak, total, todayPoints);
         }
-        var streak = HardChallengeScoring.RelaxedStreak(streakDays);
-        return new ChallengeStats(CurrentDay(challenge.StartDate, today), streak.CurrentStreak, total, todayPoints);
+
+        return result;
     }
 
     /// <summary>

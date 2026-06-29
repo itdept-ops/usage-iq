@@ -1056,7 +1056,10 @@ public static class FamilyMealsChoresEndpoints
             var role = await RoleInHouseholdAsync(db, household.Id, caller.Id, ct);
             if (!IsParent(role)) return ChildForbidden("Only a parent can approve chores.");
 
-            var chore = await db.FamilyChores.FirstOrDefaultAsync(c => c.Id == id, ct);
+            // Read-only snapshot for validation + the award math. The status FLIP is done via an atomic
+            // conditional update below (never by mutating this tracked entity), so two concurrent approvers can't
+            // both pass a check-then-act guard and each award credits.
+            var chore = await db.FamilyChores.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
             if (chore is null || chore.HouseholdId != household.Id) return NotFound();
             // Idempotent: re-approving an already-approved chore is a no-op (never double-awards).
             if (chore.Status == "approved")
@@ -1066,72 +1069,107 @@ public static class FamilyMealsChoresEndpoints
 
             var now = DateTime.UtcNow;
             var claimant = chore.ClaimedByUserId ?? chore.AssignedToUserId;
-            chore.Status = "approved";
-            chore.ApprovedByUserId = caller.Id;
-            chore.ApprovedUtc = now;
-            // Mark the legacy done flag + stamp for the shared board / "good job" summary continuity.
-            chore.Done = true;
-            chore.DoneByUserId = claimant;
-            chore.DoneUtc = now;
+            var isRecurring = chore.Recurrence != "none";
 
-            // Build ONE completion snapshot (chore-history) AND, when a child claimant earns money, ONE earn
-            // ledger row (the money-history the balance sums). Credits are awarded EXACTLY once per approval.
-            FamilyChoreCompletion? completion = null;
+            // Whether the claimant is a CHILD member who accrues an allowance balance (an adult claimant just
+            // gets the points). Computed up front off the snapshot — it doesn't depend on the flip.
             var awardCredit = false;
             if (claimant is int childId)
-            {
-                completion = new FamilyChoreCompletion
-                {
-                    ChoreId = chore.Id,
-                    ByUserId = childId,
-                    AtUtc = now,
-                    Points = chore.Points,
-                    Credits = chore.CreditValue,
-                };
-                db.FamilyChoreCompletions.Add(completion);
-                // Only a CHILD member accrues an allowance balance (an adult claimant just gets the points).
                 awardCredit = chore.CreditValue > 0 && await IsChildMemberAsync(db, household.Id, childId, ct);
-            }
 
-            // Recurring chore: reset the marketplace lifecycle for the next period (the earn ledger is kept).
-            if (chore.Recurrence != "none")
-            {
-                chore.Status = "open";
-                chore.ClaimedByUserId = null;
-                chore.ClaimedUtc = null;
-                chore.ApprovedByUserId = null;
-                chore.ApprovedUtc = null;
-                // Leave Done=true/DoneUtc=now so the existing background tick resets the done flag next period.
-            }
-
-            // Persist atomically: the status change, the completion, AND the earn row commit together or not at
-            // all — so a failure can never leave an approved chore WITHOUT its credit award (which the idempotent
-            // re-approve guard would then never retry → lost credits). Wrapped in the execution strategy because
-            // Npgsql retry-on-failure forbids a bare BeginTransactionAsync.
+            // Persist atomically AND race-safely: the status flip, the completion, AND the earn row commit
+            // together or not at all. The flip is a CONDITIONAL update gated on Status=="submitted" — exactly ONE
+            // concurrent approver can win it; the loser sees rows==0 and short-circuits to the SAME idempotent OK
+            // the re-approve guard returns, awarding nothing. The side-effects (completion + credit + audit) are
+            // gated on winning the flip, so credits are awarded EXACTLY once even under two distinct approvers.
+            // Wrapped in the execution strategy because Npgsql retry-on-failure forbids a bare BeginTransaction.
             var strategy = db.Database.CreateExecutionStrategy();
-            await strategy.ExecuteAsync(async () =>
+            var won = await strategy.ExecuteAsync(async () =>
             {
                 await using var tx = await db.Database.BeginTransactionAsync(ct);
-                await db.SaveChangesAsync(ct); // status + completion (the completion gets its Id here)
-                if (awardCredit && completion is not null)
+
+                // The atomic gate. A recurring chore resets its marketplace lifecycle to open/unclaimed for the
+                // next period (the earn ledger is kept); a one-off lands in "approved". EITHER way the WHERE is
+                // Status=="submitted", so whoever flips it away from submitted is the sole winner. Done/DoneUtc
+                // are stamped in both cases for the shared board / "good job" continuity (a recurring chore keeps
+                // Done=true so the background tick clears it next period).
+                int rows;
+                if (isRecurring)
                 {
-                    db.FamilyCreditEntries.Add(new FamilyCreditEntry
-                    {
-                        HouseholdId = household.Id,
-                        ChildUserId = completion.ByUserId,
-                        Kind = "earn",
-                        Amount = chore.CreditValue,
-                        ChoreCompletionId = completion.Id,
-                        Note = chore.Title,
-                        CreatedByUserId = completion.ByUserId,
-                        CreatedUtc = now,
-                    });
-                    await db.SaveChangesAsync(ct);
+                    rows = await db.FamilyChores
+                        .Where(c => c.Id == id && c.Status == "submitted")
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(x => x.Status, "open")
+                            .SetProperty(x => x.ClaimedByUserId, (int?)null)
+                            .SetProperty(x => x.ClaimedUtc, (DateTime?)null)
+                            .SetProperty(x => x.ApprovedByUserId, (int?)null)
+                            .SetProperty(x => x.ApprovedUtc, (DateTime?)null)
+                            .SetProperty(x => x.Done, true)
+                            .SetProperty(x => x.DoneByUserId, claimant)
+                            .SetProperty(x => x.DoneUtc, (DateTime?)now), ct);
                 }
+                else
+                {
+                    rows = await db.FamilyChores
+                        .Where(c => c.Id == id && c.Status == "submitted")
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(x => x.Status, "approved")
+                            .SetProperty(x => x.ApprovedByUserId, (int?)caller.Id)
+                            .SetProperty(x => x.ApprovedUtc, (DateTime?)now)
+                            .SetProperty(x => x.Done, true)
+                            .SetProperty(x => x.DoneByUserId, claimant)
+                            .SetProperty(x => x.DoneUtc, (DateTime?)now), ct);
+                }
+
+                if (rows == 0)
+                {
+                    // A concurrent approver already won the flip — award nothing, leave their work intact.
+                    await tx.CommitAsync(ct);
+                    return false;
+                }
+
+                // We won the flip. Append ONE completion snapshot (chore-history) AND, when a child claimant
+                // earns money, ONE earn ledger row (the money-history the balance sums) — exactly once.
+                if (claimant is int winnerChildId)
+                {
+                    var completion = new FamilyChoreCompletion
+                    {
+                        ChoreId = id,
+                        ByUserId = winnerChildId,
+                        AtUtc = now,
+                        Points = chore.Points,
+                        Credits = chore.CreditValue,
+                    };
+                    db.FamilyChoreCompletions.Add(completion);
+                    await db.SaveChangesAsync(ct); // the completion gets its Id here
+
+                    if (awardCredit)
+                    {
+                        db.FamilyCreditEntries.Add(new FamilyCreditEntry
+                        {
+                            HouseholdId = household.Id,
+                            ChildUserId = completion.ByUserId,
+                            Kind = "earn",
+                            Amount = chore.CreditValue,
+                            ChoreCompletionId = completion.Id,
+                            Note = chore.Title,
+                            CreatedByUserId = completion.ByUserId,
+                            CreatedUtc = now,
+                        });
+                        await db.SaveChangesAsync(ct);
+                    }
+                }
+
                 await tx.CommitAsync(ct);
+                return true;
             });
+
+            // The concurrent loser short-circuits to the same idempotent OK (awards nothing, no audit row).
+            if (!won)
+                return Results.Ok(await BuildChoresDtoAsync(db, household.Id, null, role, ct));
+
             await audit.LogAsync("family.chore.approve", targetEmail: null,
-                detail: $"chore={chore.Id} credits={chore.CreditValue}", ct: ct);
+                detail: $"chore={id} credits={chore.CreditValue}", ct: ct);
 
             return Results.Ok(await BuildChoresDtoAsync(db, household.Id, null, role, ct));
         }).RequirePermission(Permissions.AllowanceManage);
