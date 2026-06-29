@@ -417,10 +417,24 @@
 .tracker__meal-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--tech-space-2);
   padding: var(--tech-space-3) var(--tech-space-4);
   border-bottom: 1px solid var(--tech-border-subtle);
 }
+
+/* Copy-meal affordance sits at the far right; quiet at rest, revealed on hover/focus-within. */
+.tracker__meal-copy {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  color: var(--tech-text-tertiary);
+  opacity: 0.55;
+  transition: opacity 0.12s ease, color 0.12s ease;
+  &:hover { color: var(--tech-accent); }
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+}
+.tracker__meal-head:hover .tracker__meal-copy,
+.tracker__meal-head:focus-within .tracker__meal-copy { opacity: 1; }
 
 .tracker__meal-title {
   display: flex;
@@ -434,7 +448,11 @@
   mat-icon { color: var(--tech-text-secondary); font-size: 20px; width: 20px; height: 20px; }
 }
 
-.tracker__meal-cal { font-size: var(--tech-fs-body); color: var(--tech-text-secondary); }
+.tracker__meal-cal {
+  font-size: var(--tech-fs-body);
+  color: var(--tech-text-secondary);
+  margin-left: auto;
+}
 
 .tracker__entries {
   list-style: none;
@@ -459,10 +477,13 @@
     justify-content: flex-start;
   }
 
-  /* On an owner row, reveal the edit affordance on hover/focus-within for a lighter resting state. */
-  &--editable .tracker__entry-edit { opacity: 0.55; transition: opacity 0.12s ease; }
+  /* On an owner row, reveal the edit/copy affordances on hover/focus-within for a lighter resting state. */
+  &--editable .tracker__entry-edit,
+  &--editable .tracker__entry-copy { opacity: 0.55; transition: opacity 0.12s ease; }
   &--editable:hover .tracker__entry-edit,
-  &--editable:focus-within .tracker__entry-edit { opacity: 1; }
+  &--editable:focus-within .tracker__entry-edit,
+  &--editable:hover .tracker__entry-copy,
+  &--editable:focus-within .tracker__entry-copy { opacity: 1; }
 }
 
 .tracker__entry-id { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; gap: 1px; }
@@ -495,6 +516,15 @@
 }
 
 .tracker__entry-edit {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  color: var(--tech-text-tertiary);
+  &:hover { color: var(--tech-accent); }
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+}
+
+.tracker__entry-copy {
   flex: 0 0 auto;
   width: 44px;
   height: 44px;

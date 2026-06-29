@@ -440,6 +440,76 @@ public static class TrackerEndpoints
             return Results.Ok(ToFoodDto(entry));
         }).RequirePermission(Permissions.TrackerSelf);
 
+        // ---- Copy logged foods onto another day (OWN only; nutrition snapshotted; source untouched) ----
+        // Bulk COPY (not move): take N of the CALLER's OWN FoodEntry ids and re-create each as a brand-new
+        // row on targetDate, snapshotting the SAME nutrition (description, brand, fdcId, quantity,
+        // servingDesc, calories, macros) — no provider re-lookup, no migration, the source rows are left
+        // exactly as-is.
+        //
+        // IDOR GUARD: the source set is filtered by UserEmail == caller, so an id that belongs to ANOTHER
+        // user is silently dropped — it is never read into the copy and never produces a row. Writes always
+        // land on the CALLER's own day (UserEmail = caller.Email), so a caller can never copy a stranger's
+        // entry nor write onto a stranger's day. No new permission; gated by tracker.self like every other
+        // write on this group.
+        g.MapPost("/food/copy", async (
+            CopyFoodRequest req, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+        {
+            var caller = (await me.GetUserAsync(ct))!;
+
+            if (!TryParseDate(req.TargetDate, out var targetDate))
+                return Results.BadRequest(new { message = "A valid targetDate (yyyy-MM-dd) is required." });
+
+            // Optional meal override: when present it must be valid; when absent each copy keeps its source meal.
+            MealType? targetMeal = null;
+            if (!string.IsNullOrWhiteSpace(req.TargetMeal))
+            {
+                if (!TryParseMeal(req.TargetMeal, out var parsedMeal))
+                    return Results.BadRequest(new { message = "Meal must be breakfast, lunch, dinner, or snack." });
+                targetMeal = parsedMeal;
+            }
+
+            var ids = (req.EntryIds ?? Array.Empty<long>()).Where(id => id > 0).Distinct().ToArray();
+            if (ids.Length == 0)
+                return Results.BadRequest(new { message = "At least one entryId is required." });
+
+            // OWNER-ONLY load: filter by UserEmail == caller so a foreign id is never even fetched (the IDOR
+            // guard). AsNoTracking — we re-create new rows, we don't mutate the sources.
+            var sources = await db.FoodEntries.AsNoTracking()
+                .Where(f => f.UserEmail == caller.Email && ids.Contains(f.Id))
+                .ToListAsync(ct);
+
+            // Re-create each owned source as a NEW row on targetDate, snapshotting its stored nutrition
+            // verbatim (mirrors BuildFoodEntry's field copying). meal = override ?? the source's own meal.
+            var copies = sources.Select(src => new FoodEntry
+            {
+                UserEmail = caller.Email,
+                LocalDate = targetDate,
+                Meal = targetMeal ?? src.Meal,
+                FdcId = src.FdcId,
+                Description = src.Description,
+                Brand = src.Brand,
+                Quantity = src.Quantity,
+                ServingDesc = src.ServingDesc,
+                Calories = src.Calories,
+                ProteinG = src.ProteinG,
+                CarbG = src.CarbG,
+                FatG = src.FatG,
+                CreatedUtc = DateTime.UtcNow,
+            }).ToList();
+
+            if (copies.Count > 0)
+            {
+                db.FoodEntries.AddRange(copies);
+                await db.SaveChangesAsync(ct);
+            }
+
+            return Results.Ok(new CopyFoodResponse
+            {
+                CopiedCount = copies.Count,
+                Entries = copies.Select(ToFoodDto).ToArray(),
+            });
+        }).RequirePermission(Permissions.TrackerSelf);
+
         // ---- Log an exercise (OWN only; MET-estimate calories when omitted) ----
         g.MapPost("/exercise", async (
             AddExerciseRequest req, CurrentUserAccessor me, UsageDbContext db, ActivityEmitter activity, CancellationToken ct) =>

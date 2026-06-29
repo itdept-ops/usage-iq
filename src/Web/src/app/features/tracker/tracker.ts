@@ -33,6 +33,7 @@ import {
   AddHydrationRequest,
   CoffeeEntryDto,
   CommitDayResponse,
+  CopyFoodRequest,
   CustomFoodDto,
   DailyCoachResponse,
   DaySummaryResponse,
@@ -78,6 +79,7 @@ import { ProfileDialog, ProfileData } from './profile-dialog';
 import { LogWeightDialog, LogWeightData } from './log-weight-dialog';
 import { OnboardingCard, OnboardingResult } from './onboarding-card';
 import { MoveDayDialog, MoveDayData } from './move-day-dialog';
+import { CopyFoodDialog, CopyFoodData, CopyFoodResult } from './copy-food-dialog';
 import { AiDayBuilderDialog, AiDayBuilderData, AiDayBuilderResult } from './ai-day-builder-dialog';
 import { VoiceCaptureDialog, VoiceCaptureData, VoiceCaptureResult } from './voice-capture-dialog';
 import { WhatToEatDialog, WhatToEatData } from './what-to-eat-dialog';
@@ -1799,6 +1801,75 @@ export class Tracker {
       .deleteFood(f.id)
       .then(() => this.statusMsg.set(`Removed ${f.description}`))
       .catch(() => this.snack.open('Could not remove entry', 'Dismiss', { duration: 4000 }));
+  }
+
+  // ---- copy food to another day (owner-only; hidden in read-only views) ------------------------------
+
+  /**
+   * Open the "Copy to another day" dialog for a SINGLE food row. The copy snapshots the same nutrition onto
+   * the picked day (the source row is untouched — COPY not move). Defaults the target meal to the row's slot.
+   */
+  copyFoodEntry(f: FoodEntryDto): void {
+    if (this.store.readOnly()) return;
+    this.openCopyFood([f.id], f.meal, '1 item');
+  }
+
+  /**
+   * Open the "Copy meal to another day" dialog for a WHOLE meal section — copies every food currently logged
+   * in that meal onto the picked day. No-op for an empty meal. Defaults the target meal to the source meal.
+   */
+  copyMeal(meal: Meal): void {
+    if (this.store.readOnly()) return;
+    const ids = this.foodsFor(meal).map((f) => f.id);
+    if (ids.length === 0) return;
+    const label = this.mealSections.find((s) => s.meal === meal)?.label ?? 'meal';
+    this.openCopyFood(ids, meal, `${label} — ${ids.length} item${ids.length === 1 ? '' : 's'}`);
+  }
+
+  /** Open the copy dialog with the given entry ids + source meal, then POST the chosen target on confirm. */
+  private openCopyFood(entryIds: number[], sourceMeal: Meal, label: string): void {
+    const data: CopyFoodData = { entryIds, sourceMeal, label };
+    this.dialog
+      .open(CopyFoodDialog, {
+        data,
+        width: '420px',
+        maxWidth: '95vw',
+        panelClass: 'tracker-dialog',
+        autoFocus: false,
+      })
+      .afterClosed()
+      .subscribe((res: CopyFoodResult | undefined) => {
+        if (!res) return;
+        void this.runCopyFood(entryIds, res);
+      });
+  }
+
+  /**
+   * POST the copy, snackbar the result, and — if the copy landed on the currently-viewed day — refresh it so
+   * the new rows appear. The source day is never touched (server-side COPY), so no refresh is needed for it.
+   */
+  private async runCopyFood(entryIds: number[], res: CopyFoodResult): Promise<void> {
+    const body: CopyFoodRequest = {
+      entryIds,
+      targetDate: res.targetDate,
+      targetMeal: res.targetMeal,
+    };
+    try {
+      const out = await firstValueFrom(this.api.copyFood(body));
+      const n = out.copiedCount;
+      if (n === 0) {
+        this.snack.open('Nothing was copied', 'Dismiss', { duration: 4000 });
+        return;
+      }
+      // Refresh only if the copy targeted the day on screen (so the new rows show without a manual reload).
+      if (res.targetDate === this.store.date()) await this.store.load();
+      const to = this.shortDate(res.targetDate);
+      const msg = `Copied ${n} item${n === 1 ? '' : 's'} to ${to}`;
+      this.statusMsg.set(msg);
+      this.snack.open(msg, 'OK', { duration: 4000 });
+    } catch {
+      this.snack.open('Could not copy — nothing was changed', 'Dismiss', { duration: 4000 });
+    }
   }
 
   // ---- inline food editing (owner-only; hidden in read-only views) ----------------------------------

@@ -1726,6 +1726,37 @@ public sealed class AddFoodFromMealRequest
     public int? TargetUserId { get; set; }
 }
 
+/// <summary>
+/// Bulk-copy logged foods onto another day (POST /api/tracker/food/copy). OWNER-ONLY: only the caller's
+/// OWN entries are copied, and only onto the caller's OWN day. <see cref="EntryIds"/> that aren't the
+/// caller's are silently ignored (the IDOR guard) — never copied, never written to anyone else's day.
+/// COPY not move: the source rows are untouched. Each copy SNAPSHOTS the source's stored nutrition
+/// (no provider re-lookup). meal = <see cref="TargetMeal"/> when provided, else each source's own meal.
+/// </summary>
+public sealed class CopyFoodRequest
+{
+    /// <summary>The caller's own FoodEntry ids to copy. Non-positive ids and foreign ids are ignored.</summary>
+    public long[] EntryIds { get; set; } = Array.Empty<long>();
+
+    /// <summary>The day (yyyy-MM-dd) to copy onto. Required + validated (400 on a bad value).</summary>
+    public string TargetDate { get; set; } = "";
+
+    /// <summary>Optional meal override ("breakfast"|"lunch"|"dinner"|"snack"). When present it must be valid
+    /// (400 otherwise); when absent each copy keeps its source entry's meal slot.</summary>
+    public string? TargetMeal { get; set; }
+}
+
+/// <summary>Result of a bulk food copy: the newly-created entries plus how many were copied. The count
+/// reflects only the caller's OWN source ids that resolved (foreign/non-existent ids are silently dropped).</summary>
+public sealed class CopyFoodResponse
+{
+    /// <summary>How many new FoodEntry rows were created (== <see cref="Entries"/>.Length).</summary>
+    public int CopiedCount { get; set; }
+
+    /// <summary>The created entries (each a fresh snapshot on the target day). Empty when nothing matched.</summary>
+    public FoodEntryDto[] Entries { get; set; } = Array.Empty<FoodEntryDto>();
+}
+
 /// <summary>One of the caller's saved "My foods" — a per-user library auto-built from manual food logs.
 /// Calories/macros are the verbatim totals first logged; <see cref="UseCount"/> tracks how often it was
 /// logged (newest-used first in the list).</summary>

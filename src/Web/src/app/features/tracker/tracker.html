@@ -1271,6 +1271,18 @@
               <mat-icon aria-hidden="true">{{ s.icon }}</mat-icon> {{ s.label }}
             </h2>
             <span class="tracker__meal-cal mono-num">{{ caloriesFor(s.meal) | number }} kcal</span>
+            @if (!store.readOnly() && foodsFor(s.meal).length > 0) {
+              <button
+                mat-icon-button
+                type="button"
+                class="tracker__meal-copy"
+                (click)="copyMeal(s.meal)"
+                [attr.aria-label]="'Copy ' + s.label + ' to another day'"
+                matTooltip="Copy this meal to another day"
+              >
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            }
           </div>
 
           <ul class="tracker__entries">
@@ -1484,6 +1496,16 @@
                       [attr.aria-label]="'Edit ' + f.description"
                     >
                       <mat-icon>edit</mat-icon>
+                    </button>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      class="tracker__entry-copy"
+                      (click)="copyFoodEntry(f)"
+                      [attr.aria-label]="'Copy ' + f.description + ' to another day'"
+                      matTooltip="Copy to another day"
+                    >
+                      <mat-icon>content_copy</mat-icon>
                     </button>
                     <button
                       mat-icon-button

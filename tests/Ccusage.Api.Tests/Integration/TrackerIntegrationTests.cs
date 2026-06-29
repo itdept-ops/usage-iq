@@ -305,6 +305,186 @@ public class TrackerIntegrationTests(WebAppFactory factory)
         updated.GetProperty("fatG").GetDouble().Should().Be(0.0);
     }
 
+    // ---- Food: copy to another day (POST /food/copy) ----
+
+    private const string OtherDay = "2026-06-18";
+
+    [Fact]
+    public async Task Copying_a_food_to_another_day_snapshots_macros_and_leaves_the_source_unchanged()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        var add = await user.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "breakfast", description = "Oatmeal", brand = "Quaker", quantity = 2.0,
+            servingDesc = "2 cups", fdcId = 555, calories = 300, proteinG = 10.0, carbG = 54.0, fatG = 5.0,
+        });
+        var foodId = (await Json(add)).GetProperty("id").GetInt64();
+
+        // Copy that entry onto OtherDay (no meal override -> keeps "breakfast").
+        var copy = await user.PostAsJsonAsync("/api/tracker/food/copy", new
+        {
+            entryIds = new[] { foodId }, targetDate = OtherDay,
+        });
+        copy.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await Json(copy);
+        result.GetProperty("copiedCount").GetInt32().Should().Be(1);
+
+        var created = result.GetProperty("entries").EnumerateArray().Single();
+        created.GetProperty("id").GetInt64().Should().NotBe(foodId);          // a NEW row, not the source
+        created.GetProperty("meal").GetString().Should().Be("breakfast");     // source meal preserved
+        created.GetProperty("description").GetString().Should().Be("Oatmeal");
+        created.GetProperty("brand").GetString().Should().Be("Quaker");
+        created.GetProperty("fdcId").GetInt32().Should().Be(555);
+        created.GetProperty("quantity").GetDouble().Should().Be(2.0);
+        created.GetProperty("servingDesc").GetString().Should().Be("2 cups");
+        created.GetProperty("calories").GetInt32().Should().Be(300);          // identical snapshot
+        created.GetProperty("proteinG").GetDouble().Should().Be(10.0);
+        created.GetProperty("carbG").GetDouble().Should().Be(54.0);
+        created.GetProperty("fatG").GetDouble().Should().Be(5.0);
+
+        // The copy shows on the target day...
+        var target = await Json(await user.GetAsync($"/api/tracker/day?date={OtherDay}"));
+        target.GetProperty("foods").EnumerateArray().Should().ContainSingle();
+        target.GetProperty("caloriesIn").GetInt32().Should().Be(300);
+
+        // ...and the SOURCE day is untouched (still exactly one entry, unchanged total — COPY, not move).
+        var source = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
+        source.GetProperty("foods").EnumerateArray().Should().ContainSingle();
+        source.GetProperty("caloriesIn").GetInt32().Should().Be(300);
+    }
+
+    [Fact]
+    public async Task Copying_a_food_can_override_the_target_meal_slot()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+
+        var add = await user.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "breakfast", description = "Yogurt", quantity = 1.0,
+            calories = 150, proteinG = 12.0, carbG = 15.0, fatG = 4.0,
+        });
+        var foodId = (await Json(add)).GetProperty("id").GetInt64();
+
+        var copy = await user.PostAsJsonAsync("/api/tracker/food/copy", new
+        {
+            entryIds = new[] { foodId }, targetDate = OtherDay, targetMeal = "snack",
+        });
+        copy.StatusCode.Should().Be(HttpStatusCode.OK);
+        var created = (await Json(copy)).GetProperty("entries").EnumerateArray().Single();
+        created.GetProperty("meal").GetString().Should().Be("snack"); // override applied, not "breakfast"
+    }
+
+    [Fact]
+    public async Task Copying_an_entry_owned_by_another_user_is_silently_ignored_and_never_written()
+    {
+        var (_, owner) = await ProvisionUser("tracker.self");
+        var (_, attacker) = await ProvisionUser("tracker.self");
+
+        // The owner logs a private entry.
+        var add = await owner.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "lunch", description = "Salad", quantity = 1.0,
+            calories = 150, proteinG = 5.0, carbG = 10.0, fatG = 8.0,
+        });
+        var ownerFoodId = (await Json(add)).GetProperty("id").GetInt64();
+
+        // The attacker tries to copy the OWNER's entry id (IDOR). The endpoint is owner-scoped, so the id is
+        // silently dropped: nothing is copied — 200 with copiedCount 0, never a 403/leak.
+        var copy = await attacker.PostAsJsonAsync("/api/tracker/food/copy", new
+        {
+            entryIds = new[] { ownerFoodId }, targetDate = OtherDay,
+        });
+        copy.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await Json(copy);
+        result.GetProperty("copiedCount").GetInt32().Should().Be(0);
+        result.GetProperty("entries").EnumerateArray().Should().BeEmpty();
+
+        // Nothing was written to the attacker's target day...
+        var attackerDay = await Json(await attacker.GetAsync($"/api/tracker/day?date={OtherDay}"));
+        attackerDay.GetProperty("foods").EnumerateArray().Should().BeEmpty();
+
+        // ...and the OWNER's day is completely untouched (no copy landed on the victim's day either).
+        var ownerToday = await Json(await owner.GetAsync($"/api/tracker/day?date={Today}"));
+        ownerToday.GetProperty("foods").EnumerateArray().Should().ContainSingle();
+        var ownerOther = await Json(await owner.GetAsync($"/api/tracker/day?date={OtherDay}"));
+        ownerOther.GetProperty("foods").EnumerateArray().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Copying_only_copies_the_callers_own_entries_when_ids_are_mixed()
+    {
+        var (_, owner) = await ProvisionUser("tracker.self");
+        var (_, caller) = await ProvisionUser("tracker.self");
+
+        // A foreign entry (the owner's)...
+        var foreign = await owner.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "lunch", description = "Foreign", quantity = 1.0,
+            calories = 999, proteinG = 1.0, carbG = 1.0, fatG = 1.0,
+        });
+        var foreignId = (await Json(foreign)).GetProperty("id").GetInt64();
+
+        // ...and the caller's own entry.
+        var mine = await caller.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "dinner", description = "Mine", quantity = 1.0,
+            calories = 200, proteinG = 8.0, carbG = 20.0, fatG = 6.0,
+        });
+        var mineId = (await Json(mine)).GetProperty("id").GetInt64();
+
+        // Copy BOTH ids: only the caller's own (Mine) is copied; the foreign id is dropped.
+        var copy = await caller.PostAsJsonAsync("/api/tracker/food/copy", new
+        {
+            entryIds = new[] { foreignId, mineId }, targetDate = OtherDay,
+        });
+        copy.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await Json(copy);
+        result.GetProperty("copiedCount").GetInt32().Should().Be(1);
+        result.GetProperty("entries").EnumerateArray().Single()
+            .GetProperty("description").GetString().Should().Be("Mine");
+    }
+
+    [Fact]
+    public async Task Copying_with_an_invalid_date_or_meal_is_400()
+    {
+        var (_, user) = await ProvisionUser("tracker.self");
+        var add = await user.PostAsJsonAsync("/api/tracker/food", new
+        {
+            date = Today, meal = "lunch", description = "Soup", quantity = 1.0,
+            calories = 200, proteinG = 8.0, carbG = 20.0, fatG = 6.0,
+        });
+        var foodId = (await Json(add)).GetProperty("id").GetInt64();
+
+        (await user.PostAsJsonAsync("/api/tracker/food/copy", new
+        {
+            entryIds = new[] { foodId }, targetDate = "not-a-date",
+        })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        (await user.PostAsJsonAsync("/api/tracker/food/copy", new
+        {
+            entryIds = new[] { foodId }, targetDate = OtherDay, targetMeal = "brunch",
+        })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // An empty id list is a 400 (nothing to copy).
+        (await user.PostAsJsonAsync("/api/tracker/food/copy", new
+        {
+            entryIds = Array.Empty<long>(), targetDate = OtherDay,
+        })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Copy_food_requires_authentication_and_tracker_self()
+    {
+        var anon = factory.CreateClient();
+        (await anon.PostAsJsonAsync("/api/tracker/food/copy", new { entryIds = new[] { 1 }, targetDate = OtherDay }))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var (_, noTracker) = await ProvisionUser("dashboard.view");
+        (await noTracker.PostAsJsonAsync("/api/tracker/food/copy", new { entryIds = new[] { 1 }, targetDate = OtherDay }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     // ---- Day summary roll-up: in/out/net + macros + remaining vs goal ----
 
     [Fact]

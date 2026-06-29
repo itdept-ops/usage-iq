@@ -2598,6 +2598,29 @@ export interface UpdateFoodRequest {
 }
 
 /**
+ * Copy-foods-to-another-day payload (POST /api/tracker/food/copy) — mirrors CopyFoodRequest. COPY, not
+ * move: the source day is untouched and each copy snapshots the source's nutrition (no provider re-lookup).
+ * Owner-only server-side: `entryIds` that aren't the caller's are silently ignored (never copied, never
+ * written to anyone else's day). `targetMeal` is optional — when omitted, each copy keeps its source meal.
+ */
+export interface CopyFoodRequest {
+  /** The caller's own food-entry ids to copy. Non-positive / foreign ids are ignored server-side. */
+  entryIds: number[];
+  /** The day (yyyy-MM-dd) to copy onto. Required + validated (400 on a bad value). */
+  targetDate: string;
+  /** Optional meal override ("breakfast"|"lunch"|"dinner"|"snack"); omitted keeps each source's slot. */
+  targetMeal?: string;
+}
+
+/** Result of POST /api/tracker/food/copy — the created entries + how many were copied. Mirrors CopyFoodResponse. */
+export interface CopyFoodResponse {
+  /** How many new entries were created (== `entries.length`); foreign/non-existent ids are dropped. */
+  copiedCount: number;
+  /** The created entries (each a fresh snapshot on the target day). Empty when nothing matched. */
+  entries: FoodEntryDto[];
+}
+
+/**
  * One of the caller's saved "My foods" (GET /api/tracker/foods/saved) — a per-user library auto-built
  * from manual food logs. Calories/macros are the verbatim totals first logged; the dialog can scale
  * them by quantity when re-picking. Mirrors CustomFoodDto.

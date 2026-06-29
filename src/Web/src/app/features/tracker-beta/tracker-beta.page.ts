@@ -26,6 +26,7 @@ import { WeightSheet } from './sheets/weight-sheet';
 import { WatchSheet } from './sheets/watch-sheet';
 import { CoffeeSheet, ExerciseSheet, SleepSheet, SupplementSheet } from './sheets/quick-sheets';
 import { LeftoversSheet, LeftoversLogged } from './sheets/leftovers-sheet';
+import { CopyFoodSheet, CopyFoodDone } from './sheets/copy-food-sheet';
 import { currentStreak, dayHasAnyLog } from './util/streak';
 
 /**
@@ -59,7 +60,7 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
     HeroRing, QuickRail,
     FuelCard, WaterCard, MoveCard, CoffeeCard, SleepCard, WeightCard,
     LogMenuSheet, FoodSheet, FoodEditSheet, WeightSheet, WatchSheet, CoffeeSheet, ExerciseSheet, SleepSheet, SupplementSheet,
-    LeftoversSheet,
+    LeftoversSheet, CopyFoodSheet,
   ],
   template: `
     <!-- ─────────────────── DAY STRIP (fixed top glass) ─────────────────── -->
@@ -111,7 +112,8 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
         }
 
         <!-- CARD STACK -->
-        <app-fuel-card (addToMeal)="openFood($event)" (editFood)="openEditFood($event)" />
+        <app-fuel-card (addToMeal)="openFood($event)" (editFood)="openEditFood($event)"
+                       (copyFood)="openCopyFood($event)" (copyMeal)="openCopyMeal($event)" />
         <app-tb-water-card />
         <app-move-card (addExercise)="exerciseOpen.set(true)" (editWatch)="watchOpen.set(true)" />
         <app-tracker-beta-coffee-card />
@@ -151,6 +153,9 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
     <app-weight-sheet [(open)]="weightOpen" (logged)="onWeighed()" />
     <app-watch-sheet [(open)]="watchOpen" (logged)="onWatchSaved()" />
     <app-leftovers-sheet [(open)]="leftoversOpen" (logged)="onLeftoversLogged($event)" />
+    <app-copy-food-sheet [(open)]="copyFoodOpen" [(entryIds)]="copyEntryIds"
+                         [(sourceMeal)]="copySourceMeal" [(label)]="copyLabel"
+                         (copied)="onFoodCopied($event)" />
   `,
   styles: [`
     /* DAY STRIP internals */
@@ -241,6 +246,11 @@ export class TrackerBetaPage {
   protected readonly weightOpen = signal(false);
   protected readonly watchOpen = signal(false);
   protected readonly leftoversOpen = signal(false);
+  // Copy-food sheet state (seeded by the fuel card's copyFood/copyMeal outputs).
+  protected readonly copyFoodOpen = signal(false);
+  protected readonly copyEntryIds = signal<number[]>([]);
+  protected readonly copySourceMeal = signal<Meal>('breakfast');
+  protected readonly copyLabel = signal<string>('');
 
   private readonly scrollEl = viewChild<ElementRef<HTMLElement>>('scroll');
   private readonly weightCard = viewChild<WeightCard>('weightCard');
@@ -438,6 +448,69 @@ export class TrackerBetaPage {
     if (this.readOnly()) return;
     this.editingFood.set(f);
     this.foodEditOpen.set(true);
+  }
+
+  /**
+   * Open the copy-food sheet for a SINGLE tapped row (owner-only — the card hides the affordance in read-only
+   * views). Seeds the sheet with the one entry id + the row's meal slot, then opens it; the sheet POSTs the
+   * copyFood endpoint (a COPY — the source row is untouched) and reports back via (copied).
+   */
+  protected openCopyFood(f: FoodEntryDto): void {
+    if (this.readOnly()) return;
+    this.copyEntryIds.set([f.id]);
+    this.copySourceMeal.set(f.meal);
+    this.copyLabel.set('1 item');
+    this.copyFoodOpen.set(true);
+  }
+
+  /**
+   * Open the copy-food sheet for a WHOLE meal — copies every food currently logged in that meal onto the
+   * picked day. No-op for an empty meal / read-only. Seeds the sheet with all the meal's entry ids + the
+   * source meal slot.
+   */
+  protected openCopyMeal(meal: Meal): void {
+    if (this.readOnly()) return;
+    const ids = (this.day()?.foods ?? []).filter((f) => f.meal === meal).map((f) => f.id);
+    if (ids.length === 0) return;
+    this.copyEntryIds.set(ids);
+    this.copySourceMeal.set(meal);
+    this.copyLabel.set(`${this.mealTitle(meal)} — ${ids.length} item${ids.length === 1 ? '' : 's'}`);
+    this.copyFoodOpen.set(true);
+  }
+
+  /** Friendly meal title for the copy sheet's sub-line. */
+  private mealTitle(meal: Meal): string {
+    return { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' }[meal];
+  }
+
+  /**
+   * A copy settled (the sheet POSTed copyFood). Surface a confirmation toast, and — if the copy landed on the
+   * day currently on screen — reload it so the new rows appear in the fuel card / rings. The source day is
+   * never touched server-side (COPY), so only the target day can need a refresh.
+   */
+  protected onFoodCopied(r: CopyFoodDone): void {
+    const n = r.copiedCount;
+    if (n === 0) {
+      this.snack.open('Nothing was copied', 'Dismiss', { duration: 4000, politeness: 'polite' });
+      return;
+    }
+    const to = this.copyDayLabel(r.targetDate);
+    this.snack.open(`Copied ${n} item${n === 1 ? '' : 's'} to ${to}`, 'OK',
+      { duration: 3000, politeness: 'polite' });
+    if (r.targetDate === this.store.date()) void this.store.load();
+  }
+
+  /** A short "today/tomorrow/Jun 25" label for the copy confirmation toast. */
+  private copyDayLabel(iso: string): string {
+    const d = new Date(iso + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return iso;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+    if (diff === 0) return 'today';
+    if (diff === 1) return 'tomorrow';
+    if (diff === -1) return 'yesterday';
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
   // ── weight reconcile ──

@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, from, throwError } from 'rxjs';
 import { concatMap, last } from 'rxjs/operators';
 import {
-  AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, UpdateFoodRequest, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatLocationShareDto, ChatMessageDto, ChatRepliesResult, StartLocationShareRequest, UpdateLocationShareRequest, ExtendLocationShareRequest, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
+  AccessPolicy, AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, UpdateFoodRequest, CopyFoodRequest, CopyFoodResponse, AddHydrationRequest, AuditEntry, BuildDayRequest, BuildDayResponse, CacheEfficiency, CalendarDay, CalendarEvent, CalendarEventInput, CalendarMemberBusy, CalendarStatus, ChatChannelDto, ChatCatchUpResult, ChatComposeAction, ChatComposeResult, ChatContactDto, ChatLocationShareDto, ChatMessageDto, ChatRepliesResult, StartLocationShareRequest, UpdateLocationShareRequest, ExtendLocationShareRequest, CommitDayRequest, CommitDayResponse, CreateChannelRequest, DaySummaryRequest, DaySummaryResponse,
   CreateShareRequest, CustomExerciseDto, CustomFoodDto, DailyCoachResponse, EstimateExerciseRequest, EstimateExerciseResponse, EstimateMacrosRequest, EstimateMacrosResponse, ExerciseEntryDto, ExerciseLibraryDto, Fleet, FleetDeleteRequest,
   FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChoreSource, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, Allowance, AllowanceMe, AllowanceMoveRequest, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, RecipeBreakdownResult, Recipe, RecipeUpsertRequest, RecipeFromBreakdownRequest, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FinanceParseRequest, FinanceStagedImport, FinanceStagedPage, FinanceStagedRow, FinanceStagedRowPatch, FinanceCategorizeAiResult, FinanceCommitRequest,
   FinanceBudgetsResponse, FinanceBudgetDto, FinanceBudgetUpsertRequest, FinanceNetWorthDto,
@@ -977,6 +977,17 @@ export class Api {
   /** Delete a logged food entry. */
   deleteFood(id: number): Observable<unknown> {
     return this.http.delete(`${this.base}/tracker/food/${id}`);
+  }
+
+  /**
+   * Copy one or more of the caller's OWN logged foods onto another day (COPY, not move — the source day is
+   * untouched). Each copy snapshots the same nutrition (no provider re-lookup). `targetMeal` is optional —
+   * when omitted, each copy keeps its source entry's meal slot. Owner-only server-side: ids that aren't the
+   * caller's are silently ignored (never copied, never written to anyone else's day). Returns the created
+   * entries + a `copiedCount`. See `CopyFoodRequest` / `CopyFoodResponse`.
+   */
+  copyFood(body: CopyFoodRequest): Observable<CopyFoodResponse> {
+    return this.http.post<CopyFoodResponse>(`${this.base}/tracker/food/copy`, body);
   }
 
   /**

@@ -46,6 +46,8 @@ const MEAL_ORDER: ReadonlyArray<{ meal: Meal; title: string }> = [
  *   selector: app-fuel-card
  *   outputs:  addToMeal (Meal)        — the user tapped "+ add to {meal}"; the page opens the food sheet for it
  *             editFood  (FoodEntryDto) — the user tapped a logged row; the page opens the edit sheet for it
+ *             copyFood  (FoodEntryDto) — the user tapped a row's copy affordance; the page opens the copy sheet
+ *             copyMeal  (Meal)         — the user tapped a meal's "copy" affordance; the page copies all its rows
  */
 @Component({
   selector: 'app-fuel-card',
@@ -78,6 +80,13 @@ const MEAL_ORDER: ReadonlyArray<{ meal: Meal; title: string }> = [
                 @if (g.foods.length) {
                   <span class="fc-group-sub">{{ groupSub(g) }}</span>
                 }
+                @if (g.foods.length && !readOnly()) {
+                  <button type="button" class="fc-group-copy"
+                          [attr.aria-label]="'Copy ' + g.title + ' to another day'"
+                          (click)="copyMeal.emit(g.meal)">
+                    <mat-icon aria-hidden="true">content_copy</mat-icon>
+                  </button>
+                }
               </header>
 
               @for (f of g.foods; track f.id) {
@@ -97,19 +106,26 @@ const MEAL_ORDER: ReadonlyArray<{ meal: Meal; title: string }> = [
                       }
                     </div>
                   } @else {
-                    <button type="button" class="fc-row fc-row-edit"
-                            [attr.aria-label]="'Edit ' + f.description + ', ' + kcal(f) + ' kcal'"
-                            (click)="editFood.emit(f)">
-                      <div class="fc-row-main">
-                        <span class="fc-name">{{ f.description }}</span>
-                        <span class="fc-leader" aria-hidden="true"></span>
-                        <span class="fc-kcal">{{ kcal(f) }}</span>
-                        <mat-icon class="fc-edit-ic" aria-hidden="true">edit</mat-icon>
-                      </div>
-                      @if (macroLine(f); as ml) {
-                        <span class="fc-macros">{{ ml }}</span>
-                      }
-                    </button>
+                    <div class="fc-row-wrap">
+                      <button type="button" class="fc-row fc-row-edit"
+                              [attr.aria-label]="'Edit ' + f.description + ', ' + kcal(f) + ' kcal'"
+                              (click)="editFood.emit(f)">
+                        <div class="fc-row-main">
+                          <span class="fc-name">{{ f.description }}</span>
+                          <span class="fc-leader" aria-hidden="true"></span>
+                          <span class="fc-kcal">{{ kcal(f) }}</span>
+                          <mat-icon class="fc-edit-ic" aria-hidden="true">edit</mat-icon>
+                        </div>
+                        @if (macroLine(f); as ml) {
+                          <span class="fc-macros">{{ ml }}</span>
+                        }
+                      </button>
+                      <button type="button" class="fc-row-copy"
+                              [attr.aria-label]="'Copy ' + f.description + ' to another day'"
+                              (click)="copyFood.emit(f)">
+                        <mat-icon aria-hidden="true">content_copy</mat-icon>
+                      </button>
+                    </div>
                   }
                 </app-swipe-row>
               }
@@ -168,7 +184,7 @@ const MEAL_ORDER: ReadonlyArray<{ meal: Meal; title: string }> = [
     .fc-group { margin-top: 14px; }
     .fc-group:first-child { margin-top: 0; }
     .fc-group-head {
-      display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+      display: flex; align-items: center; gap: 10px;
       margin-bottom: 4px;
     }
     .fc-group-title {
@@ -176,16 +192,33 @@ const MEAL_ORDER: ReadonlyArray<{ meal: Meal; title: string }> = [
       text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim);
     }
     .fc-group-sub {
+      margin-left: auto;
       font-family: var(--font-ui); font-size: 11px; font-variant-numeric: tabular-nums;
       color: var(--ink-faint); letter-spacing: .02em;
     }
+    /* Copy-the-whole-meal affordance, far right of the group header. */
+    .fc-group-copy {
+      flex: 0 0 auto; margin-left: 2px;
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border: 0; background: none; cursor: pointer;
+      color: var(--ink-faint); border-radius: var(--r-tile);
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      transition: color 120ms var(--ease-out), background 120ms var(--ease-out);
+    }
+    /* When there's no subtotal (shouldn't happen for a non-empty meal) the copy still anchors right. */
+    .fc-group-title + .fc-group-copy { margin-left: auto; }
+    .fc-group-copy:active { color: var(--ink); background: var(--bg-sink); }
+    .fc-group-copy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .fc-group-copy mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
     /* ── ledger row (GRAFT LEDGER: name · dotted-leader · tabular kcal) ─────── */
     app-swipe-row { margin: 2px 0; }
     .fc-row { padding: 7px 2px; min-height: 30px; }
-    /* Tappable edit affordance: the row body becomes a full-width button (still inside the swipe-row). */
+    /* Editable rows: a flex pairing of the tap-to-edit body (grows) + a trailing copy icon button. */
+    .fc-row-wrap { display: flex; align-items: stretch; gap: 4px; }
+    /* Tappable edit affordance: the row body grows to fill (still inside the swipe-row). */
     .fc-row-edit {
-      display: block; width: 100%; box-sizing: border-box;
+      display: block; flex: 1 1 auto; min-width: 0; box-sizing: border-box;
       min-height: 44px; padding: 8px 2px; margin: 0;
       background: none; border: 0; text-align: left; color: var(--ink); cursor: pointer;
       border-radius: var(--r-tile); touch-action: pan-y; -webkit-tap-highlight-color: transparent;
@@ -195,6 +228,18 @@ const MEAL_ORDER: ReadonlyArray<{ meal: Meal; title: string }> = [
     .fc-row-edit:focus-visible {
       outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-tile);
     }
+    /* Trailing copy-this-row affordance. */
+    .fc-row-copy {
+      flex: 0 0 auto; align-self: center;
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; min-height: 44px; border: 0; background: none; cursor: pointer;
+      color: var(--ink-faint); border-radius: var(--r-tile);
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      transition: color 120ms var(--ease-out), background 120ms var(--ease-out);
+    }
+    .fc-row-copy:active { color: var(--ink); background: var(--bg-sink); }
+    .fc-row-copy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .fc-row-copy mat-icon { font-size: 18px; width: 18px; height: 18px; }
     .fc-edit-ic {
       flex: 0 0 auto; font-size: 16px; width: 16px; height: 16px;
       color: var(--ink-faint); align-self: center; margin-left: 2px;
@@ -240,7 +285,7 @@ const MEAL_ORDER: ReadonlyArray<{ meal: Meal; title: string }> = [
       outline: 2px solid var(--focus); outline-offset: 3px; border-radius: var(--r-tile);
     }
     @media (prefers-reduced-motion: reduce) {
-      .fc-chevron, .fc-add, .fc-row-edit { transition: none; }
+      .fc-chevron, .fc-add, .fc-row-edit, .fc-row-copy, .fc-group-copy { transition: none; }
     }
   `],
 })
@@ -252,6 +297,12 @@ export class FuelCard {
 
   /** The user tapped a logged food row — the page opens the edit sheet seeded with this entry. */
   readonly editFood = output<FoodEntryDto>();
+
+  /** The user tapped a row's copy affordance — the page opens the copy sheet for this single entry. */
+  readonly copyFood = output<FoodEntryDto>();
+
+  /** The user tapped a meal's copy affordance — the page opens the copy sheet for all that meal's rows. */
+  readonly copyMeal = output<Meal>();
 
   /** Collapsed state is local UI; the card opens expanded. */
   protected readonly expanded = signal(true);
