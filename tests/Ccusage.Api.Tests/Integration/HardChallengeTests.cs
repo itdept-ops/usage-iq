@@ -293,6 +293,58 @@ public class HardChallengeTests(WebAppFactory factory)
         board.Select(r => r.GetProperty("userId").GetInt32()).Should().NotContain(sharerId);
     }
 
+    [Fact]
+    public async Task Leaderboard_scores_each_person_the_SAME_as_their_own_per_person_read()
+    {
+        // Pins that the BATCHED ComputeStatsBatchAsync still scores correctly: with 2 sharing users who each
+        // have an active challenge + logged data, every leaderboard row's day-count/points/streak EQUALS the
+        // value that person's OWN /api/challenge self-read computes (the per-person scorer). This is the
+        // invariant the batch rewrite must preserve — the query-shape change must not change the scores.
+        var (meEmail, me) = await ProvisionUser("tracker.self");
+        var (sharerEmail, sharer) = await ProvisionUser("tracker.self");
+        await MakeContacts(meEmail, sharerEmail);
+
+        // Both start a challenge today; the sharer shares so they appear on my board.
+        await me.PostAsJsonAsync("/api/challenge", new { startDate = Today });
+        await sharer.PutAsJsonAsync("/api/tracker/profile", new { goal = "Maintain", shareWithContacts = true });
+        await sharer.PostAsJsonAsync("/api/challenge", new { startDate = Today });
+
+        // Each logs a DIFFERENT reading amount so their scores are distinct (both non-zero points today).
+        await me.PutAsJsonAsync("/api/challenge/day", new
+        {
+            date = Today, tasks = new[] { new { key = "reading", value = 10 } },
+        });
+        await sharer.PutAsJsonAsync("/api/challenge/day", new
+        {
+            date = Today, tasks = new[] { new { key = "reading", value = 30 } },
+        });
+
+        var meId = await UserIdFor(meEmail);
+        var sharerId = await UserIdFor(sharerEmail);
+
+        // Each person's authoritative per-person stats from their OWN self-read.
+        var meSelf = await Json(await me.GetAsync("/api/challenge"));
+        var sharerSelf = await Json(await sharer.GetAsync("/api/challenge"));
+
+        var board = (await Json(await me.GetAsync("/api/challenge/leaderboard"))).EnumerateArray().ToList();
+        var meRow = board.Single(r => r.GetProperty("userId").GetInt32() == meId);
+        var sharerRow = board.Single(r => r.GetProperty("userId").GetInt32() == sharerId);
+
+        // The batched leaderboard row matches the per-person read EXACTLY for each person.
+        foreach (var (row, self) in new[] { (meRow, meSelf), (sharerRow, sharerSelf) })
+        {
+            row.GetProperty("totalPoints").GetDecimal().Should().Be(self.GetProperty("totalPoints").GetDecimal());
+            row.GetProperty("todayPoints").GetDecimal().Should().Be(self.GetProperty("todayPoints").GetDecimal());
+            row.GetProperty("currentStreak").GetInt32().Should().Be(self.GetProperty("currentStreak").GetInt32());
+            row.GetProperty("currentDay").GetInt32().Should().Be(self.GetProperty("currentDay").GetInt32());
+        }
+
+        // Day 1 with a logged reading task → a non-zero point total for each person (the data was actually scored).
+        meRow.GetProperty("currentDay").GetInt32().Should().Be(1);
+        meRow.GetProperty("totalPoints").GetDecimal().Should().BeGreaterThan(0m);
+        sharerRow.GetProperty("totalPoints").GetDecimal().Should().BeGreaterThan(0m);
+    }
+
     // ---- Task config CRUD ----
 
     [Fact]

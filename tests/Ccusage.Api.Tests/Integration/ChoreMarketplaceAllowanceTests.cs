@@ -195,6 +195,40 @@ public class ChoreMarketplaceAllowanceTests(WebAppFactory factory)
     }
 
     [Fact]
+    public async Task Re_approving_an_already_approved_chore_is_OK_and_credits_EXACTLY_once()
+    {
+        // Pins the atomic-gate / idempotency fix on the approve endpoint: once a one-off chore is approved,
+        // a SECOND approve (the re-approve / concurrent-loser short-circuit path) returns 200 OK, leaves the
+        // chore "approved", and awards NOTHING — the single FamilyCreditEntry earn row + the balance are
+        // byte-for-byte unchanged on the second approve (no double-credit).
+        var (parent, _, child, _) = await ParentWithChild();
+        var poolId = await CreatePoolChore(parent, "Wash dishes", 7m);
+
+        await child.PostAsync($"/api/family/chores/{poolId}/claim", null);
+        await child.PostAsync($"/api/family/chores/{poolId}/submit", null);
+
+        // First approve — credits the child exactly once.
+        (await parent.PostAsync($"/api/family/chores/{poolId}/approve", null))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        var afterFirst = await Json(await child.GetAsync("/api/family/allowance/me"));
+        afterFirst.GetProperty("balance").GetDecimal().Should().Be(7m);
+        var earnCountAfterFirst = afterFirst.GetProperty("ledger").EnumerateArray()
+            .Count(e => e.GetProperty("kind").GetString() == "earn");
+        earnCountAfterFirst.Should().Be(1);
+
+        // Second approve of the ALREADY-approved chore → idempotent 200 OK (NOT a 409), chore stays approved.
+        var second = await parent.PostAsync($"/api/family/chores/{poolId}/approve", null);
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        ChoreById(await Json(second), poolId).GetProperty("status").GetString().Should().Be("approved");
+
+        // No second FamilyCreditEntry: the earn count + the balance are UNCHANGED after the re-approve.
+        var afterSecond = await Json(await child.GetAsync("/api/family/allowance/me"));
+        afterSecond.GetProperty("balance").GetDecimal().Should().Be(7m);
+        afterSecond.GetProperty("ledger").EnumerateArray()
+            .Count(e => e.GetProperty("kind").GetString() == "earn").Should().Be(earnCountAfterFirst);
+    }
+
+    [Fact]
     public async Task Child_cannot_claim_a_chore_already_claimed_409()
     {
         var (parent, _, child, _) = await ParentWithChild();

@@ -2,7 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Ccusage.Api.Data;
+using Ccusage.Api.Services;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Ccusage.Api.Tests.Integration;
 
@@ -79,6 +82,16 @@ public class FamilyFinanceTests(WebAppFactory factory)
 
     private static JsonElement Account(JsonElement accounts, string name) =>
         accounts.EnumerateArray().Single(a => a.GetProperty("name").GetString() == name);
+
+    /// <summary>Today in the app's display timezone — the SAME "today" the finance balance default-date uses
+    /// (<see cref="TrackerVisibility.DisplayTzTodayAsync"/>). Resolved from the live host so the assertion can
+    /// never be a time-of-day-flaky raw-UTC date.</summary>
+    private async Task<DateOnly> DisplayTzToday()
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        return await TrackerVisibility.DisplayTzTodayAsync(db, CancellationToken.None);
+    }
 
     // =====================================================================================
     // GATING — family.finance is required on EVERY route (family.use alone is not enough)
@@ -1196,5 +1209,110 @@ public class FamilyFinanceTests(WebAppFactory factory)
         (await useOnly.GetAsync("/api/family/finance/savings")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await useOnly.GetAsync("/api/family/finance/ai/budget-check"))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    // =====================================================================================
+    // MONEY OVERFLOW GUARD (MoneyCap) — an oversized amount is a clean 400, never a 500. The
+    // numeric(18,2) money columns top out near 1e16; an input above MoneyCap (1e14) would otherwise
+    // overflow the column into an unhandled Postgres 22003 (NumericValueOutOfRange) → 500. These pin
+    // that the guard rejects the oversized value with a 400 while a normal in-range value still succeeds.
+    // 1e15 (1,000,000,000,000,000) is comfortably > the 1e14 cap.
+    // =====================================================================================
+
+    private const decimal Oversized = 1e15m;
+
+    [Fact]
+    public async Task Balance_entry_rejects_an_oversized_amount_with_400_not_500_and_an_in_range_value_succeeds()
+    {
+        var owner = await FinanceUser();
+        await owner.PostAsJsonAsync("/api/family/finance/import", new { fileName = "rm.csv", content = SampleCsv });
+        var bankId = Account(await Json(await owner.GetAsync("/api/family/finance/accounts")), "SoFi Checking 1")
+            .GetProperty("id").GetInt32();
+
+        // An oversized balance → 400 BadRequest (the MoneyCap guard), NOT a 500 column overflow.
+        (await owner.PostAsJsonAsync($"/api/family/finance/accounts/{bankId}/balance",
+            new { asOfDate = "2026-05-01", balance = Oversized }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // The oversized NEGATIVE (a huge liability) is bounded the same way (Math.Abs both directions).
+        (await owner.PostAsJsonAsync($"/api/family/finance/accounts/{bankId}/balance",
+            new { asOfDate = "2026-05-01", balance = -Oversized }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // A normal in-range balance still succeeds (200) and lands in net worth.
+        (await owner.PostAsJsonAsync($"/api/family/finance/accounts/{bankId}/balance",
+            new { asOfDate = "2026-05-01", balance = 5000.00m }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(await owner.GetAsync("/api/family/finance/net-worth")))
+            .GetProperty("assets").GetDecimal().Should().Be(5000.00m);
+    }
+
+    [Fact]
+    public async Task Savings_contribution_rejects_an_oversized_amount_with_400_not_500_and_an_in_range_value_succeeds()
+    {
+        var owner = await FinanceUser();
+        var goalId = (await Json(await owner.PostAsJsonAsync("/api/family/finance/savings",
+            new { name = "Emergency fund", targetAmount = 1000.00m, owner = "joint" }))).GetProperty("id").GetInt32();
+
+        // An oversized contribution → 400 BadRequest (the MoneyCap guard on BOTH the input and the running total).
+        (await owner.PostAsJsonAsync($"/api/family/finance/savings/{goalId}/contribute", new { amount = Oversized }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // A normal in-range contribution still succeeds (200) and moves saved.
+        var contributed = await owner.PostAsJsonAsync(
+            $"/api/family/finance/savings/{goalId}/contribute", new { amount = 250.00m });
+        contributed.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(contributed)).GetProperty("savedAmount").GetDecimal().Should().Be(250.00m);
+    }
+
+    [Fact]
+    public async Task Budget_limit_and_savings_target_reject_an_oversized_amount_with_400_not_500()
+    {
+        var owner = await FinanceUser();
+
+        // POST /budgets with an oversized LimitAmount → 400 (TryNormalizeLimit's MoneyCap guard).
+        (await owner.PostAsJsonAsync("/api/family/finance/budgets",
+            new { category = "Groceries", limitAmount = Oversized }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // A normal in-range budget still succeeds (200).
+        (await owner.PostAsJsonAsync("/api/family/finance/budgets",
+            new { category = "Groceries", limitAmount = 100.00m }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // POST /savings with an oversized TargetAmount → 400 (same shared guard).
+        (await owner.PostAsJsonAsync("/api/family/finance/savings",
+            new { name = "Moon", targetAmount = Oversized }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // A normal in-range savings target still succeeds (200).
+        (await owner.PostAsJsonAsync("/api/family/finance/savings",
+            new { name = "Trip", targetAmount = 1000.00m }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    // =====================================================================================
+    // DISPLAY-TZ "TODAY" — a balance entry WITHOUT an asOfDate buckets to the DISPLAY-tz today,
+    // not the raw-UTC day. Pins that the default date flows through TrackerVisibility.DisplayTzTodayAsync
+    // (so an evening-boundary scenario records the display-tz day, not a UTC off-by-one).
+    // =====================================================================================
+
+    [Fact]
+    public async Task Balance_entry_with_no_asOfDate_defaults_to_display_tz_today()
+    {
+        var owner = await FinanceUser();
+        await owner.PostAsJsonAsync("/api/family/finance/import", new { fileName = "rm.csv", content = SampleCsv });
+        var bankId = Account(await Json(await owner.GetAsync("/api/family/finance/accounts")), "SoFi Checking 1")
+            .GetProperty("id").GetInt32();
+
+        // POST a balance with NO asOfDate → the server defaults the snapshot day to display-tz "today".
+        (await owner.PostAsJsonAsync($"/api/family/finance/accounts/{bankId}/balance", new { balance = 1234.00m }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // The net-worth per-account row reports that snapshot's asOfDate; it must equal display-tz today
+        // (the SAME helper the endpoint uses), NOT raw DateTime.UtcNow.Date.
+        var expected = (await DisplayTzToday()).ToString("yyyy-MM-dd");
+        var bankRow = (await Json(await owner.GetAsync("/api/family/finance/net-worth")))
+            .GetProperty("accounts").EnumerateArray()
+            .Single(a => a.GetProperty("accountId").GetInt32() == bankId);
+        bankRow.GetProperty("latestBalance").GetDecimal().Should().Be(1234.00m);
+        bankRow.GetProperty("asOfDate").GetString().Should().Be(expected);
     }
 }
