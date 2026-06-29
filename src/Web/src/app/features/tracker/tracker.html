@@ -1027,7 +1027,7 @@
               <div class="tracker__actcell">
                 <span class="tracker__stat-l">Distance</span>
                 <span class="tracker__stat-v mono-num">{{
-                  distanceLabel($safeNavigationMigration(activity()?.distanceMeters))
+                  distanceLabel(activity()?.distanceMeters)
                 }}</span>
               </div>
               <div class="tracker__actcell">
@@ -1111,13 +1111,13 @@
               <div class="tracker__statcell">
                 <span class="tracker__stat-l">Current</span>
                 <span class="tracker__stat-v mono-num">{{
-                  weightLabel($safeNavigationMigration(store.profile()?.weightKg))
+                  weightLabel(store.profile()?.weightKg)
                 }}</span>
               </div>
               <div class="tracker__statcell">
                 <span class="tracker__stat-l">Goal</span>
                 <span class="tracker__stat-v mono-num">{{
-                  weightLabel($safeNavigationMigration(store.profile()?.goalWeightKg))
+                  weightLabel(store.profile()?.goalWeightKg)
                 }}</span>
               </div>
               <div class="tracker__statcell">
@@ -1188,7 +1188,7 @@
             <div class="tracker__trend-body">
               <app-weight-trend
                 [points]="weightHistory()"
-                [goalWeightKg]="$safeNavigationMigration(store.profile()?.goalWeightKg)"
+                [goalWeightKg]="store.profile()?.goalWeightKg"
                 [imperial]="imperial()"
               />
               <!-- Per-slot averages (Morning/Afternoon/Evening) + morning→evening delta. -->
