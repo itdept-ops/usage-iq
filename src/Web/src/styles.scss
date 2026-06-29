@@ -187,8 +187,23 @@ iframe[src*="accounts.google.com"] { color-scheme: normal !important; }
 
   /* ---- Motion ---- */
   --tech-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tech-t-fast: 120ms;             /* micro/hover transitions (chips, taps) */
   --tech-t-control: 140ms;
   --tech-t-panel: 200ms;
+  --tech-t-slow: 200ms;             /* alias of --tech-t-panel — the slow tier of the scale */
+
+  /* ---- Progress / bars ---- */
+  --tech-progress-height: 9px;      /* macro / hydration / progress bar track height */
+
+  /* ---- Accent ramp gradient (avatar / brand) ---- */
+  /* Built from the existing accent ramp: blue → violet → cyan. Used for avatars,
+     hero edges, brand gradients. */
+  --tech-gradient-accent: linear-gradient(100deg, var(--tech-accent) 0%, var(--tech-accent-2) 52%, var(--tech-accent-cyan) 100%);
+
+  /* ---- Overlay / scrim (dialog & photo overlays) ---- */
+  /* Theme-independent dark scrim — reads correctly over both light and dark photos. */
+  --tech-bg-overlay: rgba(0, 0, 0, 0.55);
+  --tech-text-on-overlay: #fff;
 
   /* ---- Spacing scale (4px base) ---- */
   --tech-space-1: 4px;
@@ -479,6 +494,18 @@ code, pre, kbd, samp {
 }
 
 /* =========================================================================
+   Global shimmer keyframe (canonical skeleton sweep)
+   Defined ONCE here so every skeleton across the app animates in sync (a
+   keyframe in :root scope is global regardless of where it's used). The
+   beta-ui app-bs-skeleton + later waves reference THIS name. Per-component
+   copies remain for now (later waves remove them); this is the source of truth.
+   The sweep moves the 200%-wide gradient background left→right.
+   ========================================================================= */
+@keyframes tech-shimmer {
+  to { background-position: -200% 0; }
+}
+
+/* =========================================================================
    Global utility classes (reused by components)
    ========================================================================= */
 
@@ -584,6 +611,35 @@ code, pre, kbd, samp {
 /* 2px inset left-bar selection language (vendor-tintable). */
 .selected-bar {
   box-shadow: inset 2px 0 0 var(--tech-accent);
+}
+
+/* OPT-IN ergonomics utilities (apply per-element — NOT a global override).
+   Later waves add these to specific dense/touch controls; never blanket-applied. */
+
+/* Guarantee a >=44px WCAG touch target without forcing it on every button. */
+.tap-target {
+  min-block-size: 44px;
+  min-inline-size: 44px;
+}
+
+/* KPI-style icon orb — a 28px square accent-tinted tile that centers an ~18px
+   glyph. Matches the KPI icon-orb look from the audit. Reads --accent first so a
+   themed surface tints it; falls back to --tech-accent on a plain page. */
+.header-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: var(--tech-r-chip);
+  background: color-mix(in srgb, var(--accent, var(--tech-accent)) 12%, transparent);
+  color: var(--accent, var(--tech-accent));
+}
+.header-icon mat-icon,
+.header-icon .material-icons,
+.header-icon svg {
+  font-size: 18px;
+  inline-size: 18px;
+  block-size: 18px;
 }
 
 /* =========================================================================

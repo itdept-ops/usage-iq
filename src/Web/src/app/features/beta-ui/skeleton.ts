@@ -38,7 +38,10 @@ import {
       display: block;
       background: linear-gradient(100deg, var(--bg-sink) 30%, var(--bg-rise) 50%, var(--bg-sink) 70%);
       background-size: 200% 100%;
-      animation: bs-shimmer 1.4s var(--ease-out) infinite;
+      /* Canonical sweep: the GLOBAL @keyframes tech-shimmer (styles.scss) so every
+         skeleton across the app animates in sync. bs-shimmer is kept below as a
+         fallback for any context where the global sheet isn't loaded. */
+      animation: tech-shimmer 1.4s var(--ease-out) infinite;
     }
     @keyframes bs-shimmer { to { background-position: -200% 0; } }
     @media (prefers-reduced-motion: reduce) { :host(.bs-skeleton) { animation: none; } }
