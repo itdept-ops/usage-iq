@@ -58,6 +58,11 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './tracker-beta.page.scss',
+  // Component-scoped so the page + every child card/sheet shares ONE optimistic store (which wraps the
+  // root TrackerStore). Provided HERE rather than on the route so the eager page-registry never references
+  // the value and the store stays inside this lazy chunk. The /tracker-beta route file provides it too —
+  // both paths land on the same component-tree instance.
+  providers: [OptimisticTracker],
   imports: [
     MatIconModule,
     HeroRing, QuickRail,

@@ -10,6 +10,7 @@ import { catchError, firstValueFrom, of } from 'rxjs';
 import { Api } from '../../core/api';
 import { FamilyAssistantResult, FamilyBriefing, FamilyToday } from '../../core/models';
 
+import { OptimisticFamily } from './state/optimistic-family';
 import {
   BetaBottomSheet, BetaFab, BetaPullRefresh, BetaToaster, ToastController,
 } from '../beta-ui';
@@ -60,7 +61,10 @@ import { LeaderboardCard } from './cards/leaderboard-card';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './family-beta.page.scss',
-  providers: [ToastController],
+  // Component-scoped so the page + every child card shares ONE optimistic store. Provided HERE rather than
+  // on the route so the eager page-registry never references the value and the store stays inside this lazy
+  // chunk. The /beta/family route file provides it too — both paths land on the same component-tree instance.
+  providers: [ToastController, OptimisticFamily],
   imports: [
     FormsModule, RouterLink, MatIconModule,
     BetaPullRefresh, BetaBottomSheet, BetaFab, BetaToaster,

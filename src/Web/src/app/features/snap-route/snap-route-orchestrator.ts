@@ -10,9 +10,11 @@ import { firstValueFrom } from 'rxjs';
 import { Api } from '../../core/api';
 import { PlatformService } from '../../core/platform';
 import { SnapRouteService } from '../../core/snap-route';
-import {
-  captureImage, pickImage, downscaleToJpeg, readFileAsBase64, confirmPhotoNotice,
-} from '../tracker/ai-image';
+// ai-image (camera/picker/downscale + the one-time Gemini notice) is DYNAMIC-imported on first capture, not
+// statically — this orchestrator is mounted in the app shell (eager initial chunk), but the photo helpers
+// are only ever needed once the user triggers a Snap. Keeping them out of the initial bundle (loaded via
+// {@link aiImage}) trims the main chunk; the module is memoized so repeat captures don't re-fetch.
+import type * as AiImage from '../tracker/ai-image';
 import { BetaBottomSheet } from '../beta-ui';
 import type {
   ImageRequest, PhotoKind, ParsedFoodItemDto, ReadLabelResponse, ScheduleAiEvent, ReceiptItemDto,
@@ -282,6 +284,12 @@ export class SnapRouteOrchestrator {
   /** The draft bill id created when the user COMMITS to the receipt route (deleted on cancel/abandon). */
   private draftBillId: number | null = null;
 
+  /** Memoized dynamic import of the ai-image helpers (loaded lazily on the first capture; see import note). */
+  private aiImageMod: Promise<typeof AiImage> | null = null;
+  private aiImage(): Promise<typeof AiImage> {
+    return (this.aiImageMod ??= import('../tracker/ai-image'));
+  }
+
   /** The routes the caller can WRITE, in display order (per-permission visibility). */
   protected readonly routes = computed<RouteOption[]>(() => {
     const writable = new Set(this.snapRoute.writableRoutes());
@@ -340,14 +348,15 @@ export class SnapRouteOrchestrator {
   /** Start a capture: privacy notice (one-time) → OS camera (mobile) or drop sheet (desktop). */
   private async begin(): Promise<void> {
     if (!this.snapRoute.canCapture()) return; // defensive: trigger shouldn't show, but never dead-end
-    if (!(await confirmPhotoNotice())) return; // user declined the one-time Gemini notice
+    const ai = await this.aiImage();
+    if (!(await ai.confirmPhotoNotice())) return; // user declined the one-time Gemini notice
 
     this.resetState();
     if (this.platform.isMobile()) {
       // Mobile: open the OS rear camera directly, then classify.
       let img: ImageRequest | null = null;
       try {
-        img = await captureImage();
+        img = await ai.captureImage();
       } catch {
         this.snack.open('Could not read that photo.', 'OK', { duration: 4000 });
         return;
@@ -367,7 +376,8 @@ export class SnapRouteOrchestrator {
     void (async () => {
       let img: ImageRequest | null = null;
       try {
-        img = await pickImage();
+        const ai = await this.aiImage();
+        img = await ai.pickImage();
       } catch {
         this.snack.open('Could not read that photo.', 'OK', { duration: 4000 });
         return;
@@ -404,7 +414,8 @@ export class SnapRouteOrchestrator {
       return;
     }
     try {
-      this.image = await downscaleToJpeg(file);
+      const ai = await this.aiImage();
+      this.image = await ai.downscaleToJpeg(file);
     } catch {
       this.snack.open('Could not read that photo.', 'OK', { duration: 4000 });
       return;

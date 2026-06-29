@@ -4,8 +4,6 @@ import { authGuard } from './auth.guard';
 import { permissionGuard, anyPermissionGuard } from './permission.guard';
 import { isMobileGated } from './platform.guard';
 import { PERM } from './models';
-import { OptimisticTracker } from '../features/tracker-beta/state/optimistic-tracker';
-import { OptimisticFamily } from '../features/family-beta/state/optimistic-family';
 
 /**
  * The CENTRAL registry of the authenticated app's pages — the single source of truth that drives (a) the route
@@ -126,7 +124,6 @@ export const PAGE_REGISTRY: readonly PageDef[] = [
     id: 'tracker', path: 'tracker', title: 'Usage IQ · Tracker', perm: PERM.trackerSelf,
     desktop: () => import('../features/tracker/tracker').then(m => m.Tracker),
     mobile: () => import('../features/tracker-beta/tracker-beta.page').then(m => m.TrackerBetaPage),
-    providers: [OptimisticTracker],
     nav: { group: 'Fitness', label: 'Tracker', icon: 'fitness_center', tab: true },
     home: { label: 'Tracker', icon: 'fitness_center' },
   },
@@ -307,7 +304,6 @@ export const PAGE_REGISTRY: readonly PageDef[] = [
   {
     id: 'family', path: 'family', perm: PERM.familyUse,
     mobile: () => import('../features/family-beta/family-beta.page').then(m => m.FamilyBetaPage),
-    providers: [OptimisticFamily],
     nav: { group: 'Family', label: 'Family', icon: 'cottage', tab: true },
     home: { label: 'Family', icon: 'cottage' },
     children: [
