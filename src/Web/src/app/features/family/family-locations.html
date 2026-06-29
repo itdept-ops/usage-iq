@@ -15,11 +15,24 @@
       </div>
     </div>
     <div class="family-locs__actions">
-      <button mat-stroked-button (click)="refresh()" [disabled]="loading()"
-              matTooltip="Refresh everyone's latest location">
-        <mat-icon aria-hidden="true">refresh</mat-icon>
-        Refresh
-      </button>
+      <!-- Mode toggle: live current positions (default) ↔ historical replay -->
+      <div class="family-locs__modes" role="group" aria-label="Map mode">
+        <button type="button" class="family-locs__mode" [class.is-active]="mode() === 'live'"
+                [attr.aria-pressed]="mode() === 'live'" (click)="setMode('live')">
+          <mat-icon aria-hidden="true">place</mat-icon> Live
+        </button>
+        <button type="button" class="family-locs__mode" [class.is-active]="mode() === 'replay'"
+                [attr.aria-pressed]="mode() === 'replay'" (click)="setMode('replay')">
+          <mat-icon aria-hidden="true">history</mat-icon> Replay
+        </button>
+      </div>
+      @if (mode() === 'live') {
+        <button mat-stroked-button (click)="refresh()" [disabled]="loading()"
+                matTooltip="Refresh everyone's latest location">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          Refresh
+        </button>
+      }
       <a mat-stroked-button routerLink="/locations" matTooltip="Your own location settings & history">
         <mat-icon aria-hidden="true">my_location</mat-icon>
         My locations
@@ -27,79 +40,210 @@
     </div>
   </header>
 
-  @if (!loading() && error()) {
-    <!-- Load failed: explicit error state with a retry, distinct from the empty state -->
-    <div class="family__card family-locs__empty" role="alert">
-      <span class="family__crest family-locs__empty-crest" aria-hidden="true">
-        <mat-icon>error_outline</mat-icon>
-      </span>
-      <h2 class="family-locs__empty-title">We couldn't load family locations</h2>
-      <p class="family-locs__empty-body">Something went wrong reaching the family map. Please try again in a
-        moment.</p>
-      <button mat-flat-button color="primary" (click)="refresh()">
-        <mat-icon aria-hidden="true">refresh</mat-icon>
-        Try again
-      </button>
-    </div>
-  } @else if (!loading() && !error() && !members().length) {
-    <!-- Friendly empty state: nobody is sharing yet -->
-    <div class="family__card family-locs__empty" role="status">
-      <span class="family__crest family-locs__empty-crest" aria-hidden="true">
-        <mat-icon>location_off</mat-icon>
-      </span>
-      <h2 class="family-locs__empty-title">No one's sharing a location yet</h2>
-      <p class="family-locs__empty-body">When a family member turns on location sharing for the household,
-        their pin shows up here. You can opt in on your own
-        <a routerLink="/locations">My locations</a> page — enable location, then switch on
-        “Share with my household.”</p>
-      <a mat-flat-button color="primary" routerLink="/locations">
-        <mat-icon aria-hidden="true">my_location</mat-icon>
-        Go to My locations
-      </a>
-    </div>
-  } @else if (members().length) {
-    <div class="family-locs__layout">
-      <!-- Map -->
-      <section class="family__card family-locs__map-card" aria-label="Family map">
-        <app-location-map [pins]="pins()" (pinClick)="onPinClick($event)" />
-        <div class="family-locs__osm">
-          <mat-icon aria-hidden="true">public</mat-icon>
-          <span>Powered by
-            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</span>
+  @if (mode() === 'live') {
+    @if (!loading() && error()) {
+      <!-- Load failed: explicit error state with a retry, distinct from the empty state -->
+      <div class="family__card family-locs__empty" role="alert">
+        <span class="family__crest family-locs__empty-crest" aria-hidden="true">
+          <mat-icon>error_outline</mat-icon>
+        </span>
+        <h2 class="family-locs__empty-title">We couldn't load family locations</h2>
+        <p class="family-locs__empty-body">Something went wrong reaching the family map. Please try again in a
+          moment.</p>
+        <button mat-flat-button color="primary" (click)="refresh()">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          Try again
+        </button>
+      </div>
+    } @else if (!loading() && !error() && !members().length) {
+      <!-- Friendly empty state: nobody is sharing yet -->
+      <div class="family__card family-locs__empty" role="status">
+        <span class="family__crest family-locs__empty-crest" aria-hidden="true">
+          <mat-icon>location_off</mat-icon>
+        </span>
+        <h2 class="family-locs__empty-title">No one's sharing a location yet</h2>
+        <p class="family-locs__empty-body">When a family member turns on location sharing for the household,
+          their pin shows up here. You can opt in on your own
+          <a routerLink="/locations">My locations</a> page — enable location, then switch on
+          “Share with my household.”</p>
+        <a mat-flat-button color="primary" routerLink="/locations">
+          <mat-icon aria-hidden="true">my_location</mat-icon>
+          Go to My locations
+        </a>
+      </div>
+    } @else if (members().length) {
+      <div class="family-locs__layout">
+        <!-- Map -->
+        <section class="family__card family-locs__map-card" aria-label="Family map">
+          <app-location-map [pins]="mapPins()" (pinClick)="onPinClick($event)" />
+          <div class="family-locs__osm">
+            <mat-icon aria-hidden="true">public</mat-icon>
+            <span>Powered by
+              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</span>
+          </div>
+        </section>
+
+        <!-- Side list: name · city · as-of · stale -->
+        <aside class="family__card family-locs__list-card" aria-label="Family members">
+          <h2 class="family__card-title">Family</h2>
+          <ul class="member-locs">
+            @for (m of members(); track m.userId) {
+              <li class="member-loc" [class.member-loc--self]="m.isSelf"
+                  [class.member-loc--active]="selectedId() === m.userId"
+                  [class.member-loc--stale]="isStale(m)">
+                <button type="button" class="member-loc__btn" (click)="select(m.userId)"
+                        [attr.aria-pressed]="selectedId() === m.userId">
+                  <span class="member-loc__swatch" [style.background]="colorFor(m)" aria-hidden="true">
+                    {{ initials(m.name) }}
+                  </span>
+                  <span class="member-loc__body">
+                    <span class="member-loc__name">
+                      {{ m.name }}
+                      @if (m.isSelf) { <span class="member-loc__you">You</span> }
+                    </span>
+                    <span class="member-loc__place">{{ placeLabel(m) }}</span>
+                    <span class="member-loc__meta">
+                      <span class="member-loc__asof">as of {{ timeAgo(m.capturedUtc, now()) }}</span>
+                      @if (isStale(m)) {
+                        <span class="member-loc__stale" matTooltip="This location may be out of date">stale</span>
+                      }
+                    </span>
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+        </aside>
+      </div>
+    }
+  } @else {
+    <!-- ───────────────────────── REPLAY MODE ───────────────────────── -->
+    @if (replayLoading()) {
+      <mat-progress-bar mode="indeterminate" />
+      <div class="family__card family-locs__empty" role="status">
+        <span class="family__crest family-locs__empty-crest" aria-hidden="true">
+          <mat-icon>history</mat-icon>
+        </span>
+        <h2 class="family-locs__empty-title">Loading location history…</h2>
+      </div>
+    } @else if (replayError()) {
+      <div class="family__card family-locs__empty" role="alert">
+        <span class="family__crest family-locs__empty-crest" aria-hidden="true">
+          <mat-icon>error_outline</mat-icon>
+        </span>
+        <h2 class="family-locs__empty-title">We couldn't load location history</h2>
+        <p class="family-locs__empty-body">Something went wrong reaching the history. Please try again.</p>
+        <button mat-flat-button color="primary" (click)="loadReplay()">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          Try again
+        </button>
+      </div>
+    } @else if (!replay.hasData()) {
+      <div class="family__card family-locs__empty" role="status">
+        <span class="family__crest family-locs__empty-crest" aria-hidden="true">
+          <mat-icon>location_off</mat-icon>
+        </span>
+        <h2 class="family-locs__empty-title">No history to replay yet</h2>
+        <p class="family-locs__empty-body">No one who opted into sharing has any recorded positions in this
+          window. Try a longer window, or check back later.</p>
+      </div>
+    } @else {
+      <div class="family-locs__layout">
+        <!-- Map (replay): interpolated pins + per-member fading trails; the scrubber owns the viewport -->
+        <section class="family__card family-locs__map-card" aria-label="Family replay map">
+          <app-location-map [pins]="mapPins()" [trails]="replay.trails()" [fitOnChange]="false" />
+          <div class="family-locs__osm">
+            <mat-icon aria-hidden="true">public</mat-icon>
+            <span>Powered by
+              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</span>
+          </div>
+        </section>
+
+        <!-- Replay legend: per-member colour + name (display names only) -->
+        <aside class="family__card family-locs__list-card" aria-label="People in this replay">
+          <h2 class="family__card-title">In this replay</h2>
+          <ul class="member-locs">
+            @for (mb of replay.members(); track mb.userId) {
+              <li class="member-loc">
+                <span class="member-loc__btn member-loc__btn--static">
+                  <span class="member-loc__swatch" [style.background]="mb.color" aria-hidden="true">
+                    {{ initials(mb.name) }}
+                  </span>
+                  <span class="member-loc__body">
+                    <span class="member-loc__name">
+                      {{ mb.name }}
+                      @if (mb.isSelf) { <span class="member-loc__you">You</span> }
+                    </span>
+                  </span>
+                </span>
+              </li>
+            }
+          </ul>
+        </aside>
+      </div>
+
+      <!-- ── Time scrubber + transport controls ── -->
+      <section class="family__card family-locs__scrubber" aria-label="Replay controls">
+        <div class="scrub__top">
+          <!-- Window picker (within the server's 48h cap) -->
+          <div class="scrub__window">
+            <label for="replay-window">Window</label>
+            <select id="replay-window" [ngModel]="windowHours()"
+                    (ngModelChange)="setWindowHours(+$event)">
+              <option [ngValue]="6">Last 6h</option>
+              <option [ngValue]="12">Last 12h</option>
+              <option [ngValue]="24">Last 24h</option>
+              <option [ngValue]="48">Last 48h</option>
+            </select>
+          </div>
+          <!-- Live clock label for the current scrub time -->
+          <span class="scrub__clock" aria-live="polite">
+            <mat-icon aria-hidden="true">schedule</mat-icon>
+            {{ replay.clockLabel() }}
+          </span>
+        </div>
+
+        <!-- The slider over the window -->
+        <input class="scrub__slider" type="range" min="0" max="1" step="0.0005"
+               [value]="replay.fraction()"
+               (input)="onScrub(+$any($event.target).value)"
+               aria-label="Scrub replay time" />
+
+        <div class="scrub__transport">
+          <button type="button" class="scrub__btn" (click)="stepMinutes(-5)"
+                  matTooltip="Step back 5 minutes" aria-label="Step back five minutes">
+            <mat-icon aria-hidden="true">replay_5</mat-icon>
+          </button>
+
+          @if (!reducedMotion()) {
+            <button type="button" class="scrub__btn scrub__btn--play" (click)="togglePlay()"
+                    [attr.aria-label]="replay.playing() ? 'Pause' : 'Play'">
+              <mat-icon aria-hidden="true">{{ replay.playing() ? 'pause' : 'play_arrow' }}</mat-icon>
+            </button>
+          }
+
+          <button type="button" class="scrub__btn" (click)="stepMinutes(5)"
+                  matTooltip="Step forward 5 minutes" aria-label="Step forward five minutes">
+            <mat-icon aria-hidden="true">forward_5</mat-icon>
+          </button>
+
+          @if (!reducedMotion()) {
+            <div class="scrub__speed">
+              <label for="replay-speed">Speed</label>
+              <select id="replay-speed" [ngModel]="replay.speed()" (ngModelChange)="setSpeed(+$event)">
+                @for (s of speedOptions; track s) {
+                  <option [ngValue]="s">{{ s }}×</option>
+                }
+              </select>
+            </div>
+          } @else {
+            <span class="scrub__reduced" matTooltip="Auto-play is off because your system prefers reduced motion">
+              <mat-icon aria-hidden="true">motion_photos_off</mat-icon>
+              Step manually
+            </span>
+          }
         </div>
       </section>
-
-      <!-- Side list: name · city · as-of · stale -->
-      <aside class="family__card family-locs__list-card" aria-label="Family members">
-        <h2 class="family__card-title">Family</h2>
-        <ul class="member-locs">
-          @for (m of members(); track m.userId) {
-            <li class="member-loc" [class.member-loc--self]="m.isSelf"
-                [class.member-loc--active]="selectedId() === m.userId"
-                [class.member-loc--stale]="isStale(m)">
-              <button type="button" class="member-loc__btn" (click)="select(m.userId)"
-                      [attr.aria-pressed]="selectedId() === m.userId">
-                <span class="member-loc__swatch" [style.background]="colorFor(m)" aria-hidden="true">
-                  {{ initials(m.name) }}
-                </span>
-                <span class="member-loc__body">
-                  <span class="member-loc__name">
-                    {{ m.name }}
-                    @if (m.isSelf) { <span class="member-loc__you">You</span> }
-                  </span>
-                  <span class="member-loc__place">{{ placeLabel(m) }}</span>
-                  <span class="member-loc__meta">
-                    <span class="member-loc__asof">as of {{ timeAgo(m.capturedUtc, now()) }}</span>
-                    @if (isStale(m)) {
-                      <span class="member-loc__stale" matTooltip="This location may be out of date">stale</span>
-                    }
-                  </span>
-                </span>
-              </button>
-            </li>
-          }
-        </ul>
-      </aside>
-    </div>
+    }
   }
 </section>

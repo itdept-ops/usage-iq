@@ -68,6 +68,37 @@ public sealed class FamilyMemberLocationDto
     public DateTime CapturedUtc { get; set; }
 }
 
+/// <summary>
+/// One historical position point for the family replay (<c>GET /api/family/locations/history</c>) — a single
+/// lat/lng fix with its capture time. No identity is on the point itself; points are nested under the owning
+/// member in <see cref="FamilyMemberHistoryDto"/>, which carries the display NAME only. Mirrors a downsampled
+/// row of <see cref="Data.Entities.UserLocation"/>.
+/// </summary>
+public sealed class LocationHistoryPointDto
+{
+    public double Lat { get; set; }
+    public double Lng { get; set; }
+    public double? AccuracyM { get; set; }
+    public DateTime CapturedUtc { get; set; }
+}
+
+/// <summary>
+/// One household member's ordered history for the time-scrubber replay (<c>GET /api/family/locations/history</c>).
+/// Identity is userId + display NAME only — an email is NEVER on the wire (mirrors the live finder). Points are
+/// ordered oldest→newest and DOWNSAMPLED to a server cap (so the payload is bounded regardless of window). Only
+/// members who opted into household sharing appear here; the CALLER's own history is always included
+/// (<see cref="IsSelf"/> = true). Mirrors the live family-finder's opt-in + household scope exactly.
+/// </summary>
+public sealed class FamilyMemberHistoryDto
+{
+    public int UserId { get; set; }
+    public string Name { get; set; } = "";
+    /// <summary>True for the caller's own track (always included if they have any history in the window, regardless of sharing).</summary>
+    public bool IsSelf { get; set; }
+    /// <summary>The member's position points in the window, ordered oldest→newest, downsampled to the per-member cap.</summary>
+    public List<LocationHistoryPointDto> Points { get; set; } = new();
+}
+
 /// <summary>Body of <c>POST /api/chat/channels/{id}/location-share</c> — start a live location share scoped to
 /// that conversation. Carries the first GPS fix and the requested duration; the server clamps both.</summary>
 public sealed class StartLocationShareRequest

@@ -2767,6 +2767,34 @@ export interface FamilyMemberLocation {
 }
 
 /**
+ * One historical position point for the family replay (GET /api/family/locations/history) — a single lat/lng
+ * fix with its capture time. No identity is on the point; points are nested under the owning member in
+ * `FamilyMemberHistory`. Mirrors LocationHistoryPointDto.
+ */
+export interface LocationHistoryPoint {
+  lat: number;
+  lng: number;
+  accuracyM?: number | null;
+  capturedUtc: string;
+}
+
+/**
+ * One household member's ordered history for the time-scrubber replay (GET /api/family/locations/history).
+ * Identity is `userId` + display `name` only — no email is ever on the wire (mirrors the live finder). Points
+ * are ordered oldest→newest and downsampled server-side to a per-member cap. Only members who opted into
+ * household sharing appear; the caller's own history is always included (`isSelf` = true). Mirrors
+ * FamilyMemberHistoryDto.
+ */
+export interface FamilyMemberHistory {
+  userId: number;
+  name: string;
+  /** True for the caller's own track (always included if they have history in the window, regardless of sharing). */
+  isSelf: boolean;
+  /** The member's position points in the window, oldest→newest, downsampled to the per-member cap. */
+  points: LocationHistoryPoint[];
+}
+
+/**
  * A person the owner may add to the household (GET /api/family/household/candidates) — the caller's
  * circle / family-capable users not yet in a household. Identity is `userId` + `name` (+ optional
  * `picture`); never an email. The picker adds by `userId`. Mirrors CandidateDto.

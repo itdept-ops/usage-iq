@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,6 +11,7 @@ import { FamilyMemberLocation } from '../../core/models';
 import { timeAgo } from '../../shared/format';
 import { LocationMap, type MapPin } from '../location/location-map';
 import { BetaSkeleton } from '../beta-ui';
+import { ReplayEngine } from '../family/replay-engine';
 
 /**
  * Family Locations "Where is everyone" — the mobile-first twin of the live /family/locations page
@@ -38,13 +40,17 @@ import { BetaSkeleton } from '../beta-ui';
   selector: 'app-family-locations-mobile',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, MatIconModule, LocationMap, BetaSkeleton],
+  imports: [FormsModule, RouterLink, MatIconModule, LocationMap, BetaSkeleton],
   template: `
     <div class="fl">
       <!-- ─────────── FULL-BLEED MAP ─────────── -->
-      <div class="fl-map" [class.is-dim]="loading() || errored() || !members().length">
-        @if (members().length) {
+      <div class="fl-map"
+           [class.is-dim]="mode() === 'live' ? (loading() || errored() || !members().length)
+                                             : (replayLoading() || replayError() || !replay.hasData())">
+        @if (mode() === 'live' && members().length) {
           <app-location-map [pins]="pins()" (pinClick)="onPinClick($event)" />
+        } @else if (mode() === 'replay' && replay.hasData()) {
+          <app-location-map [pins]="replay.pins()" [trails]="replay.trails()" [fitOnChange]="false" />
         } @else {
           <!-- No pins to plot yet — a calm placeholder behind the sheet (still themed map chrome). -->
           <div class="fl-map__placeholder" aria-hidden="true">
@@ -58,15 +64,29 @@ import { BetaSkeleton } from '../beta-ui';
         <div class="fl-head__text">
           <span class="fl-head__eyebrow"><mat-icon aria-hidden="true">person_pin_circle</mat-icon> Family</span>
           <h1 class="fl-head__title">Where is everyone</h1>
+          <!-- Live ↔ Replay mode toggle -->
+          <div class="fl-modes" role="group" aria-label="Map mode">
+            <button type="button" class="fl-mode" [class.is-active]="mode() === 'live'"
+                    [attr.aria-pressed]="mode() === 'live'" (click)="setMode('live')">
+              <mat-icon aria-hidden="true">place</mat-icon> Live
+            </button>
+            <button type="button" class="fl-mode" [class.is-active]="mode() === 'replay'"
+                    [attr.aria-pressed]="mode() === 'replay'" (click)="setMode('replay')">
+              <mat-icon aria-hidden="true">history</mat-icon> Replay
+            </button>
+          </div>
         </div>
-        <button type="button" class="fl-head__refresh" (click)="refresh()"
-                [class.is-spinning]="loading()" [disabled]="loading()"
-                aria-label="Refresh locations">
-          <mat-icon aria-hidden="true">refresh</mat-icon>
-        </button>
+        @if (mode() === 'live') {
+          <button type="button" class="fl-head__refresh" (click)="refresh()"
+                  [class.is-spinning]="loading()" [disabled]="loading()"
+                  aria-label="Refresh locations">
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+          </button>
+        }
       </header>
 
-      <!-- ─────────── DOCKED MEMBER SHEET (absolute bottom, clears the global tab bar) ─────────── -->
+      <!-- ─────────── DOCKED SHEET (absolute bottom, clears the global tab bar) ─────────── -->
+      @if (mode() === 'live') {
       <section class="fl-sheet" aria-label="People sharing their location" aria-live="polite">
         <div class="fl-sheet__grip" aria-hidden="true"></div>
 
@@ -153,6 +173,109 @@ import { BetaSkeleton } from '../beta-ui';
           </p>
         }
       </section>
+      } @else {
+      <!-- ─────────── REPLAY SHEET (scrubber + transport) ─────────── -->
+      <section class="fl-sheet fl-sheet--replay" aria-label="Replay controls">
+        <div class="fl-sheet__grip" aria-hidden="true"></div>
+
+        @if (replayLoading()) {
+          <div class="fl-sheet__head">
+            <app-bs-skeleton width="46%" height="16px" radius="6px" />
+          </div>
+          <div class="fl-replay__skel">
+            <app-bs-skeleton width="100%" height="34px" radius="10px" />
+            <app-bs-skeleton width="100%" height="44px" radius="12px" />
+          </div>
+
+        } @else if (replayError()) {
+          <div class="fl-state">
+            <span class="fl-state__orb"><mat-icon aria-hidden="true">cloud_off</mat-icon></span>
+            <h2 class="fl-state__title">Couldn't load history</h2>
+            <p class="fl-state__body">Something went wrong reaching the location history. Give it another go.</p>
+            <button type="button" class="fl-state__cta" (click)="loadReplay()">
+              <mat-icon aria-hidden="true">refresh</mat-icon> Try again
+            </button>
+          </div>
+
+        } @else if (!replay.hasData()) {
+          <div class="fl-state">
+            <span class="fl-state__orb"><mat-icon aria-hidden="true">location_off</mat-icon></span>
+            <h2 class="fl-state__title">No history to replay</h2>
+            <p class="fl-state__body">
+              No one who opted into sharing has recorded positions in this window. Try a longer window.
+            </p>
+          </div>
+
+        } @else {
+          <!-- Window + clock -->
+          <div class="fl-replay__top">
+            <label class="fl-replay__window">
+              <span>Window</span>
+              <select [ngModel]="windowHours()" (ngModelChange)="setWindowHours(+$event)"
+                      aria-label="Replay window">
+                <option [ngValue]="6">6h</option>
+                <option [ngValue]="12">12h</option>
+                <option [ngValue]="24">24h</option>
+                <option [ngValue]="48">48h</option>
+              </select>
+            </label>
+            <span class="fl-replay__clock" aria-live="polite">
+              <mat-icon aria-hidden="true">schedule</mat-icon>{{ replay.clockLabel() }}
+            </span>
+          </div>
+
+          <!-- Slider -->
+          <input class="fl-replay__slider" type="range" min="0" max="1" step="0.0005"
+                 [value]="replay.fraction()"
+                 (input)="onScrub(+$any($event.target).value)"
+                 aria-label="Scrub replay time" />
+
+          <!-- Transport -->
+          <div class="fl-replay__transport">
+            <button type="button" class="fl-replay__btn" (click)="stepMinutes(-5)"
+                    aria-label="Step back five minutes">
+              <mat-icon aria-hidden="true">replay_5</mat-icon>
+            </button>
+
+            @if (!reducedMotion()) {
+              <button type="button" class="fl-replay__btn fl-replay__btn--play" (click)="togglePlay()"
+                      [attr.aria-label]="replay.playing() ? 'Pause' : 'Play'">
+                <mat-icon aria-hidden="true">{{ replay.playing() ? 'pause' : 'play_arrow' }}</mat-icon>
+              </button>
+            }
+
+            <button type="button" class="fl-replay__btn" (click)="stepMinutes(5)"
+                    aria-label="Step forward five minutes">
+              <mat-icon aria-hidden="true">forward_5</mat-icon>
+            </button>
+
+            @if (!reducedMotion()) {
+              <label class="fl-replay__speed">
+                <span>Speed</span>
+                <select [ngModel]="replay.speed()" (ngModelChange)="setSpeed(+$event)"
+                        aria-label="Playback speed">
+                  @for (s of speedOptions; track s) { <option [ngValue]="s">{{ s }}×</option> }
+                </select>
+              </label>
+            } @else {
+              <span class="fl-replay__reduced">
+                <mat-icon aria-hidden="true">motion_photos_off</mat-icon> Step
+              </span>
+            }
+          </div>
+
+          <!-- Legend: per-member colour + name (display names only) -->
+          <ul class="fl-replay__legend">
+            @for (mb of replay.members(); track mb.userId) {
+              <li class="fl-replay__chip">
+                <span class="fl-replay__dot" [style.background]="mb.color" aria-hidden="true"></span>
+                {{ mb.name }}@if (mb.isSelf) { <span class="fl-row__you">You</span> }
+              </li>
+            }
+          </ul>
+        }
+      </section>
+      }
     </div>
   `,
   styleUrl: './family-locations-mobile.page.scss',
@@ -200,6 +323,25 @@ export class FamilyLocationsMobilePage implements OnDestroy {
     }));
   });
 
+  // ───────────────────────── REPLAY ─────────────────────────
+  /** `live` (default) = current positions; `replay` = the time-scrubber. */
+  readonly mode = signal<'live' | 'replay'>('live');
+  /** Shared engine: bounded history → interpolated pins + fading trails (identical to the desktop page). */
+  readonly replay = new ReplayEngine();
+  readonly replayLoading = signal(false);
+  readonly replayError = signal(false);
+  /** Chosen window length in hours (within the server's 48h cap). Default = last 24h. */
+  readonly windowHours = signal(24);
+  readonly speedOptions = [30, 60, 120, 300];
+  /** True when the OS prefers reduced motion — disables auto-play; the scrubber + step stay available. */
+  readonly reducedMotion = signal(
+    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+
+  /** rAF handle + last frame timestamp for the playback loop (host-owned so cleanup is guaranteed). */
+  private rafId: number | null = null;
+  private lastFrame = 0;
+
   constructor() {
     void this.load();
     this.clockTimer = setInterval(
@@ -212,6 +354,88 @@ export class FamilyLocationsMobilePage implements OnDestroy {
     if (this.clockTimer) {
       clearInterval(this.clockTimer);
       this.clockTimer = null;
+    }
+    this.stopLoop();
+  }
+
+  /** Switch between the live finder and the replay scrubber (lazily fetching history the first time). */
+  setMode(mode: 'live' | 'replay'): void {
+    if (mode === this.mode()) return;
+    this.mode.set(mode);
+    if (mode === 'replay') {
+      this.loadReplay();
+    } else {
+      this.replay.pause();
+      this.stopLoop();
+    }
+  }
+
+  /** Fetch the bounded history for the chosen window and hand it to the engine. */
+  loadReplay(): void {
+    this.replayLoading.set(true);
+    this.replayError.set(false);
+    this.replay.pause();
+    this.stopLoop();
+    const to = new Date();
+    const from = new Date(to.getTime() - this.windowHours() * 60 * 60 * 1000);
+    void (async () => {
+      try {
+        const rows = await firstValueFrom(
+          this.api.familyLocationHistory(from.toISOString(), to.toISOString()),
+        );
+        this.replay.setHistory(rows ?? []);
+      } catch {
+        this.replayError.set(true);
+      } finally {
+        this.replayLoading.set(false);
+      }
+    })();
+  }
+
+  setWindowHours(hours: number): void {
+    this.windowHours.set(hours);
+    this.loadReplay();
+  }
+
+  togglePlay(): void {
+    this.replay.toggle();
+    if (this.replay.playing()) this.startLoop();
+    else this.stopLoop();
+  }
+
+  onScrub(fraction: number): void {
+    this.replay.pause();
+    this.stopLoop();
+    this.replay.seekFraction(fraction);
+  }
+
+  stepMinutes(minutes: number): void {
+    this.stopLoop();
+    this.replay.step(minutes);
+  }
+
+  setSpeed(mult: number): void {
+    this.replay.setSpeed(mult);
+  }
+
+  /** The single rAF loop that advances the engine by real elapsed time. */
+  private startLoop(): void {
+    if (this.rafId != null) return;
+    this.lastFrame = performance.now();
+    const tick = (ts: number) => {
+      const dt = ts - this.lastFrame;
+      this.lastFrame = ts;
+      this.replay.advance(dt);
+      if (this.replay.playing()) this.rafId = requestAnimationFrame(tick);
+      else this.rafId = null;
+    };
+    this.rafId = requestAnimationFrame(tick);
+  }
+
+  private stopLoop(): void {
+    if (this.rafId != null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
     }
   }
 

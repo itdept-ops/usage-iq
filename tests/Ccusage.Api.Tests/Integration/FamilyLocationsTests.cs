@@ -2,7 +2,11 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Ccusage.Api.Data;
+using Ccusage.Api.Data.Entities;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Ccusage.Api.Tests.Integration;
 
@@ -192,5 +196,161 @@ public class FamilyLocationsTests(WebAppFactory factory)
         var self = PinFor(arr, ownerId)!;
         self.Lat.Should().BeApproximately(6.0, 0.0001);
         self.Lng.Should().BeApproximately(6.0, 0.0001);
+    }
+
+    // ======================= History replay (GET /api/family/locations/history) =======================
+
+    /// <summary>Seed N fixes directly for an email at evenly spaced times ending at <paramref name="endUtc"/>,
+    /// going back <paramref name="span"/>. Bypasses the live record endpoint so we control CapturedUtc.</summary>
+    private async Task SeedHistory(string email, int count, DateTime endUtc, TimeSpan span,
+        double lat = 1.0, double lng = 1.0)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var stepTicks = count <= 1 ? 0 : span.Ticks / (count - 1);
+        for (var i = 0; i < count; i++)
+        {
+            db.UserLocations.Add(new UserLocation
+            {
+                UserEmail = email,
+                Lat = lat,
+                Lng = lng,
+                Source = "manual",
+                CapturedUtc = endUtc - TimeSpan.FromTicks(stepTicks * (count - 1 - i)),
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private static FamilyMemberHistoryView? HistoryFor(JsonElement arr, int userId)
+    {
+        foreach (var e in arr.EnumerateArray())
+            if (e.GetProperty("userId").GetInt32() == userId)
+                return new FamilyMemberHistoryView(e);
+        return null;
+    }
+
+    private sealed record FamilyMemberHistoryView(JsonElement El)
+    {
+        public bool IsSelf => El.GetProperty("isSelf").GetBoolean();
+        public string Name => El.GetProperty("name").GetString()!;
+        public JsonElement Points => El.GetProperty("points");
+        public int PointCount => Points.GetArrayLength();
+    }
+
+    [Fact]
+    public async Task History_requires_authentication_and_family_use()
+    {
+        var anon = factory.CreateClient();
+        (await anon.GetAsync("/api/family/locations/history")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var (_, plain, _) = await ProvisionUser("dashboard.view");
+        (await plain.GetAsync("/api/family/locations/history")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task History_happy_path_returns_ordered_points_for_self_and_sharing_member()
+    {
+        var (ownerEmail, owner, ownerId) = await ProvisionUser("family.use", "location.self", "location.share");
+        var (bobEmail, bob, bobId) = await ProvisionUser("family.use", "location.self", "location.share");
+
+        await EnsureHousehold(owner);
+        await AddMember(owner, bobId);
+        await EnableAndShare(owner, share: true);
+        await EnableAndShare(bob, share: true);
+
+        var now = DateTime.UtcNow;
+        await SeedHistory(ownerEmail, 5, now, TimeSpan.FromHours(2), lat: 10.0, lng: 10.0);
+        await SeedHistory(bobEmail, 5, now, TimeSpan.FromHours(2), lat: 20.0, lng: 20.0);
+
+        var arr = await Json(await owner.GetAsync("/api/family/locations/history"));
+        arr.GetArrayLength().Should().Be(2);
+
+        var self = HistoryFor(arr, ownerId)!;
+        self.IsSelf.Should().BeTrue();
+        self.PointCount.Should().Be(5);
+        // Ordered oldest→newest.
+        var times = self.Points.EnumerateArray()
+            .Select(p => p.GetProperty("capturedUtc").GetDateTime()).ToList();
+        times.Should().BeInAscendingOrder();
+
+        HistoryFor(arr, bobId)!.PointCount.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task History_excludes_non_sharing_member_and_out_of_household_user()
+    {
+        var (ownerEmail, owner, ownerId) = await ProvisionUser("family.use", "location.self", "location.share");
+        var (nonSharerEmail, nonSharer, nonSharerId) = await ProvisionUser("family.use", "location.self", "location.share");
+        var (outsiderEmail, outsider, outsiderId) = await ProvisionUser("family.use", "location.self", "location.share");
+
+        await EnsureHousehold(owner);
+        await AddMember(owner, nonSharerId);
+        await EnableAndShare(owner, share: true);
+        await EnableAndShare(nonSharer, share: false); // in household, NOT sharing
+        await EnsureHousehold(outsider);
+        await EnableAndShare(outsider, share: true);   // sharing, but different household
+
+        var now = DateTime.UtcNow;
+        await SeedHistory(ownerEmail, 3, now, TimeSpan.FromHours(1));
+        await SeedHistory(nonSharerEmail, 3, now, TimeSpan.FromHours(1));
+        await SeedHistory(outsiderEmail, 3, now, TimeSpan.FromHours(1));
+
+        var arr = await Json(await owner.GetAsync("/api/family/locations/history"));
+        arr.GetArrayLength().Should().Be(1);
+        HistoryFor(arr, ownerId).Should().NotBeNull();
+        HistoryFor(arr, nonSharerId).Should().BeNull(); // never opted in → never in history
+        HistoryFor(arr, outsiderId).Should().BeNull();  // out of household → never appears
+    }
+
+    [Fact]
+    public async Task History_carries_no_email()
+    {
+        var (ownerEmail, owner, _) = await ProvisionUser("family.use", "location.self", "location.share");
+        await EnsureHousehold(owner);
+        await EnableAndShare(owner, share: true);
+        await SeedHistory(ownerEmail, 3, DateTime.UtcNow, TimeSpan.FromHours(1));
+
+        var raw = await (await owner.GetAsync("/api/family/locations/history")).Content.ReadAsStringAsync();
+        raw.Should().NotContain(ownerEmail);
+        raw.Should().NotContain("@test.local");
+    }
+
+    [Fact]
+    public async Task History_clamps_window_to_max_48h_excluding_older_points()
+    {
+        var (ownerEmail, owner, ownerId) = await ProvisionUser("family.use", "location.self", "location.share");
+        await EnsureHousehold(owner);
+        await EnableAndShare(owner, share: true);
+
+        var now = DateTime.UtcNow;
+        // One point inside the 48h cap, one WAY outside (10 days ago).
+        await SeedHistory(ownerEmail, 1, now - TimeSpan.FromHours(1), TimeSpan.Zero);
+        await SeedHistory(ownerEmail, 1, now - TimeSpan.FromDays(10), TimeSpan.Zero);
+
+        // Ask for a 30-day window: the server must CLAMP to 48h, so the 10-day-old point is excluded.
+        var from = (now - TimeSpan.FromDays(30)).ToString("o");
+        var to = now.ToString("o");
+        var arr = await Json(await owner.GetAsync($"/api/family/locations/history?from={Uri.EscapeDataString(from)}&to={Uri.EscapeDataString(to)}"));
+
+        var self = HistoryFor(arr, ownerId)!;
+        self.PointCount.Should().Be(1); // only the within-48h point survived the clamp
+    }
+
+    [Fact]
+    public async Task History_downsamples_to_max_points_per_member()
+    {
+        var (ownerEmail, owner, ownerId) = await ProvisionUser("family.use", "location.self", "location.share");
+        await EnsureHousehold(owner);
+        await EnableAndShare(owner, share: true);
+
+        // 1000 fixes packed into the last 6h — well over the 300 cap.
+        var now = DateTime.UtcNow;
+        await SeedHistory(ownerEmail, 1000, now, TimeSpan.FromHours(6));
+
+        var arr = await Json(await owner.GetAsync("/api/family/locations/history"));
+        var self = HistoryFor(arr, ownerId)!;
+        self.PointCount.Should().BeLessThanOrEqualTo(300);
+        self.PointCount.Should().BeGreaterThan(1); // still a usable track, not collapsed
     }
 }

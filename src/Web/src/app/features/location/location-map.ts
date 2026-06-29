@@ -35,6 +35,12 @@ export interface MapPin {
 /** An ordered polyline (a user's history trail), drawn faintly under the pins. */
 export interface MapTrail {
   points: [number, number][];
+  /** Optional stroke colour (e.g. a per-member replay colour). Defaults to the muted blue. */
+  color?: string;
+  /** Optional stroke opacity (0–1). Defaults to 0.45. */
+  opacity?: number;
+  /** Optional stroke weight in px. Defaults to 2. */
+  weight?: number;
 }
 
 /**
@@ -84,6 +90,12 @@ export class LocationMap implements AfterViewInit, OnDestroy {
   readonly pins = input<MapPin[]>([]);
   /** Optional history trails (polylines). */
   readonly trails = input<MapTrail[]>([]);
+  /**
+   * When false, the map stops auto-fitting/recentring as the pins change — the caller owns the
+   * viewport. Used by the replay scrubber, where markers move every frame and an auto-fit would
+   * yank the view on every tick. Defaults to true (the live finder's recentre-on-change behaviour).
+   */
+  readonly fitOnChange = input<boolean>(true);
   /** Fired with a pin's id when the user clicks its marker. */
   readonly pinClick = output<string>();
 
@@ -152,9 +164,11 @@ export class LocationMap implements AfterViewInit, OnDestroy {
     this.trailLayer.clearLayers();
     for (const t of this.trails()) {
       if (t.points.length > 1) {
-        Lm.polyline(t.points, { color: '#5b8def', weight: 2, opacity: 0.45 }).addTo(
-          this.trailLayer,
-        );
+        Lm.polyline(t.points, {
+          color: t.color ?? '#5b8def',
+          weight: t.weight ?? 2,
+          opacity: t.opacity ?? 0.45,
+        }).addTo(this.trailLayer);
       }
     }
 
@@ -183,7 +197,7 @@ export class LocationMap implements AfterViewInit, OnDestroy {
     // Fit the view to the markers the first time we see this pin set (so re-selection within the same set
     // doesn't yank the viewport). One pin → a gentle zoom; many → fit bounds with padding.
     const key = this.pinKey();
-    if (pins.length && key !== this.lastFitKey) {
+    if (pins.length && this.fitOnChange() && key !== this.lastFitKey) {
       this.lastFitKey = key;
       if (pins.length === 1) {
         this.map.setView([pins[0].lat, pins[0].lng], 12);

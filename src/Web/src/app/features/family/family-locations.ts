@@ -7,6 +7,7 @@ import {
   signal,
   ChangeDetectionStrategy,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { MatButtonModule } from '@angular/material/button';
@@ -16,9 +17,10 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { Api } from '../../core/api';
-import { FamilyMemberLocation } from '../../core/models';
+import { FamilyMemberHistory, FamilyMemberLocation } from '../../core/models';
 import { timeAgo } from '../../shared/format';
 import { LocationMap, MapPin } from '../location/location-map';
+import { ReplayEngine } from './replay-engine';
 
 /**
  * "Where is everyone" — the family-finder map (gated family.use via the /family route group). A Leaflet/OSM
@@ -36,6 +38,7 @@ import { LocationMap, MapPin } from '../location/location-map';
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     RouterLink,
     MatButtonModule,
     MatIconModule,
@@ -82,7 +85,7 @@ export class FamilyLocations implements OnDestroy {
   readonly selectedId = signal<number | null>(null);
 
   /** One map pin per member; the caller (and any selected member) is emphasised. */
-  readonly pins = computed<MapPin[]>(() => {
+  readonly livePins = computed<MapPin[]>(() => {
     const sel = this.selectedId();
     return this.members().map((m) => ({
       id: `u:${m.userId}`,
@@ -95,6 +98,32 @@ export class FamilyLocations implements OnDestroy {
     }));
   });
 
+  // ───────────────────────── REPLAY ─────────────────────────
+  /** Which mode the map is in. `live` (default) = current positions; `replay` = the time-scrubber. */
+  readonly mode = signal<'live' | 'replay'>('live');
+  /** The shared engine that turns the bounded history into interpolated pins + fading trails. */
+  readonly replay = new ReplayEngine();
+  /** Replay fetch lifecycle (separate from the live load above). */
+  readonly replayLoading = signal(false);
+  readonly replayError = signal(false);
+  /** The chosen window length in hours (within the server's 48h cap). Default = last 24h. */
+  readonly windowHours = signal(24);
+  /** Speed multiplier options for playback (× real time). */
+  readonly speedOptions = [30, 60, 120, 300];
+  /** True when the user/OS prefers reduced motion — disables auto-play; scrubber + step stay available. */
+  readonly reducedMotion = signal(
+    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+
+  /** What the map actually draws: live pins, or the replay's interpolated pins. */
+  readonly mapPins = computed<MapPin[]>(() =>
+    this.mode() === 'replay' ? this.replay.pins() : this.livePins(),
+  );
+
+  /** rAF handle + last frame timestamp for the playback loop (host-owned so cleanup is guaranteed). */
+  private rafId: number | null = null;
+  private lastFrame = 0;
+
   constructor() {
     this.load();
     this.clockTimer = setInterval(() => this.now.set(Date.now()), FamilyLocations.CLOCK_MS);
@@ -104,6 +133,94 @@ export class FamilyLocations implements OnDestroy {
     if (this.clockTimer) {
       clearInterval(this.clockTimer);
       this.clockTimer = null;
+    }
+    this.stopLoop();
+  }
+
+  /** Switch between the live finder and the replay scrubber (lazily fetching history the first time). */
+  setMode(mode: 'live' | 'replay'): void {
+    if (mode === this.mode()) return;
+    this.mode.set(mode);
+    if (mode === 'replay') {
+      this.loadReplay();
+    } else {
+      this.replay.pause();
+      this.stopLoop();
+    }
+  }
+
+  /** Fetch the bounded history for the chosen window and hand it to the engine. */
+  loadReplay(): void {
+    this.replayLoading.set(true);
+    this.replayError.set(false);
+    this.replay.pause();
+    this.stopLoop();
+    const to = new Date();
+    const from = new Date(to.getTime() - this.windowHours() * 60 * 60 * 1000);
+    this.api.familyLocationHistory(from.toISOString(), to.toISOString()).subscribe({
+      next: (rows: FamilyMemberHistory[]) => {
+        this.replay.setHistory(rows ?? []);
+        this.replayLoading.set(false);
+      },
+      error: () => {
+        this.replayLoading.set(false);
+        this.replayError.set(true);
+        this.snack.open('Could not load location history', 'Dismiss', { duration: 4000 });
+      },
+    });
+  }
+
+  /** Change the replay window length and refetch. */
+  setWindowHours(hours: number): void {
+    this.windowHours.set(hours);
+    this.loadReplay();
+  }
+
+  /** Play/pause toggle (drives the rAF loop). */
+  togglePlay(): void {
+    this.replay.toggle();
+    if (this.replay.playing()) this.startLoop();
+    else this.stopLoop();
+  }
+
+  /** Slider input handler: scrub to a 0..1 fraction (pauses playback while dragging). */
+  onScrub(fraction: number): void {
+    this.replay.pause();
+    this.stopLoop();
+    this.replay.seekFraction(fraction);
+  }
+
+  /** Step the scrub time by a signed number of minutes (the reduced-motion / fine-control buttons). */
+  stepMinutes(minutes: number): void {
+    this.stopLoop();
+    this.replay.step(minutes);
+  }
+
+  setSpeed(mult: number): void {
+    this.replay.setSpeed(mult);
+  }
+
+  /** Start the single rAF loop that advances the engine by real elapsed time. */
+  private startLoop(): void {
+    if (this.rafId != null) return;
+    this.lastFrame = performance.now();
+    const tick = (ts: number) => {
+      const dt = ts - this.lastFrame;
+      this.lastFrame = ts;
+      this.replay.advance(dt);
+      if (this.replay.playing()) {
+        this.rafId = requestAnimationFrame(tick);
+      } else {
+        this.rafId = null; // engine auto-paused at the end
+      }
+    };
+    this.rafId = requestAnimationFrame(tick);
+  }
+
+  private stopLoop(): void {
+    if (this.rafId != null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
     }
   }
 

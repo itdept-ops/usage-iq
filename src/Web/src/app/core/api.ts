@@ -8,7 +8,7 @@ import {
   FamilyAssistantResult, FamilyBriefing, FamilyChore, FamilyChoreRecurrence, FamilyChoreSource, FamilyChores, FamilyMemberEvents, ChoreSuggestAiRequest, ChoreSuggestAiResult, ChoreBalanceAiResult, ChoreValuesAiResult, ChoreSummaryAiResult, Allowance, AllowanceMe, AllowanceMoveRequest, FamilyList, FamilyListKind, FamilyMeal, FamilyMealDay, FamilyMealMacroProposal, FamilyMealMacroSource, FamilyMealSlot, FamilyNote, FamilyPoll, FamilyPollCreate, FamilyRecurrence, FamilyReminder, FamilySettings, FamilySettingsUpdate, FamilyTimer, FamilyPollKind, FamilyToday, FindTimeRequest, FindTimeAiResult, PollOptionsAiResult, PollSummaryAiResult, ReminderAiResult, ListItemsAiResult, ListSuggestAiResult, NoteDraftAiResult, NoteSummaryAiResult, AskNotesAiResult, NoteTransformAction, NoteTransformAiResult, PlanWeekAiRequest, PlanWeekAiResult, RecipeAiResult, RecipeBreakdownResult, Recipe, RecipeUpsertRequest, RecipeFromBreakdownRequest, WhatCanIMakeAiResult, TimerAiResult, FindTimeResult, QuickAddKind, QuickAddRequest, QuickAddResult, FinanceAccount, FinanceAccountPatch, FinanceAccountSummary, FinanceImportBatch, FinanceImportResult, FinanceMoneyCoachResult, FinanceSummary, FinanceSummaryAiResult, FinanceTransactionsPage, FinanceTxnKind, FinanceOwner, FinanceParseRequest, FinanceStagedImport, FinanceStagedPage, FinanceStagedRow, FinanceStagedRowPatch, FinanceCategorizeAiResult, FinanceCommitRequest,
   FinanceBudgetsResponse, FinanceBudgetDto, FinanceBudgetUpsertRequest, FinanceNetWorthDto,
   FinanceBalanceEntryRequest, FinanceSavingsResponse, FinanceSavingsGoalDto, FinanceSavingsUpsertRequest,
-  FinanceContributeRequest, FinanceBudgetCheckDto, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation,
+  FinanceContributeRequest, FinanceBudgetCheckDto, FleetDeleteResult, FleetReassignRequest, FleetReassignResult, FleetRevokeKeysRequest, FleetRevokeKeysResult, FoodEntryDto, FoodSearchItemDto, GroupBy, Household, HouseholdCandidate, FamilyMemberLocation, FamilyMemberHistory,
   AddSupplementRequest, SupplementEntryDto, SupplementMacrosRequest, SupplementMacrosResponse,
   AddSleepRequest, SleepEntryDto, SleepInsightResponse, ClientInfoRequest,
   CoffeeEntryDto, GoalPlanDto, HeatmapCell, HydrationEntryDto, HydrationSuggestResponse, ImageRequest, IngestionSource, IngestKey, IngestKeyCreated, LocationFix, LocationSettings, LocationSettingsUpdate, AdminUserLocation, RecordLocationRequest, LogWeightRequest, LoginEvent, MachineStat, ManagedUser, MealFeedbackRequest, MealFeedbackResponse, ModelStat, MoveDayRequest, MoveDayResult, NaturalGoalRequest, NaturalGoalResponse, NotificationDto, NotificationPreferenceDto, NotificationSettings,
@@ -1680,6 +1680,21 @@ export class Api {
    */
   familyLocations(): Observable<FamilyMemberLocation[]> {
     return this.http.get<FamilyMemberLocation[]>(`${this.base}/family/locations`);
+  }
+
+  /**
+   * Family replay: each opted-in household member's ORDERED position history over a bounded window
+   * (GET /api/family/locations/history, gated family.use — the SAME gate + opt-in + household scope as the live
+   * finder). The caller always gets their own track; other members appear only when they opted into household
+   * sharing. Identity is userId + display name only — never an email. The window is CLAMPED server-side (max 48h)
+   * and each track is downsampled to a per-member cap, so this can never pull unbounded history. `from`/`to` are
+   * ISO-8601 UTC; omit both for the default most-recent-24h window. Empty array when nobody has history yet.
+   */
+  familyLocationHistory(from?: string, to?: string): Observable<FamilyMemberHistory[]> {
+    let params = new HttpParams();
+    if (from) params = params.set('from', from);
+    if (to) params = params.set('to', to);
+    return this.http.get<FamilyMemberHistory[]>(`${this.base}/family/locations/history`, { params });
   }
 
   // ---- Family Hub F7: Quick-Add (one-line capture → list item / reminder / note) ----
