@@ -111,7 +111,7 @@ public static class CycleEndpoints
                 .Take(DayLogCap)
                 .ToListAsync(ct);
 
-            var prediction = BuildPrediction(periods, profile, dayLogs);
+            var prediction = await BuildPrediction(db, periods, profile, dayLogs, ct);
             return Results.Ok(new CycleDto(
                 periods.Select(ToDto).ToList(),
                 prediction,
@@ -249,7 +249,7 @@ public static class CycleEndpoints
                 .Take(DayLogCap)
                 .ToListAsync(ct);
 
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = await TrackerVisibility.DisplayTzTodayAsync(db, ct);
             var prediction = CyclePredictionService.Compute(
                 periods, profile.AvgCycleLengthDays, profile.AvgPeriodLengthDays, today, dayLogs);
 
@@ -368,10 +368,11 @@ public static class CycleEndpoints
         return profile;
     }
 
-    private static PredictionDto BuildPrediction(
-        IReadOnlyList<CyclePeriod> periods, CycleProfile profile, IReadOnlyList<CycleDayLog> dayLogs)
+    private static async Task<PredictionDto> BuildPrediction(
+        UsageDbContext db, IReadOnlyList<CyclePeriod> periods, CycleProfile profile,
+        IReadOnlyList<CycleDayLog> dayLogs, CancellationToken ct)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = await TrackerVisibility.DisplayTzTodayAsync(db, ct);
         var p = CyclePredictionService.Compute(
             periods, profile.AvgCycleLengthDays, profile.AvgPeriodLengthDays, today, dayLogs);
         var window = p.FertileStart is { } fs && p.FertileEnd is { } fe

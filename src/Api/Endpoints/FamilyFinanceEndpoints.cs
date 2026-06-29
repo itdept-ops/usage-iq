@@ -1675,7 +1675,7 @@ public static class FamilyFinanceEndpoints
         var monthLabel = from.ToString("yyyy-MM", CultureInfo.InvariantCulture);
 
         // Pace the month "as of" today when it's the current month, else the full month.
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = await TrackerVisibility.DisplayTzTodayAsync(db, ct);
         var dayOfMonth = FinanceSpendMath.ElapsedDayOfMonth(from, today);
         var daysInMonth = DateTime.DaysInMonth(from.Year, from.Month);
 
@@ -1790,7 +1790,7 @@ public static class FamilyFinanceEndpoints
             if (req.Balance is not decimal balance)
                 return Results.BadRequest(new { message = "A balance is required." });
 
-            var asOf = DateOnly.FromDateTime(DateTime.UtcNow);
+            var asOf = await TrackerVisibility.DisplayTzTodayAsync(db, ct);
             if (!string.IsNullOrWhiteSpace(req.AsOfDate))
             {
                 if (!DateOnly.TryParseExact(req.AsOfDate!.Trim(), "yyyy-MM-dd",

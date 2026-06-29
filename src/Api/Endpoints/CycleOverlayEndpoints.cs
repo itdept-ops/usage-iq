@@ -37,7 +37,7 @@ public static class CycleOverlayEndpoints
         {
             var caller = (await me.GetUserAsync(ct))!; // family.use filter guarantees non-null
             var household = await households.GetForCallerAsync(caller, ct);
-            var (from, to) = Window(fromUtc, toUtc);
+            var (from, to) = await Window(db, fromUtc, toUtc, ct);
 
             // Build the set of users to surface: the caller themselves ONLY if they cycle.track, plus each
             // OTHER household member whose CycleProfile.OverlayToFamily is true. A member who hasn't opted in
@@ -82,7 +82,7 @@ public static class CycleOverlayEndpoints
                 .GroupBy(p => p.UserEmail, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(grp => grp.Key, grp => grp.ToList(), StringComparer.OrdinalIgnoreCase);
 
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = await TrackerVisibility.DisplayTzTodayAsync(db, ct);
             var result = new List<MemberOverlayDto>();
             foreach (var u in users)
             {
@@ -106,11 +106,12 @@ public static class CycleOverlayEndpoints
         .RequirePermission(Permissions.FamilyUse);
     }
 
-    /// <summary>Resolve a [from, to] DAY window with sane defaults (today → +35 days) and a hard ≤92-day clamp
-    /// so the overlay can't enumerate an unbounded range across members.</summary>
-    private static (DateOnly From, DateOnly To) Window(DateTime? fromUtc, DateTime? toUtc)
+    /// <summary>Resolve a [from, to] DAY window with sane defaults (display-tz today → +35 days) and a hard
+    /// ≤92-day clamp so the overlay can't enumerate an unbounded range across members.</summary>
+    private static async Task<(DateOnly From, DateOnly To)> Window(
+        UsageDbContext db, DateTime? fromUtc, DateTime? toUtc, CancellationToken ct)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = await TrackerVisibility.DisplayTzTodayAsync(db, ct);
         var from = fromUtc is { } f ? DateOnly.FromDateTime(f) : today;
         var to = toUtc is { } t ? DateOnly.FromDateTime(t) : from.AddDays(35);
         if (to < from) to = from.AddDays(1);
