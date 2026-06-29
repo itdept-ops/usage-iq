@@ -14,28 +14,29 @@ import { MarketingNav } from '../marketing/marketing-nav';
 import { MarketingFooter } from '../marketing/marketing-footer';
 import { BuiltWithBadge } from './built-with-badge';
 
-/** A life-domain module that boots under the OS kernel. `accent` maps to a
- *  fixed tech token (blue/cyan/violet) reused on every marketing page so a
- *  domain always wears the same color. */
+/** A life-domain orbiting the OS core. `glyph` selects one of the custom inline
+ *  SVG domain marks rendered in the template (body/home/money/people/mind/comms);
+ *  `accent` tints the satellite + module card (indigo/violet/cyan). */
 interface Domain {
   key: string;
-  icon: string;
-  /** monospace boot status line, e.g. "work module: mounted" */
-  boot: string;
+  /** which custom SVG domain glyph to render */
+  glyph: 'body' | 'home' | 'money' | 'people' | 'mind' | 'comms';
   title: string;
   text: string;
-  /** which of the three tech accents tints this domain */
-  accent: 'blue' | 'cyan' | 'violet';
+  /** which scoped landing accent tints this domain */
+  accent: 'indigo' | 'violet' | 'cyan';
 }
 interface Agent {
-  icon: string;
+  /** which custom SVG agent glyph to render */
+  glyph: 'pulse' | 'bolt' | 'insight' | 'recap' | 'search' | 'capture';
   /** the trigger — a sentence or a photo */
   cue: string;
   /** the action the agent takes */
   act: string;
 }
 interface Proof {
-  icon: string;
+  /** which custom SVG platform glyph to render */
+  glyph: 'key' | 'server' | 'install' | 'devices';
   title: string;
   text: string;
 }
@@ -64,68 +65,50 @@ export class Login {
   /** Forwarded to /signin so a deep-linked guard redirect survives the marketing detour. */
   readonly returnUrl = signal<string | null>(null);
 
-  /** The hero "boot sequence" — monospace status lines that type in one at a time,
-   *  ending on the kernel coming fully online. Ties the OS metaphor to the real
-   *  system the product actually runs. */
-  readonly boot: string[] = [
-    '$ usage-iq --boot',
-    '  kernel: online',
-    '  mounting body · home · money',
-    '  mounting people · mind · comms',
-    '  agents: armed · permission-gated',
-    '  ✓ one OS · your entire life',
-  ];
-
-  /** The six life-modules that boot under the kernel — the breadth payload.
-   *  Rendered both as the constellation satellites and the module panels. */
+  /** The six life-domains orbiting the OS core — the breadth payload.
+   *  Rendered both as the hero orbit satellites and the Life Modules constellation. */
   readonly domains: Domain[] = [
     {
       key: 'body',
-      icon: 'fitness_center',
-      boot: 'body module: mounted',
+      glyph: 'body',
       title: 'Body',
       text: 'Food + macros, an exercise library, sleep & recovery, meds & vitals, hydration, coffee, weight trend, 75-Hard — and a daily “Day in the Life” recap.',
       accent: 'cyan',
     },
     {
       key: 'home',
-      icon: 'home',
-      boot: 'home module: mounted',
+      glyph: 'home',
       title: 'Home & Family',
       text: 'The shared Hub: calendar, lists, notes, chores + allowance, recipes and a meal planner that builds the grocery list for the whole household.',
       accent: 'violet',
     },
     {
       key: 'money',
-      icon: 'account_balance',
-      boot: 'money module: mounted',
+      glyph: 'money',
       title: 'Money',
       text: 'A full finance vertical: budgets, bills, net-worth and savings tracking, with bank-statement import to keep the whole picture current.',
-      accent: 'blue',
+      accent: 'indigo',
     },
     {
       key: 'people',
-      icon: 'groups',
-      boot: 'people module: mounted',
+      glyph: 'people',
       title: 'People & Place',
       text: 'Contacts, family and fleet on one identity spine, plus opt-in location maps and history replay — a private “where’s everyone”, hosted by you.',
       accent: 'cyan',
     },
     {
       key: 'mind',
-      icon: 'self_improvement',
-      boot: 'mind module: mounted',
+      glyph: 'mind',
       title: 'Mind',
       text: 'Journal and mood, habit streaks and the 75-Hard challenge — the inner-life layer the rest of your life is finally measured against.',
       accent: 'violet',
     },
     {
       key: 'comms',
-      icon: 'forum',
-      boot: 'comms module: mounted',
+      glyph: 'comms',
       title: 'Comms',
       text: 'Real-time chat — channels and DMs with reactions — and notifications across an in-app bell, toasts and the browser. The OS talks to you.',
-      accent: 'blue',
+      accent: 'indigo',
     },
   ];
 
@@ -134,32 +117,32 @@ export class Login {
    *  permission-gated, and prefills only. */
   readonly agents: Agent[] = [
     {
-      icon: 'schedule',
+      glyph: 'recap',
       cue: 'Proactive agents work while you sleep',
       act: '— running on a cadence and dropping what matters into the Agent Inbox.',
     },
     {
-      icon: 'bolt',
+      glyph: 'bolt',
       cue: 'Ask that acts',
       act: '— “jogged two miles”, “add milk to the list” becomes a confirm-chip action across any domain.',
     },
     {
-      icon: 'insights',
+      glyph: 'insight',
       cue: 'The Insight engine reads across domains',
       act: '— spend, macros, calendar, goals — and turns the patterns into plain language.',
     },
     {
-      icon: 'auto_awesome',
+      glyph: 'pulse',
       cue: 'A Day-in-the-Life recap reads your day',
       act: 'and hands back a clear summary — not another chart to decode.',
     },
     {
-      icon: 'search',
+      glyph: 'search',
       cue: 'Search Everything',
       act: 'spans every module at once, so one box finds anything in your life.',
     },
     {
-      icon: 'photo_camera',
+      glyph: 'capture',
       cue: 'Snap a photo or speak an intent',
       act: 'and the OS drafts the structured entry, ready for you to confirm.',
     },
@@ -168,22 +151,22 @@ export class Login {
   /** One platform — the trust + craft spine under the whole OS. */
   readonly proofs: Proof[] = [
     {
-      icon: 'vpn_key',
+      glyph: 'key',
       title: 'One login for everything',
       text: 'A single Google-pinned identity opens every module — no twenty accounts, no twenty passwords. 50+ capabilities, re-checked on the server every request.',
     },
     {
-      icon: 'dns',
+      glyph: 'server',
       title: 'Your data on your servers',
       text: 'Self-hosted and open source — Angular + .NET 9 + PostgreSQL, Docker-composed to run anywhere. No seat pricing, no telemetry, nothing phones home.',
     },
     {
-      icon: 'install_mobile',
+      glyph: 'install',
       title: 'A deep installable PWA',
       text: 'Install it like a native app and keep working offline — the OS is built to live on your home screen, not just a browser tab.',
     },
     {
-      icon: 'devices',
+      glyph: 'devices',
       title: 'Desktop + full mobile, real-time',
       text: 'Two first-class platforms — every page twinned for the phone — over one live database, with real-time chat, notifications and force-logout.',
     },
