@@ -353,10 +353,11 @@ export class SnapRouteOrchestrator {
 
     this.resetState();
     if (this.platform.isMobile()) {
-      // Mobile: open the OS rear camera directly, then classify.
+      // Mobile: open the OS photo chooser (no `capture` attr → offers BOTH "Take Photo" and "Photo Library"),
+      // so the user can snap a new photo OR attach an existing one, then classify. (Was camera-only.)
       let img: ImageRequest | null = null;
       try {
-        img = await ai.captureImage();
+        img = await ai.pickImage();
       } catch {
         this.snack.open('Could not read that photo.', 'OK', { duration: 4000 });
         return;

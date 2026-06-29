@@ -16,7 +16,7 @@ import {
 import { OptimisticTracker } from '../state/optimistic-tracker';
 import { BottomSheet } from '../ui/bottom-sheet';
 import { group } from '../util/units';
-import { captureImage, confirmPhotoNotice } from '../../tracker/ai-image';
+import { pickImage, confirmPhotoNotice } from '../../tracker/ai-image';
 
 /**
  * Strata FOOD sheet — the primary food-logging surface of Tracker Beta.
@@ -598,7 +598,9 @@ export class FoodSheet {
     if (!(await confirmPhotoNotice())) return;
     let image;
     try {
-      image = await captureImage();
+      // No `capture` attribute → the OS offers BOTH "Take Photo" and "Photo Library", so the user can snap
+      // a new photo OR attach an existing one (the mobile food log was previously camera-only).
+      image = await pickImage();
     } catch {
       this.snapMsg.set('Couldn’t read that image. Try a different photo.');
       return;

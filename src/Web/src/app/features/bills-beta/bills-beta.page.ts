@@ -7,7 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { BillDto, BillItemDto, ChatContactDto, PERM, ReceiptBreakdownDto } from '../../core/models';
-import { captureImage, pickImage, confirmPhotoNotice } from '../tracker/ai-image';
+import { pickImage, confirmPhotoNotice } from '../tracker/ai-image';
 
 import {
   BetaFab, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaStatTile,
@@ -528,8 +528,9 @@ export class BillsBetaPage {
 
     let img;
     try {
-      // A snap from the detail sheet uses the camera; pickImage is the gallery fallback on cancel.
-      img = await captureImage() ?? await pickImage();
+      // No `capture` attribute → the OS offers BOTH "Take Photo" and "Photo Library", so the user can snap
+      // a receipt OR attach an existing photo (previously this forced the camera first).
+      img = await pickImage();
     } catch (e: unknown) {
       this.toasts.show((e as Error)?.message ?? 'Could not read that image.', { tone: 'warn' });
       return;
