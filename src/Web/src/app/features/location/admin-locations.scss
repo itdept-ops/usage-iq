@@ -103,7 +103,7 @@
   text-align: left;
   cursor: pointer;
   color: var(--tech-text);
-  transition: background 120ms var(--tech-ease, ease);
+  transition: background var(--tech-t-fast) var(--tech-ease, ease);
 
   &:hover { background: var(--tech-bg-sunken, rgba(255, 255, 255, 0.04)); }
   &.selected {

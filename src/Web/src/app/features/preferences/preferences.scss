@@ -136,7 +136,7 @@
   padding: var(--tech-space-2) var(--tech-space-3);
   border: 1px dashed var(--tech-border);
   border-radius: 10px;
-  transition: opacity 120ms ease;
+  transition: opacity var(--tech-t-fast) ease;
 }
 .cats--off { opacity: 0.55; }
 .cats__label {
@@ -187,7 +187,7 @@
   border-radius: 10px;
   text-decoration: none;
   color: inherit;
-  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+  transition: border-color var(--tech-t-fast) ease, background var(--tech-t-fast) ease, transform var(--tech-t-fast) ease;
 }
 .linkout:hover { background: var(--tech-panel-raised); border-color: var(--tech-border-strong); transform: translateY(-1px); }
 .linkout:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: 2px; }

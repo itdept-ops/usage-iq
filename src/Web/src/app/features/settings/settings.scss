@@ -116,7 +116,7 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
 
   .act-save {
     font-weight: 600;
-    transition: box-shadow var(--tech-t-control) ease, transform 120ms var(--tech-ease);
+    transition: box-shadow var(--tech-t-control) ease, transform var(--tech-t-fast) var(--tech-ease);
     &:hover:not([disabled]) { box-shadow: var(--tech-glow-blue); }
     &:active:not([disabled]) { transform: scale(0.98); }
   }
@@ -124,7 +124,7 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   .act-sync {
     --mdc-outlined-button-outline-color: var(--tech-border-strong);
     color: var(--tech-accent-cyan);
-    transition: box-shadow var(--tech-t-control) ease, transform 120ms var(--tech-ease);
+    transition: box-shadow var(--tech-t-control) ease, transform var(--tech-t-fast) var(--tech-ease);
     &:hover:not([disabled]) { box-shadow: var(--tech-glow-cyan); }
     &:active:not([disabled]) { transform: scale(0.98); }
   }
@@ -214,7 +214,7 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
       align-self: stretch;
       --mdc-outlined-button-outline-color: var(--tech-border-strong);
       color: var(--tech-text-secondary);
-      transition: color var(--tech-t-control) ease, box-shadow var(--tech-t-control) ease, transform 120ms var(--tech-ease);
+      transition: color var(--tech-t-control) ease, box-shadow var(--tech-t-control) ease, transform var(--tech-t-fast) var(--tech-ease);
 
       mat-icon { font-size: 18px; height: 18px; width: 18px; margin-right: 4px; }
 
