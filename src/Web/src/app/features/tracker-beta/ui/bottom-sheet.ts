@@ -64,7 +64,9 @@ const DETENT_FRACTION: Record<SheetDetent, number> = { peek: 0.32, half: 0.62, f
          the space above the keyboard, so the food / exercise / supplement inputs are never hidden under it. */
       bottom: var(--kb-inset, 0px);
       height: min(calc(var(--sheet-frac, .62) * 100dvh), calc(100dvh - var(--kb-inset, 0px)));
-      max-height: 100dvh;
+      /* Never rise behind the fixed mobile top bar (52px + safe-area-top): a full-detent sheet otherwise
+         tucks its grip + header under the bar. --mobile-bar-h is inherited from the shell frame (0 off-shell). */
+      max-height: calc(100dvh - var(--mobile-bar-h, 0px));
       display: flex; flex-direction: column;
       background: var(--glass);
       backdrop-filter: blur(var(--blur-glass)) saturate(1.4);

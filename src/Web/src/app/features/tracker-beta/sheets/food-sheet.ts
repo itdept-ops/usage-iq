@@ -6,7 +6,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 
 import { Api } from '../../../core/api';
 import { TrackerStore } from '../../../core/tracker-store';
@@ -205,7 +205,9 @@ const MEALS: { value: Meal; label: string }[] = [
               @for (i of [1,2,3,4]; track i) { <div class="fs-skel"></div> }
             } @else if (candidates().length === 0) {
               <p class="fs-empty">
-                {{ query() ? 'No matches — try Brain-dump to describe it.' : 'No saved or recent foods yet. Search above to add one.' }}
+                @if (query()) { No matches — try Brain-dump to describe it. }
+                @else if (recentsError()) { Couldn't load your recents just now — search above to log, or reopen to retry. }
+                @else { No saved or recent foods yet. Search above to add one. }
               </p>
             } @else {
               @if (!query()) { <p class="fs-section-label">Recents &amp; favorites</p> }
@@ -444,6 +446,8 @@ export class FoodSheet {
   protected readonly query = signal('');
   protected readonly candidates = signal<Candidate[]>([]);
   protected readonly searchUnavailable = signal(false);
+  /** True when the recents/saved load failed or timed out — drives a distinct (non-"empty") steer. */
+  protected readonly recentsError = signal(false);
   /** Selected candidate rows, keyed for stable toggling across re-queries. */
   private readonly chosen = signal<Map<string, Candidate>>(new Map());
   protected readonly selected = computed(() => [...this.chosen().values()]);
@@ -501,11 +505,15 @@ export class FoodSheet {
     // Only fetch when we have nothing to show (avoids re-hitting on every keystroke-clear).
     if (this.candidates().length > 0) return;
     this.busy.set(true);
+    this.recentsError.set(false);
     try {
-      const saved = await firstValueFrom(this.api.savedFoods(undefined, true));
+      // 8s timeout: if the saved/recents endpoint stalls, fall back to a usable state instead of leaving
+      // the skeletons spinning forever (the sheet stays usable — you can still search + log).
+      const saved = await firstValueFrom(this.api.savedFoods(undefined, true).pipe(timeout(8000)));
       this.candidates.set(saved.map(s => this.fromSaved(s)));
     } catch {
       this.candidates.set([]);
+      this.recentsError.set(true);
     } finally {
       this.busy.set(false);
     }
@@ -519,6 +527,7 @@ export class FoodSheet {
       // Back to recents/favorites; drop any stale search hits so the seed effect refills.
       this.candidates.set([]);
       this.searchUnavailable.set(false);
+      this.recentsError.set(false);
       void this.loadRecents();
       return;
     }
