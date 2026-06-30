@@ -28,9 +28,38 @@ mat-progress-bar {
   --mat-progress-bar-active-indicator-color: var(--tech-accent);
 }
 
+/* ---- FiMobile card signature ---- */
 .panel {
   padding: 14px 16px;
   margin-bottom: var(--tech-space-4);
+  border-radius: var(--tech-radius) !important;
+  box-shadow: var(--tech-shadow-panel);
+  border: 1px solid var(--tech-border) !important;
+  overflow: hidden;
+}
+
+/* Filter card: subtle hover lift (interactive — opens dropdowns) */
+.filter-card {
+  transition: box-shadow 160ms ease, transform 160ms ease;
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+  }
+}
+
+/* Table card: hero panel-header — gradient strip as the primary metric */
+.table-card .panel-header {
+  display: inline-block;
+  padding: 5px 14px 5px 0;
+  font-size: var(--tech-fs-label, 12px);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background: var(--tech-gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 12px;
 }
 
 .panel-header {
@@ -106,7 +135,7 @@ mat-progress-bar {
   .exp-btn:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: 2px; }
 }
 
-/* method + status pills */
+/* method + status pills — FiMobile chip pattern: pill radius + tinted bg + tinted border */
 .method-badge {
   display: inline-block;
   min-width: 48px;
@@ -117,13 +146,30 @@ mat-progress-bar {
   letter-spacing: 0.04em;
   padding: 2px 8px;
   border-radius: var(--tech-r-pill, 999px);
+  border: 1px solid color-mix(in srgb, var(--tech-text-tertiary) 30%, transparent);
   background: color-mix(in srgb, var(--tech-text-tertiary) 18%, transparent);
   color: var(--tech-text-secondary);
 
-  &[data-m="GET"]    { background: color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 20%, transparent); color: var(--tech-accent-cyan, #7fe9e3); }
-  &[data-m="POST"]   { background: color-mix(in srgb, var(--tech-accent, #5aa9ff) 22%, transparent); color: var(--tech-accent, #9cc8ff); }
-  &[data-m="PUT"]    { background: color-mix(in srgb, var(--tech-warn, #d8a23f) 22%, transparent); color: var(--tech-warn, #e8c27f); }
-  &[data-m="DELETE"] { background: color-mix(in srgb, var(--tech-error, #ff5c6c) 22%, transparent); color: var(--tech-error, #ff9aa4); }
+  &[data-m="GET"] {
+    background: color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 35%, transparent);
+    color: var(--tech-accent-cyan, #7fe9e3);
+  }
+  &[data-m="POST"] {
+    background: color-mix(in srgb, var(--tech-accent, #5aa9ff) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-accent, #5aa9ff) 35%, transparent);
+    color: var(--tech-accent, #9cc8ff);
+  }
+  &[data-m="PUT"] {
+    background: color-mix(in srgb, var(--tech-warn, #d8a23f) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-warn, #d8a23f) 35%, transparent);
+    color: var(--tech-warn, #e8c27f);
+  }
+  &[data-m="DELETE"] {
+    background: color-mix(in srgb, var(--tech-error, #ff5c6c) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-error, #ff5c6c) 35%, transparent);
+    color: var(--tech-error, #ff9aa4);
+  }
 }
 
 .status-badge {
@@ -132,15 +178,36 @@ mat-progress-bar {
   font-size: var(--tech-fs-label, 12px);
   padding: 2px 8px;
   border-radius: var(--tech-r-pill, 999px);
+  border: 1px solid transparent;
 
-  &.st-2xx { background: color-mix(in srgb, var(--tech-success, #43d17a) 20%, transparent); color: var(--tech-success, #79e6a4); }
-  &.st-3xx { background: color-mix(in srgb, var(--tech-accent, #5aa9ff) 20%, transparent); color: var(--tech-accent, #9cc8ff); }
-  &.st-4xx { background: color-mix(in srgb, var(--tech-warn, #d8a23f) 22%, transparent); color: var(--tech-warn, #e8c27f); }
-  &.st-5xx { background: color-mix(in srgb, var(--tech-error, #ff5c6c) 24%, transparent); color: var(--tech-error, #ff9aa4); }
+  &.st-2xx {
+    background: color-mix(in srgb, var(--tech-success, #43d17a) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-success, #43d17a) 35%, transparent);
+    color: var(--tech-success, #79e6a4);
+  }
+  &.st-3xx {
+    background: color-mix(in srgb, var(--tech-accent, #5aa9ff) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-accent, #5aa9ff) 35%, transparent);
+    color: var(--tech-accent, #9cc8ff);
+  }
+  &.st-4xx {
+    background: color-mix(in srgb, var(--tech-warn, #d8a23f) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-warn, #d8a23f) 35%, transparent);
+    color: var(--tech-warn, #e8c27f);
+  }
+  &.st-5xx {
+    background: color-mix(in srgb, var(--tech-error, #ff5c6c) 16%, transparent);
+    border-color: color-mix(in srgb, var(--tech-error, #ff5c6c) 38%, transparent);
+    color: var(--tech-error, #ff9aa4);
+  }
 }
 
 /* ---- Expanded detail ---- */
-.detail-row td { padding: 0; border-bottom: 1px solid var(--tech-border); background: var(--tech-bg, #0b1019); }
+.detail-row td {
+  padding: 0;
+  border-bottom: 1px solid var(--tech-border);
+  background: var(--tech-bg-sunken);
+}
 .detail { padding: 14px 16px; }
 .detail-meta { color: var(--tech-text-tertiary); font-size: var(--tech-fs-label, 12px); margin-bottom: 10px; }
 
@@ -155,13 +222,15 @@ mat-progress-bar {
   color: var(--tech-text-tertiary);
   margin-bottom: 6px;
 }
+/* FiMobile code-block: card-radius + border + panel shadow */
 .body {
   margin: 0;
   max-height: 320px;
   overflow: auto;
   padding: 10px 12px;
-  border-radius: var(--tech-r-control, 8px);
-  border: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-radius);
+  border: 1px solid var(--tech-border);
+  box-shadow: var(--tech-shadow-panel);
   background: color-mix(in srgb, var(--tech-panel-raised) 60%, transparent);
   font-family: var(--tech-font-mono);
   font-size: 12px;
@@ -210,14 +279,24 @@ mat-form-field { --mat-form-field-container-text-size: 13px; }
       grid-template-columns: auto 1fr auto;
       align-items: center;
       gap: 6px 10px;
-      padding: 12px 12px 12px 14px;
-      border: 1px solid var(--tech-border-subtle);
-      border-radius: var(--tech-r-control);
+      /* FiMobile list row: roomy 13px v-pad, card signature radius + shadow */
+      padding: 13px 14px 13px 14px;
+      border: 1px solid var(--tech-border);
+      border-radius: var(--tech-radius);
+      box-shadow: var(--tech-shadow-panel);
       margin-bottom: 10px;
       min-height: 44px;
       white-space: normal;
+      transition: box-shadow 160ms ease, transform 160ms ease, background 120ms ease;
     }
-    .log-row.open { border-color: color-mix(in srgb, var(--tech-accent) 55%, transparent); }
+    .log-row:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--tech-shadow-raised);
+    }
+    .log-row.open {
+      border-color: color-mix(in srgb, var(--tech-accent) 55%, transparent);
+      background: color-mix(in srgb, var(--tech-accent) 8%, transparent);
+    }
 
     /* Each cell drops its table sizing; values sit beside small labels. */
     .log-row > td {
@@ -228,7 +307,17 @@ mat-form-field { --mat-form-field-container-text-size: 13px; }
     }
 
     /* Header line: method badge + status + chevron on the first row. */
-    .c-method { grid-row: 1; grid-column: 1; }
+    .c-method {
+      grid-row: 1; grid-column: 1;
+      /* FiMobile leading tile: accent-tinted rounded container */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: var(--tech-r-control);
+      background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    }
     .c-status { grid-row: 1; grid-column: 2; }
     .c-exp {
       grid-row: 1; grid-column: 3;
@@ -236,21 +325,26 @@ mat-form-field { --mat-form-field-container-text-size: 13px; }
       align-self: start;
     }
 
-    /* Path spans full width below the badges. */
+    /* Path spans full width below the badges — FiMobile title line. */
     .c-path {
       grid-row: 2; grid-column: 1 / -1;
       max-width: none;
       word-break: break-all;
+      color: var(--tech-text);
+      font-size: var(--tech-fs-body);
+      font-weight: 500;
       .path-txt { display: inline; }
+      .qs { color: var(--tech-text-tertiary); }
     }
 
-    /* Remaining fields: labelled key/value lines. */
+    /* Remaining fields: FiMobile muted subtitle rows with tertiary label prefix. */
     .c-when,
     .c-dur,
     .c-user,
     .c-ip {
       grid-column: 1 / -1;
       font-size: var(--tech-fs-label, 12px);
+      color: var(--tech-text-secondary);
     }
     .c-when::before,
     .c-dur::before,
@@ -269,9 +363,9 @@ mat-form-field { --mat-form-field-container-text-size: 13px; }
     .detail-row td { display: block; }
   }
 
-  .detail { padding: 12px 4px 4px; }
+  .detail { padding: 12px 8px 8px; }
   .bodies { gap: 12px; }
-  .body { max-height: 240px; font-size: 11.5px; }
+  .body { max-height: 240px; font-size: 11.5px; border-radius: var(--tech-r-control); }
 
   /* Must out-specify `.log-table td { white-space: nowrap }` (0,1,1) or the empty-state text
      stays one long line and forces the card wider than the 390px viewport. */

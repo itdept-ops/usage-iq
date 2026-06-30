@@ -20,6 +20,7 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
 }
 .challenge__card-title {
   margin: 0 0 var(--tech-space-2, 8px);
@@ -69,13 +70,14 @@
 }
 .challenge__readonly-avatar {
   flex: none;
-  width: 30px; height: 30px;
-  border-radius: 50%;
+  width: 32px; height: 32px;
+  /* FiMobile leading avatar tile: accent-tinted bg + accent text, control radius. */
+  border-radius: var(--tech-r-control);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--ch-fire-soft);
-  color: var(--ch-fire);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  color: var(--tech-accent);
   font-weight: 700;
   font-size: 0.78rem;
 }
@@ -132,21 +134,63 @@
 }
 .challenge__date { min-width: 180px; }
 
-/* ── Hero ── */
+/* ── Hero ── FiMobile gradient-hero treatment on the primary summary card. */
 .challenge__hero {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--tech-space-5, 20px);
 
+  /* Gradient-hero: fills with the theme accent gradient so the card stands out as THE primary metric. */
+  background: var(--tech-gradient-accent);
+  color: var(--tech-text-on-accent);
+  border-color: transparent;
+
   @media (max-width: 720px) { grid-template-columns: 1fr; }
 }
+/* On-accent overrides: all text in the hero must read clearly on the gradient fill. */
+.challenge__hero .challenge__hero-big { color: var(--tech-text-on-accent); }
+.challenge__hero .challenge__hero-small {
+  color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.challenge__hero .challenge__hero-meter-label {
+  color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent);
+}
+.challenge__hero dt {
+  color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent);
+}
+.challenge__hero dd {
+  color: var(--tech-text-on-accent);
+}
+.challenge__hero .challenge__unit {
+  color: color-mix(in srgb, var(--tech-text-on-accent) 65%, transparent);
+}
+/* Progress bar track lightened on gradient background. */
+.challenge__hero .challenge__hero-bar {
+  background: color-mix(in srgb, var(--tech-text-on-accent) 22%, transparent);
+}
+
+/* Done state: keep the bespoke fire/orange celebration gradient instead of overriding with accent. */
 .challenge__hero--done {
-  border-color: color-mix(in srgb, var(--ch-fire) 45%, transparent);
   background:
     radial-gradient(120% 160% at 0% 0%, var(--ch-fire-soft), transparent 60%),
     var(--tech-panel);
+  color: var(--tech-text);
+  border-color: color-mix(in srgb, var(--ch-fire) 45%, transparent);
 }
+/* Restore default text colours inside the done-state variant (no on-accent override needed there). */
+.challenge__hero--done .challenge__hero-big { color: var(--tech-text); }
+.challenge__hero--done .challenge__hero-small { color: var(--tech-text-tertiary); }
+.challenge__hero--done .challenge__hero-meter-label { color: var(--tech-text-tertiary); }
+.challenge__hero--done dt { color: var(--tech-text-tertiary); }
+.challenge__hero--done dd { color: var(--tech-text); }
+.challenge__hero--done .challenge__unit { color: var(--tech-text-tertiary); }
+.challenge__hero--done .challenge__hero-bar {
+  background: var(--tech-bg-sunken, color-mix(in srgb, var(--tech-text) 8%, transparent));
+}
+
 .challenge__hero-day { display: flex; align-items: center; gap: var(--tech-space-3, 12px); }
 .challenge__hero-trophy { color: var(--ch-fire); font-size: 38px; width: 38px; height: 38px; }
 .challenge__hero-daynum { display: flex; flex-direction: column; line-height: 1.1; }
@@ -166,6 +210,10 @@
     background: linear-gradient(90deg, var(--ch-fire), color-mix(in srgb, var(--ch-fire) 60%, #f7b733));
     transition: width 0.4s ease;
   }
+}
+/* Progress bar fill on gradient hero: use semi-transparent white so it reads on any accent hue. */
+.challenge__hero:not(.challenge__hero--done) .challenge__hero-bar span {
+  background: color-mix(in srgb, var(--tech-text-on-accent) 90%, transparent);
 }
 .challenge__hero-meter-label { font-size: var(--tech-fs-caption, 0.8rem); color: var(--tech-text-tertiary); }
 
@@ -214,19 +262,38 @@
   border-radius: var(--tech-r-pill, 999px);
   font-size: var(--tech-fs-caption, 0.78rem);
   font-weight: 700;
+  /* FiMobile chip: tinted border on all pill variants. */
+  border: 1px solid transparent;
 }
-.challenge__pill--ok { background: color-mix(in srgb, var(--ch-ok) 16%, transparent); color: var(--ch-ok); }
-.challenge__pill--cheat { background: var(--ch-fire-soft); color: var(--ch-fire); font-weight: 600; }
+.challenge__pill--ok {
+  background: color-mix(in srgb, var(--ch-ok) 16%, transparent);
+  color: var(--ch-ok);
+  border-color: color-mix(in srgb, var(--ch-ok) 30%, transparent);
+}
+.challenge__pill--cheat {
+  background: var(--ch-fire-soft);
+  color: var(--ch-fire);
+  font-weight: 600;
+  border-color: color-mix(in srgb, var(--ch-fire) 30%, transparent);
+}
 .challenge__pill--pts {
   background: var(--tech-bg-sunken, color-mix(in srgb, var(--tech-text) 8%, transparent));
   color: var(--tech-text-secondary);
   font-variant-numeric: tabular-nums;
+  border-color: color-mix(in srgb, var(--tech-accent) 20%, transparent);
 }
 
+/* On the gradient hero the points dd already inherits var(--tech-text-on-accent);
+   override only inside the done-state where we revert to the panel background. */
 .challenge__hero-points { color: var(--ch-fire) !important; }
+.challenge__hero:not(.challenge__hero--done) .challenge__hero-points {
+  /* Keep legible on gradient fill — use full on-accent colour instead of fire orange. */
+  color: var(--tech-text-on-accent) !important;
+  font-weight: 800;
+}
 .challenge__muted { color: var(--tech-text-tertiary); }
 
-/* ── Six tasks ── */
+/* ── Six tasks — FiMobile list rows ── */
 .challenge__tasks {
   display: grid;
   gap: var(--tech-space-2, 8px);
@@ -235,10 +302,18 @@
   display: flex;
   align-items: center;
   gap: var(--tech-space-3, 12px);
-  padding: var(--tech-space-3, 12px) var(--tech-space-4, 16px);
+  /* FiMobile row: roomy 13px vertical padding, card signature radius + shadow + border. */
+  padding: 13px var(--tech-space-4, 16px);
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+  }
 }
 .challenge__task--pass {
   border-color: color-mix(in srgb, var(--ch-ok) 40%, transparent);
@@ -246,7 +321,18 @@
 }
 .challenge__task-state mat-icon { color: var(--tech-text-tertiary); }
 .challenge__task--pass .challenge__task-state mat-icon { color: var(--ch-ok); }
-.challenge__task-glyph { flex: none; color: var(--tech-text-secondary); }
+/* FiMobile leading icon tile: tinted accent background, accent-colored icon. */
+.challenge__task-glyph {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--tech-r-control);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  color: var(--tech-accent);
+}
 .challenge__task-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .challenge__task-label { font-weight: 600; color: var(--tech-text); }
 .challenge__task-hint {
@@ -292,7 +378,7 @@
 .challenge__task-bar--full span { background: var(--ch-ok); }
 .challenge__task-measured { font-size: var(--tech-fs-caption, 0.76rem); color: var(--tech-text-tertiary); font-variant-numeric: tabular-nums; }
 
-/* Per-task earned-points pill. */
+/* Per-task earned-points pill — FiMobile chip with tinted border. */
 .challenge__task-pts {
   flex: none;
   min-width: 3.2rem;
@@ -303,9 +389,14 @@
   font-variant-numeric: tabular-nums;
   background: var(--tech-bg-sunken, color-mix(in srgb, var(--tech-text) 8%, transparent));
   color: var(--tech-text-tertiary);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 20%, transparent);
   small { font-weight: 500; opacity: 0.7; }
 }
-.challenge__task-pts--earned { background: var(--ch-fire-soft); color: var(--ch-fire); }
+.challenge__task-pts--earned {
+  background: var(--ch-fire-soft);
+  color: var(--ch-fire);
+  border-color: color-mix(in srgb, var(--ch-fire) 30%, transparent);
+}
 
 /* Inline value input for a MANUAL measurable task (reading pages / custom). */
 .challenge__task-input {
@@ -355,6 +446,8 @@
   border-radius: var(--tech-r-pill, 999px);
   background: var(--ch-fire-soft);
   color: var(--ch-fire);
+  /* FiMobile chip border. */
+  border: 1px solid color-mix(in srgb, var(--ch-fire) 30%, transparent);
   font-size: var(--tech-fs-caption, 0.82rem);
   font-weight: 600;
   mat-icon { font-size: 16px; width: 16px; height: 16px; }
@@ -369,16 +462,28 @@
   button { min-height: 44px; border-radius: var(--tech-r-control); font-weight: 600; }
 }
 
-/* ── Shared list ── */
+/* ── Shared list — FiMobile list rows ── */
 .challenge__shared-list { list-style: none; margin: 0; padding: 0; }
 .challenge__shared-row {
   display: flex;
   align-items: center;
   gap: var(--tech-space-3, 12px);
-  padding: var(--tech-space-2, 8px) 0;
+  /* FiMobile row: roomy 12px vertical padding, hover lift. */
+  padding: 12px 0;
+  border-radius: var(--tech-radius, 12px);
+  transition: transform 0.15s ease;
   & + .challenge__shared-row { border-top: 1px solid var(--tech-border); }
+
+  &:hover {
+    transform: translateY(-1px);
+  }
 }
-.challenge__shared-name { flex: 1 1 auto; min-width: 0; color: var(--tech-text); font-weight: 600; }
+.challenge__shared-name {
+  flex: 1 1 auto; min-width: 0;
+  /* FiMobile row: title color + subtitle slot. */
+  color: var(--tech-text);
+  font-weight: 600;
+}
 
 /* ── AI coach card ── */
 .challenge__coach {
@@ -433,6 +538,13 @@
   border-radius: var(--tech-radius, 12px);
   padding: var(--tech-space-3, 12px) var(--tech-space-4, 16px);
   background: var(--tech-bg-sunken, var(--tech-panel));
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+  }
 }
 .challenge__cfg--off { opacity: 0.62; }
 .challenge__cfg-head { display: flex; align-items: center; gap: var(--tech-space-2, 8px); flex-wrap: wrap; }
@@ -472,17 +584,28 @@
   ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; } }
 .challenge__addtask-measurable { flex: none; }
 
-/* ── Leaderboard ── */
+/* ── Leaderboard — FiMobile list rows ── */
 .challenge__board-list { list-style: none; margin: 0; padding: 0; counter-reset: rank; }
 .challenge__board-row {
   display: flex;
   align-items: center;
   gap: var(--tech-space-3, 12px);
-  padding: var(--tech-space-2, 8px) var(--tech-space-2, 8px);
+  /* FiMobile row: roomy 12px vertical padding, card radius, hover lift. */
+  padding: 12px var(--tech-space-2, 8px);
   border-radius: var(--tech-radius, 12px);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   & + .challenge__board-row { margin-top: 2px; }
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+    background: color-mix(in srgb, var(--tech-accent) 5%, transparent);
+  }
 }
-.challenge__board-row--self { background: var(--ch-fire-soft); }
+.challenge__board-row--self {
+  background: var(--ch-fire-soft);
+  border: 1px solid color-mix(in srgb, var(--ch-fire) 20%, transparent);
+}
 .challenge__board-rank {
   flex: none; width: 1.5rem; text-align: center;
   font-weight: 800; color: var(--tech-text-tertiary); font-variant-numeric: tabular-nums;
@@ -495,10 +618,11 @@
 .challenge__board-you {
   margin-left: 6px; padding: 0 6px;
   border-radius: var(--tech-r-pill, 999px); font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
-  background: var(--ch-fire); color: var(--tech-text-on-accent, #fff); letter-spacing: 0.04em;
+  background: var(--ch-fire); color: var(--tech-text-on-accent); letter-spacing: 0.04em;
 }
 .challenge__board-meta {
   flex: none; display: flex; align-items: center; gap: var(--tech-space-3, 12px);
+  /* FiMobile trailing muted value. */
   color: var(--tech-text-tertiary); font-size: var(--tech-fs-caption, 0.8rem);
 }
 .challenge__board-streak {
@@ -508,6 +632,7 @@
 .challenge__board-pts {
   flex: none; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1;
   strong { font-size: 1.05rem; color: var(--tech-text); font-variant-numeric: tabular-nums; }
+  /* FiMobile trailing secondary sub-value. */
   small { font-size: var(--tech-fs-caption, 0.72rem); color: var(--tech-text-tertiary); }
 }
 .challenge__board-nudge {

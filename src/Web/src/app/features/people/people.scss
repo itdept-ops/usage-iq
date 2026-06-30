@@ -33,9 +33,39 @@
   gap: 10px;
   margin-bottom: var(--tech-space-4);
 
+  /* FiMobile segmented-pill tab container */
   .seg {
-    border-radius: var(--tech-r-pill);
+    background: var(--tech-bg-sunken);
+    border-radius: var(--tech-radius);
+    padding: 4px;
     overflow: hidden;
+    border: 1px solid var(--tech-border);
+
+    /* Active toggle: accent fill + on-accent text */
+    ::ng-deep .mat-button-toggle-checked {
+      background: var(--tech-accent) !important;
+      color: var(--tech-text-on-accent) !important;
+      border-radius: var(--tech-r-control);
+
+      .mat-button-toggle-label-content { color: inherit; }
+
+      .seg__count {
+        color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent);
+        background: color-mix(in srgb, var(--tech-text-on-accent) 15%, transparent);
+      }
+    }
+
+    /* Inactive toggles: transparent, legible */
+    ::ng-deep .mat-button-toggle:not(.mat-button-toggle-checked) {
+      background: transparent;
+      border-radius: var(--tech-r-control);
+      color: var(--tech-text-secondary);
+    }
+
+    /* Remove Angular Material's default divider lines inside the group */
+    ::ng-deep .mat-button-toggle-group-appearance-standard .mat-button-toggle + .mat-button-toggle {
+      border-left: none;
+    }
 
     .seg__count {
       margin-left: 6px;
@@ -83,23 +113,67 @@
   flex-direction: column;
   gap: 10px;
   padding: var(--tech-space-3) var(--tech-space-4);
+  /* FiMobile card signature */
   border-radius: var(--tech-radius);
-  border: 1px solid var(--tech-border-subtle, #1c2533);
+  border: 1px solid var(--tech-border);
   background: var(--tech-panel, #111722);
+  box-shadow: var(--tech-shadow-panel);
   transition: border-color var(--tech-t-slow, 200ms) ease, box-shadow var(--tech-t-slow, 200ms) ease, transform var(--tech-t-slow, 200ms) ease;
 
+  /* FiMobile hover lift on interactive cards */
   &:hover {
     border-color: var(--tech-border-strong, #2a3548);
     transform: translateY(-1px);
-    box-shadow: var(--tech-shadow-1, 0 4px 16px rgba(0, 0, 0, 0.25));
+    box-shadow: var(--tech-shadow-raised);
   }
 
-  /* The caller's own card is gently accented. */
+  /* Hero card: the caller's own card — FiMobile gradient-hero treatment */
   &--self {
-    border-color: color-mix(in srgb, var(--tech-accent) 45%, var(--tech-border-subtle, #1c2533));
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--tech-accent) 7%, transparent), transparent 60%),
-      var(--tech-panel, #111722);
+    background: var(--tech-gradient-accent);
+    border-color: transparent;
+    box-shadow: var(--tech-shadow-raised);
+
+    /* Ensure all text inside the hero card is legible on the accent fill */
+    .id__name       { color: var(--tech-text-on-accent); }
+    .meta           { color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent); }
+    .meta__status   { color: color-mix(in srgb, var(--tech-text-on-accent) 90%, transparent); font-style: italic; }
+    .meta__presence { color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent); }
+    .meta__city     { color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent); }
+
+    /* Avatar ring visible on gradient */
+    .avatar { box-shadow: 0 0 0 2px color-mix(in srgb, var(--tech-text-on-accent) 30%, transparent); }
+
+    /* Presence dot outline blends with gradient bg */
+    .presence-dot { box-shadow: 0 0 0 2px transparent; }
+
+    /* Action buttons: ghost style on accent bg */
+    .act {
+      color: var(--tech-text-on-accent);
+      border-color: color-mix(in srgb, var(--tech-text-on-accent) 40%, transparent);
+
+      &:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--tech-text-on-accent) 15%, transparent);
+        box-shadow: none;
+      }
+    }
+    .act--more { color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent); }
+
+    /* Chips on the hero card remain distinct but lighter */
+    .chip {
+      border-color: color-mix(in srgb, var(--tech-text-on-accent) 30%, transparent);
+    }
+
+    /* Keep "you" badge readable on gradient */
+    .badge--you {
+      color: var(--tech-text-on-accent);
+      background: color-mix(in srgb, var(--tech-text-on-accent) 20%, transparent);
+    }
+
+    /* Hero hover: subtle lift only (gradient stays) */
+    &:hover {
+      background: var(--tech-gradient-accent);
+      border-color: transparent;
+    }
   }
 }
 
@@ -126,10 +200,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--tech-font-mono);
+  /* FiMobile icon-tile: accent gradient + on-accent text, control radius */
+  border-radius: var(--tech-r-control);
+  font-family: var(--tech-font-ui);
   font-size: 16px;
   font-weight: 700;
-  color: var(--tech-text-on-accent, #06090e);
+  color: var(--tech-text-on-accent);
   background: linear-gradient(135deg, var(--tech-accent), var(--tech-accent-cyan, #3FD8D0));
 }
 
@@ -202,12 +278,12 @@
   &--contact {
     color: var(--tech-accent-cyan, #3FD8D0);
     background: color-mix(in srgb, var(--tech-accent-cyan, #3FD8D0) 12%, transparent);
-    border-color: color-mix(in srgb, var(--tech-accent-cyan, #3FD8D0) 28%, transparent);
+    border-color: color-mix(in srgb, var(--tech-accent-cyan, #3FD8D0) 30%, transparent);
   }
   &--family {
     color: var(--tech-accent-magenta, #f472b6);
     background: color-mix(in srgb, var(--tech-accent-magenta, #f472b6) 12%, transparent);
-    border-color: color-mix(in srgb, var(--tech-accent-magenta, #f472b6) 28%, transparent);
+    border-color: color-mix(in srgb, var(--tech-accent-magenta, #f472b6) 30%, transparent);
   }
 }
 
@@ -264,8 +340,9 @@
    to the .people-profile-menu panelClass. Tokens keep it on-theme. */
 ::ng-deep .people-profile-menu.mat-mdc-menu-panel {
   background: var(--tech-panel-raised, #161d2a);
-  border: 1px solid var(--tech-border-subtle, #1c2533);
+  border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius);
+  box-shadow: var(--tech-shadow-raised);
 
   .mat-mdc-menu-content { padding: 0; }
 
@@ -291,10 +368,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--tech-font-mono);
+    /* FiMobile icon-tile in the profile peek */
+    border-radius: var(--tech-r-control);
+    font-family: var(--tech-font-ui);
     font-size: 15px;
     font-weight: 700;
-    color: var(--tech-text-on-accent, #06090e);
+    color: var(--tech-text-on-accent);
     background: linear-gradient(135deg, var(--tech-accent), var(--tech-accent-cyan, #3FD8D0));
   }
   .pp__id { min-width: 0; }

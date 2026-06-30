@@ -8,6 +8,15 @@
 //
 // ISOLATED + gated by platform.mobile: nothing here touches the global --tech-* tokens. The kit partial is
 // the only style import; we consume the kit, never modify it.
+//
+// FiMobile elevation pass (2026-06-29):
+//   • Display card (first .rise > .card) promoted to hero gradient (--tech-gradient-accent).
+//   • Card signature: explicit var(--tech-radius) + var(--tech-shadow-panel) aliases where not already
+//     covered by the kit tokens --r-card / --lift-2; hover lift on standalone interactive cards.
+//   • Icon tiles: hardcoded radii replaced with var(--r-tile) (kit token = var(--tech-r-control)).
+//   • Buttons: radius moved to var(--r-tile) (was hardcoded 13px).
+//   • Avatar: radius aligned to var(--r-glass).
+//   • On-accent labels inside the hero card made legible via color-mix opacity.
 // ============================================================================
 
 @use '../beta-ui/beta-kit' as kit;
@@ -62,7 +71,7 @@
 .hh__id { display: flex; align-items: center; gap: 14px; }
 .hh__avatar {
   flex: 0 0 auto; position: relative; display: grid; place-items: center;
-  width: 64px; height: 64px; border-radius: 22px;
+  width: 64px; height: 64px; border-radius: var(--r-glass);
   background: linear-gradient(140deg,
     color-mix(in srgb, var(--accent-a) 30%, var(--bg-rise)),
     color-mix(in srgb, var(--accent-b) 26%, var(--bg-rise)));
@@ -113,8 +122,8 @@
 .card {
   border-radius: var(--r-card);
   background: var(--bg-rise);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--lift-2);
+  border: 1px solid var(--tech-border, var(--hairline));
+  box-shadow: var(--tech-shadow-panel, var(--lift-2));
   background-image:
     linear-gradient(var(--bg-rise), var(--bg-rise)),
     linear-gradient(120deg, color-mix(in srgb, var(--accent-a) 22%, transparent), transparent 55%);
@@ -123,6 +132,29 @@
 }
 .card--pad { padding: 14px 16px; }
 .card--list { padding: 4px 2px; overflow: hidden; }
+
+// ── HERO CARD — the Display card (always the first .rise section) gets the FiMobile gradient
+// accent fill. Only ONE per page. Labels/values inside are kept legible on the dark fill.
+// The first section (.rise:first-child) always holds the Display (Appearance + Units) card.
+.rise:first-child > .card {
+  background: var(--tech-gradient-accent, linear-gradient(135deg, var(--accent-a), var(--accent-b)));
+  border-color: transparent;
+  box-shadow: var(--lift-2), 0 8px 24px color-mix(in srgb, var(--accent-b) 30%, transparent);
+
+  .qs-label,
+  .qf-label {
+    color: color-mix(in srgb, var(--tech-text-on-accent, #fff) 72%, transparent);
+    letter-spacing: .06em;
+  }
+
+  .qs-div {
+    background: color-mix(in srgb, var(--tech-text-on-accent, #fff) 18%, transparent);
+  }
+
+  // Segmented controls and fields that sit on the accent fill inherit from the kit;
+  // no extra overrides needed — the kit components read --accent-a/--accent-b which
+  // still resolve correctly since this block only changes the CARD background.
+}
 
 .card--list app-beta-toggle-row + app-beta-toggle-row,
 .card--list app-beta-toggle-row + .subgroup,
@@ -196,7 +228,8 @@
 .home-row.is-active { background: color-mix(in srgb, var(--accent-b) 10%, transparent); }
 .home-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: 12px; }
 .home-ic {
-  flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+  flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px;
+  border-radius: var(--r-tile);
   font-size: 15px; line-height: 1;
   background: color-mix(in srgb, var(--accent-a) 14%, transparent);
   color: color-mix(in srgb, var(--accent-a) 80%, var(--ink));
@@ -207,7 +240,7 @@
 .home-check {
   flex: 0 0 auto; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: var(--ink-on-accent, #fff); font-size: 13px; font-weight: 800;
+  color: var(--ink-on-accent); font-size: 13px; font-weight: 800;
   box-shadow: 0 3px 10px color-mix(in srgb, var(--accent-b) 38%, transparent);
 }
 
@@ -218,20 +251,27 @@
 .link-row {
   display: flex; align-items: center; gap: 12px; width: 100%;
   min-height: 56px; padding: 12px 14px; border-radius: var(--r-card);
-  background: var(--bg-rise); border: 1px solid var(--hairline); box-shadow: var(--lift-1);
+  background: var(--bg-rise); border: 1px solid var(--tech-border, var(--hairline)); box-shadow: var(--lift-1);
   color: var(--ink); font-family: var(--font-ui); text-align: left; text-decoration: none;
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-  transition: background 140ms var(--ease-out), transform 120ms var(--ease-out);
+  transition: background 140ms var(--ease-out), transform 120ms var(--ease-out),
+              box-shadow 140ms var(--ease-out);
+}
+// Hover lift on standalone (non-inlined) interactive link-rows
+.link-row:not(.card--list .link-row):hover {
+  transform: translateY(-1px);
+  box-shadow: var(--lift-2, var(--tech-shadow-raised));
 }
 .card--list .link-row { border: none; border-radius: 0; box-shadow: none; background: transparent; }
 .card--list .link-row + .link-row { border-top: 1px solid var(--hairline); }
 .link-row:active { transform: scale(.992); background: color-mix(in srgb, var(--accent-b) 8%, transparent); }
 .link-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: 12px; }
 .link-ic {
-  flex: 0 0 auto; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px;
+  flex: 0 0 auto; display: grid; place-items: center; width: 34px; height: 34px;
+  border-radius: var(--r-tile);
   font-size: 17px; line-height: 1;
   background: color-mix(in srgb, var(--accent-a) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-a) 24%, var(--hairline));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, transparent);
   color: color-mix(in srgb, var(--accent-a) 80%, var(--ink));
 }
 .link-ic--accent { font-weight: 800; }
@@ -260,7 +300,7 @@
 .sheet-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
 
 .btn {
-  flex: 1 1 auto; min-height: 46px; padding: 12px 16px; border-radius: 13px;
+  flex: 1 1 auto; min-height: 46px; padding: 12px 16px; border-radius: var(--r-tile);
   background: var(--bg-sink); border: 1px solid var(--hairline); color: var(--ink);
   font-family: var(--font-ui); font-size: 15px; font-weight: 650;
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
@@ -272,7 +312,7 @@
 .btn--primary {
   flex-basis: 100%;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  border-color: transparent; color: var(--ink-on-accent, #fff);
+  border-color: transparent; color: var(--ink-on-accent);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-b) 34%, transparent);
 }
 .btn--danger {

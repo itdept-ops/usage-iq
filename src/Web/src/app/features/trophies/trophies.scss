@@ -1,5 +1,6 @@
 /* Trophy Wall — reuses the tracker design tokens (--tech-*). Tier accents: bronze / silver / gold, with a
-   warm "earned" glow vs a muted "locked" state. Read-only personal grid. */
+   warm "earned" glow vs a muted "locked" state. Read-only personal grid.
+   FiMobile pass: card signature (shadow-panel + radius), chip count badge, icon-tile spec, hover lift on earned cards. */
 
 .trophies {
   --t-bronze: #c2774a;
@@ -36,17 +37,20 @@
   font-size: var(--tech-fs-body);
   line-height: 1.45;
 }
+
+/* FiMobile chip pattern — tinted accent bg, pill radius, accent border */
 .trophies__count {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
-  border: 1px solid var(--tech-border);
+  padding: 8px 16px;
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
   border-radius: var(--tech-r-pill, 999px);
-  background: var(--tech-panel);
+  background: color-mix(in srgb, var(--tech-accent) 10%, transparent);
   color: var(--tech-text);
   font-size: var(--tech-fs-body);
   white-space: nowrap;
+  box-shadow: var(--tech-shadow-panel);
 }
 .trophies__count mat-icon { color: var(--t-gold); }
 
@@ -70,6 +74,8 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--tech-text-tertiary);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--tech-border);
 }
 .trophies__grid {
   display: grid;
@@ -77,37 +83,67 @@
   gap: var(--tech-space-3, 12px);
 }
 
-/* ── Badge card ── */
+/* ── Badge card — FiMobile card signature ── */
 .badge {
   display: flex;
   align-items: flex-start;
   gap: var(--tech-space-3, 12px);
   padding: var(--tech-space-4, 16px);
   border: 1px solid var(--tech-border);
-  border-radius: var(--tech-radius, 12px);
+  border-radius: var(--tech-radius, 15px);
   background: var(--tech-panel);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  box-shadow: var(--tech-shadow-panel);
+  transition: border-color 0.15s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
-.badge--earned { border-color: color-mix(in srgb, var(--t-gold) 40%, var(--tech-border)); }
+
+/* Earned cards are interactive (have tooltip) — FiMobile hover lift */
+.badge--earned {
+  border-color: color-mix(in srgb, var(--t-gold) 40%, var(--tech-border));
+  cursor: default;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised, 0 4px 16px rgba(0,0,0,0.14));
+  }
+}
 .badge--locked { opacity: 0.72; }
 .badge--locked .badge__medal { filter: grayscale(1); opacity: 0.55; }
 
+/* ── Medal icon tile — FiMobile list-row leading icon spec ── */
 .badge__medal {
   flex: 0 0 auto;
   width: 48px;
   height: 48px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  background: var(--tech-bg, rgba(127, 127, 127, 0.08));
-  border: 2px solid var(--tech-border);
-  color: var(--tech-text-tertiary);
+  border-radius: var(--tech-r-control, 10px);   /* FiMobile: control radius, not circle */
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--tech-accent) 25%, transparent);
+  color: var(--tech-accent);
 }
 .badge__medal mat-icon { font-size: 26px; width: 26px; height: 26px; }
-.badge__medal[data-tier='bronze'] { border-color: var(--t-bronze); color: var(--t-bronze); background: color-mix(in srgb, var(--t-bronze) 12%, transparent); }
-.badge__medal[data-tier='silver'] { border-color: var(--t-silver); color: var(--t-silver); background: color-mix(in srgb, var(--t-silver) 14%, transparent); }
-.badge__medal[data-tier='gold'] { border-color: var(--t-gold); color: var(--t-gold); background: color-mix(in srgb, var(--t-gold) 16%, transparent); }
-.badge__medal[data-tier='complete'] { border-color: var(--t-complete); color: var(--t-complete); background: color-mix(in srgb, var(--t-complete) 16%, transparent); }
+
+/* Tier overrides preserve the bronze/silver/gold palette on the icon tile */
+.badge__medal[data-tier='bronze'] {
+  border-color: color-mix(in srgb, var(--t-bronze) 30%, transparent);
+  color: var(--t-bronze);
+  background: color-mix(in srgb, var(--t-bronze) 12%, transparent);
+}
+.badge__medal[data-tier='silver'] {
+  border-color: color-mix(in srgb, var(--t-silver) 35%, transparent);
+  color: var(--t-silver);
+  background: color-mix(in srgb, var(--t-silver) 14%, transparent);
+}
+.badge__medal[data-tier='gold'] {
+  border-color: color-mix(in srgb, var(--t-gold) 35%, transparent);
+  color: var(--t-gold);
+  background: color-mix(in srgb, var(--t-gold) 16%, transparent);
+}
+.badge__medal[data-tier='complete'] {
+  border-color: color-mix(in srgb, var(--t-complete) 30%, transparent);
+  color: var(--t-complete);
+  background: color-mix(in srgb, var(--t-complete) 16%, transparent);
+}
 
 .badge__body { flex: 1 1 auto; min-width: 0; }
 .badge__label {
@@ -117,15 +153,16 @@
 }
 .badge__caption {
   margin-top: 2px;
-  color: var(--tech-text-tertiary);
+  color: var(--tech-text-secondary);   /* one step up from tertiary — more legible in card context */
   font-size: var(--tech-fs-small, 12px);
 }
 .badge__bar { margin-top: 8px; border-radius: var(--tech-r-pill, 999px); overflow: hidden; }
 
+/* FiMobile chip pattern on tier pips — pill radius, tinted bg when earned */
 .badge__tiers { display: flex; gap: 6px; margin-top: 8px; }
 .badge__tier {
   width: 18px;
-  height: 4px;
+  height: 5px;
   border-radius: var(--tech-r-pill, 999px);
   background: var(--tech-border);
 }

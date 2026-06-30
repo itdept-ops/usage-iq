@@ -69,34 +69,43 @@
   }
 }
 
+// ── CARD SIGNATURE: FiMobile radii + shadow + border on the day nav ──
 .td-nav {
   display: flex; align-items: center; gap: 8px; margin-top: 6px;
-  padding: 6px; border-radius: var(--r-tile);
-  background: var(--glass); border: 1px solid var(--hairline);
+  padding: 6px;
+  border-radius: var(--tech-radius, var(--r-tile));
+  background: var(--glass); border: 1px solid var(--tech-border, var(--hairline));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
 
   &__btn {
     appearance: none; cursor: pointer; display: grid; place-items: center;
-    width: 40px; height: 40px; border-radius: 12px;
-    border: 1px solid var(--hairline); background: var(--bg-rise); color: var(--ink);
+    width: 40px; height: 40px;
+    border-radius: var(--tech-r-control, 12px);
+    border: 1px solid var(--tech-border, var(--hairline));
+    background: var(--bg-rise); color: var(--ink);
     touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-    transition: opacity .12s;
-    &:active:not(:disabled) { opacity: .75; }
+    transition: opacity .12s, transform .12s;
+    &:active:not(:disabled) { opacity: .75; transform: scale(.95); }
     &:disabled { opacity: .35; }
     mat-icon { font-size: 24px; width: 24px; height: 24px; }
   }
   &__label { flex: 1; display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
   &__day { font-size: 15px; font-weight: 700; color: var(--ink); }
-  &__date { font-size: 12px; color: var(--ink-dim); }
+  &__date { font-size: 12px; color: var(--tech-text-secondary, var(--ink-dim)); }
 }
+
+// ── CHIPS/BADGES: FiMobile pill radius + accent-tinted border ──
 .td-nav__today {
   appearance: none; cursor: pointer; align-self: center;
   display: inline-flex; align-items: center; gap: 5px; margin-top: 2px;
-  min-height: 40px; padding: 0 14px; border-radius: 999px;
+  min-height: 40px; padding: 0 14px;
+  border-radius: var(--tech-r-pill, 999px);
   font: inherit; font-size: 13px; font-weight: 600;
   color: var(--accent-a);
   background: color-mix(in srgb, var(--accent-a) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-a) 32%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, transparent);
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: opacity .12s;
   &:active:not(:disabled) { opacity: .8; }
   &:disabled { opacity: .5; }
   mat-icon { font-size: 16px; width: 16px; height: 16px; }
@@ -108,70 +117,104 @@
 }
 .td-nav__pick {
   appearance: none; cursor: pointer;
-  min-height: 40px; padding: 0 12px; border-radius: 12px;
+  min-height: 40px; padding: 0 12px;
+  border-radius: var(--tech-r-control, 12px);
   font: inherit; font-size: 13px;
   color: var(--ink); background: var(--bg-rise);
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--tech-border, var(--hairline));
   color-scheme: light dark;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   &:active:not(:disabled) { opacity: .8; }
   &:disabled { opacity: .5; }
 }
 
-// ───────── AI recap ─────────
+// ───────── AI recap — HERO CARD (gradient-hero: one primary accent fill) ─────────
+// The AI recap is the single most-important "at a glance" summary card. It earns
+// the gradient-hero treatment: full --tech-gradient-accent fill with on-accent ink.
 .td-ai {
-  border-radius: var(--r-tile); padding: 14px 16px;
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--accent-a) 16%, var(--bg-rise)),
-    color-mix(in srgb, var(--accent-b) 12%, var(--bg-rise)));
-  border: 1px solid color-mix(in srgb, var(--accent-a) 32%, transparent);
+  border-radius: var(--tech-radius, var(--r-tile)); padding: 16px 18px;
+  background: var(--tech-gradient-accent);
+  border: none;
+  box-shadow: var(--tech-shadow-raised, var(--lift-2));
+
   &__kicker {
-    display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px;
-    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent-a);
+    display: inline-flex; align-items: center; gap: 6px; margin: 0 0 8px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    // muted label legible on the gradient fill
+    color: color-mix(in srgb, var(--tech-text-on-accent, #fff) 80%, transparent);
     mat-icon { font-size: 16px; width: 16px; height: 16px; }
   }
-  &__text { margin: 0; line-height: 1.55; color: var(--ink); font-size: 15px; }
+  &__text {
+    margin: 0; line-height: 1.55; font-size: 15px;
+    color: var(--tech-text-on-accent, #fff);
+  }
   &__foot {
-    display: inline-flex; align-items: center; gap: 5px; margin: 8px 0 0;
-    font-size: 12px; color: var(--ink-dim);
+    display: inline-flex; align-items: center; gap: 5px; margin: 10px 0 0;
+    font-size: 12px;
+    color: color-mix(in srgb, var(--tech-text-on-accent, #fff) 70%, transparent);
   }
 }
 
-// ───────── stat chips ─────────
+// ───────── stat chips — CARD SIGNATURE + interactive hover lift ─────────
 .td-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 .td-stat {
   position: relative; display: flex; flex-direction: column; gap: 2px;
-  padding: 12px 14px; border-radius: var(--r-tile);
-  background: var(--bg-rise); border: 1px solid var(--hairline); overflow: hidden;
+  padding: 12px 14px;
+  border-radius: var(--tech-radius, var(--r-tile));
+  background: var(--bg-rise);
+  border: 1px solid var(--tech-border, var(--hairline));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
+  overflow: hidden;
+  // Gentle hover lift — stat chips are interactive (they convey status at a glance)
+  transition: transform .15s var(--ease-out), box-shadow .15s var(--ease-out);
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised, var(--lift-2));
+  }
   &::before {
     content: ''; position: absolute; inset: 0 auto 0 0; width: 3px;
     background: linear-gradient(180deg, var(--da, #818cf8), var(--db, #c084fc));
   }
+  // ── LEADING ICON TILE: accent-tinted bg (FiMobile list-row icon avatar) ──
   &__ico {
-    display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
-    color: var(--db); background: color-mix(in srgb, var(--da) 18%, transparent);
+    display: grid; place-items: center; width: 30px; height: 30px;
+    border-radius: var(--tech-r-control, 9px);
+    color: var(--db);
+    background: color-mix(in srgb, var(--da) 12%, transparent);
     mat-icon { font-size: 19px; width: 19px; height: 19px; }
   }
   &__val {
     margin-top: 4px; font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
     font-size: 18px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums;
   }
-  &__lab { font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-dim); }
-}
-
-// ───────── text highlights ─────────
-.td-hl {
-  margin: 0; padding: 0; list-style: none; display: grid; gap: 8px;
-  li {
-    display: flex; align-items: flex-start; gap: 8px;
-    padding: 10px 12px; border-radius: var(--r-tile);
-    background: var(--glass); border: 1px solid var(--hairline);
-    font-size: 14px; line-height: 1.45; color: var(--ink);
-    mat-icon { font-size: 18px; width: 18px; height: 18px; flex: none; margin-top: 1px; color: var(--accent-a); }
+  // muted label -> secondary text token
+  &__lab {
+    font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase;
+    color: var(--tech-text-secondary, var(--ink-dim));
   }
 }
 
-// ───────── timeline ─────────
+// ───────── text highlights — CARD SIGNATURE + LIST ROW layout ─────────
+.td-hl {
+  margin: 0; padding: 0; list-style: none; display: grid; gap: 8px;
+  li {
+    display: flex; align-items: flex-start; gap: 10px;
+    // FiMobile roomy row padding (12-14px)
+    padding: 12px 14px;
+    border-radius: var(--tech-radius, var(--r-tile));
+    background: var(--bg-rise);
+    border: 1px solid var(--tech-border, var(--hairline));
+    box-shadow: var(--tech-shadow-panel, var(--lift-1));
+    font-size: 14px; line-height: 1.45; color: var(--ink);
+    // ── LEADING ICON TILE: accent avatar (FiMobile list-row pattern) ──
+    mat-icon {
+      font-size: 18px; width: 18px; height: 18px; flex: none; margin-top: 1px;
+      color: var(--accent-a);
+    }
+  }
+}
+
+// ───────── timeline — LIST ROW pattern ─────────
 .td-line { position: relative; margin: 0; padding: 2px 0; list-style: none; display: flex; flex-direction: column; }
 .td-moment {
   position: relative; display: grid; grid-template-columns: 3.4rem 38px 1fr;
@@ -179,7 +222,7 @@
 
   &::before {
     content: ''; position: absolute; left: calc(3.4rem + 19px - 1px); top: 0; bottom: 0;
-    width: 2px; background: var(--hairline);
+    width: 2px; background: var(--tech-border, var(--hairline));
   }
   &:first-child::before { top: .85rem; }
   &:last-child { padding-bottom: 2px; }
@@ -192,27 +235,45 @@
     animation-delay: calc(var(--i, 0) * 40ms);
   }
 
+  // ── TIME: tertiary text (trailing/muted value) ──
   &__time {
     padding-top: 9px; text-align: right; white-space: nowrap;
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 12.5px; font-weight: 600; color: var(--ink-dim);
+    font-size: 12.5px; font-weight: 600;
+    color: var(--tech-text-tertiary, var(--ink-dim));
   }
+  // ── NODE: leading icon avatar with accent-tinted bg (FiMobile list-row tile) ──
   &__node {
     position: relative; z-index: 1; display: grid; place-items: center;
     width: 38px; height: 38px; border-radius: 50%;
-    color: var(--db); background: var(--bg-rise);
-    border: 2px solid color-mix(in srgb, var(--da) 60%, var(--hairline));
+    color: var(--db);
+    background: color-mix(in srgb, var(--da) 12%, transparent);
+    border: 2px solid color-mix(in srgb, var(--da) 60%, var(--tech-border, var(--hairline)));
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--da) 10%, transparent);
     mat-icon { font-size: 20px; width: 20px; height: 20px; }
   }
   &__body { padding-top: 5px; min-width: 0; }
-  &__domain { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--db); }
-  &__label { margin: 1px 0 0; font-size: 14.5px; line-height: 1.4; color: var(--ink); word-break: break-word; }
+  // ── DOMAIN CHIP: FiMobile pill-chip — pill radius + accent-tinted bg + border ──
+  &__domain {
+    display: inline-block;
+    font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--db);
+    background: color-mix(in srgb, var(--da) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--da) 30%, transparent);
+    border-radius: var(--tech-r-pill, 999px);
+    padding: 1px 7px;
+  }
+  // ── LABEL: primary title + muted subtitle text ──
+  &__label {
+    margin: 3px 0 0; font-size: 14.5px; line-height: 1.4;
+    color: var(--ink); word-break: break-word;
+  }
 }
 
 .td-foot {
   display: flex; align-items: center; gap: 6px; margin: 4px 0 0;
-  font-size: 12px; line-height: 1.5; color: var(--ink-dim);
+  font-size: 12px; line-height: 1.5;
+  color: var(--tech-text-tertiary, var(--ink-dim));
   mat-icon { font-size: 15px; width: 15px; height: 15px; flex: none; }
 }
 

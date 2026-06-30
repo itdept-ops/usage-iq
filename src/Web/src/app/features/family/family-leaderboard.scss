@@ -5,7 +5,7 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
-  box-shadow: var(--tech-shadow-raised);
+  box-shadow: var(--tech-shadow-panel);
 
   &__head {
     display: flex;
@@ -30,9 +30,9 @@
   &__switch {
     display: inline-flex;
     gap: 4px;
-    padding: 3px;
-    border-radius: 999px;
-    background: var(--tech-panel-2, var(--tech-bg-sunken));
+    padding: 4px;
+    border-radius: var(--tech-radius, 12px);
+    background: var(--tech-bg-sunken);
     border: 1px solid var(--tech-border-subtle);
   }
 
@@ -40,11 +40,11 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 6px 11px;
-    border-radius: 999px;
+    padding: 6px 12px;
+    border-radius: var(--tech-r-control);
     border: none;
     background: transparent;
-    color: var(--tech-text-tertiary);
+    color: var(--tech-text-secondary);
     font: inherit;
     font-size: var(--tech-fs-small, 12px);
     font-weight: 700;
@@ -53,12 +53,12 @@
 
     mat-icon { width: 16px; height: 16px; font-size: 16px; line-height: 16px; }
 
-    &:hover { color: var(--tech-text-secondary); }
+    &:hover { color: var(--tech-text); }
     &:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: 2px; }
 
     &.is-on {
-      background: color-mix(in srgb, var(--tech-accent) 16%, transparent);
-      color: var(--tech-text-accent);
+      background: var(--tech-accent);
+      color: var(--tech-text-on-accent);
     }
 
     @media (max-width: 520px) { .lb__tab-label { display: none; } padding: 6px 9px; }
@@ -78,11 +78,14 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 12px;
+    padding: 12px 14px;
     border-radius: var(--tech-r-control, 10px);
-    background: var(--tech-panel-2, var(--tech-bg-sunken));
+    background: var(--tech-bg-sunken);
 
-    &.is-podium { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tech-accent) 35%, transparent); }
+    &.is-podium {
+      border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+      background: color-mix(in srgb, var(--tech-accent) 6%, var(--tech-bg-sunken));
+    }
   }
 
   &__rank {

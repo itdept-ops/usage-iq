@@ -6,18 +6,25 @@
   height: 100%;
   min-height: 0;
   border: 1px solid var(--tech-border);
-  border-radius: var(--tech-r-control, 10px);
+  border-radius: var(--tech-radius, var(--tech-r-control, 15px));
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
   overflow: hidden;
 }
 
+/* FiMobile hero: panel header gets the gradient accent treatment */
 .ai-panel__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--tech-border);
+  padding: 11px 14px;
+  background: var(--tech-gradient-accent);
+  border-bottom: none;
+
+  /* keep icon buttons legible on the gradient fill */
+  button mat-icon,
+  [mat-icon-button] mat-icon { color: color-mix(in srgb, var(--tech-text-on-accent) 85%, transparent); }
 }
 
 .ai-panel__title {
@@ -26,9 +33,9 @@
   gap: 7px;
   font-weight: 600;
   font-size: 14px;
-  color: var(--tech-text);
+  color: var(--tech-text-on-accent);
 
-  mat-icon { color: var(--tech-accent); font-size: 20px; width: 20px; height: 20px; }
+  mat-icon { color: color-mix(in srgb, var(--tech-text-on-accent) 90%, transparent); font-size: 20px; width: 20px; height: 20px; }
 }
 
 .ai-panel__scroll {
@@ -54,19 +61,21 @@
 
 .ai-chip {
   text-align: left;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--tech-border);
-  background: var(--tech-bg-sunken, color-mix(in srgb, var(--tech-text) 6%, transparent));
-  color: var(--tech-text);
+  padding: 8px 14px;
+  border-radius: var(--tech-r-pill, 999px);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--tech-accent) 10%, transparent);
+  color: var(--tech-accent);
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
 
   &:hover:not([disabled]) {
     border-color: var(--tech-accent);
-    background: color-mix(in srgb, var(--tech-accent) 8%, transparent);
+    background: color-mix(in srgb, var(--tech-accent) 18%, transparent);
+    transform: translateY(-1px);
   }
   &[disabled] { opacity: 0.6; cursor: default; }
 }

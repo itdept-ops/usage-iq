@@ -80,13 +80,15 @@
   gap: var(--tech-space-3, 16px);
   padding: var(--tech-space-3, 16px);
   border-radius: var(--tech-radius, 12px);
-  border: 1px solid var(--tech-border-subtle, #1c2533);
+  border: 1px solid var(--tech-border, #1e2a3a);
   background: var(--tech-panel, #111722);
-  transition: border-color var(--tech-t-fast) ease, box-shadow var(--tech-t-fast) ease;
+  box-shadow: var(--tech-shadow-panel);
+  transition: border-color var(--tech-t-fast) ease, box-shadow var(--tech-t-fast) ease, transform var(--tech-t-fast) ease;
 
   &:hover {
-    border-color: var(--tech-border-strong, #2a3548);
-    box-shadow: var(--tech-shadow-1, 0 4px 16px rgba(0, 0, 0, 0.25));
+    border-color: color-mix(in srgb, var(--tech-accent) 30%, transparent);
+    box-shadow: var(--tech-shadow-raised);
+    transform: translateY(-1px);
   }
 
   &__body {
@@ -116,7 +118,7 @@
     display: flex;
     align-items: center;
     gap: var(--tech-space-2, 12px);
-    margin-top: 2px;
+    margin-top: 4px;
   }
 
   &__time {
@@ -131,10 +133,10 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 9px;
+  padding: 3px 10px;
   border-radius: var(--tech-r-pill, 999px);
-  border: 1px solid var(--tech-border-subtle, #1c2533);
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 20%, transparent);
+  background: color-mix(in srgb, var(--tech-accent) 6%, transparent);
   color: var(--tech-text-tertiary, #6b7688);
   font-family: var(--tech-font-ui);
   font-size: var(--tech-fs-small, 12px);
@@ -157,7 +159,8 @@
   }
 
   &:hover {
-    border-color: var(--tech-border-strong, #2a3548);
+    border-color: color-mix(in srgb, var(--tech-accent) 40%, transparent);
+    background: color-mix(in srgb, var(--tech-accent) 10%, transparent);
     color: var(--tech-text-secondary);
   }
 
@@ -171,8 +174,8 @@
 
   /* Pressed (the caller has cheered this row). */
   &--on {
-    border-color: color-mix(in srgb, var(--tech-accent, #3FD8D0) 55%, transparent);
-    background: color-mix(in srgb, var(--tech-accent, #3FD8D0) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-accent) 55%, transparent);
+    background: color-mix(in srgb, var(--tech-accent) 14%, transparent);
     color: var(--tech-text-accent, #3FD8D0);
 
     .cheer__emoji { filter: none; }
@@ -207,15 +210,15 @@
   position: absolute;
   right: -3px;
   bottom: -3px;
-  width: 19px;
-  height: 19px;
+  width: 20px;
+  height: 20px;
   border-radius: var(--tech-r-pill, 999px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--tech-panel-2, #1a2230);
+  background: color-mix(in srgb, var(--tech-accent) 16%, var(--tech-panel, #111722));
   box-shadow: 0 0 0 2px var(--tech-panel, #111722);
-  color: var(--tech-text-accent, #3FD8D0);
+  color: var(--tech-accent, #3FD8D0);
 
   mat-icon {
     width: 12px; height: 12px; font-size: 12px; line-height: 12px;

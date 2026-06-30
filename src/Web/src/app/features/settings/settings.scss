@@ -29,6 +29,12 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   padding: var(--tech-space-4) var(--tech-space-6) var(--tech-space-6);
   margin-top: var(--tech-space-4);
 
+  /* FiMobile card signature */
+  border-radius: var(--tech-radius) !important;
+  box-shadow: var(--tech-shadow-panel) !important;
+  border: 1px solid var(--tech-border) !important;
+  transition: box-shadow var(--tech-t-panel) ease, transform var(--tech-t-panel) ease;
+
   .s-panel-head {
     display: flex;
     align-items: center;
@@ -57,6 +63,52 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   }
 
   .full { width: 100%; }
+}
+
+/* ── Hero card: Ingestion panel (identified by its sync-pill) ──
+   Gradient-accent fill; all inner text re-keyed for legibility. */
+.s-panel:has(.sync-pill) {
+  background: var(--tech-gradient-accent) !important;
+  border-color: transparent !important;
+
+  /* Panel header text + subtitle on gradient */
+  .panel-header {
+    color: var(--tech-text-on-accent);
+  }
+
+  /* Hint paragraph */
+  .hint {
+    color: color-mix(in srgb, var(--tech-text-on-accent) 78%, transparent);
+
+    code {
+      color: var(--tech-text-on-accent);
+      background: color-mix(in srgb, var(--tech-text-on-accent) 14%, transparent);
+      border-color: color-mix(in srgb, var(--tech-text-on-accent) 28%, transparent);
+    }
+  }
+
+  /* Section divider */
+  .s-panel-head {
+    border-bottom-color: color-mix(in srgb, var(--tech-text-on-accent) 22%, transparent);
+  }
+
+  /* Sync-pill on gradient: invert to a semi-opaque white */
+  .sync-pill {
+    background: color-mix(in srgb, var(--tech-text-on-accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--tech-text-on-accent) 28%, transparent);
+    color: var(--tech-text-on-accent);
+  }
+
+  /* Toggle label */
+  mat-slide-toggle {
+    color: color-mix(in srgb, var(--tech-text-on-accent) 88%, transparent);
+  }
+
+  /* Save / sync button on-accent text for the flat primary button */
+  .act-save {
+    color: var(--tech-text-on-accent);
+    &:hover:not([disabled]) { box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.35); }
+  }
 }
 
 /* Inline load-failure state (recoverable blank-page fallback) */
@@ -107,15 +159,21 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   gap: var(--tech-space-3);
   margin-top: var(--tech-space-2);
 
-  button mat-icon {
-    margin-right: 4px;
-    font-size: 18px;
-    height: 18px;
-    width: 18px;
+  button {
+    border-radius: var(--tech-r-control) !important;
+
+    mat-icon {
+      margin-right: 4px;
+      font-size: 18px;
+      height: 18px;
+      width: 18px;
+    }
   }
 
   .act-save {
     font-weight: 600;
+    color: var(--tech-text-on-accent);
+    border-radius: var(--tech-r-control) !important;
     transition: box-shadow var(--tech-t-control) ease, transform var(--tech-t-fast) var(--tech-ease);
     &:hover:not([disabled]) { box-shadow: var(--tech-glow-blue); }
     &:active:not([disabled]) { transform: scale(0.98); }
@@ -124,6 +182,7 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   .act-sync {
     --mdc-outlined-button-outline-color: var(--tech-border-strong);
     color: var(--tech-accent-cyan);
+    border-radius: var(--tech-r-control) !important;
     transition: box-shadow var(--tech-t-control) ease, transform var(--tech-t-fast) var(--tech-ease);
     &:hover:not([disabled]) { box-shadow: var(--tech-glow-cyan); }
     &:active:not([disabled]) { transform: scale(0.98); }
@@ -135,18 +194,20 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
 
 .source-row {
   position: relative;
-  padding: var(--tech-space-3) var(--tech-space-3) var(--tech-space-3) var(--tech-space-4);
+  padding: 13px var(--tech-space-3) 13px var(--tech-space-4);
   margin: 0 calc(-1 * var(--tech-space-2));
   border-radius: var(--tech-r-control);
   border: 1px solid transparent;
-  transition: background-color var(--tech-t-control) ease, border-color var(--tech-t-control) ease, box-shadow var(--tech-t-panel) ease;
+  transition: background-color var(--tech-t-control) ease, border-color var(--tech-t-control) ease,
+              box-shadow var(--tech-t-panel) ease, transform var(--tech-t-panel) ease;
 
   & + .source-row { margin-top: var(--tech-space-2); }
 
   &:hover {
     background-color: var(--tech-panel-raised);
     border-color: var(--tech-border);
-    box-shadow: inset 2px 0 0 var(--tech-accent);
+    box-shadow: var(--tech-shadow-raised);
+    transform: translateY(-1px);
   }
 
   &.disabled { opacity: 0.62; }
@@ -157,15 +218,36 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
     gap: var(--tech-space-3);
     margin-bottom: var(--tech-space-3);
 
+    /* FiMobile leading icon tile */
     .src-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: var(--tech-r-pill);
+      width: 32px;
+      height: 32px;
+      border-radius: var(--tech-r-control);
       flex: 0 0 auto;
-      background: var(--tech-vendor-claude);
-      box-shadow: 0 0 8px -1px var(--tech-vendor-claude);
-      &.codex { background: var(--tech-vendor-codex); box-shadow: 0 0 8px -1px var(--tech-vendor-codex); }
-      &.off { background: var(--tech-text-tertiary); box-shadow: none; }
+      background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+      box-shadow: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      /* Inner status indicator dot */
+      &::after {
+        content: '';
+        display: block;
+        width: 8px;
+        height: 8px;
+        border-radius: var(--tech-r-pill);
+        background: var(--tech-vendor-claude);
+        box-shadow: 0 0 7px -1px var(--tech-vendor-claude);
+      }
+      &.codex {
+        background: color-mix(in srgb, var(--tech-accent-2) 12%, transparent);
+        &::after { background: var(--tech-vendor-codex); box-shadow: 0 0 7px -1px var(--tech-vendor-codex); }
+      }
+      &.off {
+        background: color-mix(in srgb, var(--tech-text-tertiary) 10%, transparent);
+        &::after { background: var(--tech-text-tertiary); box-shadow: none; }
+      }
     }
 
     .src-name {
@@ -174,7 +256,7 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
       color: var(--tech-text);
     }
 
-    /* kind pill — vendor-keyed (blue=Claude, violet=Codex) */
+    /* FiMobile chip — vendor-keyed pill with tinted bg + border */
     .src-kind {
       font-family: var(--tech-font-mono);
       font-size: var(--tech-fs-micro);
@@ -182,13 +264,14 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
       text-transform: uppercase;
       letter-spacing: 0.06em;
       padding: 2px 9px;
+      border-radius: var(--tech-r-pill);
       color: var(--tech-accent);
-      border-color: color-mix(in srgb, var(--tech-accent) 45%, transparent);
-      background: var(--tech-info-tint);
+      border-color: color-mix(in srgb, var(--tech-accent) 30%, transparent);
+      background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
 
       &.codex {
         color: var(--tech-accent-2);
-        border-color: color-mix(in srgb, var(--tech-accent-2) 45%, transparent);
+        border-color: color-mix(in srgb, var(--tech-accent-2) 30%, transparent);
         background: color-mix(in srgb, var(--tech-accent-2) 12%, transparent);
       }
     }
@@ -214,6 +297,7 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
       align-self: stretch;
       --mdc-outlined-button-outline-color: var(--tech-border-strong);
       color: var(--tech-text-secondary);
+      border-radius: var(--tech-r-control) !important;
       transition: color var(--tech-t-control) ease, box-shadow var(--tech-t-control) ease, transform var(--tech-t-fast) var(--tech-ease);
 
       mat-icon { font-size: 18px; height: 18px; width: 18px; margin-right: 4px; }
@@ -305,9 +389,9 @@ mat-slide-toggle {
   gap: 7px;
   margin-left: auto;
   padding: 4px 11px;
-  border-radius: var(--tech-r-pill, 999px);
-  background: var(--tech-input);
-  border: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-r-pill);
+  background: color-mix(in srgb, var(--tech-accent) 8%, var(--tech-input));
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 22%, transparent);
   color: var(--tech-text-secondary);
   white-space: nowrap;
 
@@ -386,8 +470,9 @@ mat-slide-toggle {
 .route-table {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--tech-border-subtle);
-  border-radius: var(--tech-r-control);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius);
+  box-shadow: var(--tech-shadow-panel);
   overflow: hidden;
 }
 
@@ -453,10 +538,11 @@ mat-slide-toggle {
 .route-key {
   font-family: var(--tech-font-mono, monospace);
   font-size: var(--tech-fs-label);
-  color: var(--tech-text-tertiary);
-  padding: 1px 6px;
-  border-radius: 5px;
-  background: var(--tech-bg-sunken);
+  color: var(--tech-accent);
+  padding: 2px 8px;
+  border-radius: var(--tech-r-pill);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
   white-space: nowrap;
 }
 

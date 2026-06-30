@@ -96,6 +96,8 @@
   display: flex; gap: 10px; margin-top: 4px;
 }
 
+// HERO CARD — the "active" stat is the primary metric: accent gradient fill.
+// Secondary stats keep the glass treatment so the hero clearly reads as primary.
 .rp-stat {
   flex: 1 1 0; min-width: 0;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -106,6 +108,17 @@
   border: 1px solid var(--glass-edge);
   border-radius: var(--r-card);
   box-shadow: var(--lift-1);
+}
+
+// The first stat tile (active count) is the hero — accent gradient, on-accent ink.
+.rp-stat:first-child {
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+
+  .rp-stat__n { color: var(--ink-on-accent); }
+  .rp-stat__l { color: color-mix(in oklab, var(--ink-on-accent) 80%, transparent); }
 }
 
 .rp-stat__n {
@@ -119,19 +132,24 @@
 }
 
 // ---- "How to connect" link button ----
+// CARD SIGNATURE + BUTTON/CTA — interactive card with hover lift and FiMobile radius.
 .rp-guidebtn {
   display: flex; align-items: center; gap: 8px;
   width: 100%; min-height: 48px; margin-top: 4px; padding: 12px 14px;
   background: var(--bg-rise);
-  border: 1px solid var(--hairline); border-radius: var(--r-card);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-radius, var(--r-card));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
   color: var(--ink); text-align: left;
   font-family: var(--font-ui); font-weight: 650; font-size: 14px;
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out);
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out),
+              box-shadow 160ms var(--ease-out), transform 160ms var(--ease-out);
 
   mat-icon { font-size: 20px; width: 20px; height: 20px; color: var(--accent-a); }
   .rp-guidebtn__go { margin-left: auto; color: var(--ink-dim); }
-  &:active { background: var(--bg-sink); }
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised, var(--lift-2)); }
+  &:active { background: var(--bg-sink); transform: none; }
   &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 }
 
@@ -139,20 +157,29 @@
 // KEY LIST.
 // ============================================================================
 
-.rp-seg-wrap { padding: 2px 0; }
+// PILL TABS — wrap the segmented control in a FiMobile sunken pill container.
+.rp-seg-wrap {
+  padding: 4px;
+  background: var(--tech-bg-sunken, var(--bg-sink));
+  border-radius: var(--tech-radius, var(--r-card));
+}
 .rp-seg { display: block; }
 
 .rp-list { display: flex; flex-direction: column; gap: 10px; }
 
+// CARD SIGNATURE — FiMobile card with proper border token, shadow, radius + hover lift.
 .rp-card {
   display: flex; align-items: center; gap: 11px;
   padding: 13px 12px;
   background: var(--bg-rise);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-tile);
-  box-shadow: var(--lift-1);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-control, var(--r-tile));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
 
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised, var(--lift-2)); }
   &.is-revoked { opacity: .6; }
+  &.is-revoked:hover { transform: none; box-shadow: var(--tech-shadow-panel, var(--lift-1)); }
   &.is-busy { opacity: .5; pointer-events: none; }
 }
 
@@ -192,17 +219,21 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+// CHIPS/BADGES — accent-tinted pill for the key prefix code chip.
 .rp-card__prefix {
   flex: 0 0 auto;
-  padding: 1px 7px; border-radius: var(--r-pill);
-  background: var(--bg-sink); border: 1px solid var(--hairline);
-  font-size: 11.5px; color: var(--ink-dim);
+  padding: 1px 7px; border-radius: var(--tech-r-pill, var(--r-pill));
+  background: color-mix(in oklab, var(--accent-a) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent-a) 30%, transparent);
+  font-size: 11.5px; color: var(--accent-a);
 }
 
+// CHIPS/BADGES — warn-tinted pill with FiMobile pill radius.
 .rp-card__badge {
   flex: 0 0 auto;
-  padding: 1px 8px; border-radius: var(--r-pill);
+  padding: 1px 8px; border-radius: var(--tech-r-pill, var(--r-pill));
   background: color-mix(in oklab, var(--warn) 18%, transparent);
+  border: 1px solid color-mix(in oklab, var(--warn) 30%, transparent);
   color: var(--warn);
   font-family: var(--font-ui); font-size: 10.5px; font-weight: 700;
   letter-spacing: .04em; text-transform: uppercase;
@@ -220,9 +251,12 @@
   &.mine { color: var(--ink); font-weight: 600; }
 }
 
+// CHIPS/BADGES — "you" identity pill with FiMobile pill radius + accent tint.
 .rp-card__you {
-  margin-left: 4px; padding: 0 6px; border-radius: var(--r-pill);
+  margin-left: 4px; padding: 0 6px;
+  border-radius: var(--tech-r-pill, var(--r-pill));
   background: color-mix(in oklab, var(--accent-a) 22%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent-a) 30%, transparent);
   color: var(--accent-a); font-size: 10px; font-weight: 700;
   letter-spacing: .03em; text-transform: uppercase;
 }
@@ -234,11 +268,13 @@
   &--never { font-style: italic; opacity: .85; }
 }
 
+// BUTTON/CTA — revoke icon button with FiMobile control radius.
 .rp-card__revoke {
   flex: 0 0 auto;
   display: grid; place-items: center;
-  width: 42px; height: 42px; border-radius: var(--r-tile);
-  border: 1px solid var(--hairline);
+  width: 42px; height: 42px;
+  border-radius: var(--tech-r-control, var(--r-tile));
+  border: 1px solid var(--tech-border, var(--hairline));
   background: var(--bg-sink);
   color: color-mix(in oklab, var(--warn) 88%, var(--ink));
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
@@ -283,14 +319,16 @@
   margin: 0; font-family: var(--font-ui); font-size: 13.5px; color: var(--ink-dim); max-width: 32ch;
 }
 
+// BUTTON/CTA — primary CTA with FiMobile control radius + on-accent text.
 .rp-empty__cta, .rp-state__cta {
   margin-top: 6px;
   display: inline-flex; align-items: center; gap: 7px;
   min-height: 46px; padding: 11px 22px;
-  border: none; border-radius: var(--r-pill);
+  border: none; border-radius: var(--tech-r-control, var(--r-pill));
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: var(--ink-on-accent); font-family: var(--font-ui); font-weight: 800; font-size: 14px;
-  box-shadow: var(--lift-2);
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
+  font-family: var(--font-ui); font-weight: 800; font-size: 14px;
+  box-shadow: var(--tech-shadow-raised, var(--lift-2));
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transition: transform 160ms var(--ease-spring-up, var(--ease-out));
 
@@ -309,11 +347,11 @@
 
 .rk__glyph {
   flex: 0 0 auto;
-  width: 44px; height: 44px; border-radius: var(--r-tile);
+  width: 44px; height: 44px; border-radius: var(--tech-r-control, var(--r-tile));
   display: grid; place-items: center;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: var(--ink-on-accent);
-  box-shadow: var(--lift-1);
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
   mat-icon { font-size: 24px; width: 24px; height: 24px; }
 }
 
@@ -330,11 +368,13 @@
   letter-spacing: .04em; text-transform: uppercase; color: var(--ink-dim);
 }
 
+// BUTTON/CTA — text input with FiMobile control radius (pill-ish for text fields).
 .rk__input {
   width: 100%; box-sizing: border-box;
   min-height: 48px; padding: 12px 14px;
-  background: var(--bg-sink);
-  border: 1px solid var(--hairline); border-radius: var(--r-pill);
+  background: var(--tech-bg-sunken, var(--bg-sink));
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-control, var(--r-pill));
   font-family: var(--font-ui); font-size: 15px; color: var(--ink);
   -webkit-tap-highlight-color: transparent;
   transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
@@ -342,20 +382,22 @@
   &::placeholder { color: var(--ink-faint, var(--ink-dim)); }
   &:focus {
     outline: none;
-    border-color: color-mix(in oklab, var(--accent-a) 60%, var(--hairline));
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-a) 22%, transparent);
+    border-color: color-mix(in oklab, var(--tech-accent, var(--accent-a)) 60%, var(--hairline));
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--tech-accent, var(--accent-a)) 22%, transparent);
   }
 }
 
 .rk__help { font-family: var(--font-ui); font-size: 12px; color: var(--ink-dim); }
 
+// BUTTON/CTA — primary mint button with FiMobile control radius + on-accent text.
 .rk__mint {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; min-height: 50px; padding: 12px 18px;
-  border: none; border-radius: var(--r-pill);
+  border: none; border-radius: var(--tech-r-control, var(--r-pill));
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: var(--ink-on-accent); font-family: var(--font-ui); font-weight: 800; font-size: 15px;
-  box-shadow: var(--lift-2);
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
+  font-family: var(--font-ui); font-weight: 800; font-size: 15px;
+  box-shadow: var(--tech-shadow-raised, var(--lift-2));
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transition: transform 160ms var(--ease-spring-up, var(--ease-out));
 
@@ -365,13 +407,14 @@
   &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 }
 
-// ---- fresh-key reveal ----
+// ---- fresh-key reveal — CARD SIGNATURE with accent wash ----
 .rk__fresh {
   display: flex; flex-direction: column; gap: 10px;
   padding: 14px;
   background: color-mix(in oklab, var(--accent-a) 8%, var(--bg-sink));
-  border: 1px solid color-mix(in oklab, var(--accent-a) 40%, var(--hairline));
-  border-radius: var(--r-card);
+  border: 1px solid color-mix(in oklab, var(--accent-a) 40%, transparent);
+  border-radius: var(--tech-radius, var(--r-card));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
 }
 
 .rk__fresh-head { display: flex; align-items: flex-start; gap: 8px; }
@@ -384,17 +427,20 @@
 
 .rk__fresh-key {
   display: block; width: 100%; box-sizing: border-box;
-  padding: 12px 14px; border-radius: var(--r-card);
-  background: var(--bg-base); border: 1px solid var(--hairline);
+  padding: 12px 14px;
+  border-radius: var(--tech-r-control, var(--r-card));
+  background: var(--tech-bg-sunken, var(--bg-base));
+  border: 1px solid var(--tech-border, var(--hairline));
   font-size: 13px; color: var(--ink);
   word-break: break-all; line-height: 1.5;
   user-select: all;
 }
 
+// BUTTON/CTA — copy + done buttons with FiMobile control radius.
 .rk__copy, .rk__done {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; min-height: 48px; padding: 12px 16px;
-  border-radius: var(--r-pill);
+  border-radius: var(--tech-r-control, var(--r-pill));
   font-family: var(--font-ui); font-weight: 700; font-size: 14px;
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transition: transform 160ms var(--ease-out), background 160ms var(--ease-out);
@@ -405,12 +451,13 @@
 .rk__copy {
   border: none;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: var(--ink-on-accent); box-shadow: var(--lift-1);
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
   &:active { transform: scale(.98); }
 }
 
 .rk__done {
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--tech-border, var(--hairline));
   background: var(--bg-sink); color: var(--ink);
   &:active { background: var(--bg-rise); }
 }
@@ -444,10 +491,11 @@
 
 .rg__glyph {
   flex: 0 0 auto;
-  width: 44px; height: 44px; border-radius: var(--r-tile);
+  width: 44px; height: 44px; border-radius: var(--tech-r-control, var(--r-tile));
   display: grid; place-items: center;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: var(--ink-on-accent); box-shadow: var(--lift-1);
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
   mat-icon { font-size: 24px; width: 24px; height: 24px; }
 }
 
@@ -458,11 +506,14 @@
   word-break: break-word;
 }
 
-// ---- flow strip ----
+// ---- flow strip — CARD SIGNATURE ----
 .rg__flow {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 10px 12px;
-  background: var(--bg-sink); border: 1px solid var(--hairline); border-radius: var(--r-card);
+  background: var(--tech-bg-sunken, var(--bg-sink));
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-radius, var(--r-card));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
 }
 
 .rg__flow-node {
@@ -473,20 +524,25 @@
 
 .rg__flow-arr { font-size: 16px; width: 16px; height: 16px; color: var(--ink-faint, var(--ink-dim)); }
 
-// ---- step ----
+// ---- step — CARD SIGNATURE ----
 .rg__step {
   display: flex; flex-direction: column; gap: 10px;
-  padding: 14px; border-radius: var(--r-card);
-  background: var(--bg-rise); border: 1px solid var(--hairline);
+  padding: 14px;
+  background: var(--bg-rise);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-radius, var(--r-card));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
 }
 
 .rg__step-head { display: flex; align-items: flex-start; gap: 11px; }
 
+// LIST ROWS — leading icon tile with FiMobile accent tint + control radius.
 .rg__step-ic {
   flex: 0 0 auto;
-  width: 36px; height: 36px; border-radius: var(--r-tile);
+  width: 36px; height: 36px;
+  border-radius: var(--tech-r-control, var(--r-tile));
   display: grid; place-items: center;
-  background: color-mix(in oklab, var(--accent-a) 18%, transparent);
+  background: color-mix(in srgb, var(--accent-a) 12%, transparent);
   color: var(--accent-a);
   mat-icon { font-size: 20px; width: 20px; height: 20px; }
 }
@@ -495,11 +551,13 @@
 .rg__step-title { margin: 0; font-family: var(--font-ui); font-weight: 700; font-size: 15px; color: var(--ink); }
 .rg__step-blurb { margin: 0; font-family: var(--font-ui); font-size: 12.5px; line-height: 1.45; color: var(--ink-dim); }
 
-// ---- command block ----
+// ---- command block — CARD SIGNATURE ----
 .rg__cmd {
   display: flex; flex-direction: column; gap: 6px;
-  padding: 10px 12px; border-radius: var(--r-card);
-  background: var(--bg-base); border: 1px solid var(--hairline);
+  padding: 10px 12px;
+  background: var(--tech-bg-sunken, var(--bg-base));
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-control, var(--r-card));
 }
 
 .rg__cmd-top { display: flex; align-items: center; gap: 8px; }
@@ -510,11 +568,14 @@
   letter-spacing: .03em; text-transform: uppercase; color: var(--ink-dim);
 }
 
+// BUTTON/CTA — compact copy icon button with FiMobile control radius.
 .rg__cmd-copy {
   flex: 0 0 auto;
   display: grid; place-items: center;
-  width: 34px; height: 34px; border-radius: var(--r-tile);
-  border: 1px solid var(--hairline); background: var(--bg-sink); color: var(--ink-dim);
+  width: 34px; height: 34px;
+  border-radius: var(--tech-r-control, var(--r-tile));
+  border: 1px solid var(--tech-border, var(--hairline));
+  background: var(--bg-sink); color: var(--ink-dim);
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transition: color 160ms var(--ease-out), background 160ms var(--ease-out);
   mat-icon { font-size: 18px; width: 18px; height: 18px; }

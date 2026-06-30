@@ -51,12 +51,13 @@
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  border-radius: var(--tech-radius-lg, 18px);
+  border-radius: var(--tech-radius, 18px);
   padding: clamp(28px, 5vw, 48px);
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--wr-a) 18%, var(--wr-panel)),
                             color-mix(in srgb, var(--wr-b) 14%, var(--wr-panel)));
   border: 1px solid var(--wr-edge);
+  box-shadow: var(--tech-shadow-panel);
   text-align: center;
 }
 .wr-hero__glow {
@@ -75,22 +76,31 @@
   color: var(--wr-ink-dim);
   mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--wr-b); }
 }
-.wr-hero__periods { display: inline-flex; gap: 6px; }
+// FiMobile segmented-pill tray wrapping the period chips
+.wr-hero__periods {
+  display: inline-flex; gap: 4px;
+  background: color-mix(in srgb, var(--wr-panel-2) 70%, transparent);
+  border-radius: var(--tech-radius, 14px);
+  padding: 4px;
+  border: 1px solid var(--wr-edge);
+}
+
 .wr-chip {
   appearance: none; cursor: pointer;
-  min-height: 36px; padding: 0 16px; border-radius: 999px;
-  border: 1px solid var(--wr-edge);
-  background: color-mix(in srgb, var(--wr-panel-2) 80%, transparent);
+  min-height: 36px; padding: 0 16px; border-radius: var(--tech-r-control, 10px);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--wr-ink-dim);
   font: 700 13px/1 var(--tech-font, system-ui);
   transition: color .16s, background .16s, border-color .16s, transform .12s;
-  &:hover:not(:disabled) { color: var(--wr-ink); }
+  &:hover:not(:disabled) { color: var(--wr-ink); background: color-mix(in srgb, var(--wr-panel-2) 60%, transparent); }
   &:active:not(:disabled) { transform: scale(.96); }
   &:focus-visible { outline: 2px solid var(--wr-a); outline-offset: 2px; }
   &:disabled { opacity: .5; cursor: default; }
   &.is-on {
     color: var(--tech-text-on-accent, #fff); border-color: transparent;
     background: linear-gradient(135deg, var(--wr-a), var(--wr-b));
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--wr-a) 28%, transparent);
   }
 }
 
@@ -102,9 +112,9 @@
 .wr-hero__sub { margin: 12px 0 0; font: 500 17px/1.5 var(--tech-font, system-ui); color: var(--wr-ink-dim); }
 .wr-hero__range {
   margin: 16px auto 0; display: inline-flex; align-items: center; gap: 7px;
-  padding: 8px 16px; border-radius: 999px;
+  padding: 8px 16px; border-radius: var(--tech-r-pill, 999px);
   background: color-mix(in srgb, var(--wr-a) 14%, transparent);
-  border: 1px solid var(--wr-edge);
+  border: 1px solid color-mix(in srgb, var(--wr-a) 30%, transparent);
   font: 700 13px/1 var(--tech-font, system-ui); color: var(--wr-ink-dim);
   mat-icon { font-size: 16px; width: 16px; height: 16px; }
 }
@@ -153,11 +163,12 @@
 
 // ─────────── AI NARRATIVE ───────────
 .wr-story {
-  border-radius: var(--tech-radius-lg, 18px);
+  border-radius: var(--tech-radius, 18px);
   padding: clamp(22px, 4vw, 34px);
   background: var(--wr-panel);
   border: 1px solid var(--wr-edge);
   border-left: 3px solid var(--wr-a);
+  box-shadow: var(--tech-shadow-panel);
 }
 .wr-story__text {
   margin: 0;
@@ -185,16 +196,22 @@
   position: relative; overflow: hidden; isolation: isolate;
   display: flex; flex-direction: column; gap: 4px;
   padding: 20px;
-  border-radius: var(--tech-radius-md, 14px);
+  border-radius: var(--tech-radius, 14px);
   background: var(--wr-panel);
   border: 1px solid var(--wr-edge);
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform .18s, box-shadow .18s;
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+  }
   &::before {
     content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
     background: linear-gradient(90deg, var(--ga, var(--wr-a)), var(--gb, var(--wr-b)));
   }
 }
 .wr-stat__ico {
-  display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; margin-bottom: 6px;
+  display: grid; place-items: center; width: 38px; height: 38px; border-radius: var(--tech-r-control, 10px); margin-bottom: 6px;
   background: linear-gradient(135deg, var(--ga, var(--wr-a)), var(--gb, var(--wr-b)));
   color: var(--tech-text-on-accent, #fff);
   mat-icon { font-size: 21px; width: 21px; height: 21px; }

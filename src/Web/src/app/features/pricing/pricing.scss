@@ -59,6 +59,7 @@
   font-family: var(--tech-font-ui);
   font-weight: 600;
   letter-spacing: 0.01em;
+  color: var(--tech-text-on-accent);
   transition: box-shadow 180ms ease, transform 120ms var(--tech-ease);
 
   &:hover:not([disabled]) {
@@ -128,7 +129,7 @@ mat-progress-bar {
 }
 
 /* =========================================================================
-   Rate card — opaque techy config panel
+   Rate card — FiMobile card signature
    ========================================================================= */
 .rate-card {
   position: relative;
@@ -136,7 +137,7 @@ mat-progress-bar {
   padding: 18px;
   background: var(--tech-panel);
   border: 1px solid var(--tech-border);
-  border-radius: var(--tech-r-panel);
+  border-radius: var(--tech-radius);
   box-shadow: var(--tech-shadow-panel);
   transition:
     border-color var(--tech-t-control) ease,
@@ -172,21 +173,19 @@ mat-progress-bar {
       background: var(--tech-border-neon);
       opacity: 1;
     }
-    .rc-dot {
-      background: var(--tech-accent-cyan);
-      box-shadow: 0 0 8px -1px var(--tech-accent-cyan);
-    }
     &::before { opacity: 1; }
   }
 }
 
-/* ---- Card header ---- */
+/* ---- Card header — FiMobile list-row leading-tile pattern ---- */
 .rc-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--tech-space-2);
   margin-bottom: var(--tech-space-3);
+  padding-bottom: var(--tech-space-2);
+  border-bottom: 1px solid var(--tech-border-subtle);
 }
 
 .rc-title {
@@ -196,13 +195,40 @@ mat-progress-bar {
   min-width: 0;
 }
 
+/* Leading icon tile — replaces the old 8px dot; gives cards the
+   FiMobile list-row signature (tinted accent tile + model pattern). */
 .rc-dot {
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--tech-vendor-claude);
-  box-shadow: 0 0 8px -1px var(--tech-vendor-claude);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--tech-r-control);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  color: var(--tech-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Inner dot retained as a decorative glyph centered in the tile */
+  &::after {
+    content: '';
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--tech-accent);
+    box-shadow: 0 0 8px -1px var(--tech-accent);
+    transition: box-shadow var(--tech-t-control) ease;
+  }
+}
+
+.rate-card.placeholder .rc-dot {
+  background: color-mix(in srgb, var(--tech-accent-cyan) 12%, transparent);
+  color: var(--tech-accent-cyan);
+
+  &::after {
+    background: var(--tech-accent-cyan);
+    box-shadow: 0 0 8px -1px var(--tech-accent-cyan);
+  }
 }
 
 .pattern {
@@ -212,6 +238,9 @@ mat-progress-bar {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* FiMobile: code chip feel on the pattern label */
+  font-family: var(--tech-font-mono);
+  letter-spacing: 0.01em;
 }
 
 .badge {
@@ -221,11 +250,11 @@ mat-progress-bar {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 3px 9px;
+  padding: 3px 10px;
   border-radius: var(--tech-r-pill);
   color: var(--tech-accent-cyan);
-  background: color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 40%, transparent);
+  background: color-mix(in srgb, var(--tech-accent-cyan) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-accent-cyan) 30%, transparent);
 }
 
 /* =========================================================================
@@ -240,6 +269,10 @@ mat-progress-bar {
   display: block;
   margin: 0 0 var(--tech-space-2);
   color: var(--tech-text-tertiary);
+  font-size: var(--tech-fs-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
 }
 
 .rates {

@@ -10,14 +10,16 @@
   gap: var(--tech-space-4, 1rem);
 }
 
+/* ── FiMobile card signature ── */
 .habits__card {
   padding: var(--tech-space-6, 24px);
   border: 1px solid var(--tech-border);
-  border-radius: var(--tech-radius, 12px);
+  border-radius: var(--tech-radius, 15px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
 }
 .habits__card-title { margin: 0 0 4px; font-size: var(--tech-fs-h1, 18px); font-weight: 700; color: var(--tech-text); }
-.habits__card-sub { margin: 0 0 var(--tech-space-4, 16px); color: var(--tech-text-tertiary); font-size: var(--tech-fs-body); line-height: 1.45; }
+.habits__card-sub { margin: 0 0 var(--tech-space-4, 16px); color: var(--tech-text-secondary, var(--tech-text-tertiary)); font-size: var(--tech-fs-body); line-height: 1.45; }
 
 /* ── Header ── */
 .habits__head { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; justify-content: space-between; }
@@ -27,18 +29,29 @@
 /* Loading spinner wrapper; empty + error render via the shared app-bs-empty / app-bs-error kit primitives. */
 .habits__loading { display: flex; justify-content: center; padding: 3rem 0; }
 
-/* ── Coach ── */
+/* ── Coach — HERO CARD (gradient-accent fill) ── */
 .habits__coach {
   display: flex; gap: 16px; align-items: flex-start;
-  background: linear-gradient(135deg, rgba(79,70,229,0.10), rgba(13,148,136,0.07));
+  background: var(--tech-gradient-accent);
+  color: var(--tech-text-on-accent);
+  border-color: transparent;
+  box-shadow: var(--tech-shadow-raised, var(--tech-shadow-panel));
 }
 .habits__coach-ic {
   flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--tech-accent, #4f46e5); color: var(--tech-text-on-accent, #fff); mat-icon { color: var(--tech-text-on-accent, #fff); }
+  background: color-mix(in srgb, var(--tech-text-on-accent) 20%, transparent);
+  color: var(--tech-text-on-accent);
+  mat-icon { color: var(--tech-text-on-accent); }
 }
-.habits__coach-h { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tech-text-accent, #4f46e5); }
-.habits__coach-note { margin: 4px 0 0; color: var(--tech-text); line-height: 1.5; }
-.habits__coach-insight { margin: 2px 0 0; color: var(--tech-text-tertiary); font-size: 0.9rem; }
+.habits__coach-h {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent);
+}
+.habits__coach-note { margin: 4px 0 0; color: var(--tech-text-on-accent); line-height: 1.5; }
+.habits__coach-insight {
+  margin: 2px 0 0; font-size: 0.9rem;
+  color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent);
+}
 
 /* ── Habit grid ── */
 .habits__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
@@ -46,6 +59,10 @@
 .hcard {
   display: flex; flex-direction: column; gap: 12px;
   border-top: 3px solid var(--hc-accent, #4f46e5);
+  border-radius: var(--tech-radius, 15px);
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised, var(--tech-shadow-panel)); }
   &.is-paused { opacity: 0.6; }
 }
 .hcard__top { display: flex; align-items: flex-start; gap: 10px; }
@@ -56,7 +73,15 @@
 }
 .hcard__id { flex: 1; min-width: 0; }
 .hcard__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--tech-text); }
-.hcard__cadence { font-size: 0.78rem; color: var(--tech-text-tertiary); }
+/* FiMobile chip — cadence pill badge */
+.hcard__cadence {
+  display: inline-block; font-size: 0.74rem; font-weight: 600; line-height: 1;
+  padding: 3px 9px; margin-top: 4px;
+  border-radius: var(--tech-r-pill, 999px);
+  background: color-mix(in srgb, var(--hc-accent, var(--tech-accent)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hc-accent, var(--tech-accent)) 30%, transparent);
+  color: var(--hc-accent, var(--tech-accent));
+}
 .hcard__menu { flex: none; }
 
 .hcard__streak { display: flex; align-items: baseline; gap: 6px; }
@@ -80,25 +105,49 @@
 
 .hcard__foot { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; margin-top: auto; }
 .hcard__spacer { flex: 1; }
-.hcard__done-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 0.76rem; font-weight: 700; color: var(--tech-success, #16a34a); mat-icon { font-size: 16px; width: 16px; height: 16px; } }
-.hcard__skip-tag { font-size: 0.74rem; color: var(--tech-text-tertiary); }
+/* FiMobile chip — status badges */
+.hcard__done-tag {
+  display: inline-flex; align-items: center; gap: 3px; font-size: 0.74rem; font-weight: 700;
+  padding: 3px 9px; border-radius: var(--tech-r-pill, 999px);
+  background: color-mix(in srgb, var(--tech-success, #16a34a) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-success, #16a34a) 30%, transparent);
+  color: var(--tech-success, #16a34a);
+  mat-icon { font-size: 14px; width: 14px; height: 14px; }
+}
+.hcard__skip-tag {
+  display: inline-flex; align-items: center; font-size: 0.72rem; font-weight: 600;
+  padding: 3px 9px; border-radius: var(--tech-r-pill, 999px);
+  background: color-mix(in srgb, var(--tech-text-tertiary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-text-tertiary) 20%, transparent);
+  color: var(--tech-text-tertiary);
+}
 .hcard__act { min-width: 0 !important; padding: 0 8px !important; color: var(--tech-text-tertiary) !important; mat-icon { font-size: 18px; width: 18px; height: 18px; } }
 .hcard__act--danger { color: var(--tech-error, #dc2626) !important; }
 
-/* ── Leaderboard ── */
-.lb__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+/* ── Leaderboard — FiMobile list rows ── */
+.lb__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .lb__row {
-  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--tech-r-control, 10px);
-  &.is-self { background: color-mix(in srgb, var(--tech-accent, #4f46e5) 8%, transparent); }
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 10px; border-radius: var(--tech-r-control, 10px);
+  transition: background 0.12s;
+  &:hover { background: color-mix(in srgb, var(--tech-accent) 5%, transparent); }
+  &.is-self { background: color-mix(in srgb, var(--tech-accent, #4f46e5) 10%, transparent); }
 }
 .lb__rank { width: 22px; text-align: center; font-weight: 800; color: var(--tech-text-tertiary); }
+/* FiMobile leading avatar tile */
 .lb__avatar {
-  flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; overflow: hidden;
-  background: var(--tech-bg); color: var(--tech-text); font-size: 0.74rem; font-weight: 700;
-  img { width: 100%; height: 100%; object-fit: cover; }
+  flex: none; width: 36px; height: 36px; border-radius: var(--tech-r-control, 10px);
+  display: grid; place-items: center; overflow: hidden;
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  color: var(--tech-accent); font-size: 0.78rem; font-weight: 700;
+  img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 }
-.lb__name { flex: 1; font-weight: 600; color: var(--tech-text); em { font-style: normal; color: var(--tech-text-tertiary); font-weight: 500; } }
-.lb__metric { font-size: 0.82rem; color: var(--tech-text); b { font-weight: 800; } }
+.lb__name {
+  flex: 1; font-weight: 600; color: var(--tech-text);
+  em { font-style: normal; color: var(--tech-text-secondary, var(--tech-text-tertiary)); font-weight: 500; }
+}
+/* trailing value in tertiary */
+.lb__metric { font-size: 0.82rem; color: var(--tech-text-tertiary); b { font-weight: 800; color: var(--tech-text); } }
 .lb__metric--soft { color: var(--tech-text-tertiary); font-size: 0.74rem; }
 
 /* ── Sheet (create/edit + calendar) ── */
@@ -107,7 +156,9 @@
   position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); z-index: 41;
   background: var(--tech-panel); border-left: 1px solid var(--tech-border);
   padding: var(--tech-space-6, 24px); overflow: auto;
-  display: flex; flex-direction: column; gap: 12px; box-shadow: -8px 0 28px rgba(0,0,0,0.18);
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: -8px 0 36px rgba(0,0,0,0.22), var(--tech-shadow-panel);
+  border-radius: var(--tech-radius, 15px) 0 0 var(--tech-radius, 15px);
 }
 .hsheet__head { display: flex; align-items: center; justify-content: space-between; h3 { margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--tech-text); } }
 .hsheet__field { display: flex; flex-direction: column; gap: 5px; }
@@ -115,11 +166,21 @@
 .hsheet__input { padding: 9px 11px; border: 1px solid var(--tech-border); border-radius: var(--tech-r-control, 9px); background: var(--tech-panel); color: var(--tech-text); font: inherit; &:focus { outline: none; border-color: var(--tech-accent, #4f46e5); } }
 .hsheet__row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-.hsheet__seg { display: flex; flex-wrap: wrap; gap: 6px; }
+/* FiMobile segmented pill container */
+.hsheet__seg {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  background: var(--tech-bg-sunken, var(--tech-bg)); border-radius: var(--tech-radius, 15px); padding: 4px;
+}
 .hsheet__seg-b {
-  padding: 7px 12px; cursor: pointer; font-size: 0.85rem;
-  border: 1px solid var(--tech-border); border-radius: 999px; background: var(--tech-panel); color: var(--tech-text);
-  &.is-on { background: var(--tech-accent, #4f46e5); border-color: var(--tech-accent, #4f46e5); color: var(--tech-text-on-accent, #fff); }
+  padding: 7px 14px; cursor: pointer; font-size: 0.85rem; font-weight: 500;
+  border: 1px solid transparent; border-radius: var(--tech-r-control, 10px);
+  background: transparent; color: var(--tech-text);
+  transition: background 0.15s, color 0.15s;
+  &:hover { background: color-mix(in srgb, var(--tech-accent) 8%, transparent); }
+  &.is-on {
+    background: var(--tech-accent, #4f46e5); border-color: var(--tech-accent, #4f46e5);
+    color: var(--tech-text-on-accent, #fff);
+  }
 }
 .hsheet__dows { display: flex; gap: 6px; }
 .hsheet__dow {

@@ -43,6 +43,9 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform var(--tech-t-fast, 120ms) ease, box-shadow var(--tech-t-fast, 120ms) ease;
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised); }
 }
 .child-card__head { display: flex; align-items: center; gap: 12px; }
 .child-card__avatar {
@@ -118,7 +121,7 @@
   gap: 4px;
   padding: 8px 12px;
   border: 1px solid var(--tech-border-subtle);
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   background: var(--tech-panel);
   color: var(--tech-text-secondary);
   cursor: pointer;

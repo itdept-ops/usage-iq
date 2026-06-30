@@ -222,7 +222,9 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
-  box-shadow: var(--tech-shadow-raised);
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform var(--tech-t-fast, 120ms) ease, box-shadow var(--tech-t-fast, 120ms) ease;
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised); }
 
   &--today {
     border-color: color-mix(in srgb, var(--tech-accent) 50%, var(--tech-border));
@@ -383,6 +385,7 @@
   background:
     radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent-cyan) 9%, transparent), transparent 55%),
     var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
   font-variant-numeric: tabular-nums;
 }
 .week-roll__label {

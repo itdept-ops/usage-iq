@@ -7,10 +7,10 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 2px 9px;
+    padding: 3px 10px;
     border-radius: var(--tech-r-pill, 999px);
-    border: 1px solid var(--tech-border-subtle, #1c2533);
-    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--tech-accent) 20%, transparent);
+    background: color-mix(in srgb, var(--tech-accent) 6%, transparent);
     color: var(--tech-text-tertiary, #6b7688);
     font-family: var(--tech-font-ui);
     font-size: var(--tech-fs-small, 12px);
@@ -21,12 +21,16 @@
 
     mat-icon { width: 15px; height: 15px; font-size: 15px; line-height: 15px; }
 
-    &:hover { border-color: var(--tech-border-strong, #2a3548); color: var(--tech-text-secondary); }
+    &:hover {
+      border-color: color-mix(in srgb, var(--tech-accent) 40%, transparent);
+      background: color-mix(in srgb, var(--tech-accent) 10%, transparent);
+      color: var(--tech-text-secondary);
+    }
     &:focus-visible { outline: 2px solid var(--tech-accent, #3FD8D0); outline-offset: 2px; }
 
     &.is-open {
-      border-color: color-mix(in srgb, var(--tech-accent, #3FD8D0) 55%, transparent);
-      background: color-mix(in srgb, var(--tech-accent, #3FD8D0) 12%, transparent);
+      border-color: color-mix(in srgb, var(--tech-accent) 55%, transparent);
+      background: color-mix(in srgb, var(--tech-accent) 14%, transparent);
       color: var(--tech-text-accent, #3FD8D0);
     }
 
@@ -37,8 +41,9 @@
     margin-top: 12px;
     padding: 12px;
     border-radius: var(--tech-radius, 12px);
-    border: 1px solid var(--tech-border-subtle, #1c2533);
+    border: 1px solid var(--tech-border, #1e2a3a);
     background: var(--tech-panel-2, #1a2230);
+    box-shadow: var(--tech-shadow-panel);
   }
 
   &__state {

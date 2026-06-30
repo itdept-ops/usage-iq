@@ -111,7 +111,7 @@ mat-progress-bar {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   KPI summary cards — opaque panels, mono hero numbers, accent glow
+   Quick-range pill row — FiMobile segmented-pill container
    ═══════════════════════════════════════════════════════════════ */
 .quick-row {
   display: flex;
@@ -126,18 +126,27 @@ mat-progress-bar {
     min-width: 0;
     height: 30px;
     padding: 0 12px;
-    border-radius: var(--tech-r-pill, 999px);
-    font-size: var(--tech-fs-label, 12px);
+    /* FiMobile chips: full pill radius, tinted bg, accent-tinted border */
+    border-radius: var(--tech-r-pill);
+    font-size: var(--tech-fs-label);
     font-weight: 500;
     color: var(--tech-text-secondary);
-    border: 1px solid var(--tech-border-subtle);
+    background: color-mix(in srgb, var(--tech-accent) 7%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tech-accent) 20%, transparent);
+    transition: background-color var(--tech-t-control) ease, border-color var(--tech-t-control) ease,
+                color var(--tech-t-control) ease, box-shadow var(--tech-t-slow) ease;
 
     &.active {
-      color: var(--tech-text-on-accent, #06090e);
-      background: var(--tech-accent, #3d8bff);
+      color: var(--tech-text-on-accent);
+      background: var(--tech-accent);
       border-color: transparent;
+      box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--tech-accent) 55%, transparent);
     }
-    &:hover:not(.active) { color: var(--tech-text); border-color: var(--tech-border-strong); }
+    &:hover:not(.active) {
+      color: var(--tech-text);
+      background: color-mix(in srgb, var(--tech-accent) 14%, transparent);
+      border-color: color-mix(in srgb, var(--tech-accent) 35%, transparent);
+    }
   }
 
   /* Vertical hairline separating quick-ranges from the Views control. */
@@ -174,11 +183,16 @@ mat-progress-bar {
 
   .qr-export {
     height: 32px;
-    border-radius: var(--tech-r-control, 8px);
+    border-radius: var(--tech-r-pill);  /* FiMobile: export buttons use pill radius to match chip row */
     color: var(--tech-text-secondary);
-    --mdc-outlined-button-outline-color: var(--tech-border-strong);
+    background: color-mix(in srgb, var(--tech-accent) 7%, transparent);
+    --mdc-outlined-button-outline-color: color-mix(in srgb, var(--tech-accent) 22%, transparent);
     mat-icon { font-size: 17px; width: 17px; height: 17px; margin-right: 2px; }
-    &:hover:not([disabled]) { color: var(--tech-accent); box-shadow: var(--tech-glow-blue); }
+    &:hover:not([disabled]) {
+      color: var(--tech-accent);
+      background: color-mix(in srgb, var(--tech-accent) 13%, transparent);
+      box-shadow: var(--tech-glow-blue);
+    }
   }
 }
 
@@ -258,19 +272,23 @@ mat-progress-bar {
     line-height: 1.4;
   }
 
-  /* A saved view row: name (apply on click) + rename/delete actions. */
+  /* A saved view row: FiMobile list-row — roomy padding, leading icon tile, muted text, trailing actions */
   .view-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 8px 4px 12px;
+    padding: 7px 8px 7px 12px;  /* ~14px vertical for roomy FiMobile rows */
     border-radius: var(--tech-r-control);
     transition: background-color var(--tech-t-control) ease, color var(--tech-t-control) ease;
 
     &:hover {
-      background: var(--tech-panel-raised);
+      background: color-mix(in srgb, var(--tech-accent) 7%, transparent);
       .view-apply { color: var(--tech-text); }
-      .view-ico { color: var(--tech-text-accent); }
+      /* Promote icon tile on hover */
+      .view-ico {
+        background: color-mix(in srgb, var(--tech-accent) 22%, transparent);
+        color: var(--tech-accent);
+      }
     }
 
     /* The apply area is a real button — strip native chrome so the row looks unchanged. */
@@ -279,7 +297,7 @@ mat-progress-bar {
       min-width: 0;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       padding: 0;
       margin: 0;
       border: 0;
@@ -291,7 +309,20 @@ mat-progress-bar {
       transition: color var(--tech-t-control) ease;
     }
 
-    .view-ico { font-size: 17px; width: 17px; height: 17px; color: var(--tech-text-tertiary); flex: 0 0 auto; }
+    /* FiMobile leading icon tile — the mat-icon itself acts as the 28px accent-tinted tile */
+    .view-ico {
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      width: 28px;
+      height: 28px;
+      border-radius: var(--tech-r-control);
+      background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+      color: var(--tech-accent);
+      font-size: 16px;
+      transition: background var(--tech-t-control) ease, color var(--tech-t-control) ease;
+    }
+
     .view-name {
       flex: 1 1 auto;
       min-width: 0;
@@ -425,6 +456,52 @@ mat-progress-bar {
 .kpi-io     { --accent: var(--tech-accent-2); }
 .kpi-active { --accent: var(--tech-accent-cyan); }
 
+/* ── FiMobile HERO CARD — Total cost is the dominant primary metric ── */
+/* The gradient fill covers the panel surface; all text must be legible on it. */
+.kpi-cost {
+  background: var(--tech-gradient-accent);
+  border-color: transparent;
+  box-shadow: var(--tech-shadow-raised);
+
+  /* Override the ::after top-accent hairline — not needed on a gradient fill. */
+  &::after { display: none; }
+
+  /* Label and value text switch to on-accent palette for legibility. */
+  .kpi-label {
+    color: color-mix(in srgb, var(--tech-text-on-accent) 72%, transparent);
+    letter-spacing: 0.07em;
+  }
+
+  /* The header-icon orb: muted tint on the gradient fill. */
+  .header-icon {
+    background: color-mix(in srgb, var(--tech-text-on-accent) 18%, transparent);
+    color: var(--tech-text-on-accent);
+  }
+
+  /* Hero number: full on-accent (overrides .kpi-value.cost magenta rule). */
+  .kpi-value,
+  .kpi-value.cost {
+    color: var(--tech-text-on-accent);
+    text-shadow: none;
+
+    .dim { color: color-mix(in srgb, var(--tech-text-on-accent) 65%, transparent); }
+  }
+
+  /* Sub-line stays readable but softer. */
+  .kpi-sub {
+    color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent);
+
+    .mono-num { color: color-mix(in srgb, var(--tech-text-on-accent) 88%, transparent); }
+  }
+
+  /* Hover: brighten border slightly; no translateY — hero cards feel anchored. */
+  &:hover {
+    border-color: color-mix(in srgb, var(--tech-text-on-accent) 22%, transparent);
+    transform: none;
+    box-shadow: var(--tech-shadow-raised);
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Charts — opaque panels with sunken chart wells
    ═══════════════════════════════════════════════════════════════ */
@@ -446,8 +523,17 @@ mat-progress-bar {
 
   .chart-card {
     padding: var(--tech-space-4);
-    transition: border-color var(--tech-t-control) ease;
-    &:hover { border-color: var(--tech-border-strong); }
+    transition:
+      border-color var(--tech-t-control) ease,
+      box-shadow var(--tech-t-slow) ease,
+      transform var(--tech-t-fast) var(--tech-ease);
+
+    /* FiMobile hover lift on interactive chart panels */
+    &:hover {
+      border-color: var(--tech-border-strong);
+      transform: translateY(-1px);
+      box-shadow: var(--tech-shadow-raised);
+    }
   }
 
   .chart-well {
@@ -481,23 +567,39 @@ mat-progress-bar {
   .header-icon { flex: 0 0 auto; }
 }
 
-/* Group-by toggle group — segmented control look */
+/* Group-by toggle group — FiMobile segmented pill-tab control */
 mat-button-toggle-group {
-  border: 1px solid var(--tech-border);
-  border-radius: var(--tech-r-control);
-  background: var(--tech-input);
+  /* FiMobile pill container: sunken bg + full pill radius + comfortable padding */
+  background: var(--tech-bg-sunken);
+  border: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-radius);
+  padding: 4px;
+  gap: 2px;
   overflow: hidden;
   --mat-standard-button-toggle-height: 30px;
   --mat-standard-button-toggle-text-color: var(--tech-text-secondary);
-  --mat-standard-button-toggle-selected-state-text-color: var(--tech-text);
-  --mat-standard-button-toggle-selected-state-background-color: var(--tech-panel-raised);
+  --mat-standard-button-toggle-selected-state-text-color: var(--tech-text-on-accent);
+  --mat-standard-button-toggle-selected-state-background-color: var(--tech-accent);
   --mat-standard-button-toggle-background-color: transparent;
-  --mat-standard-button-toggle-divider-color: var(--tech-border-subtle);
+  --mat-standard-button-toggle-divider-color: transparent;
   --mat-standard-button-toggle-label-text-size: var(--tech-fs-label);
   --mat-standard-button-toggle-label-text-tracking: 0.03em;
 
+  /* Each toggle pill radius */
+  .mat-button-toggle {
+    border-radius: var(--tech-r-control);
+    overflow: hidden;
+
+    &:hover:not(.mat-button-toggle-checked) {
+      background: color-mix(in srgb, var(--tech-accent) 10%, transparent);
+      color: var(--tech-text);
+    }
+  }
+
+  /* Active pill: solid accent fill, on-accent text, no underline bar */
   .mat-button-toggle-checked {
-    box-shadow: inset 0 -2px 0 var(--tech-accent);
+    border-radius: var(--tech-r-control);
+    box-shadow: 0 1px 4px -1px rgba(0, 0, 0, 0.28);
   }
 }
 
@@ -524,8 +626,17 @@ mat-button-toggle-group {
 .cache-card {
   --accent: var(--tech-accent-cyan);
   padding: var(--tech-space-4);
-  transition: border-color var(--tech-t-control) ease;
-  &:hover { border-color: var(--tech-border-strong); }
+  transition:
+    border-color var(--tech-t-control) ease,
+    box-shadow var(--tech-t-slow) ease,
+    transform var(--tech-t-fast) var(--tech-ease);
+
+  /* FiMobile hover lift */
+  &:hover {
+    border-color: var(--tech-border-strong);
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+  }
 
   /* .panel-header inherits the shared flex + .header-icon orb (cyan, via this card's --accent). */
 
@@ -607,10 +718,12 @@ mat-button-toggle-group {
       display: flex;
       flex-direction: column;
       gap: 3px;
-      padding: 8px 10px;
-      border-radius: var(--tech-r-chip);
+      padding: 9px 12px;
+      /* FiMobile card signature: control radius + panel shadow + border */
+      border-radius: var(--tech-r-control);
       background: var(--tech-bg-sunken);
-      border: 1px solid var(--tech-border-subtle);
+      border: 1px solid var(--tech-border);
+      box-shadow: var(--tech-shadow-panel);
 
       .cs-label {
         font-size: var(--tech-fs-micro);
@@ -729,7 +842,7 @@ td.cost {
   font-weight: 500;
 }
 
-/* Type tags — semantic tinted pills */
+/* Type tags — FiMobile pill chips (full pill radius, tinted bg + accent border) */
 .tag {
   display: inline-flex;
   align-items: center;
@@ -737,19 +850,19 @@ td.cost {
   font-size: var(--tech-fs-micro);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: var(--tech-r-chip);
+  padding: 2px 9px;
+  border-radius: var(--tech-r-pill);  /* FiMobile: full pill */
   white-space: nowrap;
   border: 1px solid transparent;
 }
 .tag.main {
-  background: var(--tech-info-tint);
-  border-color: color-mix(in srgb, var(--tech-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--tech-accent) 30%, transparent);
   color: var(--tech-text-accent);
 }
 .tag.sub {
-  background: var(--tech-warn-tint);
-  border-color: color-mix(in srgb, var(--tech-warn) 35%, transparent);
+  background: color-mix(in srgb, var(--tech-warn) 12%, transparent);
+  border-color: color-mix(in srgb, var(--tech-warn) 30%, transparent);
   color: var(--tech-warn);
 }
 

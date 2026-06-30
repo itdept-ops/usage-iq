@@ -88,10 +88,11 @@
 /* ─────────────────────────── share ─────────────────────────── */
 .re-share {
   margin-top: 6px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--tech-border);
-  border-radius: var(--tech-r-control, 10px);
+  border-radius: var(--tech-radius, var(--tech-r-control, 10px));
   background: var(--tech-bg-sunken, transparent);
+  box-shadow: var(--tech-shadow-panel);
 }
 
 .re-share-hint {

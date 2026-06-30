@@ -24,6 +24,7 @@
 .family-locs__map-card {
   padding: var(--tech-space-2, 8px);
   overflow: hidden;
+  box-shadow: var(--tech-shadow-panel);
 
   app-location-map { display: block; height: 460px; }
 
@@ -42,6 +43,7 @@
 
 .family-locs__list-card {
   padding: var(--tech-space-4, 16px);
+  box-shadow: var(--tech-shadow-panel);
 
   .family__card-title { margin-top: 0; }
 }
@@ -152,20 +154,20 @@
 /* ── Mode toggle (Live ↔ Replay) ────────────────────────────────────── */
 .family-locs__modes {
   display: inline-flex;
-  padding: 3px;
-  border-radius: var(--tech-r-pill, 999px);
-  background: var(--tech-bg-sunken, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--tech-border);
+  padding: 4px;
+  border-radius: var(--tech-radius, 12px);
+  background: var(--tech-bg-sunken);
+  border: 1px solid var(--tech-border-subtle);
 }
 
 .family-locs__mode {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 12px;
+  padding: 6px 12px;
   border: none;
   background: transparent;
-  border-radius: var(--tech-r-pill, 999px);
+  border-radius: var(--tech-r-control);
   font-size: var(--tech-fs-label, 11px);
   font-weight: 600;
   color: var(--tech-text-secondary);
@@ -175,10 +177,10 @@
   mat-icon { width: 16px; height: 16px; font-size: 16px; line-height: 16px; }
 
   &.is-active {
-    background: var(--tech-text-accent);
-    color: var(--tech-text-on-accent, #0b1020);
+    background: var(--tech-accent);
+    color: var(--tech-text-on-accent);
   }
-  &:focus-visible { outline: 2px solid var(--tech-text-accent); outline-offset: 2px; }
+  &:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: 2px; }
 }
 
 .member-loc__btn--static { cursor: default; }
@@ -267,9 +269,10 @@
   &--play {
     width: 48px;
     height: 48px;
-    background: var(--tech-text-accent);
+    background: var(--tech-accent);
     border-color: transparent;
-    color: var(--tech-text-on-accent, #0b1020);
+    color: var(--tech-text-on-accent);
+    border-radius: var(--tech-r-control);
     mat-icon { width: 24px; height: 24px; font-size: 24px; line-height: 24px; }
   }
 }

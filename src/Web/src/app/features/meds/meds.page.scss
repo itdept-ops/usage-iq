@@ -10,6 +10,8 @@
   --md-sub: var(--tech-text-secondary, #9ba9bd);
   --md-accent: var(--tech-accent, #7c8cff);
   --accent: var(--md-accent);
+  // FiMobile: Nunito headings for the feature
+  h1, h2, h3 { font-family: 'Nunito', 'Inter', system-ui, sans-serif; }
 }
 
 .mono-num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
@@ -47,21 +49,31 @@
   margin: .6rem 0 0; padding: .3rem .7rem;
   font-size: .8rem; color: var(--md-sub);
   background: color-mix(in srgb, var(--md-accent) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--md-accent) 24%, transparent);
-  border-radius: 999px;
+  // FiMobile chip: pill radius + tinted border
+  border: 1px solid color-mix(in srgb, var(--md-accent) 30%, transparent);
+  border-radius: var(--tech-r-pill, 999px);
   mat-icon { font-size: 1rem; width: 1rem; height: 1rem; color: var(--md-accent); }
 }
 
-.md-head__windows { display: inline-flex; gap: .35rem; }
+// FiMobile pill-tab container for the window selector
+.md-head__windows {
+  display: inline-flex; gap: 0;
+  background: var(--tech-bg-sunken, #0c1118);
+  border-radius: var(--tech-radius, 12px);
+  padding: 4px;
+}
 .md-chip, .md-vchip {
   display: inline-flex; align-items: center; gap: .35rem;
-  padding: .4rem .8rem; border-radius: 999px;
-  background: var(--md-panel2); border: 1px solid var(--md-border);
+  padding: .4rem .8rem;
+  // FiMobile: segmented-pill radius for chips inside the tab bar
+  border-radius: var(--tech-r-control, 8px);
+  background: transparent; border: none;
   color: var(--md-sub); font-size: .82rem; font-weight: 600; cursor: pointer;
   transition: all var(--tech-t-fast, 120ms) ease;
   mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
   &:hover:not(:disabled) { color: var(--md-text); }
   &:disabled { opacity: .5; cursor: default; }
+  // FiMobile active tab: solid accent fill
   &.is-on {
     color: var(--tech-text-on-accent, #fff); border-color: transparent;
     background: var(--accent, var(--md-accent));
@@ -70,12 +82,14 @@
 
 // ─────────── insight ───────────
 .md-insight {
-  border-radius: var(--md-r);
+  border-radius: var(--tech-radius, 12px);
   padding: 1.1rem 1.25rem;
   background: linear-gradient(135deg,
     color-mix(in srgb, var(--md-accent) 14%, var(--md-panel)),
     color-mix(in srgb, var(--tech-accent-b, #c084fc) 9%, var(--md-panel)));
   border: 1px solid color-mix(in srgb, var(--md-accent) 28%, transparent);
+  // FiMobile card signature: panel shadow on subtle cards too
+  box-shadow: var(--tech-shadow-panel);
   &__kicker {
     display: inline-flex; align-items: center; gap: .4rem;
     margin: 0 0 .5rem; font-size: .78rem; font-weight: 700;
@@ -92,10 +106,12 @@
 
 // ─────────── sections ───────────
 .md-sec {
-  border-radius: var(--md-r);
+  border-radius: var(--tech-radius, 12px);
   background: var(--md-panel);
-  border: 1px solid var(--md-border);
+  border: 1px solid var(--tech-border, #26303f);
   padding: 1.25rem;
+  // FiMobile card signature: panel shadow
+  box-shadow: var(--tech-shadow-panel);
   &__head {
     display: flex; justify-content: space-between; align-items: center;
     gap: 1rem; flex-wrap: wrap; margin-bottom: 1.1rem;
@@ -135,58 +151,80 @@
 .md-meds { display: grid; grid-template-columns: 220px 1fr; gap: 1.25rem; align-items: start; }
 @media (max-width: 720px) { .md-meds { grid-template-columns: 1fr; } }
 
+// FiMobile HERO card — adherence ring is the primary summary metric on this page.
 .md-ring-card {
   display: flex; flex-direction: column; align-items: center; gap: .9rem;
-  padding: 1.25rem; border-radius: var(--md-r);
-  background: var(--md-panel2); border: 1px solid var(--md-border);
+  padding: 1.5rem 1.25rem;
+  border-radius: var(--tech-radius, 12px);
+  // Hero gradient fill + no border (gradient-accent is the border)
+  background: var(--tech-gradient-accent);
+  border: none;
+  box-shadow: var(--tech-shadow-raised);
 }
 .md-ring {
   --pct: 0;
   width: 130px; height: 130px; border-radius: 50%;
   display: grid; place-content: center; text-align: center;
+  // Hero: inner track uses a semi-transparent on-accent tint so it reads on the gradient
   background:
-    radial-gradient(closest-side, var(--md-panel2) 79%, transparent 80% 100%),
-    conic-gradient(var(--md-accent) calc(var(--pct) * 1%), color-mix(in srgb, var(--md-border) 70%, transparent) 0);
+    radial-gradient(closest-side, rgba(6,9,14,.45) 79%, transparent 80% 100%),
+    conic-gradient(var(--tech-text-on-accent, #fff) calc(var(--pct) * 1%), rgba(255,255,255,.2) 0);
+  // Crisp text on the gradient fill
+  color: var(--tech-text-on-accent, #fff);
   &__num { font-size: 1.7rem; font-weight: 700; }
-  &__cap { display: block; font-size: .72rem; color: var(--md-sub); text-transform: uppercase; letter-spacing: .05em; }
-  &__meta { text-align: center; p { margin: .15rem 0; font-size: .85rem; } }
-  &__sub { color: var(--md-sub); font-size: .78rem !important; }
+  // muted label: 80% of on-accent
+  &__cap { display: block; font-size: .72rem; color: color-mix(in srgb, var(--tech-text-on-accent, #fff) 75%, transparent); text-transform: uppercase; letter-spacing: .05em; }
+  &__meta {
+    text-align: center; color: var(--tech-text-on-accent, #fff);
+    p { margin: .15rem 0; font-size: .85rem; }
+  }
+  &__sub { color: color-mix(in srgb, var(--tech-text-on-accent, #fff) 70%, transparent); font-size: .78rem !important; }
 }
 
 .md-list { display: flex; flex-direction: column; gap: .85rem; }
 
 .md-med {
-  border-radius: var(--md-r);
+  // FiMobile card signature: proper radius + panel shadow + hover lift on interactive cards
+  border-radius: var(--tech-radius, 12px);
   background: var(--md-panel2);
-  border: 1px solid var(--md-border);
+  border: 1px solid var(--tech-border, #26303f);
+  box-shadow: var(--tech-shadow-panel);
   overflow: hidden;
-  &__bar { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; padding: .9rem 1rem; }
+  transition: transform var(--tech-t-fast, 120ms) ease, box-shadow var(--tech-t-fast, 120ms) ease;
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised); }
+  &__bar { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; padding: 1rem 1rem; }
   &__id { display: flex; gap: .7rem; align-items: center; min-width: 0; }
   &__glyph {
-    flex: none; width: 38px; height: 38px; border-radius: 10px;
+    // FiMobile leading icon tile: tinted accent bg + accent icon
+    flex: none; width: 38px; height: 38px;
+    border-radius: var(--tech-r-control, 8px);
     display: grid; place-content: center;
-    background: color-mix(in srgb, var(--md-accent) 16%, transparent);
+    background: color-mix(in srgb, var(--md-accent) 12%, transparent);
     color: var(--md-accent);
     mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
   }
   &__name { margin: 0; font-size: 1rem; font-weight: 700; }
   &__meta {
     display: flex; flex-wrap: wrap; align-items: center; gap: .3rem;
-    margin: .2rem 0 0; font-size: .82rem; color: var(--md-sub);
+    margin: .2rem 0 0; font-size: .82rem; color: var(--tech-text-secondary, #9ba9bd);
   }
-  &__rem { display: inline-flex; align-items: center; gap: .25rem; color: var(--md-accent);
-    mat-icon { font-size: .9rem; width: .9rem; height: .9rem; } }
+  &__rem {
+    display: inline-flex; align-items: center; gap: .25rem; color: var(--md-accent);
+    mat-icon { font-size: .9rem; width: .9rem; height: .9rem; }
+  }
   &__actions { display: flex; gap: .25rem; flex: none; }
-  &__none, &__meta .md-dot { color: var(--md-sub); }
-  &__none { margin: 0; padding: 0 1rem 1rem; font-size: .82rem; color: var(--md-sub); }
+  &__none, &__meta .md-dot { color: var(--tech-text-secondary, #9ba9bd); }
+  &__none { margin: 0; padding: 0 1rem 1rem; font-size: .82rem; color: var(--tech-text-secondary, #9ba9bd); }
 }
 .md-dot { opacity: .5; }
 
 .md-doses { display: flex; flex-direction: column; gap: .5rem; padding: 0 1rem 1rem; }
 .md-dose {
   display: flex; justify-content: space-between; align-items: center; gap: .75rem;
-  padding: .55rem .75rem; border-radius: var(--tech-r-control, 10px);
-  background: var(--md-panel); border: 1px solid var(--md-border);
+  // FiMobile list row: roomy 12px vertical padding
+  padding: .7rem .85rem;
+  border-radius: var(--tech-r-control, 8px);
+  background: var(--md-panel); border: 1px solid var(--tech-border, #26303f);
   &[data-status='taken'] { border-color: color-mix(in srgb, var(--tech-success) 50%, transparent); }
   &[data-status='skipped'] { border-color: color-mix(in srgb, var(--tech-warn, #f2b340) 45%, transparent); }
   &__when { font-size: .85rem; font-weight: 600; }
@@ -194,7 +232,7 @@
   &__btn {
     display: inline-flex; align-items: center; gap: .3rem;
     padding: .35rem .65rem; border-radius: var(--tech-r-control, 8px); cursor: pointer;
-    background: transparent; border: 1px solid var(--md-border); color: var(--md-sub);
+    background: transparent; border: 1px solid var(--tech-border, #26303f); color: var(--tech-text-secondary, #9ba9bd);
     font-size: .78rem; font-weight: 600; transition: all var(--tech-t-fast, 120ms) ease;
     mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
     &:disabled { opacity: .5; }
@@ -205,14 +243,24 @@
 }
 
 // ─────────── vitals ───────────
-.md-vital-kinds { display: inline-flex; flex-wrap: wrap; gap: .35rem; }
+// FiMobile pill-tab container for vital kind selector
+.md-vital-kinds {
+  display: inline-flex; flex-wrap: wrap; gap: 0;
+  background: var(--tech-bg-sunken, #0c1118);
+  border-radius: var(--tech-radius, 12px);
+  padding: 4px;
+}
 .md-vchip.is-on { background: var(--accent); }
 .md-vitals { --accent: var(--md-accent); display: grid; grid-template-columns: 1fr 1.4fr; gap: 1.25rem; align-items: start; }
 @media (max-width: 820px) { .md-vitals { grid-template-columns: 1fr; } }
 
 .md-qlog {
-  padding: 1.1rem; border-radius: var(--md-r);
-  background: var(--md-panel2); border: 1px solid var(--md-border);
+  padding: 1.1rem;
+  border-radius: var(--tech-radius, 12px);
+  background: var(--md-panel2);
+  border: 1px solid var(--tech-border, #26303f);
+  // FiMobile card signature: panel shadow
+  box-shadow: var(--tech-shadow-panel);
   &__h {
     display: inline-flex; align-items: center; gap: .45rem;
     margin: 0 0 .9rem; font-weight: 700;
@@ -239,8 +287,12 @@
 }
 
 .md-trend {
-  padding: 1.1rem; border-radius: var(--md-r);
-  background: var(--md-panel2); border: 1px solid var(--md-border);
+  padding: 1.1rem;
+  border-radius: var(--tech-radius, 12px);
+  background: var(--md-panel2);
+  border: 1px solid var(--tech-border, #26303f);
+  // FiMobile card signature: panel shadow
+  box-shadow: var(--tech-shadow-panel);
   &__stats { display: flex; gap: 1.25rem; margin-bottom: .5rem; flex-wrap: wrap; }
   &__chart { height: 240px; }
 }
@@ -257,10 +309,17 @@
 }
 .md-reading {
   display: flex; align-items: center; gap: .75rem;
-  padding: .55rem .75rem; border-radius: var(--tech-r-control, 9px);
-  background: var(--md-panel2); border: 1px solid var(--md-border); margin-bottom: .4rem;
-  &__v { font-size: .95rem; font-weight: 600; i { color: var(--md-sub); font-style: normal; font-size: .78rem; } }
-  &__d { margin-left: auto; font-size: .8rem; color: var(--md-sub); }
+  // FiMobile list row: roomy 12-14px vertical padding, border-radius via --tech-r-control
+  padding: .7rem .85rem;
+  border-radius: var(--tech-r-control, 8px);
+  background: var(--md-panel2);
+  border: 1px solid var(--tech-border, #26303f);
+  margin-bottom: .4rem;
+  transition: background var(--tech-t-fast, 120ms) ease;
+  &:hover { background: var(--md-panel); }
+  &__v { font-size: .95rem; font-weight: 600; i { color: var(--tech-text-secondary, #9ba9bd); font-style: normal; font-size: .78rem; } }
+  // FiMobile trailing value: tertiary text color
+  &__d { margin-left: auto; font-size: .8rem; color: var(--tech-text-tertiary, #8492a8); }
 }
 
 // ─────────── shared bits ───────────
@@ -301,9 +360,11 @@
   position: fixed; z-index: 61; top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: min(460px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow: auto;
   display: flex; flex-direction: column; gap: .85rem;
-  padding: 1.25rem; border-radius: var(--tech-radius, 18px);
-  background: var(--md-panel); border: 1px solid var(--md-border);
-  box-shadow: 0 30px 80px -30px rgba(0,0,0,.7);
+  padding: 1.25rem;
+  border-radius: var(--tech-radius, 12px);
+  background: var(--md-panel); border: 1px solid var(--tech-border, #26303f);
+  // FiMobile: elevated modal shadow
+  box-shadow: var(--tech-shadow-popover, 0 24px 60px -20px rgba(0,0,0,.8));
   &__head { display: flex; justify-content: space-between; align-items: center; }
   &__title { margin: 0; font-size: 1.15rem; font-weight: 700; }
   &__err { margin: 0; color: var(--tech-error, #ff8a94); font-size: .82rem; }

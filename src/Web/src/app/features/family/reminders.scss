@@ -138,7 +138,9 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
-  box-shadow: var(--tech-shadow-raised);
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform var(--tech-t-fast, 120ms) ease, box-shadow var(--tech-t-fast, 120ms) ease;
+  &:not(.reminder--done):hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised); }
 
   &--overdue {
     border-color: color-mix(in srgb, var(--tech-warn) 50%, var(--tech-border));
@@ -159,9 +161,9 @@
   display: grid;
   place-items: center;
   width: 40px; height: 40px;
-  border-radius: var(--tech-radius, 12px);
-  background: linear-gradient(135deg, rgba(61, 139, 255, 0.16), rgba(63, 216, 208, 0.16));
-  mat-icon { color: var(--tech-accent-cyan); width: 22px; height: 22px; font-size: 22px; }
+  border-radius: var(--tech-r-control);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  mat-icon { color: var(--tech-accent); width: 22px; height: 22px; font-size: 22px; }
 }
 
 .reminder__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }

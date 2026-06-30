@@ -14,11 +14,13 @@
   gap: var(--tech-space-4, 1rem);
 }
 
+/* ── Card signature: FiMobile panel look ── */
 .journal__card {
   padding: var(--tech-space-6, 24px);
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
 }
 .journal__card-title {
   margin: 0 0 var(--tech-space-3, 12px);
@@ -35,29 +37,32 @@
 /* ── Loading ── (error renders via the shared app-bs-error kit primitive) */
 .journal__loading { display: flex; justify-content: center; padding: 3rem 0; }
 
-/* ── Weekly reflection card ── */
+/* ── Weekly reflection card — FiMobile HERO CARD ── */
 .journal__reflect {
   display: flex; gap: 16px; align-items: flex-start;
-  background: linear-gradient(135deg, var(--jr-ink-soft), rgba(13, 148, 136, 0.08));
-  border-color: color-mix(in srgb, var(--jr-ink) 28%, var(--tech-border));
+  background: var(--tech-gradient-accent);
+  border-color: transparent;
 }
 .journal__reflect-ic {
   flex: none; width: 42px; height: 42px; border-radius: 50%;
   display: grid; place-items: center;
-  background: var(--jr-ink); color: var(--tech-text-on-accent, #fff);
-  mat-icon { color: var(--tech-text-on-accent, #fff); }
+  background: color-mix(in srgb, var(--tech-text-on-accent) 18%, transparent);
+  color: var(--tech-text-on-accent);
+  mat-icon { color: var(--tech-text-on-accent); }
 }
 .journal__reflect-body { display: flex; flex-direction: column; gap: 4px; }
 .journal__reflect-h {
   font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--jr-ink);
+  color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent);
 }
-.journal__reflect-note { margin: 0; color: var(--tech-text); line-height: 1.5; font-size: 1.02rem; }
-.journal__reflect-note.is-muted { color: var(--tech-text-tertiary); }
+.journal__reflect-note { margin: 0; color: var(--tech-text-on-accent); line-height: 1.5; font-size: 1.02rem; }
+.journal__reflect-note.is-muted { color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent); }
 .journal__reflect-tag {
   align-self: flex-start; margin-top: 2px;
-  font-size: 0.68rem; padding: 2px 8px; border-radius: 999px;
-  background: var(--tech-bg); color: var(--tech-text-tertiary); border: 1px solid var(--tech-border);
+  font-size: 0.68rem; padding: 2px 8px; border-radius: var(--tech-r-pill, 999px);
+  background: color-mix(in srgb, var(--tech-text-on-accent) 18%, transparent);
+  color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-text-on-accent) 30%, transparent);
 }
 
 /* ── Summary strip ── */
@@ -68,6 +73,9 @@
   display: flex; flex-direction: column; gap: 2px;
   padding: 14px 16px; border: 1px solid var(--tech-border); border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised); }
 }
 .journal__stat-v { font-size: 1.05rem; font-weight: 800; color: var(--tech-text); }
 .journal__stat-l { font-size: 0.74rem; color: var(--tech-text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -78,15 +86,27 @@
 /* left rail */
 .journal__rail { max-height: 640px; overflow: auto; }
 .journal__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+
+/* FiMobile list rows — roomy with leading icon tile */
 .journal__row {
   width: 100%; display: flex; align-items: center; gap: 10px;
-  padding: 9px 11px; border: 1px solid transparent; border-radius: var(--tech-r-control, 10px);
+  padding: 12px 11px; border: 1px solid transparent; border-radius: var(--tech-r-control, 10px);
   background: transparent; color: var(--tech-text); cursor: pointer; text-align: left;
+  transition: background 100ms ease, border-color 100ms ease;
   &:hover { background: var(--tech-bg); }
-  &.is-sel { background: var(--jr-ink-soft); border-color: color-mix(in srgb, var(--jr-ink) 32%, transparent); }
+  &.is-sel {
+    background: color-mix(in srgb, var(--tech-accent) 10%, var(--tech-panel));
+    border-color: color-mix(in srgb, var(--tech-accent) 32%, transparent);
+  }
 }
-.journal__row-emoji { font-size: 1.05rem; width: 1.4em; text-align: center; }
-.journal__row-date { font-weight: 600; flex: 1; }
+.journal__row-emoji {
+  /* leading icon tile */
+  flex: none; width: 32px; height: 32px; border-radius: var(--tech-r-control, 10px);
+  display: grid; place-items: center; font-size: 1.05rem;
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  color: var(--tech-accent);
+}
+.journal__row-date { font-weight: 600; flex: 1; font-size: 0.92rem; }
 .journal__row-mood { font-size: 0.74rem; color: var(--tech-text-tertiary); }
 
 /* editor */
@@ -108,14 +128,20 @@
   i { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--tech-text-tertiary); }
 }
 
-/* moods */
+/* moods — FiMobile card signature on each tile */
 .journal__moods { display: flex; flex-wrap: wrap; gap: 8px; }
 .journal__mood {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   min-width: 64px; padding: 10px 8px; cursor: pointer;
-  border: 1px solid var(--tech-border); border-radius: var(--tech-radius, 12px); background: var(--tech-panel); color: var(--tech-text);
-  &:hover { border-color: var(--jr-ink); }
-  &.is-on { background: var(--jr-ink-soft); border-color: var(--jr-ink); }
+  border: 1px solid var(--tech-border); border-radius: var(--tech-radius, 12px);
+  background: var(--tech-panel); color: var(--tech-text);
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform 100ms ease, border-color 100ms ease, background 100ms ease;
+  &:hover { border-color: color-mix(in srgb, var(--tech-accent) 50%, transparent); transform: translateY(-1px); }
+  &.is-on {
+    background: color-mix(in srgb, var(--tech-accent) 12%, var(--tech-panel));
+    border-color: var(--tech-accent);
+  }
 }
 .journal__mood-emoji { font-size: 1.4rem; }
 .journal__mood-l { font-size: 0.74rem; font-weight: 600; }
@@ -125,25 +151,30 @@
 .journal__dot {
   width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
   border: 2px solid var(--tech-border); background: var(--tech-panel); padding: 0;
-  &.is-on { background: var(--jr-warm); border-color: var(--jr-warm); }
+  transition: background 100ms ease, border-color 100ms ease;
+  &.is-on { background: var(--tech-accent); border-color: var(--tech-accent); }
 }
 .journal__energy-v { font-size: 0.85rem; color: var(--tech-text-tertiary); font-weight: 600; }
 
-/* tags */
+/* tags — FiMobile chip/badge pills */
 .journal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .journal__tag {
   padding: 6px 12px; cursor: pointer; font-size: 0.85rem;
-  border: 1px solid var(--tech-border); border-radius: 999px; background: var(--tech-panel); color: var(--tech-text);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+  border-radius: var(--tech-r-pill, 999px);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  color: var(--tech-text);
   text-transform: capitalize;
-  &:hover { border-color: var(--jr-ink); }
-  &.is-on { background: var(--jr-ink); border-color: var(--jr-ink); color: var(--tech-text-on-accent, #fff); }
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+  &:hover { border-color: color-mix(in srgb, var(--tech-accent) 60%, transparent); background: color-mix(in srgb, var(--tech-accent) 18%, transparent); }
+  &.is-on { background: var(--tech-accent); border-color: var(--tech-accent); color: var(--tech-text-on-accent); }
 }
 
 /* text areas */
 .journal__area {
   resize: vertical; padding: 10px 12px; font: inherit; line-height: 1.5;
   border: 1px solid var(--tech-border); border-radius: var(--tech-r-control, 10px); background: var(--tech-panel); color: var(--tech-text);
-  &:focus { outline: none; border-color: var(--jr-ink); box-shadow: 0 0 0 3px var(--jr-ink-soft); }
+  &:focus { outline: none; border-color: var(--tech-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tech-accent) 18%, transparent); }
 }
 .journal__area--lg { min-height: 120px; }
 

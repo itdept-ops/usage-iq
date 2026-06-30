@@ -98,7 +98,8 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px;
+  /* FiMobile: roomy 12px vertical padding for list rows */
+  padding: 12px 10px;
   border: none;
   background: transparent;
   border-radius: var(--tech-r-control);
@@ -120,7 +121,8 @@
     justify-content: center;
     width: 34px;
     height: 34px;
-    border-radius: 50%;
+    /* FiMobile: leading avatar tile with r-control radius */
+    border-radius: var(--tech-r-control);
     flex: 0 0 auto;
     font-family: var(--tech-font-mono);
     font-weight: 700;
@@ -128,11 +130,12 @@
   }
   &__avatar--init { color: var(--tech-text-on-accent); background: var(--tech-gradient-accent); }
   &__avatar--channel {
-    color: var(--tech-text-secondary);
-    background: var(--tech-panel-raised);
-    box-shadow: inset 0 0 0 1px var(--tech-border-subtle);
+    /* FiMobile: tinted accent tile for channel icon */
+    color: var(--tech-accent);
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    box-shadow: none;
     mat-icon { font-size: 18px; width: 18px; height: 18px; }
-    &.private { color: var(--tech-warn); }
+    &.private { color: var(--tech-warn); background: color-mix(in srgb, var(--tech-warn) 12%, transparent); }
   }
 
   &__dot {
@@ -163,23 +166,26 @@
     flex: 0 0 auto;
     font-family: var(--tech-font-mono);
     font-size: var(--tech-fs-micro);
+    /* FiMobile: trailing value in tertiary */
     color: var(--tech-text-tertiary);
   }
   &__preview {
     display: block;
     margin-top: 1px;
     font-size: var(--tech-fs-label);
-    color: var(--tech-text-tertiary);
+    /* FiMobile: muted subtitle in secondary */
+    color: var(--tech-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  /* FiMobile: CHIP/BADGE — pill radius + tinted bg + tinted border */
   &__badge {
     flex: 0 0 auto;
     min-width: 18px;
     height: 18px;
-    padding: 0 5px;
+    padding: 0 6px;
     border-radius: var(--tech-r-pill);
     background: var(--tech-accent);
     color: var(--tech-text-on-accent);
@@ -353,10 +359,11 @@
     display: inline-flex;
     gap: 2px;
     padding: 2px;
+    /* FiMobile card signature: r-control, tech-border, shadow-panel */
     border-radius: var(--tech-r-control);
-    border: 1px solid var(--tech-border-subtle);
+    border: 1px solid var(--tech-border);
     background: var(--tech-panel-raised);
-    box-shadow: var(--tech-shadow-panel);
+    box-shadow: var(--tech-shadow-raised);
     /* Default: persistently visible so touch/coarse-pointer users can edit/delete (no hover state). */
     opacity: 1;
     transition: opacity var(--tech-t-control) ease;
@@ -385,22 +392,25 @@
   margin: 3px 0 2px;
 }
 
+/* FiMobile CHIPS/BADGES: pill radius + tinted bg + tinted border */
 .cx-react-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   min-height: 24px;
   padding: 1px 8px 1px 6px;
-  border: 1px solid var(--tech-border);
+  /* FiMobile chip: tinted accent border */
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
   border-radius: var(--tech-r-pill);
-  background: var(--tech-panel-raised);
+  /* FiMobile chip: tinted accent bg */
+  background: color-mix(in srgb, var(--tech-accent) 8%, transparent);
   color: var(--tech-text-secondary);
   cursor: pointer;
   font: inherit;
   line-height: 1;
   transition: background-color var(--tech-t-control) ease, border-color var(--tech-t-control) ease;
 
-  &:hover { background: color-mix(in srgb, var(--tech-accent) 10%, var(--tech-panel-raised)); }
+  &:hover { background: color-mix(in srgb, var(--tech-accent) 16%, transparent); border-color: color-mix(in srgb, var(--tech-accent) 50%, transparent); }
   &:focus-visible { outline: none; box-shadow: var(--tech-focus-ring); }
 
   &.mine {
@@ -411,7 +421,7 @@
 
   /* Read-only users (no chat.send): aria-disabled (NOT native `disabled`, which would suppress the
      reactor-list matTooltip). The click is a no-op via the canSend() guard in toggleReaction(). */
-  &.is-disabled { cursor: default; opacity: 0.75; &:hover { background: var(--tech-panel-raised); } }
+  &.is-disabled { cursor: default; opacity: 0.75; &:hover { background: color-mix(in srgb, var(--tech-accent) 8%, transparent); border-color: color-mix(in srgb, var(--tech-accent) 30%, transparent); } }
 
   &__emoji { font-size: 14px; line-height: 1; }
   &__count { font-size: var(--tech-fs-micro); font-weight: 700; }
@@ -536,6 +546,7 @@
 }
 
 /* @mention autocomplete popup */
+/* FiMobile card signature: tech-radius, tech-border, shadow-raised */
 .cx-mentions {
   position: absolute;
   left: 16px;
@@ -546,10 +557,10 @@
   margin-bottom: 6px;
   padding: 4px;
   border: 1px solid var(--tech-border);
-  border-radius: var(--tech-r-control);
+  border-radius: var(--tech-radius);
   background: var(--tech-glass-popover);
   backdrop-filter: blur(12px);
-  box-shadow: var(--tech-shadow-popover);
+  box-shadow: var(--tech-shadow-raised);
   z-index: 6;
 }
 
@@ -634,27 +645,34 @@
   &:disabled { opacity: 0.65; cursor: default; }
 }
 
-/* Catch-me-up recap card pinned at the top of the message log. */
+/* Catch-me-up recap card pinned at the top of the message log.
+   FiMobile HERO CARD: the single most prominent summary surface in the chat view.
+   Uses gradient-accent fill; inner text tokens ensure legibility on the accent fill. */
 .cx-catchup {
   position: relative;
   display: flex;
   gap: 12px;
   margin: 4px 0 12px;
   padding: 14px 40px 14px 14px;
-  border: 1px solid color-mix(in srgb, var(--tech-accent) 36%, var(--tech-border));
-  border-radius: var(--tech-radius, 12px);
-  background:
-    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent) 14%, transparent), transparent 55%),
-    var(--tech-panel-raised);
+  border: none;
+  border-radius: var(--tech-radius);
+  /* FiMobile hero: gradient-accent background */
+  background: var(--tech-gradient-accent);
+  box-shadow: var(--tech-shadow-panel);
 
-  /* The deterministic plain fallback drops the accent flourish to a calmer surface. */
+  /* The deterministic plain fallback drops the accent fill to a calmer tinted surface. */
   &--plain {
-    border-color: var(--tech-border);
-    background: var(--tech-panel-raised);
+    background: color-mix(in srgb, var(--tech-accent) 8%, var(--tech-panel-raised));
+    border: 1px solid color-mix(in srgb, var(--tech-accent) 24%, var(--tech-border));
+    box-shadow: var(--tech-shadow-panel);
     .cx-catchup__spark { color: var(--tech-text-secondary); }
+    .cx-catchup__eyebrow { color: var(--tech-text-secondary); }
+    .cx-catchup__text { color: var(--tech-text); }
+    .cx-catchup__close mat-icon { color: var(--tech-text-tertiary); }
   }
 
-  &__spark { flex: 0 0 auto; color: var(--tech-accent); width: 22px; height: 22px; font-size: 22px; }
+  /* FiMobile hero: spark icon on-accent */
+  &__spark { flex: 0 0 auto; color: var(--tech-text-on-accent); width: 22px; height: 22px; font-size: 22px; }
   &__body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   &__eyebrow {
     margin: 0;
@@ -662,14 +680,15 @@
     font-weight: 700;
     letter-spacing: 0.02em;
     text-transform: uppercase;
-    color: var(--tech-accent);
+    /* FiMobile hero: muted on-accent label */
+    color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent);
   }
-  &--plain &__eyebrow { color: var(--tech-text-secondary); }
   &__text {
     margin: 0;
     font-size: var(--tech-fs-body);
     line-height: 1.5;
-    color: var(--tech-text);
+    /* FiMobile hero: primary on-accent text */
+    color: var(--tech-text-on-accent);
     white-space: pre-line;
     word-break: break-word;
   }
@@ -679,7 +698,8 @@
     right: 6px;
     width: 30px;
     height: 30px;
-    mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--tech-text-tertiary); }
+    /* FiMobile hero: dismiss button legible on gradient */
+    mat-icon { font-size: 18px; width: 18px; height: 18px; color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent); }
   }
 }
 
@@ -717,23 +737,31 @@
   }
 }
 
+/* FiMobile CHIPS: pill radius + tinted bg + tinted border + hover lift */
 .cx-reply-chip {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
   padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--tech-accent) 36%, var(--tech-border));
-  background: color-mix(in srgb, var(--tech-accent) 8%, var(--tech-panel-raised));
+  border-radius: var(--tech-r-pill);
+  /* FiMobile chip: tinted accent border */
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+  /* FiMobile chip: tinted accent bg */
+  background: color-mix(in srgb, var(--tech-accent) 10%, transparent);
   color: var(--tech-text);
   font: inherit;
   font-size: var(--tech-fs-body);
   line-height: 1.35;
   text-align: left;
   cursor: pointer;
-  transition: background var(--tech-t-fast) ease, border-color var(--tech-t-fast) ease;
+  transition: background var(--tech-t-fast) ease, border-color var(--tech-t-fast) ease, transform var(--tech-t-fast) ease;
 
-  &:hover { background: color-mix(in srgb, var(--tech-accent) 18%, var(--tech-panel-raised)); border-color: var(--tech-accent); }
+  &:hover {
+    background: color-mix(in srgb, var(--tech-accent) 18%, transparent);
+    border-color: var(--tech-accent);
+    /* FiMobile hover lift on interactive chips */
+    transform: translateY(-1px);
+  }
   &:focus-visible { outline: none; box-shadow: var(--tech-glow-blue); border-color: transparent; }
 }
 
@@ -808,13 +836,15 @@
   &.cx-loc-trigger--on { background: color-mix(in srgb, var(--tech-accent) 80%, transparent); }
 }
 
-/* The "Share live location for…" duration sheet that the trigger expands above the composer row. */
+/* The "Share live location for…" duration sheet that the trigger expands above the composer row.
+   FiMobile card signature: tech-radius, tech-border, shadow-panel, tinted accent bg. */
 .cx-locshare {
   margin-bottom: 10px;
   padding: 12px;
-  border-radius: var(--tech-r-control);
-  border: 1px solid color-mix(in srgb, var(--tech-accent) 32%, var(--tech-border));
+  border-radius: var(--tech-radius);
+  border: 1px solid var(--tech-border);
   background: color-mix(in srgb, var(--tech-accent) 6%, var(--tech-panel));
+  box-shadow: var(--tech-shadow-panel);
 
   &__head {
     display: flex;
@@ -836,6 +866,7 @@
     flex-wrap: wrap;
     gap: 8px;
   }
+  /* FiMobile: interactive card-style option buttons with hover lift */
   &__opt {
     flex: 1 1 auto;
     min-width: 96px;
@@ -847,15 +878,19 @@
     border-radius: var(--tech-r-control);
     border: 1px solid var(--tech-border);
     background: var(--tech-panel-raised, var(--tech-panel));
+    box-shadow: var(--tech-shadow-panel);
     color: var(--tech-text);
     font: inherit;
     font-size: var(--tech-fs-body);
     font-weight: 600;
     cursor: pointer;
-    transition: background-color var(--tech-t-control) ease, border-color var(--tech-t-control) ease;
+    transition: background-color var(--tech-t-control) ease, border-color var(--tech-t-control) ease, transform var(--tech-t-control) ease, box-shadow var(--tech-t-control) ease;
     &:hover:not(:disabled) {
       border-color: var(--tech-accent);
       background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+      /* FiMobile hover lift on interactive cards */
+      transform: translateY(-1px);
+      box-shadow: var(--tech-shadow-raised);
     }
     &:focus-visible { outline: none; box-shadow: var(--tech-focus-ring); }
     &:disabled { opacity: 0.6; cursor: default; }

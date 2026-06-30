@@ -133,7 +133,7 @@
 
 .cm-hero__cta {
   display: inline-flex; align-items: center; gap: 7px; margin-top: 14px;
-  min-height: 44px; padding: 0 22px; border-radius: var(--r-pill);
+  min-height: 44px; padding: 0 22px; border-radius: var(--r-tile);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   color: var(--ink-on-accent); font: inherit; font-size: 14px; font-weight: 800;
   text-decoration: none; cursor: pointer;
@@ -162,7 +162,14 @@
 // SEGMENTED CONTROL — Today | Leaderboard
 // ============================================================================
 
-.cm-seg-wrap { display: flex; }
+// FiMobile segmented-pill container: sunken trough with control-radius + 4px inset padding.
+.cm-seg-wrap {
+  display: flex;
+  background: var(--bg-sink);
+  border-radius: var(--r-tile);
+  padding: 4px;
+  border: 1px solid var(--hairline);
+}
 .cm-seg { flex: 1 1 auto; }
 
 // ============================================================================
@@ -213,6 +220,10 @@
   transition: transform 140ms var(--ease-spring), box-shadow 140ms var(--ease-out),
               border-color 200ms var(--ease-out), background 200ms var(--ease-out);
 }
+.cm-task:hover:not(:active):not(.is-readonly):not([disabled]) {
+  transform: translateY(-1px);
+  box-shadow: var(--lift-2);
+}
 .cm-task:active { transform: scale(.99); box-shadow: var(--press); }
 .cm-task:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .cm-task[disabled] { opacity: .6; pointer-events: none; }
@@ -231,11 +242,12 @@
   border-color: color-mix(in srgb, var(--accent-a) 30%, var(--hairline));
 }
 
-// the lead check / icon disc
+// the lead check / icon disc — FiMobile leading-tile tint on idle state
 .cm-task__check {
   flex: 0 0 auto; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%;
-  background: var(--bg-sink); border: 1px solid var(--hairline);
-  color: var(--ink-dim);
+  background: color-mix(in srgb, var(--accent-a) 10%, var(--bg-sink));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 18%, var(--hairline));
+  color: color-mix(in srgb, var(--accent-a) 65%, var(--ink-dim));
   transition: background 200ms var(--ease-out), color 200ms var(--ease-out), border-color 200ms var(--ease-out);
   mat-icon { font-size: 23px; width: 23px; height: 23px; }
 }
@@ -296,6 +308,11 @@
   background: var(--bg-rise);
   border: 1px solid var(--hairline);
   box-shadow: var(--lift-1);
+  transition: transform 140ms var(--ease-spring), box-shadow 140ms var(--ease-out);
+}
+.cm-row:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--lift-2);
 }
 .cm-row.is-self {
   border-color: color-mix(in srgb, var(--accent-a) 48%, var(--hairline));
@@ -332,6 +349,7 @@
   font-style: normal; font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
   padding: 1px 6px; border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--accent-a) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, transparent);
   color: color-mix(in srgb, var(--accent-a) 82%, var(--ink));
 }
 .cm-row__sub {
@@ -374,5 +392,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .cm-reveal { animation: none; }
-  .cm-task__bar-fill, .cm-task__check { transition: none; }
+  .cm-task__bar-fill, .cm-task__check, .cm-row { transition: none; }
+  .cm-task:hover:not(:active):not(.is-readonly):not([disabled]),
+  .cm-row:hover { transform: none; }
 }

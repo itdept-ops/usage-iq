@@ -12,7 +12,7 @@
     radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent) 14%, transparent), transparent 55%),
     radial-gradient(120% 160% at 100% 0%, rgba(255, 196, 0, 0.10), transparent 55%),
     var(--tech-panel);
-  box-shadow: var(--tech-shadow-raised);
+  box-shadow: var(--tech-shadow-panel);
 }
 
 .assistant__head {
@@ -154,8 +154,9 @@
   flex-wrap: wrap;
   padding: var(--tech-space-3, 12px);
   border: 1px solid var(--tech-border);
-  border-radius: var(--tech-radius-sm, 8px);
+  border-radius: var(--tech-r-control, 10px);
   background: var(--tech-panel-2, var(--tech-panel));
+  box-shadow: var(--tech-shadow-panel);
 
   &--done {
     border-color: color-mix(in srgb, var(--tech-success, #16a34a) 45%, var(--tech-border));
@@ -172,9 +173,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px; height: 32px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--tech-accent) 14%, transparent);
+  width: 36px; height: 36px;
+  border-radius: var(--tech-r-control);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
   color: var(--tech-accent);
 
   mat-icon { width: 20px; height: 20px; font-size: 20px; }

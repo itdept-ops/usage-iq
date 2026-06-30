@@ -136,6 +136,9 @@
   cursor: pointer; touch-action: pan-y; -webkit-tap-highlight-color: transparent;
   transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out);
 
+  @media (hover: hover) {
+    &:hover { transform: translateY(-1px); box-shadow: var(--lift-2); }
+  }
   &:active { transform: scale(.985); box-shadow: var(--press); }
   &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   &.is-busy { opacity: .55; pointer-events: none; }
@@ -145,7 +148,7 @@
 .rc-card__glyph {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; border-radius: 12px;
+  width: 44px; height: 44px; border-radius: var(--r-tile);
   background: linear-gradient(135deg,
     color-mix(in srgb, var(--accent-a) 22%, transparent),
     color-mix(in srgb, var(--accent-b) 22%, transparent));
@@ -167,7 +170,7 @@
 .rc-card__share {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 8px;
+  width: 26px; height: 26px; border-radius: var(--r-tile);
   color: var(--accent-a);
   background: color-mix(in srgb, var(--accent-a) 14%, transparent);
   mat-icon { width: 16px; height: 16px; font-size: 16px; line-height: 16px; }
@@ -239,7 +242,7 @@
 .rd__glyph {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 48px; height: 48px; border-radius: 14px;
+  width: 48px; height: 48px; border-radius: var(--r-tile);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   color: var(--ink-on-accent); box-shadow: var(--lift-2);
   mat-icon { width: 24px; height: 24px; font-size: 24px; line-height: 24px; }
@@ -262,6 +265,7 @@
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 10px 4px;
   background: var(--bg-sink); border: 1px solid var(--hairline); border-radius: var(--r-tile);
+  box-shadow: var(--lift-1);
 }
 .rd__macro-n { font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1; }
 .rd__macro-l { font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-dim); }
@@ -299,10 +303,15 @@
   min-height: 56px; padding: 10px 14px;
   text-align: left;
   background: var(--bg-sink); border: 1px solid var(--hairline); border-radius: var(--r-tile);
+  box-shadow: var(--lift-1);
   color: var(--ink); font-family: var(--font-ui); cursor: pointer;
-  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out),
+              transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out);
   &.is-on { border-color: color-mix(in srgb, var(--accent-a) 55%, transparent);
             background: color-mix(in srgb, var(--accent-a) 8%, var(--bg-sink)); }
+  @media (hover: hover) {
+    &:hover { transform: translateY(-1px); box-shadow: var(--lift-2); }
+  }
   &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   &:disabled { opacity: .55; pointer-events: none; }
   > mat-icon { flex: 0 0 auto; color: var(--ink-dim); width: 22px; height: 22px; font-size: 22px; line-height: 22px; }
@@ -348,6 +357,7 @@
   display: flex; align-items: center; gap: 8px; margin: 0;
   padding: 12px 14px; border-radius: var(--r-tile);
   background: var(--bg-sink); border: 1px solid var(--hairline);
+  box-shadow: var(--lift-1);
   font-size: 13px; font-weight: 600; color: var(--ink-dim);
   mat-icon { flex: 0 0 auto; width: 19px; height: 19px; font-size: 19px; line-height: 19px; color: var(--accent-a); }
 }

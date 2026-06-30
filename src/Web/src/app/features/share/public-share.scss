@@ -41,16 +41,33 @@
 }
 @media (max-width: 640px) { .ps-kpis { grid-template-columns: 1fr; } }
 
+/* ── KPI cards: FiMobile card signature ─────────────────────── */
 .ps-kpi {
   padding: 16px 18px;
   border: 1px solid var(--tech-border, #26303f);
-  border-radius: var(--tech-r-panel, 12px);
+  border-radius: var(--tech-radius, 15px);
   background: var(--tech-panel, #111722);
+  box-shadow: var(--tech-shadow-panel);
   display: flex; flex-direction: column; gap: 6px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+  }
 
   .k { font-size: var(--tech-fs-micro, 10.5px); letter-spacing: 0.06em; text-transform: uppercase; color: var(--tech-text-tertiary); }
   .v { font-family: var(--tech-font-mono); font-size: 26px; font-weight: 700; color: var(--tech-text); }
   .v.cost { color: var(--tech-accent-magenta, #f472b6); }
+}
+
+/* ── Hero card: first KPI (Total cost) gets the gradient fill ── */
+.ps-kpi:first-child {
+  background: var(--tech-gradient-accent);
+  border-color: transparent;
+
+  .k { color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent); }
+  .v.cost { color: var(--tech-text-on-accent); }
 }
 
 .ps-charts {
@@ -60,11 +77,13 @@
 }
 @media (max-width: 860px) { .ps-charts { grid-template-columns: 1fr; } }
 
+/* ── Chart panels: FiMobile card signature ──────────────────── */
 .ps-chart {
   padding: 14px;
   border: 1px solid var(--tech-border, #26303f);
-  border-radius: var(--tech-r-panel, 12px);
+  border-radius: var(--tech-radius, 15px);
   background: var(--tech-panel, #111722);
+  box-shadow: var(--tech-shadow-panel);
   min-height: 328px;
 
   app-chart { display: block; width: 100%; height: 100%; }

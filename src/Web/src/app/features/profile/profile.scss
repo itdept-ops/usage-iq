@@ -28,6 +28,9 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
 .panel {
   padding: var(--tech-space-4) var(--tech-space-6) var(--tech-space-6);
   margin-top: var(--tech-space-4);
+  border-radius: var(--tech-radius) !important;
+  box-shadow: var(--tech-shadow-panel) !important;
+  border: 1px solid var(--tech-border) !important;
 
   .panel-head {
     display: flex;
@@ -55,6 +58,44 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   .full { width: 100%; }
 }
 
+/* ───────────────────────── Hero card (Display name — first panel) ───────────────────────── */
+/* Uses :first-of-type + :not(.load-error): only the Display name card in the happy path.  */
+mat-card.panel:first-of-type:not(.load-error) {
+  background: var(--tech-gradient-accent) !important;
+  color: var(--tech-text-on-accent) !important;
+  border-color: transparent !important;
+
+  .panel-head { border-bottom-color: color-mix(in srgb, var(--tech-text-on-accent) 20%, transparent); }
+
+  .panel-title { color: var(--tech-text-on-accent); }
+
+  .hint { color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent); }
+
+  /* Sunken preview block inside the hero — override base .preview tokens */
+  .preview {
+    background: color-mix(in srgb, var(--tech-text-on-accent) 10%, transparent);
+    border-color: color-mix(in srgb, var(--tech-text-on-accent) 20%, transparent);
+
+    &__label { color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent); }
+    &__value { color: var(--tech-text-on-accent); }
+  }
+
+  /* form-field inside hero — soften outline so it reads on gradient */
+  .mat-mdc-form-field {
+    --mdc-outlined-text-field-outline-color: color-mix(in srgb, var(--tech-text-on-accent) 35%, transparent);
+    --mdc-outlined-text-field-label-text-color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent);
+    --mdc-outlined-text-field-input-text-color: var(--tech-text-on-accent);
+    --mdc-outlined-text-field-hover-outline-color: color-mix(in srgb, var(--tech-text-on-accent) 60%, transparent);
+    --mat-select-trigger-text-color: var(--tech-text-on-accent);
+    --mat-option-label-text-color: var(--tech-text-on-accent);
+    --mat-form-field-subscript-text-line-height: 1.4;
+    color: var(--tech-text-on-accent);
+  }
+
+  /* hint text below form fields */
+  .mat-mdc-form-field-hint { color: color-mix(in srgb, var(--tech-text-on-accent) 65%, transparent); }
+}
+
 /* ───────────────────────── Display-name preview ───────────────────────── */
 .preview {
   display: flex;
@@ -63,8 +104,8 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   padding: var(--tech-space-3) var(--tech-space-4);
   margin-bottom: var(--tech-space-4);
   border: 1px solid var(--tech-border-subtle);
-  border-radius: var(--tech-radius-md, 10px);
-  background: var(--tech-surface-2, rgba(255, 255, 255, 0.03));
+  border-radius: var(--tech-r-control);
+  background: var(--tech-bg-sunken);
 
   &__label {
     font-size: var(--tech-fs-micro, 10.5px);
@@ -86,25 +127,25 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   align-items: center;
   justify-content: space-between;
   gap: var(--tech-space-4);
-  padding: var(--tech-space-3) 0;
+  padding: 13px 0;           /* FiMobile roomy row height */
 
   & + .toggle-row { border-top: 1px solid var(--tech-border-subtle); }
 
   &__text {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
     min-width: 0;
   }
   &__label {
     font-size: var(--tech-fs-body);
-    font-weight: 550;
+    font-weight: 600;
     color: var(--tech-text-primary);
   }
   &__sub {
     font-size: var(--tech-fs-label);
-    line-height: 1.4;
-    color: var(--tech-text-tertiary);
+    line-height: 1.45;
+    color: var(--tech-text-secondary);
   }
 }
 
@@ -116,7 +157,7 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   margin: var(--tech-space-2) 0 var(--tech-space-4);
   padding: var(--tech-space-3) var(--tech-space-4);
   border: 1px solid var(--tech-warn-border, rgba(245, 158, 11, 0.4));
-  border-radius: var(--tech-radius-md, 10px);
+  border-radius: var(--tech-r-control);
   background: var(--tech-warn-bg, rgba(245, 158, 11, 0.08));
   font-size: var(--tech-fs-label);
   line-height: 1.45;
@@ -136,6 +177,11 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   display: flex;
   gap: var(--tech-space-3);
   margin-top: var(--tech-space-5);
+
+  button { border-radius: var(--tech-r-control); }
+
+  /* primary flat button: enforce on-accent text */
+  [mat-flat-button] { color: var(--tech-text-on-accent); }
 }
 
 /* ───────────────────────── Load error ───────────────────────── */

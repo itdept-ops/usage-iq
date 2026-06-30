@@ -55,15 +55,15 @@
   ::ng-deep .leaflet-control-zoom {
     margin-top: calc(var(--safe-top) + 88px);
     margin-right: 12px;
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--r-tile);
+    border: 1px solid var(--tech-border, var(--glass-edge));
+    border-radius: var(--tech-r-control, var(--r-tile));
     overflow: hidden;
-    box-shadow: var(--lift-2);
+    box-shadow: var(--tech-shadow-raised, var(--lift-2));
   }
   ::ng-deep .leaflet-control-zoom a {
     background: var(--bg-rise);
     color: var(--ink);
-    border-bottom-color: var(--hairline);
+    border-bottom-color: var(--tech-border-subtle, var(--hairline));
   }
   ::ng-deep .leaflet-control-attribution {
     // We render our own OSM note; hide the default tile attribution to avoid a double credit.
@@ -72,12 +72,13 @@
   ::ng-deep .leaflet-popup-content-wrapper {
     background: var(--bg-rise);
     color: var(--ink);
-    border-radius: var(--r-tile);
-    box-shadow: var(--lift-3);
+    border-radius: var(--tech-radius, var(--r-tile));
+    box-shadow: var(--tech-shadow-popover, var(--lift-3));
+    border: 1px solid var(--tech-border, var(--glass-edge));
   }
   ::ng-deep .leaflet-popup-tip { background: var(--bg-rise); }
   ::ng-deep .leaflet-popup-content { font-family: var(--font-ui); }
-  ::ng-deep .lp-sub { color: var(--ink-dim); font-size: 12px; }
+  ::ng-deep .lp-sub { color: var(--tech-text-secondary, var(--ink-dim)); font-size: 12px; }
 }
 
 // A soft cover while the very first fetch + tiles settle (so we never flash a gray map + 0 pins).
@@ -228,10 +229,10 @@
   display: inline-flex; align-items: center; gap: 8px;
   padding: 12px 18px 12px 16px;
   border: none;
-  border-radius: var(--r-pill);
+  border-radius: var(--tech-r-pill, var(--r-pill));
   background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
   box-shadow: var(--lift-3), 0 8px 28px color-mix(in srgb, var(--accent-a) 36%, transparent);
-  color: var(--ink-on-accent);
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
   font: inherit; font-size: 14.5px; font-weight: 800; letter-spacing: -.01em;
   cursor: pointer;
   transition: transform 140ms var(--ease-spring-up);
@@ -273,9 +274,10 @@
   flex: 0 0 auto;
   display: grid; place-items: center;
   width: 38px; height: 38px;
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--r-tile);
+  border: 1px solid var(--tech-border, var(--glass-edge));
+  border-radius: var(--tech-r-control, var(--r-tile));
   background: var(--bg-rise);
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
   color: var(--ink);
   cursor: pointer;
   mat-icon { width: 22px; height: 22px; font-size: 22px; line-height: 22px; }
@@ -295,8 +297,9 @@
   flex: 0 0 auto;
   display: inline-grid; place-items: center;
   min-width: 30px; height: 26px; padding: 0 9px;
-  border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--accent-a) 18%, var(--bg-rise));
+  border-radius: var(--tech-r-pill, var(--r-pill));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-a) 12%, transparent);
   color: var(--ink); font-size: 13px; font-weight: 800;
 }
 
@@ -310,27 +313,26 @@
   @include kit.tap44;
   width: 100%;
   display: flex; align-items: center; gap: 12px;
-  padding: 11px 10px 11px 11px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-tile);
+  padding: 12px 10px 12px 11px;
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-radius, var(--r-tile));
   background: var(--bg-rise);
-  box-shadow: var(--lift-1);
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
   color: var(--ink);
   text-align: left;
   cursor: pointer;
-  transition: transform 120ms var(--ease-out), border-color 120ms var(--ease-out);
-  &:active { transform: scale(.985); border-color: var(--glass-edge); }
+  transition: transform 130ms var(--ease-out), box-shadow 130ms var(--ease-out), border-color 130ms var(--ease-out);
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised, var(--lift-2)); }
+  &:active { transform: scale(.985); border-color: var(--glass-edge); box-shadow: var(--tech-shadow-panel, var(--lift-1)); }
 }
 
 .ap-row__glyph {
   flex: 0 0 auto;
   display: grid; place-items: center;
   width: 40px; height: 40px;
-  border-radius: var(--r-tile);
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--accent-a) 30%, transparent),
-    color-mix(in srgb, var(--accent-b) 24%, transparent));
-  color: var(--ink);
+  border-radius: var(--tech-r-control, var(--r-tile));
+  background: color-mix(in srgb, var(--accent-a) 12%, transparent);
+  color: var(--accent-a);
   mat-icon { width: 24px; height: 24px; font-size: 24px; line-height: 24px; }
 }
 
@@ -340,17 +342,17 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ap-row__place {
-  font-size: 12.5px; font-weight: 500; color: var(--ink-dim);
+  font-size: 12.5px; font-weight: 500; color: var(--tech-text-secondary, var(--ink-dim));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ap-row__when {
   flex: 0 0 auto;
-  font-size: 11.5px; font-weight: 600; color: var(--ink-faint);
+  font-size: 11.5px; font-weight: 600; color: var(--tech-text-tertiary, var(--ink-faint));
 }
 .ap-row__go {
   flex: 0 0 auto;
   width: 20px; height: 20px; font-size: 20px; line-height: 20px;
-  color: var(--ink-faint);
+  color: var(--tech-text-tertiary, var(--ink-faint));
 }
 
 // ============================================================================
@@ -411,8 +413,9 @@
 .ap-hist__tag {
   display: inline-block;
   padding: 1px 7px;
-  border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--accent-a) 22%, transparent);
+  border-radius: var(--tech-r-pill, var(--r-pill));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-a) 12%, transparent);
   color: var(--accent-a); font-size: 10px; font-weight: 800;
   letter-spacing: .05em; text-transform: uppercase;
 }
@@ -458,9 +461,9 @@
   display: inline-flex; align-items: center; gap: 7px;
   padding: 11px 20px;
   border: none;
-  border-radius: var(--r-pill);
+  border-radius: var(--tech-r-control, var(--r-pill));
   background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
-  color: var(--ink-on-accent);
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
   font: inherit; font-size: 14.5px; font-weight: 800;
   cursor: pointer;
   &:active { transform: scale(.96); }

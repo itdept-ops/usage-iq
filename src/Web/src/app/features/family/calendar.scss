@@ -454,6 +454,7 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
   padding: var(--tech-space-3, 12px);
   overflow-x: auto;
 }
@@ -615,6 +616,7 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
   padding: var(--tech-space-3, 12px);
   overflow-x: auto;
 }
@@ -778,8 +780,9 @@
   font-size: var(--tech-fs-label);
   font-weight: 600;
   padding: 1px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--tech-accent) 16%, transparent);
+  border-radius: var(--tech-r-pill, 999px);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
   color: var(--tech-accent);
 }
 
@@ -800,15 +803,16 @@
   display: flex;
   align-items: center;
   gap: var(--tech-space-3, 12px);
-  padding: var(--tech-space-3, 12px) var(--tech-space-4, 16px);
+  padding: 12px var(--tech-space-4, 16px);
   border: 1px solid var(--tech-border-subtle);
   border-radius: var(--tech-r-control, 10px);
   background: var(--tech-panel);
   color: var(--tech-text);
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
   &:hover {
     border-color: var(--tech-accent);
     background: color-mix(in srgb, var(--tech-accent) 6%, var(--tech-panel));
+    transform: translateY(-1px);
   }
 }
 

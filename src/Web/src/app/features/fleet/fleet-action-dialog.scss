@@ -37,23 +37,28 @@ h2[mat-dialog-title] {
   .fa-target-lbl { display: block; color: var(--tech-text-tertiary); margin-bottom: 8px; }
 }
 
+/* FiMobile pill-tab segmented control for mode selection */
 .fa-mode {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   margin-bottom: 12px;
+  background: var(--tech-bg-sunken);
+  border-radius: var(--tech-radius);
+  padding: 4px;
 
   .fa-mode-btn {
     flex: 1 1 0;
-    border-radius: var(--tech-r-control, 8px);
-    border: 1px solid var(--tech-border-subtle);
+    border-radius: var(--tech-r-control);
+    border: none;
     color: var(--tech-text-secondary);
     font-weight: 600;
+    transition: background var(--tech-t-control) ease, color var(--tech-t-control) ease;
     mat-icon { font-size: 17px; width: 17px; height: 17px; margin-right: 4px; }
 
     &.active {
-      color: var(--tech-text-accent);
-      border-color: color-mix(in srgb, var(--tech-accent) 50%, transparent);
-      background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+      background: var(--tech-accent);
+      color: var(--tech-text-on-accent);
+      box-shadow: 0 1px 4px color-mix(in srgb, var(--tech-accent) 35%, transparent);
     }
   }
 }

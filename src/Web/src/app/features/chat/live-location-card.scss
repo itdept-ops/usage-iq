@@ -1,11 +1,19 @@
 :host { display: block; }
 
+/* FiMobile card signature: tech-radius, tech-border, shadow-panel + hover lift (interactive) */
 .cx-loc {
   margin: var(--tech-space-2) 0;
   border: 1px solid var(--tech-border);
-  border-radius: var(--tech-r-control, 10px);
+  border-radius: var(--tech-radius);
   background: var(--tech-panel-raised, var(--tech-panel));
+  box-shadow: var(--tech-shadow-panel);
   overflow: hidden;
+  transition: transform var(--tech-t-control) ease, box-shadow var(--tech-t-control) ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+  }
 
   &--ended { opacity: 0.92; }
 }

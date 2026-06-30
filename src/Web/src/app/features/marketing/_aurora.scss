@@ -228,7 +228,9 @@ $ease: cubic-bezier(.22, 1, .36, 1);
 //     line. Falls back to solid ink where background-clip:text is unsupported.
 // ─────────────────────────────────────────────────────────────────────────────
 @mixin aurora-text-gradient($gradient-override: null) {
-  $g: $gradient;
+  // Default to the RUNTIME aurora gradient (--aur-grad), which tracks the active FiMobile color
+  // scheme; the static $gradient (indigo→violet→teal) is only the fallback for the default scheme.
+  $g: var(--aur-grad, #{$gradient});
   @if $gradient-override != null { $g: $gradient-override; }
   background: $g;
   -webkit-background-clip: text;

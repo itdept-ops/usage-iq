@@ -12,7 +12,7 @@
 
   h2 {
     margin: 0 0 var(--tech-space-1, 8px);
-    font-family: var(--tech-font-ui);
+    font-family: var(--tech-font-display, var(--tech-font-ui));
     font-size: clamp(20px, 5vw, var(--tech-fs-display));
     font-weight: 700;
     color: var(--tech-text);
@@ -36,13 +36,15 @@
 
   p { margin: 0; max-width: 48ch; }
   mat-icon { font-size: 36px; width: 36px; height: 36px; color: var(--tech-text-accent); }
-  &--error mat-icon { color: var(--tech-danger, #ff5c6c); }
+  &--error mat-icon { color: var(--tech-error, #ff5c6c); }
 }
 
+// ── base card — FiMobile card signature ──
 .card {
-  border: 1px solid var(--tech-border, rgba(255, 255, 255, 0.1));
-  border-radius: var(--tech-radius, 12px);
-  background: var(--tech-surface, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius);
+  background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
   padding: var(--tech-space-3, 16px);
   margin-bottom: var(--tech-space-3, 16px);
 }
@@ -58,10 +60,13 @@
   &__body { margin: 0; font-size: var(--tech-fs-body); color: var(--tech-text-secondary); max-width: 56ch; }
 }
 
-// ── connect CTA ──
+// ── connect CTA — HERO CARD (gradient fill, on-accent text) ──
 .connect {
   text-align: center;
   padding: clamp(28px, 7vw, 48px) var(--tech-space-3, 16px);
+  background: var(--tech-gradient-accent);
+  border-color: transparent;
+  box-shadow: var(--tech-shadow-raised);
 
   &__badge {
     display: inline-flex;
@@ -69,43 +74,89 @@
     justify-content: center;
     width: 64px;
     height: 64px;
-    border-radius: 50%;
+    border-radius: var(--tech-r-pill);
     margin-bottom: var(--tech-space-2, 12px);
-    background: color-mix(in srgb, var(--tech-text-accent) 14%, transparent);
-    mat-icon { font-size: 32px; width: 32px; height: 32px; color: var(--tech-text-accent); }
+    background: color-mix(in srgb, var(--tech-text-on-accent) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tech-text-on-accent) 30%, transparent);
+    mat-icon {
+      font-size: 32px;
+      width: 32px;
+      height: 32px;
+      color: var(--tech-text-on-accent);
+    }
   }
-  &__title { margin: 0 0 var(--tech-space-1, 8px); font-size: var(--tech-fs-h2, 16px); color: var(--tech-text); }
-  &__body { margin: 0 auto var(--tech-space-3, 16px); max-width: 46ch; color: var(--tech-text-secondary); }
+  &__title {
+    margin: 0 0 var(--tech-space-1, 8px);
+    font-family: var(--tech-font-display, var(--tech-font-ui));
+    font-size: var(--tech-fs-h2, 16px);
+    font-weight: 700;
+    color: var(--tech-text-on-accent);
+  }
+  &__body {
+    margin: 0 auto var(--tech-space-3, 16px);
+    max-width: 46ch;
+    color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent);
+  }
   &__scopes {
     margin: var(--tech-space-2, 12px) 0 0;
     font-size: var(--tech-fs-small);
-    color: var(--tech-text-tertiary, var(--tech-text-secondary));
+    color: color-mix(in srgb, var(--tech-text-on-accent) 65%, transparent);
+  }
+
+  // Override Material button on the gradient hero so it pops against the fill
+  button[mat-flat-button] {
+    border-radius: var(--tech-r-control);
+    background: color-mix(in srgb, var(--tech-text-on-accent) 18%, transparent);
+    color: var(--tech-text-on-accent);
+    border: 1px solid color-mix(in srgb, var(--tech-text-on-accent) 35%, transparent);
   }
 }
 
-// ── connected status banner ──
+// ── connected status banner — interactive card (hover lift) ──
 .statusbar {
   display: flex;
   align-items: center;
   gap: var(--tech-space-3, 16px);
+  transition: transform var(--tech-t-fast, 120ms) var(--tech-ease, ease),
+              box-shadow var(--tech-t-fast, 120ms) var(--tech-ease, ease);
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+  }
 
   &__ic {
     flex: none;
     display: inline-flex;
-    mat-icon { font-size: 28px; width: 28px; height: 28px; }
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--tech-r-control);
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    mat-icon { font-size: 22px; width: 22px; height: 22px; color: var(--tech-accent); }
   }
   &__body { flex: 1 1 auto; min-width: 0; }
   &__line { margin: 0; color: var(--tech-text); font-size: var(--tech-fs-body); }
   &__sub { margin: 2px 0 0; color: var(--tech-text-secondary); font-size: var(--tech-fs-small); }
   &__sync {
     flex: none;
-    display: inline-flex; align-items: center; gap: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: var(--tech-r-control);
     mat-progress-spinner { display: inline-block; }
   }
 
-  &--ok &__ic mat-icon { color: var(--tech-success, #34d399); }
+  &--ok &__ic {
+    background: color-mix(in srgb, var(--tech-success, #34d399) 12%, transparent);
+    mat-icon { color: var(--tech-success, #34d399); }
+  }
   &--warn { border-color: color-mix(in srgb, var(--tech-warn, #f0a35a) 50%, var(--tech-border)); }
-  &--warn &__ic mat-icon { color: var(--tech-warn, #f0a35a); }
+  &--warn &__ic {
+    background: color-mix(in srgb, var(--tech-warn, #f0a35a) 12%, transparent);
+    mat-icon { color: var(--tech-warn, #f0a35a); }
+  }
 }
 
 // ── reconnect alert ──
@@ -113,13 +164,16 @@
   display: flex;
   align-items: center;
   gap: var(--tech-space-3, 16px);
-  border-color: color-mix(in srgb, var(--tech-danger, #ff5c6c) 45%, var(--tech-border));
+  border-color: color-mix(in srgb, var(--tech-error, #ff5c6c) 45%, var(--tech-border));
 
-  mat-icon { flex: none; color: var(--tech-danger, #ff5c6c); }
+  mat-icon { flex: none; color: var(--tech-error, #ff5c6c); }
   div { flex: 1 1 auto; }
   &__line { margin: 0; color: var(--tech-text); }
   &__sub { margin: 2px 0 0; color: var(--tech-text-secondary); font-size: var(--tech-fs-small); }
-  button { flex: none; }
+  button {
+    flex: none;
+    border-radius: var(--tech-r-control);
+  }
 }
 
 // ── sync-now summary ──
@@ -132,8 +186,11 @@
   }
   &__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--tech-space-2, 12px); }
   &__cell {
-    border: 1px solid var(--tech-border); border-radius: var(--tech-r-control, 10px);
-    padding: 10px 12px; background: var(--tech-bg-sunken, rgba(255, 255, 255, 0.02));
+    border: 1px solid var(--tech-border);
+    border-radius: var(--tech-r-control);
+    box-shadow: var(--tech-shadow-panel);
+    padding: 10px 12px;
+    background: var(--tech-bg-sunken);
   }
   &__label { display: block; font-size: var(--tech-fs-small); color: var(--tech-text-secondary); margin-bottom: 4px; }
   &__nums { font-size: var(--tech-fs-small); color: var(--tech-text-secondary); }
@@ -142,24 +199,37 @@
 }
 
 // ── toggles ──
-.toggles { padding: 4px var(--tech-space-3, 16px); }
+.toggles { padding: 4px 0; }
 
 .toggle {
   display: flex;
   align-items: center;
   gap: var(--tech-space-3, 16px);
-  padding: var(--tech-space-2, 12px) 0;
+  padding: 12px var(--tech-space-3, 16px);
 
   &__body { display: flex; align-items: center; gap: var(--tech-space-2, 12px); flex: 1 1 auto; min-width: 0; }
+
+  // FiMobile icon tile: accent-tinted square with control radius
   &__ic {
     flex: none;
     display: inline-flex;
-    mat-icon { color: var(--tech-text-accent); }
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--tech-r-control);
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: var(--tech-accent);
+    }
   }
   &__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   &__label { color: var(--tech-text); font-size: var(--tech-fs-body); }
   &__hint { color: var(--tech-text-secondary); font-size: var(--tech-fs-small); }
-  &__divider { height: 1px; background: var(--tech-border); margin: 2px 0; }
+  &__divider { height: 1px; background: var(--tech-border); margin: 2px var(--tech-space-3, 16px); }
 }
 
 // ── disconnect ──
@@ -168,6 +238,9 @@
   padding-top: var(--tech-space-3, 16px);
   border-top: 1px dashed var(--tech-border);
 
-  &__btn { color: var(--tech-danger, #ff5c6c); }
+  &__btn {
+    color: var(--tech-error, #ff5c6c);
+    border-radius: var(--tech-r-control);
+  }
   &__hint { margin: var(--tech-space-1, 8px) 0 0; font-size: var(--tech-fs-small); color: var(--tech-text-secondary); }
 }

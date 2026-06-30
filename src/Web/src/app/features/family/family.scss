@@ -104,6 +104,7 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
 }
 
 .family__card-title {
@@ -155,13 +156,13 @@
   align-items: center;
   gap: var(--tech-space-2, 8px);
   padding: 6px 12px 6px 6px;
-  border: 1px solid var(--tech-border-subtle);
-  border-radius: 999px;
-  background: var(--tech-bg-sunken);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+  border-radius: var(--tech-r-pill, 999px);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
 
   &--self {
     border-color: var(--tech-accent);
-    background: color-mix(in srgb, var(--tech-accent) 10%, var(--tech-bg-sunken));
+    background: color-mix(in srgb, var(--tech-accent) 16%, transparent);
   }
 }
 
@@ -229,14 +230,16 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
   text-decoration: none;
   position: relative;
-  transition: border-color var(--tech-t-fast, 120ms) ease, transform var(--tech-t-fast, 120ms) ease, background-color var(--tech-t-fast, 120ms) ease;
+  transition: border-color var(--tech-t-fast, 120ms) ease, transform var(--tech-t-fast, 120ms) ease, background-color var(--tech-t-fast, 120ms) ease, box-shadow var(--tech-t-fast, 120ms) ease;
 }
 a.tile:hover {
   border-color: var(--tech-border-strong);
   background: var(--tech-panel-raised);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+  box-shadow: var(--tech-shadow-raised);
 }
 a.tile:focus-visible {
   outline: none;
@@ -248,9 +251,9 @@ a.tile:focus-visible {
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: var(--tech-radius, 12px);
-  background: linear-gradient(135deg, rgba(61, 139, 255, 0.16), rgba(63, 216, 208, 0.16));
-  mat-icon { color: var(--tech-accent-cyan); width: 22px; height: 22px; font-size: 22px; }
+  border-radius: var(--tech-r-control);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  mat-icon { color: var(--tech-accent); width: 22px; height: 22px; font-size: 22px; }
 }
 
 .tile__label {
@@ -331,7 +334,7 @@ a.tile:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--tech-space-3, 12px);
-  padding: var(--tech-space-3, 12px) 0;
+  padding: 12px var(--tech-space-2, 8px);
   border-bottom: 1px solid var(--tech-border-subtle);
   &:last-child { border-bottom: none; }
 
@@ -344,10 +347,10 @@ a.tile:focus-visible {
     letter-spacing: 0.03em;
     text-transform: uppercase;
     color: var(--tech-text-secondary);
-    background: var(--tech-bg-sunken);
-    border: 1px solid var(--tech-border-subtle);
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
     padding: 2px 10px;
-    border-radius: 999px;
+    border-radius: var(--tech-r-pill, 999px);
 
     &--owner {
       color: var(--tech-warn);
@@ -451,7 +454,9 @@ a.tile:focus-visible {
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
-  box-shadow: var(--tech-shadow-raised);
+  box-shadow: var(--tech-shadow-panel);
+  transition: transform var(--tech-t-fast, 120ms) ease, box-shadow var(--tech-t-fast, 120ms) ease;
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised); }
 
   &--pinned {
     border-color: color-mix(in srgb, var(--tech-warn) 45%, var(--tech-border));
@@ -959,7 +964,7 @@ a.tile:focus-visible {
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
-  box-shadow: var(--tech-shadow-raised);
+  box-shadow: var(--tech-shadow-panel);
 }
 /* The timers card embeds the full widget; let it breathe across the row when it's wide. */
 .today-card--timers { grid-column: 1 / -1; }
@@ -1044,10 +1049,10 @@ a.tile:focus-visible {
   max-width: 9ch;
   font-size: var(--tech-fs-micro);
   font-weight: 600;
-  color: var(--tech-text-secondary);
-  background: var(--tech-bg-sunken);
-  border: 1px solid var(--tech-border-subtle);
-  border-radius: 999px;
+  color: var(--tech-text-tertiary);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+  border-radius: var(--tech-r-pill, 999px);
   padding: 1px 8px;
   white-space: nowrap;
   overflow: hidden;
@@ -1123,10 +1128,10 @@ a.tile:focus-visible {
   flex: 0 0 auto;
   font-size: var(--tech-fs-micro);
   font-weight: 700;
-  color: var(--tech-text-secondary);
-  background: var(--tech-bg-sunken);
-  border: 1px solid var(--tech-border-subtle);
-  border-radius: 999px;
+  color: var(--tech-accent);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+  border-radius: var(--tech-r-pill, 999px);
   padding: 1px 8px;
 }
 .today-list__peek {
@@ -1231,9 +1236,9 @@ a.tile:focus-visible {
   display: grid;
   place-items: center;
   width: 44px; height: 44px;
-  border-radius: var(--tech-radius, 12px);
-  background: linear-gradient(135deg, rgba(61, 139, 255, 0.16), rgba(63, 216, 208, 0.16));
-  mat-icon { color: var(--tech-accent-cyan); width: 22px; height: 22px; font-size: 22px; }
+  border-radius: var(--tech-r-control);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  mat-icon { color: var(--tech-accent); width: 22px; height: 22px; font-size: 22px; }
 }
 .settings-link__text { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
 .settings-link__title { font-size: var(--tech-fs-body); font-weight: 700; color: var(--tech-text); }

@@ -30,9 +30,20 @@
 }
 
 .metric-toggle {
-  border-radius: var(--tech-r-control, 8px);
-  --mat-standard-button-toggle-selected-state-background-color: color-mix(in srgb, var(--tech-accent) 22%, transparent);
-  --mat-standard-button-toggle-selected-state-text-color: var(--tech-accent);
+  // FiMobile pill-tab segmented control
+  background: var(--tech-bg-sunken);
+  border-radius: var(--tech-radius, 15px);
+  padding: 4px;
+  border: none;
+  --mat-standard-button-toggle-shape: var(--tech-r-control, 8px);
+  --mat-standard-button-toggle-selected-state-background-color: var(--tech-accent);
+  --mat-standard-button-toggle-selected-state-text-color: var(--tech-text-on-accent);
+  // Unselected tabs: legible but recessed
+  --mat-standard-button-toggle-text-color: var(--tech-text-secondary);
+  --mat-standard-button-toggle-background-color: transparent;
+  --mat-standard-button-toggle-divider-color: transparent;
+  // Remove the outer border that Material adds
+  --mat-standard-button-toggle-outline-color: transparent;
 }
 @media (max-width: 640px) {
   .metric-toggle {
@@ -62,6 +73,10 @@ mat-progress-bar {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  // FiMobile card signature
+  border-radius: var(--tech-radius, 15px) !important;
+  box-shadow: var(--tech-shadow-panel) !important;
+  border: 1px solid var(--tech-border) !important;
 
   .stat-label {
     font-size: var(--tech-fs-micro, 10.5px);
@@ -80,7 +95,13 @@ mat-progress-bar {
   .stat-sub { font-size: var(--tech-fs-label, 12px); color: var(--tech-text-secondary); }
 }
 
-.panel { padding: 12px 14px; }
+.panel {
+  padding: 12px 14px;
+  // FiMobile card signature
+  border-radius: var(--tech-radius, 15px) !important;
+  box-shadow: var(--tech-shadow-panel) !important;
+  border: 1px solid var(--tech-border) !important;
+}
 .cal-wrap { width: 100%; min-height: 220px; }
 .cal-wrap app-chart { display: block; width: 100%; height: 100%; }
 // The chart base sets min-height:300px; let the canvas match the inline-set wrapHeight.
@@ -140,17 +161,34 @@ mat-progress-bar {
 .ts-list { display: flex; flex-direction: column; max-height: 260px; overflow-y: auto; }
 .ts-row {
   display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 8px 4px; background: none; border: none; cursor: pointer; text-align: left;
+  // FiMobile list row — roomy tap target with 12-14px vertical padding
+  padding: 12px 8px; background: none; border: none; cursor: pointer; text-align: left;
   border-bottom: 1px solid var(--tech-border-subtle);
   font-size: 12px; color: var(--tech-text-secondary);
-  transition: background 120ms ease;
+  transition: background 120ms ease, transform 120ms ease;
   &:last-child { border-bottom: none; }
-  &:hover { background: color-mix(in srgb, var(--tech-panel-raised) 60%, transparent); }
+  &:hover {
+    background: color-mix(in srgb, var(--tech-accent) 6%, transparent);
+    transform: translateX(2px);
+  }
 
-  .ts-id { color: var(--tech-text); }
+  // Leading icon tile — FiMobile accent tile
+  .ts-icon-tile {
+    flex: 0 0 auto;
+    width: 32px; height: 32px;
+    border-radius: var(--tech-r-control, 8px);
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    color: var(--tech-accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+
+  .ts-id { color: var(--tech-text); font-weight: 500; }
   .ts-grow { flex: 1 1 auto; }
-  .ts-msgs { color: var(--tech-text-tertiary); }
-  .ts-cost { color: var(--tech-text); min-width: 72px; text-align: right; }
+  // FiMobile muted subtitle
+  .ts-msgs { color: var(--tech-text-tertiary); font-size: 11px; }
+  .ts-cost { color: var(--tech-text); min-width: 72px; text-align: right; font-weight: 600; }
+  // Trailing chevron in tertiary
   .ts-chev { font-size: 18px; width: 18px; height: 18px; color: var(--tech-text-tertiary); }
 }
 .ts-empty { padding: 20px 4px; color: var(--tech-text-tertiary); font-size: 13px; }
@@ -159,7 +197,7 @@ mat-progress-bar {
   .ts-list { max-height: none; } // let the list flow; the page scrolls, not a nested box
   .ts-row {
     min-height: 44px;          // comfortable tap target
-    padding: 10px 4px;
+    padding: 12px 6px;
     gap: 8px;
     .ts-cost { min-width: 64px; }
     .ts-msgs { white-space: nowrap; }

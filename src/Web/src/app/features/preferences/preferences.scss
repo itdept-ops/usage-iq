@@ -19,7 +19,7 @@
 }
 .prefs__note { margin: var(--tech-space-1) 0 0; font-size: 13px; color: var(--tech-text-tertiary); }
 
-// ---- Card ----
+// ---- Card (FiMobile signature) ----
 .card {
   background: var(--tech-panel);
   border: 1px solid var(--tech-border);
@@ -27,6 +27,48 @@
   box-shadow: var(--tech-shadow-panel);
   padding: var(--tech-space-4) var(--tech-space-4) var(--tech-space-2);
   margin-bottom: var(--tech-space-4);
+  transition: box-shadow var(--tech-t-control, 140ms) ease, transform var(--tech-t-control, 140ms) ease;
+}
+
+// ---- Hero card — the first .card (Display / Theme) gets the FiMobile gradient-hero look.
+//      Applied via structural selector so the template stays untouched.
+.card--hero,
+.prefs > .card:first-of-type {
+  background: var(--tech-gradient-accent);
+  border-color: transparent;
+  box-shadow: var(--tech-shadow-raised);
+
+  .card__title { color: var(--tech-text-on-accent); }
+  .card__sub   { color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent); }
+  .card__hint  { color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent); }
+  .card__icon  {
+    background: color-mix(in srgb, var(--tech-text-on-accent) 18%, transparent);
+    color: var(--tech-text-on-accent);
+  }
+
+  // Group dividers on the hero card use a translucent on-accent rule
+  .group { border-top-color: color-mix(in srgb, var(--tech-text-on-accent) 20%, transparent); }
+  .group__label { color: color-mix(in srgb, var(--tech-text-on-accent) 65%, transparent); }
+
+  // Row text legibility over the gradient
+  .row__name { color: var(--tech-text-on-accent); }
+  .row__hint { color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent); }
+
+  // Pill-tab (Units control) on hero: sunken tray uses the same translucent pattern
+  .theme-seg {
+    background: color-mix(in srgb, var(--tech-text-on-accent) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tech-text-on-accent) 20%, transparent);
+  }
+  .theme-seg__opt {
+    color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent);
+    &:hover { color: var(--tech-text-on-accent); }
+  }
+  .theme-seg__opt--on {
+    // Active pill inside hero: white/on-accent bg for contrast
+    background: color-mix(in srgb, var(--tech-text-on-accent) 28%, transparent);
+    color: var(--tech-text-on-accent);
+    &:hover { color: var(--tech-text-on-accent); }
+  }
 }
 
 .card__head {
@@ -35,6 +77,8 @@
   gap: var(--tech-space-3);
   margin-bottom: var(--tech-space-3);
 }
+
+// FiMobile icon tile — accent-tinted background + accent color
 .card__icon {
   flex: 0 0 auto;
   display: grid;
@@ -42,7 +86,7 @@
   width: 40px;
   height: 40px;
   border-radius: var(--tech-r-control, 10px);
-  background: var(--tech-info-tint);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
   color: var(--tech-accent);
 }
 .card__id { min-width: 0; }
@@ -78,12 +122,12 @@
   margin: var(--tech-space-1) 0 var(--tech-space-2);
 }
 
-// ---- Theme segmented control (System / Light / Dark) ----
+// ---- Pill tabs / segmented control (FiMobile pattern) ----
 .theme-seg {
   display: inline-flex;
   gap: 4px;
   padding: 4px;
-  border-radius: var(--tech-r-control, 8px);
+  border-radius: var(--tech-radius, 15px);     // FiMobile outer radius
   background: var(--tech-bg-sunken);
   border: 1px solid var(--tech-border);
 }
@@ -93,7 +137,7 @@
   gap: 6px;
   padding: 7px 14px;
   border: 0;
-  border-radius: var(--tech-r-chip, 6px);
+  border-radius: var(--tech-r-control, 10px);  // FiMobile pill tab radius
   background: transparent;
   color: var(--tech-text-secondary);
   font-family: var(--tech-font-ui);
@@ -113,29 +157,31 @@
   &:hover { color: var(--tech-text-on-accent); }
 }
 
+// ---- List rows (FiMobile roomy rows: 12-14px vertical padding) ----
 .row {
   display: flex;
   align-items: center;
   gap: var(--tech-space-3);
-  min-height: 44px;            // comfortable tap target
-  padding: var(--tech-space-1) 0;
+  min-height: 44px;
+  padding: 13px 0;            // FiMobile row rhythm (~13px top+bottom)
   cursor: pointer;
 }
-.row--compact { min-height: 40px; }
-.row__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
-.row__name { font-size: 14px; color: var(--tech-text); }
+.row--compact { min-height: 40px; padding: 10px 0; }
+.row__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.row__name { font-size: 14px; color: var(--tech-text); font-weight: 500; }
 .row__hint { font-size: 12px; color: var(--tech-text-tertiary); line-height: 1.3; }
 
 // ---- Form fields ----
 .field { width: 100%; }
 .field + .field { margin-top: var(--tech-space-1); }
 
-// ---- Discord per-category sub-block ----
+// ---- Discord per-category sub-block (FiMobile accent-tinted chip container) ----
 .cats {
   margin: var(--tech-space-1) 0 var(--tech-space-2);
   padding: var(--tech-space-2) var(--tech-space-3);
-  border: 1px dashed var(--tech-border);
+  border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
   border-radius: var(--tech-r-control, 10px);
+  background: color-mix(in srgb, var(--tech-accent) 5%, transparent);
   transition: opacity var(--tech-t-fast) ease;
 }
 .cats--off { opacity: 0.55; }
@@ -144,7 +190,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--tech-text-tertiary);
+  color: var(--tech-accent);
   margin-bottom: var(--tech-space-1);
 }
 
@@ -172,27 +218,48 @@
   gap: var(--tech-space-2);
   align-items: center;
 }
-.webhook__actions button { min-height: 40px; }
+.webhook__actions button { min-height: 40px; border-radius: var(--tech-r-control, 10px); }
 .webhook__clear { margin-left: auto; color: var(--tech-danger, #ff6b6b); }
 
-// ---- Link-outs ----
+// ---- Link-outs (FiMobile interactive card rows with hover lift) ----
 .links { display: grid; gap: var(--tech-space-2); padding-bottom: var(--tech-space-2); }
 .linkout {
   display: flex;
   align-items: center;
   gap: var(--tech-space-3);
-  min-height: 44px;
-  padding: var(--tech-space-2) var(--tech-space-3);
+  min-height: 52px;            // FiMobile roomy row height
+  padding: 14px var(--tech-space-3);
   border: 1px solid var(--tech-border);
-  border-radius: var(--tech-r-control, 10px);
+  border-radius: var(--tech-radius, 15px);     // FiMobile card radius
+  background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel);
   text-decoration: none;
   color: inherit;
-  transition: border-color var(--tech-t-fast) ease, background var(--tech-t-fast) ease, transform var(--tech-t-fast) ease;
+  transition: border-color var(--tech-t-fast) ease,
+              background var(--tech-t-fast) ease,
+              box-shadow var(--tech-t-fast) ease,
+              transform var(--tech-t-fast) ease;
 }
-.linkout:hover { background: var(--tech-panel-raised); border-color: var(--tech-border-strong); transform: translateY(-1px); }
+.linkout:hover {
+  background: var(--tech-panel-raised);
+  border-color: var(--tech-border-strong);
+  box-shadow: var(--tech-shadow-raised);
+  transform: translateY(-1px);
+}
 .linkout:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: 2px; }
-.linkout__icon { flex: 0 0 auto; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--tech-r-control, 8px); background: var(--tech-info-tint); color: var(--tech-accent); }
-.linkout__body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+// FiMobile accent-tinted icon tile
+.linkout__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--tech-r-control, 10px);
+  background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  color: var(--tech-accent);
+}
+.linkout__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .linkout__label { font-size: 14px; font-weight: 600; color: var(--tech-text); }
 .linkout__blurb { font-size: 12px; color: var(--tech-text-secondary); }
 .linkout__chev { margin-left: auto; color: var(--tech-text-tertiary); }

@@ -16,6 +16,10 @@
   // ---- JOURNAL SIGNATURE ACCENT: INDIGO → TEAL ----
   --accent-a: #6366f1;             // indigo (start)
   --accent-b: #0d9488;             // teal (end)
+
+  // The indigo → teal ramp is deep enough for white on-accent text (WCAG AA).
+  // Override the kit default (#0c0d12) so all on-accent text/icons render white.
+  --ink-on-accent: #fff;
 }
 
 @include kit.beta-springs;
@@ -63,19 +67,30 @@
 // REFLECTION CARD
 // ============================================================================
 
+// ---- HERO CARD: "This week" reflection is the primary summary surface. ----
+// Full gradient fill + on-accent ink so it reads as the FiMobile hero block.
 .jr-reflect {
   display: flex; gap: 12px; align-items: flex-start; padding: 16px;
-  border-radius: var(--r-tile); border: 1px solid var(--hairline); box-shadow: var(--lift-1);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-a) 14%, var(--glass)), color-mix(in srgb, var(--accent-b) 10%, var(--glass)));
+  border-radius: var(--r-tile); border: none; box-shadow: var(--lift-2);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: var(--ink-on-accent, #fff);
 }
 .jr-reflect__ic {
   flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--tech-text-on-accent, #fff);
-  mat-icon { color: var(--tech-text-on-accent, #fff); font-size: 20px; width: 20px; height: 20px; }
+  background: color-mix(in srgb, var(--ink-on-accent, #fff) 18%, transparent);
+  color: var(--ink-on-accent, #fff);
+  mat-icon { color: var(--ink-on-accent, #fff); font-size: 20px; width: 20px; height: 20px; }
 }
 .jr-reflect__body { display: flex; flex-direction: column; gap: 3px; }
-.jr-reflect__h { font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-a); }
-.jr-reflect__note { margin: 0; font-size: .96rem; line-height: 1.45; color: var(--ink); &.is-muted { color: var(--ink-dim); } }
+// Muted label on the solid fill: pulled back to 75% so it reads as a sub-label, not the headline.
+.jr-reflect__h {
+  font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink-on-accent, #fff) 75%, transparent);
+}
+.jr-reflect__note {
+  margin: 0; font-size: .96rem; line-height: 1.45; color: var(--ink-on-accent, #fff);
+  &.is-muted { color: color-mix(in srgb, var(--ink-on-accent, #fff) 72%, transparent); }
+}
 
 // ============================================================================
 // SUMMARY
@@ -85,6 +100,7 @@
 .jr-stat {
   display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px;
   border-radius: var(--r-tile); background: var(--glass); border: 1px solid var(--hairline); box-shadow: var(--lift-1);
+  // Non-interactive tiles: no hover lift (values only).
 }
 .jr-stat__v { font-size: 1.05rem; font-weight: 800; color: var(--ink); }
 .jr-stat__l { font-size: .64rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-faint); }
@@ -104,11 +120,22 @@
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
   padding: 12px 14px; border-radius: var(--r-tile); background: var(--glass);
   border: 1px solid var(--hairline); box-shadow: var(--lift-1); color: var(--ink); cursor: pointer;
-  transition: transform .12s ease;
-  &:active { transform: scale(.99); }
+  // FiMobile interactive-card hover lift.
+  transition: transform .14s ease, box-shadow .14s ease;
+  &:hover { transform: translateY(-1px); box-shadow: var(--lift-2); }
+  &:active { transform: scale(.99); box-shadow: var(--lift-1); }
 }
-.jr-row__emoji { font-size: 1.2rem; width: 1.4em; text-align: center; }
-.jr-row__date { font-weight: 700; flex: 1; }
+// Leading emoji is rendered inside a FiMobile-style accent tile: tinted bg + accent ink.
+.jr-row__emoji {
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: var(--r-tile);
+  background: color-mix(in srgb, var(--accent-a) 12%, transparent);
+  font-size: 1.15rem; text-align: center;
+}
+.jr-row__date { font-weight: 700; flex: 1; color: var(--ink); }
+// Subtitle-class info reads in secondary/tertiary ink per FiMobile list pattern.
 .jr-row__mood { font-size: .78rem; color: var(--ink-dim); }
 .jr-row__tags { font-size: .72rem; color: var(--ink-faint); }
 
@@ -147,17 +174,25 @@
 .ls__label { font-size: .8rem; font-weight: 700; color: var(--ink-dim); i { font-style: normal; font-weight: 500; color: var(--ink-faint); } }
 .ls__input {
   width: 100%; box-sizing: border-box; padding: 11px 12px; border: 1px solid var(--hairline);
-  border-radius: var(--r-card); background: var(--bg-base); color: var(--ink); font: inherit; font-size: .92rem;
+  // FiMobile form control: var(--r-tile) = var(--tech-r-control) keeps the input on-brand.
+  border-radius: var(--r-tile); background: var(--bg-base); color: var(--ink); font: inherit; font-size: .92rem;
   &:focus-visible { outline: none; border-color: var(--accent-a); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-a) 22%, transparent); }
 }
 .ls__area { resize: vertical; min-height: 56px; }
 .ls__area--lg { min-height: 96px; }
 .ls__chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .ls__chip {
-  display: inline-flex; align-items: center; gap: 5px; padding: 8px 14px; border: 1px solid var(--hairline);
-  border-radius: var(--r-pill); background: var(--bg-base); color: var(--ink); font-size: .85rem; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 5px; padding: 8px 14px;
+  // FiMobile pill chip: tinted bg + tinted border in rest state; solid accent when active.
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, transparent);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--accent-a) 10%, transparent);
+  color: var(--ink); font-size: .85rem; font-weight: 600;
   text-transform: capitalize; cursor: pointer; transition: transform .12s ease;
-  &.is-on { border-color: transparent; color: var(--tech-text-on-accent, #fff); background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); }
+  &.is-on {
+    border-color: transparent; color: var(--ink-on-accent, #fff);
+    background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  }
   &:active { transform: scale(.95); }
 }
 .ls__energy { display: flex; gap: 10px; }
@@ -186,17 +221,22 @@
 }
 
 // Inline copy-to-day picker, revealed under the editor.
+// FiMobile card signature: border-radius + shadow + 1px tinted border.
 .ls__copybox {
   display: flex; flex-direction: column; gap: 10px; padding: 12px;
-  border: 1px solid var(--hairline); border-radius: var(--r-card);
-  background: color-mix(in srgb, var(--accent-a) 5%, var(--bg-rise));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 22%, var(--hairline));
+  border-radius: var(--r-tile);
+  box-shadow: var(--lift-1);
+  background: color-mix(in srgb, var(--accent-a) 7%, var(--bg-rise));
 }
 .ls__copyhint { margin: 0; font-size: .8rem; line-height: 1.4; color: var(--ink-dim); }
 .ls__copywarn { margin: 0; font-size: .8rem; color: var(--warn); }
 .ls__copygo {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px;
-  border: 0; border-radius: var(--r-pill);
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--tech-text-on-accent, #fff);
+  border: 0;
+  // FiMobile block CTA: control radius (var(--r-tile)) for a roomy button; on-accent text.
+  border-radius: var(--r-tile);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--ink-on-accent, #fff);
   font-size: .92rem; font-weight: 800; cursor: pointer;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transition: opacity 160ms ease, transform 120ms ease;

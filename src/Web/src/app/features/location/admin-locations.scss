@@ -46,7 +46,9 @@
 
 .map-card {
   padding: var(--tech-space-2, 8px);
-  border-radius: var(--tech-r-panel, 14px);
+  border-radius: var(--tech-radius, var(--tech-r-panel, 14px));
+  border: 1px solid var(--tech-border);
+  box-shadow: var(--tech-shadow-panel);
 
   app-location-map { display: block; height: 540px; }
 
@@ -69,7 +71,9 @@
 
 .side {
   padding: var(--tech-space-3, 12px);
-  border-radius: var(--tech-r-panel, 14px);
+  border-radius: var(--tech-radius, var(--tech-r-panel, 14px));
+  border: 1px solid var(--tech-border);
+  box-shadow: var(--tech-shadow-panel);
   max-height: 560px;
   overflow-y: auto;
 
@@ -96,22 +100,40 @@
   align-items: center;
   gap: var(--tech-space-2, 8px);
   width: 100%;
-  padding: var(--tech-space-2, 8px);
+  padding: var(--tech-space-3, 12px) var(--tech-space-2, 8px);
   border: 1px solid transparent;
   border-radius: var(--tech-r-control, 10px);
   background: transparent;
   text-align: left;
   cursor: pointer;
   color: var(--tech-text);
-  transition: background var(--tech-t-fast) var(--tech-ease, ease);
+  transition:
+    background var(--tech-t-fast, 120ms) var(--tech-ease, ease),
+    box-shadow var(--tech-t-fast, 120ms) var(--tech-ease, ease),
+    transform var(--tech-t-fast, 120ms) var(--tech-ease, ease);
 
-  &:hover { background: var(--tech-bg-sunken, rgba(255, 255, 255, 0.04)); }
+  &:hover {
+    background: var(--tech-bg-sunken, rgba(255, 255, 255, 0.04));
+    box-shadow: var(--tech-shadow-raised);
+    transform: translateY(-1px);
+  }
   &.selected {
     background: color-mix(in srgb, var(--tech-accent, #5b8def) 14%, transparent);
     border-color: color-mix(in srgb, var(--tech-accent, #5b8def) 38%, transparent);
   }
 
-  .roster-icon { color: var(--tech-accent, #5b8def); flex: 0 0 auto; }
+  // FiMobile leading icon tile
+  .roster-icon {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--tech-r-control, 10px);
+    background: color-mix(in srgb, var(--tech-accent, #5b8def) 12%, transparent);
+    color: var(--tech-accent, #5b8def);
+  }
 
   .roster-id {
     flex: 1 1 auto;
@@ -128,7 +150,7 @@
   }
   .roster-place {
     font-size: var(--tech-fs-label, 11px);
-    color: var(--tech-text-tertiary);
+    color: var(--tech-text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -149,7 +171,7 @@
   .hist-item {
     display: flex;
     gap: var(--tech-space-2, 8px);
-    padding: var(--tech-space-2, 8px) 0;
+    padding: var(--tech-space-3, 12px) 0;
     border-bottom: 1px solid var(--tech-border-subtle, rgba(255, 255, 255, 0.06));
 
     &:last-child { border-bottom: none; }
@@ -161,13 +183,18 @@
     margin-top: 5px;
     border-radius: 50%;
     background: var(--tech-accent, #5b8def);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tech-accent, #5b8def) 22%, transparent);
   }
-  .hist-place { font-size: var(--tech-fs-body, 13px); color: var(--tech-text); }
+  .hist-place {
+    font-size: var(--tech-fs-body, 13px);
+    font-weight: 600;
+    color: var(--tech-text);
+  }
   .hist-when {
     font-family: var(--tech-font-mono);
     font-size: var(--tech-fs-label, 11px);
     color: var(--tech-text-tertiary);
-    margin-top: 1px;
+    margin-top: 2px;
   }
 }
 

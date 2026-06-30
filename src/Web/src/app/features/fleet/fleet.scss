@@ -40,6 +40,10 @@ mat-progress-bar {
   padding: 12px 16px;
   margin-bottom: var(--tech-space-4);
   border-radius: var(--tech-radius);
+  /* FiMobile: sunken container surface + card signature */
+  background: var(--tech-bg-sunken);
+  border: 1px solid var(--tech-border);
+  box-shadow: var(--tech-shadow-panel);
 
   .filters-row {
     display: flex;
@@ -69,16 +73,27 @@ mat-progress-bar {
     border-radius: var(--tech-r-pill);
     color: var(--tech-text-secondary);
     font-weight: 600;
-    &.active { color: var(--tech-text-on-accent, #fff); background: var(--tech-accent); }
+    transition: background var(--tech-t-control) ease, color var(--tech-t-control) ease;
+    /* FiMobile chip: tinted default, accent fill when active */
+    &:hover:not(.active) { background: color-mix(in srgb, var(--tech-accent) 8%, transparent); }
+    &.active {
+      color: var(--tech-text-on-accent, #fff);
+      background: var(--tech-accent);
+      box-shadow: var(--tech-glow-blue);
+    }
   }
 
   .grow { flex: 1 1 auto; }
 
   .filter-actions {
     display: flex; flex: 0 0 auto; align-items: center; gap: 8px;
+    /* FiMobile button radius + on-accent text */
     button { border-radius: var(--tech-r-control); font-weight: 600; mat-icon { margin-right: 2px; } }
     .btn-reset { --mdc-outlined-button-outline-color: var(--tech-border-strong); color: var(--tech-text-secondary); }
-    .btn-apply:hover:not(:disabled) { box-shadow: var(--tech-glow-blue); }
+    .btn-apply {
+      --mdc-filled-button-label-text-color: var(--tech-text-on-accent);
+      &:hover:not(:disabled) { box-shadow: var(--tech-glow-blue); }
+    }
   }
 }
 
@@ -140,6 +155,10 @@ mat-progress-bar {
 
 .kpi {
   padding: var(--tech-space-3) var(--tech-space-4);
+  /* FiMobile card signature */
+  border-radius: var(--tech-radius);
+  box-shadow: var(--tech-shadow-panel);
+  border: 1px solid var(--tech-border);
   @media (max-width: 640px) { padding: var(--tech-space-3); }
 
   .kpi-top { display: flex; align-items: center; justify-content: space-between; }
@@ -160,8 +179,26 @@ mat-progress-bar {
   &.kpi-cost .kpi-icon mat-icon { color: var(--tech-accent-magenta, #f472b6); }
 }
 
+/* ── Hero card: Total Cost is the primary fleet KPI — gradient-accent fill ── */
+.kpi.kpi-cost {
+  background: var(--tech-gradient-accent);
+  color: var(--tech-text-on-accent);
+  border-color: transparent;
+
+  .kpi-label { color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent); }
+  .kpi-icon mat-icon { color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent); }
+  .kpi-value.cost { color: var(--tech-text-on-accent); }
+  .kpi-sub { color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent); }
+}
+
 /* ───────────────────────── Leaderboard ───────────────────────── */
-.board-card { padding: var(--tech-space-4) var(--tech-space-4) var(--tech-space-3); }
+.board-card {
+  padding: var(--tech-space-4) var(--tech-space-4) var(--tech-space-3);
+  /* FiMobile card signature */
+  border-radius: var(--tech-radius);
+  box-shadow: var(--tech-shadow-panel);
+  border: 1px solid var(--tech-border);
+}
 @media (max-width: 640px) { .board-card { padding: var(--tech-space-3) var(--tech-space-3) var(--tech-space-2); } }
 
 .board-head {
@@ -170,8 +207,28 @@ mat-progress-bar {
   margin-bottom: var(--tech-space-3); gap: var(--tech-space-3);
 
   mat-button-toggle-group {
-    border-radius: var(--tech-r-control);
+    /* FiMobile segmented pill tabs */
+    border: none;
+    background: var(--tech-bg-sunken);
+    border-radius: var(--tech-radius);
+    padding: 4px;
+    gap: 2px;
     mat-icon { font-size: 16px; width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
+
+    ::ng-deep .mat-button-toggle {
+      border: none;
+      border-radius: var(--tech-r-control);
+      background: transparent;
+      color: var(--tech-text-secondary);
+      font-weight: 600;
+      transition: background var(--tech-t-control) ease, color var(--tech-t-control) ease;
+    }
+    ::ng-deep .mat-button-toggle-checked {
+      background: var(--tech-accent);
+      color: var(--tech-text-on-accent);
+      border-radius: var(--tech-r-control);
+    }
+    ::ng-deep .mat-button-toggle-button { border-radius: inherit; }
   }
 
   /* The board toggle goes full-width and stays a comfortable tap target on phones. */
@@ -212,6 +269,8 @@ mat-progress-bar {
 
 .lb-row {
   border-bottom: 1px solid var(--tech-border-subtle);
+  border-radius: var(--tech-r-control);
+  transition: background var(--tech-t-control) ease;
   &:last-child { border-bottom: none; }
   &.open { background: color-mix(in srgb, var(--tech-accent) 5%, transparent); }
 
@@ -250,7 +309,8 @@ mat-progress-bar {
 
 .lb-main {
   width: 100%;
-  padding: 10px;
+  /* FiMobile roomy list row: 12-14px vertical padding */
+  padding: 13px 10px;
   border: none;
   background: transparent;
   text-align: left;
@@ -260,7 +320,7 @@ mat-progress-bar {
   border-radius: var(--tech-r-control);
   transition: background-color var(--tech-t-control) ease;
 
-  &:hover { background: var(--tech-panel-raised); }
+  &:hover { background: color-mix(in srgb, var(--tech-accent) 6%, var(--tech-panel-raised)); }
   &:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: -2px; }
 
   .lb-rank { color: var(--tech-text-tertiary); text-align: center; font-size: var(--tech-fs-label); }
@@ -268,16 +328,30 @@ mat-progress-bar {
   .lb-name {
     display: flex; align-items: center; gap: 6px; min-width: 0;
     .lb-chev { flex: 0 0 auto; font-size: 18px; width: 18px; height: 18px; color: var(--tech-text-tertiary); }
-    .lb-kind { flex: 0 0 auto; font-size: 16px; width: 16px; height: 16px; color: var(--tech-accent); }
+    /* FiMobile leading icon tile: tinted background pill */
+    .lb-kind {
+      flex: 0 0 auto;
+      display: flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px;
+      border-radius: var(--tech-r-control);
+      background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+      color: var(--tech-accent);
+      font-size: 15px;
+    }
     .lb-label {
       min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       font-weight: 600; color: var(--tech-text);
     }
+    /* FiMobile chip: pill radius + tinted border */
     .lb-tag {
       flex: 0 0 auto;
-      padding: 1px 7px; border-radius: var(--tech-r-chip);
-      border: 1px solid var(--tech-border-subtle); background: var(--tech-bg-sunken);
-      color: var(--tech-text-tertiary);
+      padding: 1px 8px;
+      border-radius: var(--tech-r-pill);
+      border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+      background: color-mix(in srgb, var(--tech-accent) 8%, transparent);
+      color: var(--tech-text-secondary);
+      font-size: var(--tech-fs-micro);
+      font-weight: 600;
     }
   }
 
@@ -370,13 +444,14 @@ mat-progress-bar {
   .lb-detail-lbl { display: block; color: var(--tech-text-tertiary); margin-bottom: 6px; }
   .lb-detail-empty { font-size: var(--tech-fs-label); color: var(--tech-text-tertiary); }
 
-  /* ── System metadata panel (machine details) ── */
+  /* ── System metadata panel (machine details) — FiMobile card signature ── */
   .meta {
     margin-bottom: var(--tech-space-3);
     padding: var(--tech-space-3);
-    border: 1px solid var(--tech-border-subtle);
-    border-radius: var(--tech-r-control);
+    border: 1px solid var(--tech-border);
+    border-radius: var(--tech-radius);
     background: var(--tech-bg-sunken);
+    box-shadow: var(--tech-shadow-panel);
 
     .lb-detail-lbl { margin-bottom: var(--tech-space-2); }
   }
@@ -478,15 +553,17 @@ mat-progress-bar {
   }
 
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  /* FiMobile chip: pill radius + tinted accent border + accent icon */
   .ent-chip {
     display: inline-flex; align-items: center; gap: 5px;
-    padding: 3px 10px;
+    padding: 4px 12px;
     border-radius: var(--tech-r-pill);
-    border: 1px solid var(--tech-border-subtle);
-    background: var(--tech-panel-raised);
+    border: 1px solid color-mix(in srgb, var(--tech-accent) 30%, transparent);
+    background: color-mix(in srgb, var(--tech-accent) 8%, transparent);
     font-size: var(--tech-fs-label);
+    font-weight: 500;
     color: var(--tech-text-secondary);
-    mat-icon { font-size: 14px; width: 14px; height: 14px; color: var(--tech-text-tertiary); }
+    mat-icon { font-size: 14px; width: 14px; height: 14px; color: var(--tech-accent); }
   }
 }
 

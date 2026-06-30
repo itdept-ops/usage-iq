@@ -19,6 +19,8 @@
   // ---- PROFILE's SIGNATURE ACCENT: indigo → violet (the per-page contract override) ----
   --accent-a: #818cf8;             // signature indigo (start)
   --accent-b: #a855f7;             // signature violet (end)
+  // Indigo/violet are dark enough that white ink clears WCAG AA; override the kit default near-black.
+  --ink-on-accent: #ffffff;
 
   // A faint indigo wash behind the whole column (still within the kit's dark contract).
   background: radial-gradient(120% 80% at 50% -8%, var(--tech-panel, #15132a) 0%, var(--bg-base) 58%);
@@ -97,6 +99,12 @@
   border: 1px solid var(--glass-edge);
   border-radius: var(--r-card);
   box-shadow: var(--lift-1);
+  transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--lift-2);
+  }
 
   &.is-offline { opacity: .82; }
 }
@@ -150,6 +158,12 @@
   border: 1px solid var(--hairline);
   border-radius: var(--r-card);
   box-shadow: var(--lift-1);
+  transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--lift-2);
+  }
 }
 
 .pm-card__head { display: flex; align-items: flex-start; gap: 11px; }
@@ -237,8 +251,9 @@
   flex: 0 0 auto;
   width: 38px; height: 38px; border-radius: var(--r-tile);
   display: grid; place-items: center;
-  background: var(--bg-sink);
-  color: var(--ink-dim);
+  // FiMobile list row icon tile: subtle accent tint even in off-state
+  background: color-mix(in oklab, var(--accent-a) 10%, var(--bg-sink));
+  color: color-mix(in oklab, var(--accent-a) 60%, var(--ink-dim));
   transition: background 200ms var(--ease-out), color 200ms var(--ease-out);
 
   mat-icon { font-size: 20px; width: 20px; height: 20px; }

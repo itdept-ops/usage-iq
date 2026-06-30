@@ -71,14 +71,17 @@
   }
 }
 
+// FiMobile segmented-pill container: sunken bg + radius + padding 4px
 .td-nav {
   display: inline-flex;
   align-items: center;
   gap: .5rem;
-  padding: .35rem .5rem;
+  padding: 4px .55rem;
   border-radius: var(--tech-radius, 14px);
-  background: var(--tech-panel-raised, #161c28);
+  // FiMobile pill-tab container: sunken background
+  background: var(--tech-bg-sunken, var(--tech-panel-raised, #161c28));
   border: 1px solid var(--tech-border, #26303f);
+  box-shadow: var(--tech-shadow-panel, 0 2px 12px rgba(0,0,0,.28));
 
   &__btn {
     appearance: none;
@@ -91,8 +94,11 @@
     border: 1px solid var(--tech-border, #26303f);
     background: var(--tech-panel, #11161f);
     color: var(--tech-text, #e6edf6);
-    transition: background .15s, border-color .15s;
-    &:hover:not(:disabled) { border-color: var(--tech-accent, #7c8cff); }
+    transition: background .15s, border-color .15s, transform .15s;
+    &:hover:not(:disabled) {
+      border-color: var(--tech-accent, #7c8cff);
+      background: color-mix(in srgb, var(--tech-accent, #7c8cff) 8%, var(--tech-panel, #11161f));
+    }
     &:disabled { opacity: .4; cursor: default; }
     mat-icon { font-size: 22px; width: 22px; height: 22px; }
   }
@@ -114,6 +120,7 @@
     color: var(--tech-text-secondary, #9ba9bd);
   }
 
+  // FiMobile pill chip — already has the correct pill look; refine for consistency
   &__today {
     appearance: none;
     cursor: pointer;
@@ -121,13 +128,14 @@
     align-items: center;
     gap: .3rem;
     margin-left: .15rem;
-    padding: .4rem .7rem;
+    padding: .4rem .75rem;
     border-radius: var(--tech-r-pill, 999px);
     font: inherit;
     font-size: .8rem;
     font-weight: 600;
     color: var(--tech-accent, #7c8cff);
     background: color-mix(in srgb, var(--tech-accent, #7c8cff) 12%, transparent);
+    // FiMobile chip border: 30% accent tint
     border: 1px solid color-mix(in srgb, var(--tech-accent, #7c8cff) 30%, transparent);
     transition: background .15s;
     &:hover:not(:disabled) { background: color-mix(in srgb, var(--tech-accent, #7c8cff) 22%, transparent); }
@@ -153,16 +161,16 @@
   }
 }
 
-// ─────────── AI NARRATIVE BANNER ───────────
+// ─────────── AI NARRATIVE BANNER — FiMobile gradient-hero card ───────────
 .td-ai {
   position: relative;
   border-radius: var(--tech-radius, 16px);
   padding: clamp(16px, 2.5vw, 24px);
-  background:
-    linear-gradient(135deg,
-      color-mix(in srgb, var(--tech-accent, #7c8cff) 16%, var(--tech-panel, #11161f)),
-      color-mix(in srgb, var(--tech-accent-2, #c084fc) 12%, var(--tech-panel, #11161f)));
-  border: 1px solid color-mix(in srgb, var(--tech-accent, #7c8cff) 30%, transparent);
+  // FiMobile hero: full accent gradient fill
+  background: var(--tech-gradient-accent,
+    linear-gradient(135deg, var(--tech-accent, #7c8cff), var(--tech-accent-2, #c084fc)));
+  border: none;
+  box-shadow: var(--tech-shadow-panel, 0 4px 24px rgba(0,0,0,.35));
 
   &__kicker {
     display: inline-flex;
@@ -173,14 +181,15 @@
     font-weight: 700;
     letter-spacing: .04em;
     text-transform: uppercase;
-    color: var(--tech-text, #e6edf6);
+    // on-accent: full luminosity label
+    color: var(--tech-text-on-accent, #fff);
     mat-icon { font-size: 18px; width: 18px; height: 18px; }
   }
   &__text {
     margin: 0;
     font-size: 1.04rem;
     line-height: 1.6;
-    color: var(--tech-text, #e6edf6);
+    color: var(--tech-text-on-accent, #fff);
   }
   &__foot {
     display: flex;
@@ -188,12 +197,13 @@
     gap: .35rem;
     margin: .85rem 0 0;
     font-size: .78rem;
-    color: var(--tech-text-secondary, #9ba9bd);
+    // muted on-accent: legible but softer
+    color: color-mix(in srgb, var(--tech-text-on-accent, #fff) 78%, transparent);
     mat-icon { font-size: 15px; width: 15px; height: 15px; }
   }
 }
 
-// ─────────── STAT CHIPS ───────────
+// ─────────── STAT CHIPS — FiMobile card signature ───────────
 .td-stats {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -204,12 +214,17 @@
   display: flex;
   flex-direction: column;
   gap: .15rem;
-  padding: .7rem .85rem .8rem;
+  padding: .8rem 1rem .9rem;
+  // FiMobile card: radius + shadow + border
   border-radius: var(--tech-radius, 14px);
+  box-shadow: var(--tech-shadow-panel, 0 2px 12px rgba(0,0,0,.28));
   background: var(--tech-panel, #11161f);
   border: 1px solid var(--tech-border, #26303f);
   overflow: hidden;
+  transition: transform .18s var(--tech-ease, cubic-bezier(.2,.6,.2,1)),
+              box-shadow .18s var(--tech-ease, cubic-bezier(.2,.6,.2,1));
 
+  // domain accent rail (kept — it's the signature domain identity stripe)
   &::before {
     content: '';
     position: absolute;
@@ -217,11 +232,19 @@
     width: 3px;
     background: linear-gradient(180deg, var(--da, #818cf8), var(--db, #c084fc));
   }
+
+  // FiMobile hover lift on interactive cards
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised, 0 6px 28px rgba(0,0,0,.45));
+  }
+
   &__ico {
     display: grid;
     place-items: center;
-    width: 28px; height: 28px;
-    border-radius: 8px;
+    width: 30px; height: 30px;
+    // FiMobile icon tile: control radius + accent tint bg
+    border-radius: var(--tech-r-control, 10px);
     color: var(--db);
     background: color-mix(in srgb, var(--da) 18%, transparent);
     mat-icon { font-size: 18px; width: 18px; height: 18px; }
@@ -243,7 +266,7 @@
   }
 }
 
-// ─────────── TEXT HIGHLIGHTS ───────────
+// ─────────── TEXT HIGHLIGHTS — FiMobile list rows ───────────
 .td-hl {
   margin: 0;
   padding: 0;
@@ -254,16 +277,28 @@
   li {
     display: flex;
     align-items: flex-start;
-    gap: .5rem;
-    padding: .6rem .8rem;
+    gap: .65rem;
+    // FiMobile roomy rows: ~13px vertical padding
+    padding: .8rem 1rem;
     border-radius: var(--tech-radius, 12px);
+    box-shadow: var(--tech-shadow-panel, 0 2px 12px rgba(0,0,0,.28));
     background: var(--tech-panel-raised, #161c28);
     border: 1px solid var(--tech-border, #26303f);
     font-size: .9rem;
     line-height: 1.45;
     color: var(--tech-text, #e6edf6);
+
+    // FiMobile leading icon tile
     mat-icon {
-      font-size: 18px; width: 18px; height: 18px; flex: none; margin-top: 1px;
+      flex: none;
+      margin-top: 1px;
+      font-size: 18px; width: 18px; height: 18px;
+      display: grid;
+      place-items: center;
+      // icon tile: control radius + accent tint bg
+      padding: .2rem;
+      border-radius: var(--tech-r-control, 10px);
+      background: color-mix(in srgb, var(--tech-accent, #7c8cff) 12%, transparent);
       color: var(--tech-accent, #7c8cff);
     }
   }
@@ -333,8 +368,20 @@
     mat-icon { font-size: 21px; width: 21px; height: 21px; }
   }
   &__body {
-    padding-top: .35rem;
+    padding: .45rem .75rem .55rem;
     min-width: 0;
+    // FiMobile card signature on timeline body: radius + shadow + border
+    border-radius: var(--tech-radius, 14px);
+    box-shadow: var(--tech-shadow-panel, 0 2px 12px rgba(0,0,0,.28));
+    background: var(--tech-panel, #11161f);
+    border: 1px solid var(--tech-border, #26303f);
+    transition: transform .18s var(--tech-ease, cubic-bezier(.2,.6,.2,1)),
+                box-shadow .18s var(--tech-ease, cubic-bezier(.2,.6,.2,1));
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--tech-shadow-raised, 0 6px 28px rgba(0,0,0,.45));
+    }
   }
   &__domain {
     font-size: .68rem;

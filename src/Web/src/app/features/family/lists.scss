@@ -33,8 +33,10 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background: var(--tech-panel);
-  box-shadow: var(--tech-shadow-raised);
+  box-shadow: var(--tech-shadow-panel);
   overflow: hidden;
+  transition: transform var(--tech-t-fast, 120ms) ease, box-shadow var(--tech-t-fast, 120ms) ease;
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised); }
 }
 
 .list-card__head {
@@ -54,8 +56,7 @@
 .item-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .item {
   display: flex; align-items: center; gap: 8px;
-  /* 8px vertical aligns the item baseline with the add-item row below (was 6px → misaligned). */
-  padding: var(--tech-space-2, 8px) var(--tech-space-4, 16px);
+  padding: 12px var(--tech-space-4, 16px);
   border-top: 1px solid var(--tech-border-subtle);
 
   &__check { flex: 0 0 auto; }

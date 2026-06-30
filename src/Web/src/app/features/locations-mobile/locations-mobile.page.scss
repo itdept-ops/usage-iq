@@ -196,8 +196,11 @@ $tabbar: 62px;
   background: var(--glass);
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.1);
   backdrop-filter: blur(var(--blur-glass)) saturate(1.1);
-  border-top: 1px solid var(--glass-edge);
-  border-radius: 22px 22px 0 0;
+  // FiMobile card signature: 1px --tech-border on the visible edges
+  border-top: 1px solid var(--tech-border, var(--glass-edge));
+  border-left: 1px solid var(--tech-border, var(--glass-edge));
+  border-right: 1px solid var(--tech-border, var(--glass-edge));
+  border-radius: var(--r-card) var(--r-card) 0 0;
   box-shadow: var(--lift-3, 0 -18px 44px rgba(0, 0, 0, .5));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -275,13 +278,20 @@ $tabbar: 62px;
   display: flex; align-items: center; gap: 12px;
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid var(--hairline);
+  // FiMobile card signature: 1px --tech-border + panel shadow
+  border: 1px solid var(--tech-border, var(--hairline));
   border-radius: var(--r-card);
   background: var(--bg-rise);
   box-shadow: var(--lift-1);
   text-align: left;
   cursor: pointer;
-  transition: border-color var(--ease-out, 160ms), background var(--ease-out, 160ms);
+  transition: border-color var(--ease-out, 160ms), background var(--ease-out, 160ms),
+              transform var(--ease-out, 160ms), box-shadow var(--ease-out, 160ms);
+
+  &:hover:not(:disabled):not(.is-on) {
+    transform: translateY(-1px);
+    box-shadow: var(--lift-2);
+  }
 
   &.is-on {
     border-color: color-mix(in oklab, var(--accent-a) 50%, transparent);
@@ -294,7 +304,8 @@ $tabbar: 62px;
   flex: none;
   display: grid; place-items: center;
   width: 38px; height: 38px;
-  border-radius: 12px;
+  // FiMobile list icon tile: --tech-r-control radius + accent tint
+  border-radius: var(--r-tile);
   background: color-mix(in oklab, var(--accent-a) 16%, transparent);
   color: var(--accent-a);
   mat-icon { font-size: 20px; width: 20px; height: 20px; }
@@ -353,7 +364,14 @@ $tabbar: 62px;
   background: var(--bg-rise);
   text-align: left;
   cursor: pointer;
-  transition: border-color var(--ease-out, 160ms), background var(--ease-out, 160ms);
+  // FiMobile interactive row: smooth hover lift
+  transition: border-color var(--ease-out, 160ms), background var(--ease-out, 160ms),
+              transform var(--ease-out, 160ms), box-shadow var(--ease-out, 160ms);
+
+  &:hover:not(.is-sel) {
+    transform: translateY(-1px);
+    box-shadow: var(--lift-2);
+  }
 
   &.is-sel {
     border-color: color-mix(in oklab, var(--accent-a) 55%, transparent);

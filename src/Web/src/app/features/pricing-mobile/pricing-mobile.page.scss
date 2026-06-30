@@ -105,9 +105,10 @@
   background: var(--glass);
   backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--r-tile);
-  box-shadow: var(--lift-1);
+  // FiMobile card signature: use global border + shadow + radius tokens
+  border: 1px solid var(--tech-border, var(--glass-edge));
+  border-radius: var(--tech-r-control, var(--r-tile));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
 
   &--ro {
     flex-direction: row; align-items: center; gap: 6px;
@@ -138,10 +139,18 @@
   display: flex; flex-direction: column; gap: 12px;
   padding: 16px 14px;
   background: var(--bg-rise);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-card);
-  box-shadow: var(--lift-1);
+  // FiMobile card signature: global border + shadow + radius tokens
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-radius, var(--r-card));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
   overflow: hidden;
+  // hover lift on interactive cards — the whole card is an edit surface
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised, var(--lift-2));
+  }
 
   &.is-placeholder {
     border-color: color-mix(in oklab, var(--accent-a) 36%, var(--hairline));
@@ -182,9 +191,10 @@
   flex: 0 0 auto;
   font-family: var(--font-ui); font-size: 10.5px; font-weight: 700;
   letter-spacing: .05em; text-transform: uppercase;
-  padding: 3px 8px; border-radius: var(--r-pill);
+  // FiMobile chip: global pill radius + tinted bg + tinted border
+  padding: 3px 8px; border-radius: var(--tech-r-pill, var(--r-pill));
   color: var(--accent-a);
-  background: color-mix(in oklab, var(--accent-a) 16%, transparent);
+  background: color-mix(in oklab, var(--accent-a) 12%, transparent);
   border: 1px solid color-mix(in oklab, var(--accent-a) 30%, transparent);
 }
 
@@ -200,8 +210,9 @@
   width: 100%; box-sizing: border-box;
   min-height: 46px; padding: 11px 14px;
   background: var(--bg-sink);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-pill);
+  // FiMobile: global border + control radius (pill was too extreme for a text input field)
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-control, var(--r-tile));
   font-family: var(--font-ui); font-size: 15px; color: var(--ink);
   -webkit-tap-highlight-color: transparent;
   transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
@@ -231,13 +242,19 @@
 .pr-rate { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 
 .pr-rate__label {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-family: var(--font-ui); font-size: 12px; font-weight: 600; color: var(--ink-dim);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-ui); font-size: 12px; font-weight: 600;
+  // FiMobile list row: muted subtitle text
+  color: var(--tech-text-secondary, var(--ink-dim));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 
   mat-icon {
     flex: 0 0 auto;
-    font-size: 14px; width: 14px; height: 14px; color: var(--accent-a);
+    // FiMobile leading icon tile: tinted bg + accent color + control radius
+    font-size: 13px; width: 13px; height: 13px;
+    padding: 3px; border-radius: var(--tech-r-control, var(--r-tile));
+    background: color-mix(in srgb, var(--accent-a) 12%, transparent);
+    color: var(--accent-a);
   }
 }
 
@@ -245,8 +262,9 @@
   display: flex; align-items: center;
   min-height: 46px; padding: 0 10px;
   background: var(--bg-sink);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-tile);
+  // FiMobile list-row style: global border + control-radius
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-control, var(--r-tile));
   transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
 
   &:focus-within {
@@ -286,7 +304,8 @@
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; min-height: 46px; padding: 12px 16px; margin-top: 2px;
   border: 1px solid color-mix(in oklab, var(--accent-a) 36%, var(--hairline));
-  border-radius: var(--r-pill);
+  // FiMobile CTA: control radius (not full pill) for in-card actions
+  border-radius: var(--tech-r-control, var(--r-tile));
   background: color-mix(in oklab, var(--accent-a) 12%, var(--bg-sink));
   color: var(--ink);
   font-family: var(--font-ui); font-weight: 700; font-size: 14px;
@@ -340,10 +359,13 @@
   flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   min-height: 46px; padding: 12px 22px;
-  border: none; border-radius: var(--r-pill);
+  border: none;
+  // FiMobile CTA: control radius + on-accent text token
+  border-radius: var(--tech-r-control, var(--r-pill));
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: var(--ink-on-accent); font-family: var(--font-ui); font-weight: 800; font-size: 14px;
-  box-shadow: var(--lift-2);
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
+  font-family: var(--font-ui); font-weight: 800; font-size: 14px;
+  box-shadow: var(--tech-shadow-raised, var(--lift-2));
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transition: transform 160ms var(--ease-spring-up, var(--ease-out)), opacity 160ms var(--ease-out);
 
@@ -389,9 +411,12 @@
   margin-top: 6px;
   display: inline-flex; align-items: center; gap: 7px;
   min-height: 44px; padding: 10px 20px;
-  border: none; border-radius: var(--r-pill);
+  border: none;
+  // FiMobile CTA: control radius + on-accent text token
+  border-radius: var(--tech-r-control, var(--r-pill));
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: var(--ink-on-accent); font-family: var(--font-ui); font-weight: 700; font-size: 14px;
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
+  font-family: var(--font-ui); font-weight: 700; font-size: 14px;
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   mat-icon { font-size: 19px; width: 19px; height: 19px; }
   &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

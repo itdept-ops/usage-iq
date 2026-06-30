@@ -113,13 +113,16 @@
     flex-direction: column;
   }
 
-  /* ── Header: title + unread count + mark-all ── */
+  /* ── Header: FiMobile hero-card — gradient fill, on-accent text ── */
   .nb-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 11px 12px;
-    border-bottom: 1px solid var(--tech-border-subtle, #1c2533);
+    padding: 13px 12px;
+    /* FiMobile HERO CARD: gradient-accent background */
+    background: var(--tech-gradient-accent);
+    color: var(--tech-text-on-accent);
+    border-bottom: 1px solid color-mix(in srgb, var(--tech-text-on-accent) 15%, transparent);
     cursor: default;
   }
   .nb-head__title {
@@ -128,13 +131,21 @@
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--tech-text-secondary);
+    /* Muted on-accent label: legible on gradient fill */
+    color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent);
   }
   .nb-head__count {
+    /* FiMobile chip on hero: semi-opaque white pill, legible on gradient */
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: var(--tech-r-pill, 999px);
+    background: color-mix(in srgb, var(--tech-text-on-accent) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tech-text-on-accent) 30%, transparent);
     font-family: var(--tech-font-mono);
     font-size: var(--tech-fs-label, 11px);
     font-weight: 700;
-    color: var(--tech-accent);
+    color: var(--tech-text-on-accent);
   }
   .nb-head__action {
     margin-left: auto;
@@ -143,26 +154,25 @@
     gap: 5px;
     height: 28px;
     padding: 0 10px;
-    border: 1px solid var(--tech-border-subtle, #1c2533);
-    border-radius: var(--tech-r-pill, 999px);
-    background: var(--tech-bg-sunken, #0c1118);
-    color: var(--tech-text-secondary);
+    /* FiMobile on-accent pill button: semi-opaque white fill, on-accent text */
+    border: 1px solid color-mix(in srgb, var(--tech-text-on-accent) 30%, transparent);
+    border-radius: var(--tech-r-control, 8px);
+    background: color-mix(in srgb, var(--tech-text-on-accent) 15%, transparent);
+    color: var(--tech-text-on-accent);
     font-family: var(--tech-font-ui);
     font-size: var(--tech-fs-label, 11px);
     font-weight: 500;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition:
-      color var(--tech-t-control, 140ms) ease,
-      border-color var(--tech-t-control, 140ms) ease,
-      background-color var(--tech-t-control, 140ms) ease;
+      background-color var(--tech-t-control, 140ms) ease,
+      border-color var(--tech-t-control, 140ms) ease;
 
     mat-icon { font-size: 15px; width: 15px; height: 15px; }
 
     &:hover:not(:disabled) {
-      color: var(--tech-text);
-      border-color: var(--tech-border-strong, #33425a);
-      background: color-mix(in srgb, var(--tech-panel-raised) 70%, transparent);
+      background: color-mix(in srgb, var(--tech-text-on-accent) 25%, transparent);
+      border-color: color-mix(in srgb, var(--tech-text-on-accent) 50%, transparent);
     }
     &:focus-visible {
       outline: none;
@@ -196,7 +206,8 @@
     align-items: flex-start;
     gap: 10px;
     width: 100%;
-    padding: 9px 9px 9px 8px;
+    /* FiMobile list rows: roomy 12px vertical padding */
+    padding: 12px 10px 12px 8px;
     border: none;
     background: transparent;
     border-radius: var(--tech-r-control, 8px);
@@ -227,22 +238,19 @@
       width: 32px;
       height: 32px;
       border-radius: var(--tech-r-control, 8px);
-      background: var(--tech-bg-sunken, #0c1118);
-      border: 1px solid var(--tech-border-subtle, #1c2533);
-      color: var(--tech-text-secondary);
+      /* FiMobile list-row leading icon tile: accent-tinted bg + accent ink */
+      background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--tech-accent) 28%, transparent);
+      color: var(--tech-accent);
     }
     /* System events read as alerts; tint them. */
     &__icon-wrap[data-type='systemSyncFailed'],
     &__icon-wrap[data-type='systemFleetOffline'] {
       color: var(--tech-error, #ff5c6c);
       border-color: color-mix(in srgb, var(--tech-error, #ff5c6c) 30%, transparent);
-      background: color-mix(in srgb, var(--tech-error, #ff5c6c) 10%, var(--tech-bg-sunken, #0c1118));
+      background: color-mix(in srgb, var(--tech-error, #ff5c6c) 10%, transparent);
     }
-    &__icon-wrap[data-type='mention'],
-    &__icon-wrap[data-type='directMessage'] {
-      color: var(--tech-accent);
-      border-color: color-mix(in srgb, var(--tech-accent) 28%, transparent);
-    }
+    /* mention + DM already inherit the accent tile above — no override needed. */
     &__icon { font-size: 18px; width: 18px; height: 18px; }
 
     &__body {
@@ -273,8 +281,8 @@
       min-width: 0;
       font-family: var(--tech-font-mono);
       font-size: var(--tech-fs-label, 11px);
-      /* Secondary (not tertiary) so the 11px actor/timestamp meta clears ~4.5:1 against the panel. */
-      color: var(--tech-text-secondary);
+      /* FiMobile muted subtitle — tertiary for the timestamp/actor secondary line */
+      color: var(--tech-text-tertiary, #5e6c82);
     }
     &__actor {
       overflow: hidden;
@@ -341,6 +349,7 @@
     padding: 0 10px;
     border: none;
     background: transparent;
+    /* FiMobile interactive row: control radius, smooth hover */
     border-radius: var(--tech-r-control, 8px);
     color: var(--tech-text-secondary);
     font-family: var(--tech-font-ui);
@@ -350,19 +359,21 @@
     -webkit-tap-highlight-color: transparent;
     transition:
       color var(--tech-t-control, 140ms) ease,
-      background-color var(--tech-t-control, 140ms) ease;
+      background-color var(--tech-t-control, 140ms) ease,
+      transform var(--tech-t-control, 140ms) ease;
 
     mat-icon {
       font-size: 18px;
       width: 18px;
       height: 18px;
-      color: var(--tech-text-tertiary, #5e6c82);
+      /* FiMobile: leading icon in accent color */
+      color: var(--tech-accent);
     }
 
     &:hover {
       color: var(--tech-text);
-      background: color-mix(in srgb, var(--tech-panel-raised, #161d2a) 80%, transparent);
-      mat-icon { color: var(--tech-text-accent, #9fb4d4); }
+      background: color-mix(in srgb, var(--tech-accent) 8%, transparent);
+      transform: translateY(-1px);
     }
     &:focus-visible {
       outline: none;

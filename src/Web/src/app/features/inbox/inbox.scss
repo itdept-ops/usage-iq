@@ -8,7 +8,15 @@
 .head {
   margin-bottom: var(--tech-space-4, 24px);
 
-  .head-eyebrow { display: block; color: var(--tech-text-accent); margin-bottom: 6px; }
+  .head-eyebrow {
+    display: block;
+    color: var(--tech-text-accent);
+    margin-bottom: 6px;
+    font-size: var(--tech-fs-small);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
 
   .head-row {
     display: flex;
@@ -38,21 +46,25 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  border: 1px solid var(--tech-border, rgba(255, 255, 255, 0.14));
-  border-radius: var(--tech-r-control, 8px);
-  background: var(--tech-surface, rgba(255, 255, 255, 0.04));
+  padding: 8px 16px;
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-r-control);
+  background: var(--tech-bg-sunken, var(--tech-surface));
   color: var(--tech-text);
   font: inherit;
   font-size: var(--tech-fs-small);
   font-weight: 600;
   cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 
   mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
-  &:hover:not(:disabled) { border-color: var(--tech-text-accent); }
+  &:hover:not(:disabled) {
+    border-color: var(--tech-accent);
+    box-shadow: var(--tech-shadow-panel);
+  }
   &:disabled { opacity: 0.6; cursor: default; }
-  &:focus-visible { outline: 2px solid var(--tech-text-accent); outline-offset: 1px; }
+  &:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: 1px; }
 }
 
 .state {
@@ -69,6 +81,8 @@
   mat-icon { font-size: 36px; width: 36px; height: 36px; color: var(--tech-text-accent); }
 }
 
+// ── period section ──────────────────────────────────────────────────────────
+
 .period {
   margin-bottom: var(--tech-space-4, 24px);
 
@@ -78,27 +92,32 @@
     gap: 8px;
     margin: 0 0 var(--tech-space-2, 12px);
     font-family: var(--tech-font-ui);
-    font-size: var(--tech-fs-body);
+    font-size: var(--tech-fs-small);
     font-weight: 700;
-    letter-spacing: 0.01em;
-    color: var(--tech-text);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--tech-text-secondary);
 
-    mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--tech-text-accent); }
+    mat-icon { font-size: 16px; width: 16px; height: 16px; color: var(--tech-text-accent); }
   }
 
+  // FiMobile chip: pill bg + tinted border
   &__count {
     display: inline-grid;
     place-items: center;
     min-width: 20px;
     height: 20px;
-    padding: 0 6px;
-    border-radius: var(--tech-r-pill, 999px);
+    padding: 0 7px;
+    border-radius: var(--tech-r-pill);
     font-size: var(--tech-fs-small);
-    font-weight: 600;
-    color: var(--tech-text-secondary);
-    background: var(--tech-surface-2, rgba(255, 255, 255, 0.06));
+    font-weight: 700;
+    color: var(--tech-text-accent);
+    background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tech-accent) 28%, transparent);
   }
 }
+
+// ── list container ──────────────────────────────────────────────────────────
 
 .items {
   list-style: none;
@@ -109,12 +128,18 @@
   gap: var(--tech-space-2, 12px);
 }
 
+// ── base card shell (FiMobile card signature) ───────────────────────────────
+
 .card {
-  border: 1px solid var(--tech-border, rgba(255, 255, 255, 0.1));
-  border-radius: var(--tech-radius, 12px);
-  background: var(--tech-surface, rgba(255, 255, 255, 0.03));
-  padding: var(--tech-space-3, 16px);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius);
+  background: var(--tech-surface);
+  padding: 14px var(--tech-space-3, 16px);
+  box-shadow: var(--tech-shadow-panel);
+  transition: box-shadow 180ms ease, transform 180ms ease, border-color 160ms ease, opacity 160ms ease;
 }
+
+// ── inbox item row ──────────────────────────────────────────────────────────
 
 .item {
   // Per-card accent: a subtle hue derived from the agent kind, blended over the accent token.
@@ -123,21 +148,27 @@
   display: flex;
   align-items: flex-start;
   gap: var(--tech-space-3, 16px);
-  transition: border-color 160ms ease, opacity 160ms ease;
+
+  // FiMobile hover lift on interactive (unhandled) cards
+  &.item--unhandled:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised);
+  }
 
   &--unhandled {
-    border-color: color-mix(in srgb, var(--item-accent) 40%, var(--tech-border, rgba(255, 255, 255, 0.1)));
+    border-color: color-mix(in srgb, var(--item-accent) 40%, var(--tech-border));
   }
   &:not(.item--unhandled) { opacity: 0.78; }
 
+  // FiMobile leading icon tile
   &__ic {
     flex: none;
     display: grid;
     place-items: center;
     width: 40px;
     height: 40px;
-    border-radius: var(--tech-r-control, 8px);
-    background: color-mix(in srgb, var(--item-accent) 16%, var(--tech-surface-2, rgba(255, 255, 255, 0.06)));
+    border-radius: var(--tech-r-control);
+    background: color-mix(in srgb, var(--item-accent) 12%, transparent);
     color: var(--item-accent);
 
     mat-icon { font-size: 22px; width: 22px; height: 22px; }
@@ -153,20 +184,21 @@
     font-size: var(--tech-fs-small);
     color: var(--tech-text-secondary);
   }
-  &__agent { font-weight: 600; color: var(--tech-text); }
+  &__agent { font-weight: 700; color: var(--tech-text); }
   &__dot { color: var(--tech-text-tertiary, var(--tech-text-secondary)); }
   &__time { color: var(--tech-text-secondary); }
 
+  // FiMobile chip/badge
   &__new {
     margin-left: 4px;
     padding: 1px 8px;
-    border-radius: var(--tech-r-pill, 999px);
+    border-radius: var(--tech-r-pill);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--item-accent);
-    background: color-mix(in srgb, var(--item-accent) 16%, transparent);
-    border: 1px solid color-mix(in srgb, var(--item-accent) 36%, transparent);
+    background: color-mix(in srgb, var(--item-accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--item-accent) 30%, transparent);
   }
 
   &__summary {
@@ -195,30 +227,34 @@
   }
 }
 
+// ── action buttons ──────────────────────────────────────────────────────────
+
 .btn-act,
 .btn-handle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--tech-r-control, 8px);
-  border: 1px solid var(--tech-border, rgba(255, 255, 255, 0.14));
+  padding: 6px 13px;
+  border-radius: var(--tech-r-control);
+  border: 1px solid var(--tech-border);
   background: transparent;
   color: var(--tech-text);
   font: inherit;
   font-size: var(--tech-fs-small);
   font-weight: 600;
   cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 
   mat-icon { font-size: 16px; width: 16px; height: 16px; }
 
-  &:hover { border-color: var(--tech-text-accent); }
-  &:focus-visible { outline: 2px solid var(--tech-text-accent); outline-offset: 1px; }
+  &:hover { border-color: var(--tech-accent); box-shadow: var(--tech-shadow-panel); }
+  &:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: 1px; }
 }
 
 .btn-act {
   color: var(--item-accent);
-  border-color: color-mix(in srgb, var(--item-accent) 40%, transparent);
+  border-color: color-mix(in srgb, var(--item-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--item-accent) 8%, transparent);
 
-  &:hover { border-color: var(--item-accent); }
+  &:hover { border-color: var(--item-accent); box-shadow: var(--tech-shadow-panel); }
 }

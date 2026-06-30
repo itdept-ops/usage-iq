@@ -57,6 +57,7 @@
 
 .cc-search { margin-bottom: -0.5em; }
 
+/* FiMobile card signature: tech-radius, tech-border, shadow-panel */
 .cc-people {
   display: flex;
   flex-direction: column;
@@ -64,17 +65,20 @@
   max-height: 256px;
   overflow-y: auto;
   padding: 4px;
-  border: 1px solid var(--tech-border-subtle);
-  border-radius: var(--tech-r-control);
+  border: 1px solid var(--tech-border);
+  border-radius: var(--tech-radius);
   background: var(--tech-bg-sunken);
+  box-shadow: var(--tech-shadow-panel);
 }
 
+/* FiMobile LIST ROW: roomy 12px vertical padding, leading avatar tile, muted subtitle */
 .cc-person {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 7px 8px;
+  /* FiMobile: roomy row padding */
+  padding: 12px 10px;
   border: none;
   background: transparent;
   border-radius: var(--tech-r-control);
@@ -97,7 +101,8 @@
   &__avatar {
     width: 30px;
     height: 30px;
-    border-radius: 50%;
+    /* FiMobile: leading tile with r-control radius */
+    border-radius: var(--tech-r-control);
     object-fit: cover;
     box-shadow: 0 0 0 1px var(--tech-border-subtle);
   }
