@@ -257,8 +257,11 @@
   left: 0;
   right: 0;
   z-index: 30;
-  min-height: calc(var(--action-bar-h) + var(--safe-bottom));
-  padding-bottom: max(12px, var(--safe-bottom));
+  // bottom: --beta-bar-bottom already sits this bar ON TOP of the tab bar (which owns the home-indicator
+  // safe-area), so it must NOT re-add --safe-bottom — that double-counted the inset and left a slab of dead
+  // space under the LOG button. (snap-pod clearance for the raised camera pod is added below.)
+  min-height: var(--action-bar-h);
+  padding-bottom: 12px;
   padding-top: 10px;
   padding-inline: var(--gutter) var(--gutter-r);
   display: flex;
@@ -270,6 +273,11 @@
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
   border-top: 1px solid var(--hairline);
   box-shadow: var(--lift-3);
+}
+// When the raised center camera pod is shown it protrudes ~20px above the tab bar into this bar's space;
+// give the LOG button a touch more bottom clearance so the pod never overlaps it.
+:host-context(.snap-pod) .tb-action-bar {
+  padding-bottom: 26px;
 }
 
 // ---- Own visible focus ring (never outline:none without a replacement) ----
