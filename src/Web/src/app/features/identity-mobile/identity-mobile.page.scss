@@ -16,8 +16,8 @@
   @include kit.beta-host;            // the whole Strata token contract on :host
 
   // ---- IDENTITY'S SIGNATURE ACCENT: VIOLET → INDIGO (the per-page contract override) ----
-  --accent-a: #8b7cff;               // violet (start)
-  --accent-b: #5b5bf0;               // indigo (deep, end)
+  --accent-a: var(--tech-accent);               // violet (start)
+  --accent-b: var(--tech-accent-2);               // indigo (deep, end)
 }
 
 @include kit.beta-springs;           // @supports linear() spring upgrade (top-level, once)

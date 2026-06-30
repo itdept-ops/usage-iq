@@ -20,8 +20,8 @@
   // ---- SETTINGS' SIGNATURE ACCENT: cool slate → steel-blue (the per-page contract override) ----
   // A restrained, premium cool-grey signature with a steel-blue pop on the gradient end-stop, so toggles
   // and active states carry a tasteful accent without shouting.
-  --accent-a: #8fa0bd;             // signature cool slate (start)
-  --accent-b: #5b7cb8;             // restrained steel-blue pop (end)
+  --accent-a: var(--tech-accent);             // signature cool slate (start)
+  --accent-b: var(--tech-accent-2);             // restrained steel-blue pop (end)
 
   // Cool the layered base toward a slate surface (still within the kit's dark contract).
   --bg-base: var(--tech-bg, #0e1119);

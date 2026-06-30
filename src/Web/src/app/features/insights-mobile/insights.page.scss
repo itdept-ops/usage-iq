@@ -15,8 +15,8 @@
   @include kit.beta-host;            // the whole Strata token contract on :host
 
   // ---- signature accent: indigo → violet (the per-page contract override) ----
-  --accent-a: #6366f1;
-  --accent-b: #a855f7;
+  --accent-a: var(--tech-accent);
+  --accent-b: var(--tech-accent-2);
 
   // ---- per-DOMAIN accent start/end (the card edge wash + icon tint) ----
   --da-sleep:     #a5b4fc; --db-sleep:     #818cf8;

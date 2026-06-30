@@ -16,8 +16,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- FINANCE' SIGNATURE ACCENT: MINT → TEAL (the per-page contract override) ----
-  --accent-a: #2dd4bf;             // mint (start)
-  --accent-b: #0d9488;             // teal (deep, end)
+  --accent-a: var(--tech-accent);             // mint (start)
+  --accent-b: var(--tech-accent-2);             // teal (deep, end)
 }
 
 @include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)

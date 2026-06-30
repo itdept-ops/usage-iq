@@ -16,8 +16,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- 75-HARD SIGNATURE ACCENT: FLAME (the per-page contract override) ----
-  --accent-a: #fb7185;             // ember rose-orange (start)
-  --accent-b: #f97316;             // flame orange (end)
+  --accent-a: var(--tech-accent);             // ember rose-orange (start)
+  --accent-b: var(--tech-accent-2);             // flame orange (end)
 
   // local medal hues for the leaderboard podium
   --m-gold:   #fbbf24;

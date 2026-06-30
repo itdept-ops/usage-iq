@@ -18,8 +18,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- RELAY'S SIGNATURE ACCENT: amber → red (the per-page contract override) ----
-  --accent-a: #fb923c;             // signature amber  (start)
-  --accent-b: #ef4444;             // signature red    (end)
+  --accent-a: var(--tech-accent);             // signature amber  (start)
+  --accent-b: var(--tech-accent-2);             // signature red    (end)
 
   // A faint warm wash behind the whole column (still within the kit's dark contract).
   background: radial-gradient(120% 80% at 50% -8%, #1c1110 0%, var(--bg-base) 58%);

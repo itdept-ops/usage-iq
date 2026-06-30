@@ -11,8 +11,8 @@
   @include kit.beta-host;
 
   // ---- SEARCH'S SIGNATURE ACCENT: INDIGO → VIOLET ----
-  --accent-a: #818cf8;   // indigo (start)
-  --accent-b: #c084fc;   // violet (end)
+  --accent-a: var(--tech-accent);   // indigo (start)
+  --accent-b: var(--tech-accent-2);   // violet (end)
 
   display: block;
   height: 100%;

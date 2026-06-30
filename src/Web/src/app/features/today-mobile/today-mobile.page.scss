@@ -13,8 +13,8 @@
   @include kit.beta-host;
 
   // ---- YOUR DAY SIGNATURE ACCENT: INDIGO → VIOLET ----
-  --accent-a: #818cf8;
-  --accent-b: #c084fc;
+  --accent-a: var(--tech-accent);
+  --accent-b: var(--tech-accent-2);
   --accent: var(--accent-a);
 
   // ---- per-DOMAIN accent start/end ----

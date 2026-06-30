@@ -16,8 +16,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- POLLS' SIGNATURE ACCENT: VIOLET → INDIGO (the per-page contract override) ----
-  --accent-a: #8b5cf6;             // violet (start)
-  --accent-b: #4f46e5;             // indigo (deep, end)
+  --accent-a: var(--tech-accent);             // violet (start)
+  --accent-b: var(--tech-accent-2);             // indigo (deep, end)
 }
 
 @include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)

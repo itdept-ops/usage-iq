@@ -16,8 +16,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- LISTS' SIGNATURE ACCENT: LIME → TEAL (the per-page contract override) ----
-  --accent-a: #65a30d;             // lime (start)
-  --accent-b: #0d9488;             // teal (deep, end)
+  --accent-a: var(--tech-accent);             // lime (start)
+  --accent-b: var(--tech-accent-2);             // teal (deep, end)
 }
 
 @include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)

@@ -8,8 +8,8 @@
 
 :host {
   @include kit.beta-host;
-  --accent-a: #7c5cff;
-  --accent-b: #3b82f6;
+  --accent-a: var(--tech-accent);
+  --accent-b: var(--tech-accent-2);
   display: contents;
 }
 @include kit.beta-a11y;

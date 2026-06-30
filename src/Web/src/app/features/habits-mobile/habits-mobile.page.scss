@@ -14,8 +14,8 @@
   @include kit.beta-host;
 
   // ---- HABITS SIGNATURE ACCENT: EMERALD → LIME ----
-  --accent-a: #10b981;             // emerald (start)
-  --accent-b: #84cc16;             // lime (end)
+  --accent-a: var(--tech-accent);             // emerald (start)
+  --accent-b: var(--tech-accent-2);             // lime (end)
 }
 
 @include kit.beta-springs;

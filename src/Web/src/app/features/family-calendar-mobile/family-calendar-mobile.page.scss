@@ -21,8 +21,8 @@
   @include kit.beta-host;            // the whole Strata token contract on :host
 
   // ---- CALENDAR'S SIGNATURE ACCENT: INDIGO → SKY (the per-page contract override) ----
-  --accent-a: #6366f1;               // indigo (start)
-  --accent-b: #38bdf8;               // sky (end)
+  --accent-a: var(--tech-accent);               // indigo (start)
+  --accent-b: var(--tech-accent-2);               // sky (end)
 
   display: block;
   position: relative;

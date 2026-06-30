@@ -16,8 +16,8 @@
   @include kit.beta-host;            // the whole Strata token contract on :host
 
   // ---- SIGNATURE ACCENT: CYAN → INDIGO (the per-page contract override) ----
-  --accent-a: #38bdf8;               // cyan (start)
-  --accent-b: #6366f1;               // indigo (end)
+  --accent-a: var(--tech-accent);               // cyan (start)
+  --accent-b: var(--tech-accent-2);               // indigo (end)
 }
 
 @include kit.beta-springs;           // @supports linear() spring upgrade (top-level, once)

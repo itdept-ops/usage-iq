@@ -16,8 +16,8 @@
   @include kit.beta-host;            // the whole Strata token contract on :host
 
   // ---- ALLOWANCE' SIGNATURE ACCENT: EMERALD → MINT ----
-  --accent-a: #10b981;               // emerald (start)
-  --accent-b: #34d399;               // mint (end)
+  --accent-a: var(--tech-accent);               // emerald (start)
+  --accent-b: var(--tech-accent-2);               // mint (end)
   // a shared "danger" tone for negative balances / docks
   --neg: var(--tech-error, #ef4444);
 

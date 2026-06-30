@@ -26,8 +26,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- WRAPPED's SIGNATURE ACCENT: purple → magenta (the per-page contract override) ----
-  --accent-a: #a855f7;             // signature purple  (start)
-  --accent-b: #ec4899;             // signature magenta (end)
+  --accent-a: var(--tech-accent);             // signature purple  (start)
+  --accent-b: var(--tech-accent-2);             // signature magenta (end)
   --spark-c:  #f59e0b;             // a warm third spark for the tri-tone cover wordmark
 
   // ---- PER-ACCENT GRADIENTS (one per card accent key) — the celebration palette ----

@@ -18,8 +18,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- THE HUB's SIGNATURE ACCENT: blue (the per-page contract override) ----
-  --accent-a: #3b82f6;             // signature blue (start)
-  --accent-b: #38bdf8;             // signature sky  (end)
+  --accent-a: var(--tech-accent);             // signature blue (start)
+  --accent-b: var(--tech-accent-2);             // signature sky  (end)
 }
 
 @include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)

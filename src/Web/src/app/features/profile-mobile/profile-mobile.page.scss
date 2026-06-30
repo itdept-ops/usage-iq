@@ -17,8 +17,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- PROFILE's SIGNATURE ACCENT: indigo → violet (the per-page contract override) ----
-  --accent-a: #818cf8;             // signature indigo (start)
-  --accent-b: #a855f7;             // signature violet (end)
+  --accent-a: var(--tech-accent);             // signature indigo (start)
+  --accent-b: var(--tech-accent-2);             // signature violet (end)
   // Indigo/violet are dark enough that white ink clears WCAG AA; override the kit default near-black.
   --ink-on-accent: #ffffff;
 

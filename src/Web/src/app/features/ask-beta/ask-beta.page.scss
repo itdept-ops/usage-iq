@@ -18,8 +18,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- ASK's SIGNATURE ACCENT: indigo (the per-page contract override) ----
-  --accent-a: #818cf8;             // signature indigo (start)
-  --accent-b: #6366f1;             // signature indigo (end)
+  --accent-a: var(--tech-accent);             // signature indigo (start)
+  --accent-b: var(--tech-accent-2);             // signature indigo (end)
 
   // A faint indigo wash behind the whole column (still within the kit's dark contract).
   background: radial-gradient(120% 70% at 50% -6%, #15183a 0%, var(--bg-base) 56%);

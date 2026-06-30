@@ -16,8 +16,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- CYCLE'S SIGNATURE ACCENT: ROSE → PLUM (the per-page contract override) ----
-  --accent-a: #f472b6;             // rose (start)
-  --accent-b: #a855f7;             // plum (deep, end)
+  --accent-a: var(--tech-accent);             // rose (start)
+  --accent-b: var(--tech-accent-2);             // plum (deep, end)
 
   // The rose→plum gradient is dark enough for white on-accent ink (WCAG AA).
   // Override the kit default (#0c0d12) so all on-accent text/icons stay white.

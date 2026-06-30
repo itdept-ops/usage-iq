@@ -14,8 +14,8 @@
   @include kit.beta-host;
 
   // ---- THIS PAGE'S SIGNATURE ACCENT: INDIGO → VIOLET ----
-  --accent-a: #6366f1;             // indigo (start)
-  --accent-b: #a855f7;             // violet (end)
+  --accent-a: var(--tech-accent);             // indigo (start)
+  --accent-b: var(--tech-accent-2);             // violet (end)
 }
 
 @include kit.beta-springs;

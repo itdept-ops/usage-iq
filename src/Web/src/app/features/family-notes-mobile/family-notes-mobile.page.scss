@@ -19,8 +19,8 @@
   @include kit.beta-host;          // the whole Strata token contract on :host
 
   // ---- NOTES' SIGNATURE ACCENT: AMBER → ROSE (the per-page contract override) ----
-  --accent-a: #f59e0b;             // amber (start)
-  --accent-b: #e11d6e;             // rose (deep, end)
+  --accent-a: var(--tech-accent);             // amber (start)
+  --accent-b: var(--tech-accent-2);             // rose (deep, end)
 }
 
 @include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)
