@@ -231,7 +231,7 @@
   &:hover { background: color-mix(in srgb, var(--tech-accent) 6%, transparent); }
 
   &:focus-visible {
-    outline: var(--tech-focus-ring, 2px solid var(--tech-accent));
+    outline: 2px solid var(--tech-accent);
     outline-offset: -2px;
     border-radius: var(--tech-radius, 10px);
   }

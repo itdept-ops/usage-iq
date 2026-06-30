@@ -26,7 +26,7 @@
       background: color-mix(in srgb, var(--tech-accent) 10%, transparent);
       color: var(--tech-text-secondary);
     }
-    &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--tech-accent, #3FD8D0)); outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--tech-accent, #3FD8D0); outline-offset: 2px; }
 
     &.is-open {
       border-color: color-mix(in srgb, var(--tech-accent) 55%, transparent);
@@ -144,7 +144,7 @@
 
     &:hover:not(:disabled) { color: var(--tech-warn, #f5a623); background: color-mix(in srgb, var(--tech-warn, #f5a623) 12%, transparent); }
     &:disabled { opacity: .4; cursor: default; }
-    &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--tech-accent, #3FD8D0)); outline-offset: 1px; }
+    &:focus-visible { outline: 2px solid var(--tech-accent, #3FD8D0); outline-offset: 1px; }
   }
 
   &__composer {
@@ -186,6 +186,6 @@
 
     &:hover:not(:disabled) { transform: translateY(-1px); }
     &:disabled { opacity: .4; cursor: default; }
-    &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--tech-accent, #3FD8D0)); outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--tech-accent, #3FD8D0); outline-offset: 2px; }
   }
 }

@@ -51,7 +51,7 @@
   .sd-create {
     border-radius: var(--tech-r-control, 8px);
     font-weight: 600;
-    &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--tech-accent, #3d8bff)); outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--tech-accent, #3d8bff); outline-offset: 2px; }
   }
 }
 
@@ -137,7 +137,7 @@
   .sd-revoke {
     color: var(--tech-text-tertiary); flex: 0 0 auto;
     &:hover { color: var(--tech-error, #ff5c6c); }
-    &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--tech-accent, #3d8bff)); outline-offset: 2px; border-radius: 50%; }
+    &:focus-visible { outline: 2px solid var(--tech-accent, #3d8bff); outline-offset: 2px; border-radius: 50%; }
   }
 }
 

@@ -102,7 +102,7 @@
       background: color-mix(in srgb, var(--tech-accent, #7c8cff) 8%, var(--tech-panel, #11161f));
     }
     &:active:not(:disabled) { opacity: .75; transform: scale(.95); }
-    &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--tech-accent, #7c8cff)); outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--tech-accent, #7c8cff); outline-offset: 2px; }
     &:disabled { opacity: .4; cursor: default; }
     mat-icon { font-size: 22px; width: 22px; height: 22px; }
   }
@@ -144,7 +144,7 @@
     transition: background .15s;
     &:hover:not(:disabled) { background: color-mix(in srgb, var(--tech-accent, #7c8cff) 22%, transparent); }
     &:active:not(:disabled) { opacity: .75; }
-    &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--tech-accent, #7c8cff)); outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--tech-accent, #7c8cff); outline-offset: 2px; }
     &:disabled { opacity: .5; cursor: default; }
     mat-icon { font-size: 16px; width: 16px; height: 16px; }
   }
@@ -163,7 +163,7 @@
     color-scheme: light dark; // native calendar popup follows the OS light/dark preference
     transition: border-color .15s;
     &:hover:not(:disabled) { border-color: color-mix(in srgb, var(--tech-accent, #7c8cff) 45%, var(--tech-border, #26303f)); }
-    &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--tech-accent, #7c8cff)); outline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--tech-accent, #7c8cff); outline-offset: 2px; }
     &:disabled { opacity: .5; cursor: default; }
   }
 }

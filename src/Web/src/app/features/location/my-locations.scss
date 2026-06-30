@@ -113,7 +113,7 @@
 
 // Focus-visible rings for button strip in header
 .head-actions button:focus-visible {
-  outline: var(--tech-focus-ring, 2px solid var(--tech-accent));
+  outline: 2px solid var(--tech-accent);
   outline-offset: 2px;
 }
 

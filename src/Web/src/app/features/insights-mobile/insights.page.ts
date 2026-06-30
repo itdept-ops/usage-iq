@@ -60,8 +60,8 @@ interface FeedCard extends InsightCard {
       <div class="im-scroll">
 
         <!-- ─── hero bloom ─── -->
-        <header class="im-hero" aria-hidden="true">
-          <div class="im-hero__bloom"></div>
+        <header class="im-hero">
+          <div class="im-hero__bloom" aria-hidden="true"></div>
           <p class="im-hero__kicker"><mat-icon aria-hidden="true">query_stats</mat-icon> Your patterns</p>
           <h1 class="im-hero__title">The Insight Engine</h1>
           <p class="im-hero__sub">Cross-domain signals surfaced from your own logs — no other user's data.</p>

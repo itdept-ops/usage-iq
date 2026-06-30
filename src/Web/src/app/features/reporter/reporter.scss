@@ -303,7 +303,7 @@
     border-radius: var(--tech-r-chip);
     transition: color var(--tech-t-control) ease;
     &:hover { color: var(--tech-accent); }
-    &:focus-visible { outline: var(--tech-focus-ring); }
+    &:focus-visible { outline: 2px solid var(--tech-accent); }
     mat-icon { font-size: 17px; width: 17px; height: 17px; }
   }
 }
@@ -581,7 +581,7 @@
   color: var(--tech-text-tertiary);
   transition: color var(--tech-t-control) ease;
   &:hover { color: var(--tech-error, #ff5c6c); }
-  &:focus-visible { outline: var(--tech-focus-ring); }
+  &:focus-visible { outline: 2px solid var(--tech-accent); }
 }
 
 .foot {

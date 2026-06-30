@@ -84,53 +84,9 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
   .full { width: 100%; }
 }
 
-/* ── Hero card: Ingestion panel (identified by its sync-pill) ──
-   Gradient-accent fill; all inner text re-keyed for legibility. */
-.s-panel:has(.sync-pill) {
-  background: var(--tech-gradient-accent) !important;
-  border-color: transparent !important;
-  /* Replace the inset white highlight with a softer on-gradient shimmer */
-  box-shadow: var(--tech-shadow-panel), inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent) !important;
-
-  /* Panel header text + subtitle on gradient */
-  .panel-header {
-    color: var(--tech-text-on-accent);
-  }
-
-  /* Hint paragraph */
-  .hint {
-    color: color-mix(in srgb, var(--tech-text-on-accent) 78%, transparent);
-
-    code {
-      color: var(--tech-text-on-accent);
-      background: color-mix(in srgb, var(--tech-text-on-accent) 14%, transparent);
-      border-color: color-mix(in srgb, var(--tech-text-on-accent) 28%, transparent);
-    }
-  }
-
-  /* Section divider */
-  .s-panel-head {
-    border-bottom-color: color-mix(in srgb, var(--tech-text-on-accent) 22%, transparent);
-  }
-
-  /* Sync-pill on gradient: invert to a semi-opaque white */
-  .sync-pill {
-    background: color-mix(in srgb, var(--tech-text-on-accent) 16%, transparent);
-    border-color: color-mix(in srgb, var(--tech-text-on-accent) 28%, transparent);
-    color: var(--tech-text-on-accent);
-  }
-
-  /* Toggle label */
-  mat-slide-toggle {
-    color: color-mix(in srgb, var(--tech-text-on-accent) 88%, transparent);
-  }
-
-  /* Save / sync button on-accent text for the flat primary button */
-  .act-save {
-    color: var(--tech-text-on-accent);
-    &:hover:not([disabled]) { box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.35); }
-  }
-}
+/* The Ingestion panel uses the standard flat .s-panel card. (A gradient-accent "hero"
+   fill was tried here but it's a FORM panel — it hurt field contrast and made a lone
+   gradient tile next to the flat Sources card. Flat is correct.) */
 
 /* Inline load-failure state (recoverable blank-page fallback) */
 .load-error {
@@ -199,7 +155,7 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
       width: 18px;
     }
 
-    &:focus-visible { outline: var(--tech-focus-ring); outline-offset: 3px; }
+    &:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: 3px; }
   }
 
   .act-save {
@@ -339,7 +295,7 @@ mat-progress-bar { margin-bottom: var(--tech-space-3); }
         box-shadow: var(--tech-glow-blue);
       }
       &:active:not([disabled]) { transform: scale(0.98); }
-      &:focus-visible { outline: var(--tech-focus-ring); outline-offset: 3px; }
+      &:focus-visible { outline: 2px solid var(--tech-accent); outline-offset: 3px; }
     }
   }
 }

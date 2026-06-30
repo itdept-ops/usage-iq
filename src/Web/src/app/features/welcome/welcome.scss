@@ -120,7 +120,7 @@
 
   // Rubric #6: keyboard focus ring using the scheme focus-ring token.
   &:focus-visible {
-    outline: var(--tech-focus-ring, 2px solid var(--aur-a));
+    outline: 2px solid var(--aur-a);
     outline-offset: 2px;
     border-color: var(--aur-a);
   }
@@ -223,7 +223,7 @@
 
     // Rubric #6: keyboard focus ring.
     &:focus-visible {
-      outline: var(--tech-focus-ring, 2px solid var(--aur-a));
+      outline: 2px solid var(--aur-a);
       outline-offset: 3px;
     }
   }

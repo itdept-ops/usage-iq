@@ -85,7 +85,7 @@ const SLOT_ORDER: FamilyMealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
         <header class="fm-hero">
           <div class="fm-hero__bloom" aria-hidden="true"></div>
           <p class="fm-hero__kicker"><mat-icon aria-hidden="true">restaurant</mat-icon> Meal plan</p>
-          <h1 class="fm-hero__title">This Week's Meals</h1>
+          <h1 class="fm-hero__title">Your meals</h1>
 
           <div class="fm-week">
             <button type="button" class="fm-week__nav" (click)="shiftWeek(-1)" aria-label="Previous week">

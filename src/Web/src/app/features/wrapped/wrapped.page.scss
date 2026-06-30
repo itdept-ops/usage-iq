@@ -96,7 +96,7 @@
   transition: color .16s, background .16s, border-color .16s, transform .12s;
   &:hover:not(:disabled) { color: var(--wr-ink); background: color-mix(in srgb, var(--wr-panel-2) 60%, transparent); }
   &:active:not(:disabled) { transform: scale(.96); }
-  &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--wr-a)); outline-offset: 2px; }
+  &:focus-visible { outline: 2px solid var(--wr-a); outline-offset: 2px; }
   &:disabled { opacity: .5; cursor: default; }
   &.is-on {
     color: var(--tech-text-on-accent, #fff); border-color: transparent;
@@ -136,7 +136,7 @@
   transition: transform .12s, filter .16s, background .16s;
   mat-icon { font-size: 20px; width: 20px; height: 20px; }
   &:active:not(:disabled) { transform: scale(.96); }
-  &:focus-visible { outline: var(--tech-focus-ring, 2px solid var(--wr-a)); outline-offset: 3px; }
+  &:focus-visible { outline: 2px solid var(--wr-a); outline-offset: 3px; }
   &:disabled { opacity: .6; cursor: default; }
 }
 .wr-btn--solid {
