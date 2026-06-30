@@ -43,3 +43,7 @@ reporter.key
 
 # Themeforest source template (design reference only — not part of the app)
 ThemeforestMobileTemplate/
+
+# Stray Windows reserved-name file occasionally created by tooling redirects (> nul)
+nul
+**/nul
