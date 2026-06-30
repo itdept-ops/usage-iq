@@ -170,7 +170,7 @@ interface LinkOut {
                 <div class="subgroup" [class.subgroup--off]="!d.surfaceDiscord">
                   @for (c of categoryMeta; track c.key) {
                     <app-beta-toggle-row class="sub-row" [title]="c.label"
-                                         [checked]="d.categories[c.key]"
+                                         [checked]="d.categories?.[c.key] ?? false"
                                          [disabled]="!d.surfaceDiscord" [busy]="discordBusy()"
                                          (toggle)="setCategory(c.key, $event)" />
                   }

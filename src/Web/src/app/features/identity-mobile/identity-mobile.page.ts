@@ -433,8 +433,10 @@ export class IdentityMobilePage {
   }
 
   private applyData(data: IdentityMapData): void {
-    this.roles.set(data.roles);
-    this.totals.set(data.totals);
+    // Defensive: tolerate a thin/partial payload so the page renders an empty state
+    // instead of throwing on a non-iterable roles()/totals() during load.
+    this.roles.set(data?.roles ?? []);
+    this.totals.set(data?.totals ?? []);
   }
 
   // ─────────────── RANGE ───────────────
