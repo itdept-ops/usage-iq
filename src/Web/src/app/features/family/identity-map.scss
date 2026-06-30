@@ -22,7 +22,7 @@
   border: 1px solid var(--tech-border); background: var(--tech-panel-2, transparent); color: var(--tech-text);
   border-radius: var(--tech-r-pill, 999px); padding: 6px 14px; font-size: var(--tech-fs-caption, 0.82rem);
   font-family: inherit; cursor: pointer;
-  &--on { background: var(--tech-accent); border-color: var(--tech-accent); color: #fff; font-weight: 600; }
+  &--on { background: var(--tech-accent); border-color: var(--tech-accent); color: var(--tech-text-on-accent, #fff); font-weight: 600; }
 }
 .idm__range-custom { display: inline-flex; gap: var(--tech-space-2, 8px); margin-left: auto; flex-wrap: wrap; }
 .idm__date { width: 150px; max-width: 46vw; }

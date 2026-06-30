@@ -79,11 +79,14 @@ $ease: cubic-bezier(.22, 1, .36, 1);
 
   --aur-line:      #{$line};
 
-  --aur-a:         #{$a};
-  --aur-b:         #{$b};
-  --aur-c:         #{$c};
+  // Accent fields track the active FiMobile color scheme (the no-flash bootstrap sets --tech-accent
+  // even on these bare/public pages), so the landing's aurora hero matches the user's chosen scheme.
+  // Aurora's original indigo/violet/teal remain the fallback for the default-blue scheme.
+  --aur-a:         var(--tech-accent, #{$a});
+  --aur-b:         var(--tech-accent-2, #{$b});
+  --aur-c:         var(--tech-accent-cyan, #{$c});
 
-  --aur-grad:      #{$gradient};
+  --aur-grad:      linear-gradient(115deg, var(--aur-a) 0%, var(--aur-b) 52%, var(--aur-c) 100%);
   --aur-ease:      #{$ease};
 
   // glass tuning knobs (override per-surface if needed)

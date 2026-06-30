@@ -317,7 +317,7 @@
   overflow: hidden;
   font-weight: 650;
   font-size: 1rem;
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   text-decoration: none;
   background: var(--grad-cta);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1049,7 +1049,7 @@
   padding: 0.95rem 1.7rem;
   border-radius: 999px;
   font-weight: 650;
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   text-decoration: none;
   background: var(--grad-cta);
   border: 1px solid rgba(255, 255, 255, 0.14);

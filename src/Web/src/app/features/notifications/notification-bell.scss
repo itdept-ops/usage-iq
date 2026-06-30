@@ -70,7 +70,7 @@
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0.02em;
-    box-shadow: 0 0 0 2px var(--tech-panel, #111722), 0 0 8px -1px rgba(255, 92, 108, 0.6);
+    box-shadow: 0 0 0 2px var(--tech-panel, #111722), 0 0 8px -1px color-mix(in srgb, var(--tech-badge-alert, #c8102e) 60%, transparent);
   }
 }
 
@@ -94,7 +94,7 @@
   border: 1px solid var(--tech-border, #26303f);
   border-radius: var(--tech-r-panel, 12px);
   background: var(--tech-panel, #111722);
-  background-image: radial-gradient(120% 100% at 100% 0%, rgba(61, 139, 255, 0.08), transparent 55%);
+  background-image: radial-gradient(120% 100% at 100% 0%, color-mix(in srgb, var(--tech-accent) 8%, transparent), transparent 55%);
   box-shadow: var(--tech-shadow-popover, 0 24px 60px -20px rgba(0, 0, 0, 0.8));
   overflow: hidden;
   /* Cap the whole panel so a short (landscape) viewport never overruns the fixed header/footer. */

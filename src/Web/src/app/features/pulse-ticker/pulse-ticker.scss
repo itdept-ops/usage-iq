@@ -97,8 +97,8 @@
     background: color-mix(in srgb, var(--tech-accent, #f2b340) 14%, transparent);
   }
   &[data-kind='hydration.goalHit'] {
-    color: #5fb0ff;
-    background: color-mix(in srgb, #5fb0ff 14%, transparent);
+    color: var(--tech-accent-cyan, #5fb0ff);
+    background: color-mix(in srgb, var(--tech-accent-cyan, #5fb0ff) 14%, transparent);
   }
 }
 

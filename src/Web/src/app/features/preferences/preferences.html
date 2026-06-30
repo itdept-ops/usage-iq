@@ -15,18 +15,7 @@
     </div>
 
     <div class="group">
-      <div class="group__label">Theme</div>
-      <div class="theme-seg" role="radiogroup" aria-label="Theme">
-        @for (t of themeModes; track t.value) {
-          <button type="button" class="theme-seg__opt" role="radio"
-                  [class.theme-seg__opt--on]="theme.mode() === t.value"
-                  [attr.aria-checked]="theme.mode() === t.value"
-                  (click)="theme.setMode(t.value)">
-            <mat-icon class="theme-seg__icon" aria-hidden="true">{{ t.icon }}</mat-icon>
-            <span class="theme-seg__label">{{ t.label }}</span>
-          </button>
-        }
-      </div>
+      <app-theme-picker />
       @if (theme.mode() === 'system') {
         <p class="card__hint">Currently showing the {{ theme.resolved() }} theme (matching your device).</p>
       }

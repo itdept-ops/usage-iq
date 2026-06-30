@@ -224,8 +224,8 @@ mat-progress-bar {
   padding: 3px 9px;
   border-radius: var(--tech-r-pill);
   color: var(--tech-accent-cyan);
-  background: rgba(63, 216, 208, 0.12);
-  border: 1px solid rgba(63, 216, 208, 0.4);
+  background: color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 40%, transparent);
 }
 
 /* =========================================================================

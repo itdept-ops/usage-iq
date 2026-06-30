@@ -77,7 +77,7 @@
   &__btn {
     appearance: none; cursor: pointer; display: grid; place-items: center;
     width: 40px; height: 40px; border-radius: 12px;
-    border: 1px solid var(--hairline); background: var(--card); color: var(--ink);
+    border: 1px solid var(--hairline); background: var(--bg-rise); color: var(--ink);
     touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     transition: opacity .12s;
     &:active:not(:disabled) { opacity: .75; }
@@ -86,7 +86,7 @@
   }
   &__label { flex: 1; display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
   &__day { font-size: 15px; font-weight: 700; color: var(--ink); }
-  &__date { font-size: 12px; color: var(--ink-2); }
+  &__date { font-size: 12px; color: var(--ink-dim); }
 }
 .td-nav__today {
   appearance: none; cursor: pointer; align-self: center;
@@ -110,7 +110,7 @@
   appearance: none; cursor: pointer;
   min-height: 40px; padding: 0 12px; border-radius: 12px;
   font: inherit; font-size: 13px;
-  color: var(--ink); background: var(--card);
+  color: var(--ink); background: var(--bg-rise);
   border: 1px solid var(--hairline);
   color-scheme: light dark;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
@@ -122,8 +122,8 @@
 .td-ai {
   border-radius: var(--r-tile); padding: 14px 16px;
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--accent-a) 16%, var(--card)),
-    color-mix(in srgb, var(--accent-b) 12%, var(--card)));
+    color-mix(in srgb, var(--accent-a) 16%, var(--bg-rise)),
+    color-mix(in srgb, var(--accent-b) 12%, var(--bg-rise)));
   border: 1px solid color-mix(in srgb, var(--accent-a) 32%, transparent);
   &__kicker {
     display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px;
@@ -133,7 +133,7 @@
   &__text { margin: 0; line-height: 1.55; color: var(--ink); font-size: 15px; }
   &__foot {
     display: inline-flex; align-items: center; gap: 5px; margin: 8px 0 0;
-    font-size: 12px; color: var(--ink-2);
+    font-size: 12px; color: var(--ink-dim);
   }
 }
 
@@ -142,7 +142,7 @@
 .td-stat {
   position: relative; display: flex; flex-direction: column; gap: 2px;
   padding: 12px 14px; border-radius: var(--r-tile);
-  background: var(--card); border: 1px solid var(--hairline); overflow: hidden;
+  background: var(--bg-rise); border: 1px solid var(--hairline); overflow: hidden;
   &::before {
     content: ''; position: absolute; inset: 0 auto 0 0; width: 3px;
     background: linear-gradient(180deg, var(--da, #818cf8), var(--db, #c084fc));
@@ -156,7 +156,7 @@
     margin-top: 4px; font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
     font-size: 18px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums;
   }
-  &__lab { font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-2); }
+  &__lab { font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-dim); }
 }
 
 // ───────── text highlights ─────────
@@ -195,12 +195,12 @@
   &__time {
     padding-top: 9px; text-align: right; white-space: nowrap;
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+    font-size: 12.5px; font-weight: 600; color: var(--ink-dim);
   }
   &__node {
     position: relative; z-index: 1; display: grid; place-items: center;
     width: 38px; height: 38px; border-radius: 50%;
-    color: var(--db); background: var(--card);
+    color: var(--db); background: var(--bg-rise);
     border: 2px solid color-mix(in srgb, var(--da) 60%, var(--hairline));
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--da) 10%, transparent);
     mat-icon { font-size: 20px; width: 20px; height: 20px; }
@@ -212,7 +212,7 @@
 
 .td-foot {
   display: flex; align-items: center; gap: 6px; margin: 4px 0 0;
-  font-size: 12px; line-height: 1.5; color: var(--ink-2);
+  font-size: 12px; line-height: 1.5; color: var(--ink-dim);
   mat-icon { font-size: 15px; width: 15px; height: 15px; flex: none; }
 }
 

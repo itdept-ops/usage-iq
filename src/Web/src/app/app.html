@@ -665,24 +665,11 @@
         <span class="acct-item__label">Home page</span>
       </button>
 
-      <!-- Quick theme picker (System / Light / Dark). Not a menu-item so clicking a segment doesn't
-           close the menu; $event.stopPropagation keeps the menu open while you flip themes. Persisted
-           + applied by ThemeService; the full version lives in /preferences. -->
-      <div class="acct-theme" role="radiogroup" aria-label="Theme"
-           (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
-        <mat-icon class="acct-item__icon acct-theme__lead" aria-hidden="true">contrast</mat-icon>
-        <div class="acct-theme__seg">
-          @for (t of themeModes; track t.value) {
-            <button type="button" class="acct-theme__opt" role="radio"
-                    [class.acct-theme__opt--on]="theme.mode() === t.value"
-                    [attr.aria-checked]="theme.mode() === t.value"
-                    [matTooltip]="t.label" matTooltipClass="axon-tip"
-                    [attr.aria-label]="t.label + ' theme'"
-                    (click)="theme.setMode(t.value)">
-              <mat-icon aria-hidden="true">{{ t.icon }}</mat-icon>
-            </button>
-          }
-        </div>
+      <!-- Theme + color-scheme picker (FiMobile appearance panel). Not a menu-item so clicking a control
+           doesn't close the menu; $event.stopPropagation keeps the menu open while you flip theme/scheme.
+           Persisted + applied by ThemeService; the same component is embedded in /preferences. -->
+      <div class="acct-theme-wrap" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+        <app-theme-picker />
       </div>
     </div>
 

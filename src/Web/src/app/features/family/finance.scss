@@ -549,7 +549,7 @@ app-chart { display: block; width: 100%; height: 100%; }
   align-items: center;
   justify-content: center;
   width: 36px; height: 36px;
-  border-radius: 10px;
+  border-radius: var(--tech-r-control, 10px);
   background: color-mix(in srgb, var(--tech-accent) 16%, transparent);
   color: var(--tech-accent);
   mat-icon { width: 22px; height: 22px; font-size: 22px; }
@@ -1138,7 +1138,7 @@ app-chart { display: block; width: 100%; height: 100%; }
 .fin-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(4, 7, 12, 0.6);
+  background: var(--tech-scrim, rgba(4, 7, 12, 0.6));
   backdrop-filter: blur(2px);
 }
 

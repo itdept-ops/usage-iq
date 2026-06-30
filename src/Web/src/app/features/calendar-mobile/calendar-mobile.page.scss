@@ -395,7 +395,7 @@
     border: none;
     border-radius: var(--r-pill);
     background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-    color: #06121f;
+    color: var(--tech-text-on-accent, #06121f);
     font-family: var(--font-ui);
     font-size: 14px;
     font-weight: 700;

@@ -115,7 +115,7 @@
   display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;
   padding: 10px 18px; border: none; border-radius: var(--r-pill);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; font-family: var(--font-ui); font-size: 14px; font-weight: 700; cursor: pointer;
+  color: var(--tech-text-on-accent, #fff); font-family: var(--font-ui); font-size: 14px; font-weight: 700; cursor: pointer;
   box-shadow: var(--lift-2);
   mat-icon { width: 18px; height: 18px; font-size: 18px; line-height: 18px; }
   &:active { transform: scale(.97); }
@@ -420,7 +420,7 @@
 }
 .rm-btn--save {
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; box-shadow: var(--lift-2);
+  color: var(--tech-text-on-accent, #fff); box-shadow: var(--lift-2);
 }
 
 // ============================================================================
@@ -456,7 +456,7 @@
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 44px; padding: 11px 20px; border: none; border-radius: var(--r-pill);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; font-family: var(--font-ui); font-size: 14px; font-weight: 700;
+  color: var(--tech-text-on-accent, #fff); font-family: var(--font-ui); font-size: 14px; font-weight: 700;
   cursor: pointer; box-shadow: var(--lift-2);
   mat-icon { width: 18px; height: 18px; font-size: 18px; line-height: 18px; }
   &:active { transform: scale(.97); }
@@ -528,7 +528,7 @@
   border-bottom-left-radius: 5px;
 }
 .rm-msg--me .rm-msg__bubble {
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #fff;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--tech-text-on-accent, #fff);
   border: none; border-bottom-left-radius: 16px; border-bottom-right-radius: 5px;
 }
 .rm-msg__bubble--typing {
@@ -549,7 +549,7 @@
 .rm-chat__send {
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
   width: 46px; height: 46px; border: none; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #fff;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--tech-text-on-accent, #fff);
   cursor: pointer; box-shadow: var(--lift-2);
   mat-icon { width: 22px; height: 22px; font-size: 22px; line-height: 22px; }
   &:active { transform: scale(.94); }
@@ -566,6 +566,6 @@
 
 .rm-spin-dot {
   width: 16px; height: 16px; border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, .4); border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, var(--tech-text-on-accent, #fff) 40%, transparent); border-top-color: var(--tech-text-on-accent, #fff);
   animation: rm-rotate 700ms linear infinite;
 }

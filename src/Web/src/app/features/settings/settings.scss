@@ -316,13 +316,13 @@ mat-slide-toggle {
     height: 6px;
     border-radius: 999px;
     background: var(--tech-success, #3dd68c);
-    box-shadow: 0 0 8px 0 rgba(61, 214, 140, 0.6);
+    box-shadow: var(--tech-glow-success, 0 0 8px 0 rgba(61, 214, 140, 0.6));
   }
   .sync-pill__sep { opacity: 0.4; }
 
   &[data-state='running'] .sync-pill__dot {
     background: var(--tech-accent-cyan, #3fd8d0);
-    box-shadow: 0 0 8px 0 rgba(63, 216, 208, 0.6);
+    box-shadow: var(--tech-glow-cyan, 0 0 8px 0 rgba(63, 216, 208, 0.6));
     animation: axon-sync-pulse 1.4s ease-in-out infinite;
   }
   &[data-state='error'] .sync-pill__dot { background: var(--tech-error, #ff5c6c); box-shadow: none; }

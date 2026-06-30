@@ -70,7 +70,7 @@
 .chip {
   font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
   padding: 2px 7px; border-radius: 999px;
-  &--settled { color: #6ee7a8; background: rgba(110,231,168,.12); border: 1px solid rgba(110,231,168,.3); }
+  &--settled { color: var(--tech-success, #6ee7a8); background: rgba(110,231,168,.12); border: 1px solid rgba(110,231,168,.3); }
 }
 
 /* ---- Detail ---- */
@@ -118,10 +118,10 @@
 }
 .item__settle { background: transparent; border: none; cursor: pointer; color: var(--tech-text-dim); padding: 2px;
   display: inline-flex; align-items: center; justify-content: center;
-  &:hover { color: #6ee7a8; }
+  &:hover { color: var(--tech-success, #6ee7a8); }
   &--ph { width: 36px; height: 36px; }
   mat-icon { font-size: 22px; height: 22px; width: 22px; } }
-.item--settled .item__settle { color: #6ee7a8; }
+.item--settled .item__settle { color: var(--tech-success, #6ee7a8); }
 .item__name {
   background: transparent; border: 1px solid transparent; border-radius: var(--tech-r-control);
   color: var(--tech-text); padding: 7px 8px; min-width: 0; width: 100%;

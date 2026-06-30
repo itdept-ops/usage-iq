@@ -149,8 +149,8 @@
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 8px 11px; border-radius: 11px;
   background: var(--surface-2, var(--glass)); border: 1px solid var(--hairline);
-  &[data-status='taken'] { border-color: color-mix(in srgb, #34d399 55%, transparent); }
-  &[data-status='skipped'] { border-color: color-mix(in srgb, #fbbf24 50%, transparent); }
+  &[data-status='taken'] { border-color: color-mix(in srgb, var(--tech-success, #34d399) 55%, transparent); }
+  &[data-status='skipped'] { border-color: color-mix(in srgb, var(--tech-warn, #fbbf24) 50%, transparent); }
   &__when { font-size: 13.5px; font-weight: 600; color: var(--ink); }
   &__btns { display: flex; gap: 7px; }
   &__b {
@@ -159,8 +159,8 @@
     transition: all .15s var(--ease-spring, ease);
     mat-icon { font-size: 19px; width: 19px; height: 19px; }
     &:disabled { opacity: .5; }
-    &.is-take.is-on { background: #1f9d6b; border-color: #34d399; color: #fff; }
-    &.is-skip.is-on { background: #b88114; border-color: #fbbf24; color: #fff; }
+    &.is-take.is-on { background: color-mix(in srgb, var(--tech-success, #34d399) 55%, #000); border-color: var(--tech-success, #34d399); color: var(--tech-text-on-accent, #fff); }
+    &.is-skip.is-on { background: color-mix(in srgb, var(--tech-warn, #fbbf24) 50%, #000); border-color: var(--tech-warn, #fbbf24); color: var(--tech-text-on-accent, #fff); }
   }
 }
 
@@ -177,7 +177,7 @@
   mat-icon { font-size: 22px; width: 22px; height: 22px; }
   span { font-size: 12px; font-weight: 600; }
   &.is-on {
-    color: #fff; border-color: transparent;
+    color: var(--tech-text-on-accent, #fff); border-color: transparent;
     background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000));
   }
 }
@@ -203,7 +203,7 @@
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     margin-top: 12px; width: 100%; padding: 12px; border-radius: 13px; cursor: pointer;
     background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000));
-    color: #fff; border: 0; font-weight: 700; font-size: 15px;
+    color: var(--tech-text-on-accent, #fff); border: 0; font-weight: 700; font-size: 15px;
     &:disabled { opacity: .6; }
     mat-icon { font-size: 19px; width: 19px; height: 19px; }
   }
@@ -246,7 +246,7 @@
 .mv-switch {
   flex: none; width: 42px; height: 24px; border-radius: 999px; padding: 2px;
   background: var(--hairline); transition: background .2s ease;
-  span { display: block; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s var(--ease-spring, ease); }
+  span { display: block; width: 20px; height: 20px; border-radius: 50%; background: var(--tech-text-on-accent, #fff); transition: transform .2s var(--ease-spring, ease); }
   &.is-on { background: var(--accent-a); span { transform: translateX(18px); } }
 }
 
@@ -283,18 +283,18 @@
     &-txt { display: flex; flex-direction: column; flex: 1; min-width: 0;
       b { font-size: 14.5px; color: var(--ink); } i { font-size: 12px; color: var(--ink-2); font-style: normal; } }
   }
-  &__err { margin: 0; color: #ff8a94; font-size: 13px; }
+  &__err { margin: 0; color: var(--tech-error, #ff8a94); font-size: 13px; }
   &__save {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     padding: 13px; border-radius: 14px; cursor: pointer; font-weight: 700; font-size: 15.5px;
-    background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #fff; border: 0;
+    background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--tech-text-on-accent, #fff); border: 0;
     &:disabled { opacity: .6; }
     mat-icon { font-size: 20px; width: 20px; height: 20px; }
   }
   &__danger {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     padding: 11px; border-radius: 13px; cursor: pointer; font-weight: 600;
-    background: transparent; border: 1px solid color-mix(in srgb, #ff5c6c 40%, transparent); color: #ff8a94;
+    background: transparent; border: 1px solid color-mix(in srgb, var(--tech-error, #ff5c6c) 40%, transparent); color: var(--tech-error, #ff8a94);
     mat-icon { font-size: 18px; width: 18px; height: 18px; }
   }
   &__foot {

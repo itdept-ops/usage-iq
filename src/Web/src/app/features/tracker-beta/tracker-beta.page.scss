@@ -1,31 +1,32 @@
 // ============================================================================
 // Tracker Beta — "Strata" design system + shell layout.
 //
-// ISOLATED design system: every token here is defined on :host of app-tracker-beta
-// so all child components inherit them via the cascade. NONE of the global Usage IQ
-// --tech-* tokens are used or imported. Child components reference var(--bg-base) etc.
+// Token contract: every token here is defined on :host of app-tracker-beta
+// so all child components inherit them via the cascade. Surface/ink/shadow/radius
+// tokens now route to the global FiMobile --tech-* layer (with the original hex
+// as fallbacks) so light/dark + all 9 colour schemes apply automatically. Domain
+// accent pairs (--cal-a/b, --pro-a/b …) remain intentionally fixed — they are
+// the Strata brand identity and not overridden by the global palette.
 //
-// Tokens are VERBATIM from the Strata build brief. Dark is the default; light is
-// supplied via prefers-color-scheme. A prefers-reduced-motion killswitch, a
-// prefers-reduced-transparency / prefers-contrast blur-drop, and env() safe-area
-// insets are all honored here so child components inherit a consistent contract.
+// A prefers-reduced-motion killswitch, a prefers-reduced-transparency /
+// prefers-contrast blur-drop, and env() safe-area insets are all honoured here
+// so child components inherit a consistent contract.
 // ============================================================================
 
 :host {
-  // Dark-only (matches the rest of Usage IQ). Declaring the scheme makes the browser render dark UA
-  // chrome (scrollbars, form controls, tap highlights) and stops a light-mode device from flipping the
-  // page to light. A real opt-in light theme is a separate, app-wide feature.
-  color-scheme: dark;
-  // ---- DARK (default) ----
-  --bg-base: #0d0e16;
-  --bg-rise: #15172a;
-  --bg-sink: #0a0b12;
-  --glass: rgba(26, 29, 52, .62);
-  --glass-edge: rgba(255, 255, 255, .10);
-  --hairline: rgba(255, 255, 255, .07);
-  --ink: #f3f4ff;
-  --ink-dim: #a4a7c6;
-  --ink-faint: #6d7194;
+  // Theme-aware: routed to the global FiMobile --tech-* tokens so light/dark + all 9
+  // colour schemes are picked up for free. The original hex values are kept as fallbacks
+  // so the default (dark) look is byte-identical when the global tokens are absent.
+  // ---- SURFACES + INK ----
+  --bg-base: var(--tech-bg, #0d0e16);
+  --bg-rise: var(--tech-panel, #15172a);
+  --bg-sink: var(--tech-bg-sunken, #0a0b12);
+  --glass: var(--tech-glass-popover, rgba(26, 29, 52, .62));
+  --glass-edge: var(--tech-glass-inset-hi, rgba(255, 255, 255, .10));
+  --hairline: var(--tech-border-subtle, rgba(255, 255, 255, .07));
+  --ink: var(--tech-text, #f3f4ff);
+  --ink-dim: var(--tech-text-secondary, #a4a7c6);
+  --ink-faint: var(--tech-text-tertiary, #6d7194);
 
   // domain accents (analogous gradients, applied as SVG <linearGradient> never flat)
   --cal-a: #7c5cff;
@@ -40,26 +41,26 @@
   --coffee-b: #f0b760; // coffee bronze->tan
   --sleep-a: #6366f1;
   --sleep-b: #a78bfa; // sleep/recovery indigo->violet (night)
-  --signal: #34d399; // goal-hit success green
-  --warn: #f0a35a; // GRAFT(Daylight): over-goal = warm AMBER, never red
-  --focus: #7c5cff; // own visible focus ring, >=3:1 on bg-base
+  --signal: var(--tech-success, #34d399); // goal-hit success green (theme-aware)
+  --warn: var(--tech-warn, #f0a35a); // GRAFT(Daylight): over-goal = warm AMBER, never red (theme-aware)
+  --focus: var(--cal-a, #7c5cff); // own visible focus ring, >=3:1 on bg-base; tracks the hero accent
 
-  // ---- TYPE ----
-  --font-display: "Clash Display", system-ui, sans-serif; // numerals only
-  --font-ui: "Plus Jakarta Sans", system-ui, sans-serif; // labels/body
+  // ---- TYPE (unified with the app — Nunito display + Inter UI; global fallbacks preserved) ----
+  --font-display: var(--tech-font-display, "Clash Display", system-ui, sans-serif); // numerals only
+  --font-ui: var(--tech-font-ui, "Plus Jakarta Sans", system-ui, sans-serif); // labels/body
 
-  // ---- RADII ----
-  --r-glass: 28px;
-  --r-card: 24px;
-  --r-tile: 18px;
+  // ---- RADII (aligned to the FiMobile scale; global tokens with local fallbacks) ----
+  --r-glass: 22px;
+  --r-card: var(--tech-r-panel, 24px);
+  --r-tile: var(--tech-r-control, 18px);
   --r-ring: 32px;
-  --r-pill: 999px;
+  --r-pill: var(--tech-r-pill, 999px);
 
-  // ---- ELEVATION (the depth system) ----
-  --lift-1: 0 2px 8px rgba(4, 6, 20, .35); // sediment resting
-  --lift-2: 0 8px 24px rgba(4, 6, 20, .45), inset 0 1px 0 var(--glass-edge); // raised card
-  --lift-3: 0 16px 48px rgba(4, 6, 20, .55), inset 0 1px 0 var(--glass-edge); // floating glass
-  --press: inset 0 2px 8px rgba(4, 6, 20, .5); // depressed well
+  // ---- ELEVATION (routed to the theme-aware app shadow recipes; local fallbacks preserved) ----
+  --lift-1: var(--tech-shadow-panel, 0 2px 8px rgba(4, 6, 20, .35)); // sediment resting
+  --lift-2: var(--tech-shadow-raised, 0 8px 24px rgba(4, 6, 20, .45), inset 0 1px 0 var(--glass-edge)); // raised card
+  --lift-3: var(--tech-shadow-popover, 0 16px 48px rgba(4, 6, 20, .55), inset 0 1px 0 var(--glass-edge)); // floating glass
+  --press: inset 0 2px 8px rgba(0, 0, 0, .35); // depressed well
 
   // ---- MOTION / EASING ----
   --ease-out: cubic-bezier(.22, 1, .36, 1);
@@ -105,8 +106,8 @@
   }
 }
 
-// Dark-only by design — no prefers-color-scheme:light override (it was flipping the whole page to
-// light on light-mode phones). A proper opt-in light theme is a separate app-wide feature.
+// Theme follows the root (light/dark + scheme driven by the global FiMobile engine via --tech-* tokens).
+// No prefers-color-scheme override needed — the global palette handles it.
 
 // ---- a11y: reduced transparency / forced contrast => drop blur, solidify glass ----
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {

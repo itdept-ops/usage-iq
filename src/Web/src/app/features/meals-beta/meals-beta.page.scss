@@ -113,7 +113,7 @@
 .hh__week:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .hh__today-hint {
   margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill);
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #07140d;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--tech-text-on-accent, #07140d);
   font-size: 10px; font-weight: 800;
 }
 
@@ -262,7 +262,7 @@
 .mb-state-btn {
   display: inline-flex; align-items: center; gap: 7px;
   min-height: 46px; padding: 0 20px; border: none; border-radius: var(--r-pill);
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #07140d;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--tech-text-on-accent, #07140d);
   font-family: var(--font-ui); font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: var(--lift-2);
   -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   transition: transform 120ms var(--ease-out);

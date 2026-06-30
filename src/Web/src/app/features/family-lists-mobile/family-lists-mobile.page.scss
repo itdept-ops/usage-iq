@@ -345,9 +345,9 @@
   mat-icon { width: 19px; height: 19px; font-size: 19px; line-height: 19px; }
 }
 .ld__btn--del {
-  color: var(--warn, #ef4444);
-  border-color: color-mix(in srgb, var(--warn, #ef4444) 38%, transparent);
-  background: color-mix(in srgb, var(--warn, #ef4444) 8%, var(--glass));
+  color: var(--tech-error, #ef4444);
+  border-color: color-mix(in srgb, var(--tech-error, #ef4444) 38%, transparent);
+  background: color-mix(in srgb, var(--tech-error, #ef4444) 8%, var(--glass));
 }
 .ld__shared-note {
   display: inline-flex; align-items: center; gap: 6px; justify-content: center;

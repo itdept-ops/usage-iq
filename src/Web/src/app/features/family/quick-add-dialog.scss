@@ -4,7 +4,7 @@
   gap: 0.5rem;
 
   mat-icon {
-    color: var(--brand-blue, #3d8bff);
+    color: var(--tech-accent, #3d8bff);
   }
 }
 
@@ -55,7 +55,7 @@
     flex: none;
     min-width: 0;
     border: 1px solid var(--tech-border, rgba(255, 255, 255, 0.16));
-    border-radius: 10px;
+    border-radius: var(--tech-r-control, 10px);
     overflow: hidden;
   }
 
@@ -106,7 +106,7 @@
 
 .qadd__error {
   margin: 0;
-  color: var(--sev-error, #e5484d);
+  color: var(--tech-error, #e5484d);
   font-size: 0.85rem;
 }
 

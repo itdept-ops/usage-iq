@@ -14,6 +14,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { ThemeService, ThemeMode } from '../../core/theme';
+import { ThemePicker } from '../shell/theme-picker/theme-picker';
 import { UnitService, UnitSystem } from '../../core/unit.service';
 import { PushNotifications } from '../../core/push-notifications';
 import { SwUpdateService, OFFLINE_DISABLED_KEY } from '../../core/sw-update';
@@ -50,7 +51,7 @@ interface LinkOut {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, RouterLink, MatIconModule, MatButtonModule, MatSlideToggleModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, ThemePicker,
   ],
   templateUrl: './preferences.html',
   styleUrl: './preferences.scss',

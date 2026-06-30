@@ -211,7 +211,7 @@
   display: inline-flex;
   align-items: center;
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   font-size: var(--tech-fs-caption, 0.78rem);
   font-weight: 700;
 }
@@ -298,7 +298,7 @@
   min-width: 3.2rem;
   text-align: center;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   background: var(--tech-bg-sunken, color-mix(in srgb, var(--tech-text) 8%, transparent));
@@ -352,7 +352,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 4px 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   background: var(--ch-fire-soft);
   color: var(--ch-fire);
   font-size: var(--tech-fs-caption, 0.82rem);
@@ -396,7 +396,7 @@
 .challenge__coach-glyph { color: var(--ch-fire); flex: none; }
 .challenge__coach-tag {
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   font-size: var(--tech-fs-caption, 0.72rem);
   font-weight: 600;
   background: var(--tech-bg-sunken, color-mix(in srgb, var(--tech-text) 8%, transparent));
@@ -494,8 +494,8 @@
 }
 .challenge__board-you {
   margin-left: 6px; padding: 0 6px;
-  border-radius: 999px; font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
-  background: var(--ch-fire); color: #fff; letter-spacing: 0.04em;
+  border-radius: var(--tech-r-pill, 999px); font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+  background: var(--ch-fire); color: var(--tech-text-on-accent, #fff); letter-spacing: 0.04em;
 }
 .challenge__board-meta {
   flex: none; display: flex; align-items: center; gap: var(--tech-space-3, 12px);

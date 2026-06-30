@@ -205,13 +205,13 @@
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 .cm-chip--submitted {
-  color: #b7791f;
-  background: color-mix(in srgb, #f6ad55 22%, transparent);
-  border-color: color-mix(in srgb, #f6ad55 36%, transparent);
+  color: var(--tech-warn, #b7791f);
+  background: color-mix(in srgb, var(--tech-warn, #f6ad55) 22%, transparent);
+  border-color: color-mix(in srgb, var(--tech-warn, #f6ad55) 36%, transparent);
 }
 .cm-chip--rejected {
-  color: #c05621;
-  background: color-mix(in srgb, #ed8936 20%, transparent);
+  color: var(--tech-error, #c05621);
+  background: color-mix(in srgb, var(--tech-error, #ed8936) 20%, transparent);
 }
 .cm-chip--approved {
   color: var(--accent-b);

@@ -19,6 +19,10 @@
   --accent-a: #f472b6;             // rose (start)
   --accent-b: #a855f7;             // plum (deep, end)
 
+  // The rose→plum gradient is dark enough for white on-accent ink (WCAG AA).
+  // Override the kit default (#0c0d12) so all on-accent text/icons stay white.
+  --ink-on-accent: #fff;
+
   // phase tones (soft, non-medical — period vs fertile read distinctly without alarm)
   --phase-period: #f472b6;         // rose
   --phase-logged: #ec4899;         // deeper rose (a real logged day)
@@ -327,8 +331,8 @@
   // phase fills (a logged day is the strongest)
   &[data-phase='logged'] {
     background: var(--phase-logged);
-    color: #fff;
-    .cy-day__n { color: #fff; }
+    color: var(--ink-on-accent, #fff);
+    .cy-day__n { color: var(--ink-on-accent, #fff); }
   }
   &[data-phase='period'] {
     background: color-mix(in srgb, var(--phase-period) 24%, transparent);
@@ -515,7 +519,7 @@
   border: none;
   border-radius: var(--r-pill);
   font-weight: 700;
-  color: #fff;
+  color: var(--ink-on-accent, #fff);
   cursor: pointer;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
 
@@ -583,7 +587,7 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--ink-on-accent, #fff);
     box-shadow: var(--lift-1);
     transition: transform .18s var(--ease-spring, ease);
   }
@@ -779,7 +783,7 @@
   border: none;
   border-radius: var(--r-pill);
   font-weight: 800;
-  color: #fff;
+  color: var(--ink-on-accent, #fff);
   cursor: pointer;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
 
@@ -792,8 +796,8 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, .5);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, var(--ink-on-accent, #fff) 50%, transparent);
+  border-top-color: var(--ink-on-accent, #fff);
   animation: cy-spin .7s linear infinite;
 }
 
@@ -822,7 +826,7 @@
 
   &.is-on {
     border-color: transparent;
-    color: #fff;
+    color: var(--ink-on-accent, #fff);
     background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   }
   &:active { transform: scale(.95); }
@@ -849,7 +853,7 @@
   cursor: pointer;
 
   &.is-on {
-    color: #fff;
+    color: var(--ink-on-accent, #fff);
     background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   }
 }

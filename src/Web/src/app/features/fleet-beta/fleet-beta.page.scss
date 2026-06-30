@@ -23,7 +23,7 @@
   --accent-b: #06b6d4;             // signature cyan (end)
 
   // A faint cyan wash behind the whole column (still within the kit's dark contract).
-  background: radial-gradient(120% 80% at 50% -8%, #08191e 0%, var(--bg-base) 58%);
+  background: radial-gradient(120% 80% at 50% -8%, var(--tech-bg, #08191e) 0%, var(--bg-base) 58%);
 
   height: 100%; // fill the immersive shell frame; the pull-refresh owns the scroll
 }
@@ -142,7 +142,7 @@
 .pill:active { transform: scale(.95); }
 .pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .pill--on {
-  color: #04222a;
+  color: var(--tech-text-on-accent, #04222a);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   border-color: transparent;
   box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-a) 35%, transparent);
@@ -231,7 +231,7 @@
   display: inline-flex; align-items: center; gap: 6px;
   min-height: 44px; padding: 0 18px; border-radius: var(--r-pill);
   border: none; background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #04222a; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
+  color: var(--tech-text-on-accent, #04222a); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
   text-decoration: none; // the all-time CTA is an <a routerLink> — keep it looking like the button
   box-shadow: var(--lift-2); -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   transition: transform 120ms var(--ease-spring);

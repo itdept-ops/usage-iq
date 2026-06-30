@@ -18,7 +18,7 @@
 
     &.is-on {
       color: var(--ink-0, #fff);
-      background: linear-gradient(120deg, #fbbf24, #fb7185);
+      background: linear-gradient(120deg, var(--accent-a, #fbbf24), var(--accent-b, #fb7185));
     }
   }
 }
@@ -36,7 +36,7 @@
     align-items: center;
     gap: 10px;
     padding: 8px 10px;
-    border-radius: 12px;
+    border-radius: var(--r-tile, 12px);
     background: var(--glass-2);
 
     &.is-podium { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-a, #fbbf24) 40%, transparent); }
@@ -49,17 +49,17 @@
     font-weight: 700; font-size: 11px;
     color: var(--ink-3, var(--ink-2)); background: transparent;
 
-    &[data-rank='1'] { color: #1a1206; background: #f5c542; }
-    &[data-rank='2'] { color: #1a1206; background: #c9d1d9; }
-    &[data-rank='3'] { color: #1a1206; background: #cd7f32; }
+    &[data-rank='1'] { color: var(--ink-on-accent, #1a1206); background: var(--tech-warn, #f5c542); }
+    &[data-rank='2'] { color: var(--ink-on-accent, #1a1206); background: #c9d1d9; }
+    &[data-rank='3'] { color: var(--ink-on-accent, #1a1206); background: #cd7f32; }
   }
 
   &__avatar {
     flex: 0 0 auto;
     width: 28px; height: 28px; border-radius: 50%;
     display: grid; place-items: center;
-    font-size: 11px; font-weight: 700; color: var(--ink-0, #fff);
-    background: linear-gradient(135deg, #fbbf24, #fb7185);
+    font-size: 11px; font-weight: 700; color: var(--ink-on-accent, var(--ink-0, #fff));
+    background: linear-gradient(135deg, var(--accent-a, #fbbf24), var(--accent-b, #fb7185));
   }
 
   &__name {

@@ -1005,53 +1005,9 @@
     padding: 2px 0;
   }
 
-  /* Quick theme picker row (System / Light / Dark) — a labeled segmented control inside the menu. */
-  .acct-theme {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 12px 4px;
-
-    .acct-theme__lead {
-      color: var(--tech-text-tertiary, #5e6c82);
-      margin-right: 0;
-    }
-  }
-  .acct-theme__seg {
-    display: inline-flex;
-    gap: 3px;
-    padding: 3px;
-    border-radius: var(--tech-r-control, 8px);
-    background: var(--tech-bg-sunken, #0c1118);
-    border: 1px solid var(--tech-border, #26303f);
-  }
-  .acct-theme__opt {
-    display: inline-grid;
-    place-items: center;
-    width: 30px;
-    height: 26px;
-    border: 0;
-    border-radius: var(--tech-r-chip, 6px);
-    background: transparent;
-    color: var(--tech-text-secondary, #9ba9bd);
-    cursor: pointer;
-    transition:
-      background var(--tech-t-control, 140ms) ease,
-      color var(--tech-t-control, 140ms) ease;
-
-    mat-icon {
-      font-size: 17px;
-      width: 17px;
-      height: 17px;
-    }
-
-    &:hover { color: var(--tech-text); }
-    &:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--tech-border-strong, #33425a); }
-  }
-  .acct-theme__opt--on {
-    background: var(--tech-accent);
-    color: var(--tech-text-on-accent);
-    &:hover { color: var(--tech-text-on-accent); }
+  /* Theme + color-scheme picker (<app-theme-picker>) — padded to align with the menu's rows. */
+  .acct-theme-wrap {
+    padding: 8px 12px 4px;
   }
 
   .acct-divider {

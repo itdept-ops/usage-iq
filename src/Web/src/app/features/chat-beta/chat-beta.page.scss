@@ -96,7 +96,7 @@
   min-width: 24px; height: 24px; padding: 0 8px;
   border-radius: var(--r-pill);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; font-size: 12px; font-weight: 800; line-height: 1;
+  color: var(--tech-text-on-accent, #fff); font-size: 12px; font-weight: 800; line-height: 1;
   box-shadow: var(--lift-1);
 }
 .lh__live {
@@ -167,7 +167,7 @@
 .lh__filter:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .lh__filter mat-icon { font-size: 18px; width: 18px; height: 18px; }
 .lh__filter.is-on {
-  color: #fff; border-color: transparent;
+  color: var(--tech-text-on-accent, #fff); border-color: transparent;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   box-shadow: var(--lift-1);
 }
@@ -247,11 +247,11 @@
   display: grid; place-items: center; object-fit: cover; box-shadow: var(--lift-1);
 }
 .th__mono {
-  font-size: 15px; font-weight: 800; color: #fff;
+  font-size: 15px; font-weight: 800; color: var(--tech-text-on-accent, #fff);
   background: linear-gradient(135deg, hsl(var(--h,220) 70% 56%), hsl(calc(var(--h,220) + 36) 72% 48%));
 }
 .th__hash {
-  font-size: 18px; font-weight: 800; color: #fff;
+  font-size: 18px; font-weight: 800; color: var(--tech-text-on-accent, #fff);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
 }
 .th__text { min-width: 0; display: flex; flex-direction: column; }
@@ -355,7 +355,7 @@
   width: 44px; height: 44px; border: none; border-radius: 50%;
   display: grid; place-items: center;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; box-shadow: var(--lift-2);
+  color: var(--tech-text-on-accent, #fff); box-shadow: var(--lift-2);
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transition: transform 120ms var(--ease-spring), opacity 140ms var(--ease-out), filter 140ms var(--ease-out);
 }

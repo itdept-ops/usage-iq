@@ -226,7 +226,7 @@
 .sheet__send {
   flex: 0 0 auto; display: grid; place-items: center; width: 48px; height: 48px;
   border-radius: var(--r-pill); border: none; cursor: pointer;
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #1a0f06;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--ink-on-accent, #1a0f06);
   transition: transform 120ms var(--ease-spring);
 }
 .sheet__send:active { transform: scale(.92); }

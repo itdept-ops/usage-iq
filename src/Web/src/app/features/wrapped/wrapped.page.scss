@@ -89,7 +89,7 @@
   &:focus-visible { outline: 2px solid var(--wr-a); outline-offset: 2px; }
   &:disabled { opacity: .5; cursor: default; }
   &.is-on {
-    color: #fff; border-color: transparent;
+    color: var(--tech-text-on-accent, #fff); border-color: transparent;
     background: linear-gradient(135deg, var(--wr-a), var(--wr-b));
   }
 }
@@ -129,7 +129,7 @@
   &:disabled { opacity: .6; cursor: default; }
 }
 .wr-btn--solid {
-  color: #fff; background: linear-gradient(135deg, var(--wr-a), var(--wr-b));
+  color: var(--tech-text-on-accent, #fff); background: linear-gradient(135deg, var(--wr-a), var(--wr-b));
   box-shadow: 0 10px 28px color-mix(in srgb, var(--wr-a) 34%, transparent);
   &:hover:not(:disabled) { filter: brightness(1.06); }
 }
@@ -196,7 +196,7 @@
 .wr-stat__ico {
   display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; margin-bottom: 6px;
   background: linear-gradient(135deg, var(--ga, var(--wr-a)), var(--gb, var(--wr-b)));
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   mat-icon { font-size: 21px; width: 21px; height: 21px; }
 }
 .wr-stat__num {

@@ -66,11 +66,32 @@ echarts.use([
 ]);
 
 /**
- * The categorical series palette — Claude blue, Codex violet, then data accents (cyan, success, warn,
- * error, lit blue/violet). These saturated hues read on BOTH the dark console and a light canvas, so the
+ * The categorical series palette — FiMobile-flavored: accent blue, violet, cyan, green, amber, red,
+ * then lit blue/teal. These saturated hues read on BOTH the dark console and a light canvas, so the
  * palette is shared; only the chrome (axes, labels, tooltip, grid) flips with the theme below.
+ * The FIRST two entries are overridden at render time with the live scheme accent (see seriesColors()),
+ * so charts recolor with the active FiMobile color scheme.
  */
-const SERIES_COLORS = ['#3d8bff', '#8b7cff', '#3fd8d0', '#3dd68c', '#f2b340', '#ff5c6c', '#5ba3ff', '#a99bff'];
+const SERIES_COLORS = ['#5b8cff', '#9b7bff', '#57bdff', '#34d399', '#ffc24d', '#ff5b78', '#f472b6', '#2ec5d3'];
+
+/** Read a CSS custom property off <html> at render time (empty string if unavailable / SSR). */
+function cssVar(name: string): string {
+  if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') return '';
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/**
+ * The series palette with entries 0/1 swapped for the LIVE scheme accent + secondary, so every chart's
+ * primary series follows the active FiMobile color scheme. Falls back to the static hues off-DOM.
+ */
+function seriesColors(): string[] {
+  const accent = cssVar('--tech-accent');
+  const accent2 = cssVar('--tech-accent-2');
+  const palette = [...SERIES_COLORS];
+  if (accent) palette[0] = accent;
+  if (accent2) palette[1] = accent2;
+  return palette;
+}
 
 /** Per-theme chrome colors (everything that must contrast with the surface, not the series). */
 interface ChartChrome {
@@ -88,31 +109,31 @@ interface ChartChrome {
 }
 
 const DARK_CHROME: ChartChrome = {
-  text: '#9ba9bd',
-  title: '#e6edf6',
-  inactive: '#5e6c82',
-  axisLine: '#26303f',
-  axisLabel: '#5e6c82',
-  splitLine: 'rgba(28,37,51,0.7)',
-  tooltipBg: 'rgba(16,21,32,0.86)',
-  tooltipBorder: '#33425a',
-  tooltipText: '#e6edf6',
-  tooltipShadow: '0 24px 60px -20px rgba(0,0,0,.8)',
-  pointer: 'rgba(61,139,255,0.5)',
+  text: '#9fb0cc',
+  title: '#e9eefb',
+  inactive: '#5d6c88',
+  axisLine: 'rgba(255,255,255,0.14)',
+  axisLabel: '#7d8ea8',
+  splitLine: 'rgba(255,255,255,0.07)',
+  tooltipBg: 'rgba(14,28,56,0.9)',
+  tooltipBorder: 'rgba(127,165,255,0.4)',
+  tooltipText: '#e9eefb',
+  tooltipShadow: '0 24px 60px -20px rgba(0,0,0,.72)',
+  pointer: 'rgba(91,140,255,0.5)',
 };
 
 const LIGHT_CHROME: ChartChrome = {
-  text: '#4a5a70',
-  title: '#16202e',
-  inactive: '#9aa7b8',
-  axisLine: '#d4dae4',
-  axisLabel: '#6b7a8f',
-  splitLine: 'rgba(15,23,42,0.08)',
+  text: '#4a5a76',
+  title: '#0e1830',
+  inactive: '#9aa7be',
+  axisLine: '#dadff6',
+  axisLabel: '#66748f',
+  splitLine: 'rgba(9,24,64,0.08)',
   tooltipBg: 'rgba(255,255,255,0.94)',
-  tooltipBorder: '#cbd4e1',
-  tooltipText: '#16202e',
-  tooltipShadow: '0 24px 56px -24px rgba(15,23,42,.34)',
-  pointer: 'rgba(37,99,235,0.45)',
+  tooltipBorder: '#c7d0ea',
+  tooltipText: '#0e1830',
+  tooltipShadow: '0 24px 56px -22px rgba(20,40,90,.28)',
+  pointer: 'rgba(42,79,214,0.45)',
 };
 
 /** Read the live theme off <html data-theme> (set by the no-flash bootstrap + ThemeService). */
@@ -126,7 +147,7 @@ function currentChrome(): ChartChrome {
 function chartBase(c: ChartChrome): EChartsOption {
   return {
     backgroundColor: 'transparent',
-    color: SERIES_COLORS,
+    color: seriesColors(),
     textStyle: { fontFamily: 'Inter, system-ui, sans-serif', color: c.text },
     title: { textStyle: { color: c.title, fontFamily: 'Inter, system-ui, sans-serif' } },
     legend: {
@@ -231,6 +252,7 @@ export class ChartComponent implements OnDestroy {
     effect(() => {
       const opt = this.option();
       this.theme.resolved();
+      this.theme.scheme();
       this.chart?.setOption(withAxonTheme(opt), true);
     });
   }

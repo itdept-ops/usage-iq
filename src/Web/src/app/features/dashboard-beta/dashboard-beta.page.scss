@@ -103,7 +103,7 @@
   position: absolute; top: -4px; right: -4px;
   min-width: 18px; height: 18px; padding: 0 4px; border-radius: var(--r-pill);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center;
+  color: var(--tech-text-on-accent, #fff); font-size: 11px; font-weight: 800; line-height: 18px; text-align: center;
   box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-a) 50%, transparent);
 }
 
@@ -126,7 +126,7 @@
 .pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .pill--on {
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; border-color: transparent;
+  color: var(--tech-text-on-accent, #fff); border-color: transparent;
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-a) 34%, transparent);
 }
 

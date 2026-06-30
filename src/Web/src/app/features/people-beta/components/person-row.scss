@@ -50,7 +50,7 @@ $hues: #fb7185, #f0a35a, #a78bfa, #38bdf8, #34d399, #f472b6;
 .cr__avatar--init {
   display: grid; place-items: center;
   font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: -.02em;
-  color: #1a0e14;
+  color: var(--tech-text-on-accent, #1a0e14);
   background: linear-gradient(135deg,
     color-mix(in srgb, var(--av) 92%, #fff),
     color-mix(in srgb, var(--av) 78%, #000));
@@ -89,7 +89,7 @@ $hues: #fb7185, #f0a35a, #a78bfa, #38bdf8, #34d399, #f472b6;
 }
 .cr__you {
   flex: 0 0 auto; padding: 1px 7px; border-radius: var(--r-pill);
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #1a0e14;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--tech-text-on-accent, #1a0e14);
   font-size: 10px; font-weight: 800; letter-spacing: .02em;
 }
 
@@ -128,9 +128,9 @@ $hues: #fb7185, #f0a35a, #a78bfa, #38bdf8, #34d399, #f472b6;
   background: color-mix(in srgb, var(--accent-a) 10%, var(--bg-sink));
 }
 .cr__chip--family {
-  color: #38bdf8;
-  border-color: color-mix(in srgb, #38bdf8 28%, transparent);
-  background: color-mix(in srgb, #38bdf8 10%, var(--bg-sink));
+  color: var(--tech-accent-cyan, #38bdf8);
+  border-color: color-mix(in srgb, var(--tech-accent-cyan, #38bdf8) 28%, transparent);
+  background: color-mix(in srgb, var(--tech-accent-cyan, #38bdf8) 10%, var(--bg-sink));
 }
 
 .cr__chev { flex: 0 0 auto; color: var(--ink-faint); font-size: 22px; width: 22px; height: 22px; align-self: center; }

@@ -123,7 +123,7 @@
 
   &__track {
     fill: none;
-    stroke: rgba(255, 255, 255, .1);
+    stroke: var(--tech-border-subtle, rgba(255, 255, 255, .1));
     stroke-width: 9;
   }
 

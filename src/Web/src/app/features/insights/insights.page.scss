@@ -84,7 +84,7 @@
   border: 0;
   cursor: pointer;
   padding: .45rem .85rem;
-  border-radius: var(--tech-radius, 8px);
+  border-radius: var(--tech-r-control, 8px);
   font: inherit;
   font-size: .85rem;
   font-weight: 600;
@@ -94,7 +94,7 @@
 
   &:hover:not(:disabled) { color: var(--tech-text, #e6edf6); }
   &.is-on {
-    color: #fff;
+    color: var(--tech-text-on-accent, #fff);
     background: var(--tech-accent, #7c8cff);
   }
   &:disabled { opacity: .55; cursor: default; }
@@ -199,7 +199,7 @@
     min-width: 26px;
     text-align: center;
     padding: .15rem .5rem;
-    border-radius: 999px;
+    border-radius: var(--tech-r-pill, 999px);
     font-size: .78rem;
     font-weight: 700;
     color: var(--tech-text-secondary, #9ba9bd);
@@ -256,7 +256,7 @@
     place-items: center;
     width: 26px;
     height: 26px;
-    border-radius: 8px;
+    border-radius: var(--tech-r-control, 8px);
     color: var(--db);
     background: color-mix(in srgb, var(--da) 18%, transparent);
     mat-icon { font-size: 17px; width: 17px; height: 17px; }
@@ -273,16 +273,16 @@
   &__mag {
     margin-left: auto;
     padding: .12rem .5rem;
-    border-radius: 999px;
+    border-radius: var(--tech-r-pill, 999px);
     font-size: .72rem;
     font-weight: 700;
     color: var(--tech-text-secondary, #c3cedd);
     background: var(--tech-panel-raised, #161c28);
     border: 1px solid var(--tech-border, #26303f);
 
-    &[data-dir='up']   { color: #4ade80; border-color: color-mix(in srgb, #4ade80 40%, transparent); }
-    &[data-dir='down'] { color: #fb7185; border-color: color-mix(in srgb, #fb7185 40%, transparent); }
-    &[data-dir='flat'] { color: #9ba9bd; }
+    &[data-dir='up']   { color: var(--tech-success, #4ade80); border-color: color-mix(in srgb, var(--tech-success, #4ade80) 40%, transparent); }
+    &[data-dir='down'] { color: var(--tech-error, #fb7185); border-color: color-mix(in srgb, var(--tech-error, #fb7185) 40%, transparent); }
+    &[data-dir='flat'] { color: var(--tech-text-secondary, #9ba9bd); }
   }
 
   &__title {
@@ -334,7 +334,7 @@
     align-items: center;
     gap: .25rem;
     padding: .3rem .6rem;
-    border-radius: 999px;
+    border-radius: var(--tech-r-pill, 999px);
     font: inherit;
     font-size: .74rem;
     font-weight: 600;
@@ -384,7 +384,7 @@
   align-items: center;
   gap: .28rem;
   padding: .2rem .55rem;
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   font-size: .7rem;
   font-weight: 600;
   color: var(--tech-text-secondary, #9ba9bd);
@@ -393,9 +393,9 @@
   mat-icon { font-size: 14px; width: 14px; height: 14px; }
 
   &--med {
-    color: #fbbf24;
-    border-color: color-mix(in srgb, #fbbf24 35%, transparent);
-    background: color-mix(in srgb, #fbbf24 10%, transparent);
+    color: var(--tech-warn, #fbbf24);
+    border-color: color-mix(in srgb, var(--tech-warn, #fbbf24) 35%, transparent);
+    background: color-mix(in srgb, var(--tech-warn, #fbbf24) 10%, transparent);
   }
 }
 

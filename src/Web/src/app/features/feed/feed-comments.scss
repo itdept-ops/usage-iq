@@ -8,7 +8,7 @@
     align-items: center;
     gap: 6px;
     padding: 2px 9px;
-    border-radius: 999px;
+    border-radius: var(--tech-r-pill, 999px);
     border: 1px solid var(--tech-border-subtle, #1c2533);
     background: transparent;
     color: var(--tech-text-tertiary, #6b7688);
@@ -124,7 +124,7 @@
     align-items: center;
     justify-content: center;
     border: none;
-    border-radius: 999px;
+    border-radius: var(--tech-r-pill, 999px);
     background: transparent;
     color: var(--tech-text-tertiary, #6b7688);
     cursor: pointer;
@@ -147,7 +147,7 @@
     flex: 1 1 auto;
     min-width: 0;
     padding: 9px 12px;
-    border-radius: 999px;
+    border-radius: var(--tech-r-pill, 999px);
     border: 1px solid var(--tech-border-subtle, #1c2533);
     background: var(--tech-panel, #111722);
     color: var(--tech-text);
@@ -166,7 +166,7 @@
     align-items: center;
     justify-content: center;
     border: none;
-    border-radius: 50%;
+    border-radius: var(--tech-r-pill, 999px);
     background: var(--tech-accent, #3FD8D0);
     color: var(--tech-text-on-accent, #06090e);
     cursor: pointer;

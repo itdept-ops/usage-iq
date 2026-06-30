@@ -41,7 +41,7 @@ $tabbar: 62px;
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(120% 90% at 50% 0%, transparent, rgba(8, 9, 16, .55));
+    background: radial-gradient(120% 90% at 50% 0%, transparent, color-mix(in srgb, var(--tech-bg, #08090f) 55%, transparent));
     pointer-events: none;
   }
 }
@@ -76,7 +76,7 @@ $tabbar: 62px;
   justify-content: space-between;
   gap: 12px;
   padding: calc(var(--safe-top, 0px) + 12px) 14px 16px;
-  background: linear-gradient(180deg, rgba(8, 9, 16, .82), rgba(8, 9, 16, .42) 60%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tech-bg, #08090f) 82%, transparent), color-mix(in srgb, var(--tech-bg, #08090f) 42%, transparent) 60%, transparent);
   pointer-events: none; // let map drags pass through gaps; children re-enable
 }
 
@@ -146,7 +146,7 @@ $tabbar: 62px;
   background: var(--glass);
   backdrop-filter: blur(18px) saturate(1.1);
   border-top: 1px solid var(--glass-edge);
-  border-radius: 22px 22px 0 0;
+  border-radius: var(--tech-radius, 22px) var(--tech-radius, 22px) 0 0;
   box-shadow: 0 -18px 44px rgba(0, 0, 0, .5);
 }
 
@@ -155,7 +155,7 @@ $tabbar: 62px;
   width: 40px;
   height: 4px;
   margin: 6px auto 4px;
-  border-radius: 99px;
+  border-radius: var(--tech-r-pill, 99px);
   background: var(--ink-faint);
   opacity: .6;
 }
@@ -185,7 +185,7 @@ $tabbar: 62px;
 }
 
 .fl-row {
-  border-radius: 14px;
+  border-radius: var(--tech-radius, 14px);
 
   & + & { margin-top: 4px; }
 
@@ -202,13 +202,13 @@ $tabbar: 62px;
   padding: 9px 10px;
   border: 0;
   background: transparent;
-  border-radius: 14px;
+  border-radius: var(--tech-radius, 14px);
   text-align: left;
   color: inherit;
   cursor: pointer;
   transition: background .12s ease;
 
-  &:active { background: rgba(255, 255, 255, .05); }
+  &:active { background: color-mix(in srgb, var(--tech-text, #fff) 5%, transparent); }
 }
 
 .fl-row__avatar {
@@ -221,7 +221,7 @@ $tabbar: 62px;
   font-size: 14px;
   font-weight: 800;
   letter-spacing: .02em;
-  color: #0b0c12;
+  color: var(--tech-text-on-accent, #0b0c12);
   background: var(--swatch, var(--accent-a));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--swatch, var(--accent-a)) 35%, transparent);
 }
@@ -253,7 +253,7 @@ $tabbar: 62px;
   letter-spacing: .06em;
   text-transform: uppercase;
   padding: 2px 6px;
-  border-radius: 99px;
+  border-radius: var(--tech-r-pill, 99px);
   color: var(--ink-on-accent);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
 }
@@ -285,7 +285,7 @@ $tabbar: 62px;
   letter-spacing: .04em;
   text-transform: uppercase;
   padding: 1px 6px;
-  border-radius: 99px;
+  border-radius: var(--tech-r-pill, 99px);
   color: var(--ink-dim);
   background: var(--hairline);
 }
@@ -361,7 +361,7 @@ $tabbar: 62px;
   gap: 7px;
   padding: 11px 18px;
   border: 0;
-  border-radius: 99px;
+  border-radius: var(--tech-r-pill, 99px);
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
@@ -396,7 +396,7 @@ $tabbar: 62px;
   display: inline-flex;
   margin-top: 10px;
   padding: 3px;
-  border-radius: 99px;
+  border-radius: var(--tech-r-pill, 99px);
   background: var(--glass);
   backdrop-filter: blur(10px);
   border: 1px solid var(--glass-edge);
@@ -409,7 +409,7 @@ $tabbar: 62px;
   padding: 6px 14px;
   border: 0;
   background: transparent;
-  border-radius: 99px;
+  border-radius: var(--tech-r-pill, 99px);
   font-size: 12px;
   font-weight: 700;
   color: var(--ink-dim);
@@ -460,7 +460,7 @@ $tabbar: 62px;
   }
   select {
     padding: 5px 8px;
-    border-radius: 9px;
+    border-radius: var(--tech-r-control, 9px);
     border: 1px solid var(--glass-edge);
     background: var(--bg-sink);
     color: var(--ink);

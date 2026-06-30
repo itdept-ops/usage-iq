@@ -64,7 +64,7 @@
     inset: -40px -30% auto -10%;
     height: 180px;
     background: radial-gradient(60% 80% at 22% 0%, color-mix(in srgb, var(--accent-a) 32%, transparent), transparent 70%);
-    filter: blur(var(--blur-cap, 30px));
+    filter: blur(var(--blur-glass, 30px));
     pointer-events: none;
     z-index: 0;
   }
@@ -80,7 +80,7 @@
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: color-mix(in srgb, var(--accent-a) 78%, var(--ink-2));
+    color: color-mix(in srgb, var(--accent-a) 78%, var(--ink-dim));
 
     mat-icon { font-size: 16px; width: 16px; height: 16px; }
   }
@@ -94,7 +94,7 @@
     line-height: 1.02;
     font-weight: 800;
     letter-spacing: -0.02em;
-    color: var(--ink-0);
+    color: var(--ink);
   }
 
   &__sub {
@@ -104,7 +104,7 @@
     max-width: 44ch;
     font-size: 13.5px;
     line-height: 1.45;
-    color: var(--ink-2);
+    color: var(--ink-dim);
   }
 
   &__chip {
@@ -118,17 +118,17 @@
     border-radius: var(--r-pill);
     font-size: 12.5px;
     font-weight: 650;
-    color: var(--ink-1);
-    background: var(--glass-1);
-    border: 1px solid var(--hair);
+    color: var(--ink-dim);
+    background: var(--glass);
+    border: 1px solid var(--hairline);
     box-shadow: var(--lift-1);
 
     mat-icon { font-size: 16px; width: 16px; height: 16px; }
 
     &.is-circle {
-      color: color-mix(in srgb, var(--accent-a) 88%, var(--ink-0));
-      border-color: color-mix(in srgb, var(--accent-a) 36%, var(--hair));
-      background: color-mix(in srgb, var(--accent-a) 12%, var(--glass-1));
+      color: color-mix(in srgb, var(--accent-a) 88%, var(--ink));
+      border-color: color-mix(in srgb, var(--accent-a) 36%, var(--hairline));
+      background: color-mix(in srgb, var(--accent-a) 12%, var(--glass));
     }
   }
 }
@@ -180,10 +180,10 @@
     font-weight: 750;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--ink-1);
-    background: color-mix(in srgb, var(--bg-1, var(--glass-2)) 86%, transparent);
-    backdrop-filter: blur(var(--blur-cap, 18px));
-    border: 1px solid var(--hair);
+    color: var(--ink-dim);
+    background: color-mix(in srgb, var(--bg-rise, var(--glass)) 86%, transparent);
+    backdrop-filter: blur(var(--blur-glass, 18px));
+    border: 1px solid var(--hairline);
     box-shadow: var(--lift-1);
   }
 }
@@ -204,8 +204,8 @@
   gap: 12px;
   padding: 11px 13px;
   border-radius: var(--r-tile, 16px);
-  background: var(--glass-1);
-  border: 1px solid var(--hair);
+  background: var(--glass);
+  border: 1px solid var(--hairline);
   box-shadow: var(--lift-1);
 
   // The comment thread drops onto a full-width second line below the avatar/verb/cheer line.
@@ -231,12 +231,12 @@
     font-size: 15px;
     font-weight: 750;
     letter-spacing: 0.01em;
-    color: var(--ink-0);
+    color: var(--ink);
     background:
       linear-gradient(140deg,
-        color-mix(in srgb, var(--kind, var(--accent-a)) 26%, var(--glass-2)),
-        var(--glass-2));
-    border: 1px solid color-mix(in srgb, var(--kind, var(--accent-a)) 30%, var(--hair));
+        color-mix(in srgb, var(--kind, var(--accent-a)) 26%, var(--glass)),
+        var(--glass));
+    border: 1px solid color-mix(in srgb, var(--kind, var(--accent-a)) 30%, var(--hairline));
   }
 
   &__badge {
@@ -248,9 +248,9 @@
     width: 21px;
     height: 21px;
     border-radius: 50%;
-    color: var(--on-accent, #fff);
+    color: var(--ink-on-accent, #fff);
     background: var(--kind, var(--accent-a));
-    border: 2px solid var(--bg-0, var(--glass-1));
+    border: 2px solid var(--bg-base, var(--glass));
     box-shadow: var(--lift-1);
 
     mat-icon { font-size: 13px; width: 13px; height: 13px; }
@@ -271,15 +271,15 @@
     margin: 0;
     font-size: 14px;
     line-height: 1.4;
-    color: var(--ink-1);
+    color: var(--ink-dim);
   }
 
   &__name {
     font-weight: 750;
-    color: var(--ink-0);
+    color: var(--ink);
   }
 
-  &__verb { color: var(--ink-1); }
+  &__verb { color: var(--ink-dim); }
   &__verb::before { content: ' '; }
 
   &__time {
@@ -288,7 +288,7 @@
     font-size: 11.5px;
     font-weight: 600;
     letter-spacing: 0.02em;
-    color: var(--ink-3, var(--ink-2));
+    color: var(--ink-faint, var(--ink-dim));
   }
 
   // ---- cheer toggle (big tap target) ----
@@ -301,9 +301,9 @@
     padding: 0 11px;
     border-radius: var(--r-pill);
     font: inherit;
-    background: var(--glass-2);
-    border: 1px solid var(--hair);
-    color: var(--ink-2);
+    background: var(--glass);
+    border: 1px solid var(--hairline);
+    color: var(--ink-dim);
     cursor: pointer;
     transition: transform var(--ease-spring, 160ms), background 140ms, border-color 140ms, color 140ms;
 
@@ -323,9 +323,9 @@
     }
 
     &.is-on {
-      color: color-mix(in srgb, var(--accent-a) 92%, var(--ink-0));
-      background: color-mix(in srgb, var(--accent-a) 16%, var(--glass-2));
-      border-color: color-mix(in srgb, var(--accent-a) 42%, var(--hair));
+      color: color-mix(in srgb, var(--accent-a) 92%, var(--ink));
+      background: color-mix(in srgb, var(--accent-a) 16%, var(--glass));
+      border-color: color-mix(in srgb, var(--accent-a) 42%, var(--hairline));
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-a) 30%, transparent),
                   0 4px 14px color-mix(in srgb, var(--accent-a) 26%, transparent);
 
@@ -359,7 +359,7 @@
   &__error {
     margin: 0;
     font-size: 12.5px;
-    color: var(--danger, #f87171);
+    color: var(--tech-error, #f87171);
   }
 
   &__btn {
@@ -372,9 +372,9 @@
     font: inherit;
     font-size: 14px;
     font-weight: 700;
-    color: var(--ink-1);
-    background: var(--glass-1);
-    border: 1px solid var(--hair);
+    color: var(--ink-dim);
+    background: var(--glass);
+    border: 1px solid var(--hairline);
     box-shadow: var(--lift-1);
     cursor: pointer;
     transition: transform var(--ease-spring, 160ms);
@@ -389,7 +389,7 @@
     width: 15px;
     height: 15px;
     border-radius: 50%;
-    border: 2px solid color-mix(in srgb, var(--accent-a) 40%, var(--hair));
+    border: 2px solid color-mix(in srgb, var(--accent-a) 40%, var(--hairline));
     border-top-color: var(--accent-a);
     animation: fm-spin 720ms linear infinite;
   }
@@ -403,5 +403,5 @@
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--ink-3, var(--ink-2));
+  color: var(--ink-faint, var(--ink-dim));
 }

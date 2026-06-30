@@ -94,7 +94,7 @@
   font-family: var(--tech-font-mono);
   font-size: var(--tech-fs-label, 11px);
   font-weight: 700;
-  color: #0b1020;
+  color: var(--tech-text-on-accent, #0b1020);
   letter-spacing: 0.02em;
 }
 
@@ -176,7 +176,7 @@
 
   &.is-active {
     background: var(--tech-text-accent);
-    color: #0b1020;
+    color: var(--tech-text-on-accent, #0b1020);
   }
   &:focus-visible { outline: 2px solid var(--tech-text-accent); outline-offset: 2px; }
 }
@@ -269,7 +269,7 @@
     height: 48px;
     background: var(--tech-text-accent);
     border-color: transparent;
-    color: #0b1020;
+    color: var(--tech-text-on-accent, #0b1020);
     mat-icon { width: 24px; height: 24px; font-size: 24px; line-height: 24px; }
   }
 }

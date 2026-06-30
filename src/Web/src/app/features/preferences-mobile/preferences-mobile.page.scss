@@ -18,11 +18,11 @@
   --accent-a: #8fa0bd;             // signature cool slate (start)
   --accent-b: #5b7cb8;             // restrained steel-blue pop (end)
 
-  --bg-base: #0e1119;
-  --bg-rise: #161a26;
-  --bg-sink: #0a0c12;
+  --bg-base: var(--tech-bg, #0e1119);
+  --bg-rise: var(--tech-panel, #161a26);
+  --bg-sink: var(--tech-bg-sunken, #0a0c12);
 
-  background: radial-gradient(120% 80% at 50% -10%, #1b2233 0%, var(--bg-base) 58%);
+  background: radial-gradient(120% 80% at 50% -10%, var(--tech-panel-raised, #1b2233) 0%, var(--bg-base) 58%);
 }
 
 @include kit.beta-springs;
@@ -207,7 +207,7 @@
 .home-check {
   flex: 0 0 auto; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; font-size: 13px; font-weight: 800;
+  color: var(--ink-on-accent, #fff); font-size: 13px; font-weight: 800;
   box-shadow: 0 3px 10px color-mix(in srgb, var(--accent-b) 38%, transparent);
 }
 
@@ -272,13 +272,13 @@
 .btn--primary {
   flex-basis: 100%;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  border-color: transparent; color: #fff;
+  border-color: transparent; color: var(--ink-on-accent, #fff);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-b) 34%, transparent);
 }
 .btn--danger {
   background: transparent;
-  border-color: color-mix(in srgb, var(--danger, #e2576c) 40%, var(--hairline));
-  color: color-mix(in srgb, var(--danger, #e2576c) 80%, var(--ink));
+  border-color: color-mix(in srgb, var(--tech-error, #e2576c) 40%, var(--hairline));
+  color: color-mix(in srgb, var(--tech-error, #e2576c) 80%, var(--ink));
 }
 
 // ============================================================================

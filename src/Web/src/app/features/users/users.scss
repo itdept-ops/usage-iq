@@ -548,7 +548,7 @@ mat-progress-bar {
   border: 1px solid color-mix(in srgb, var(--tech-accent) 55%, var(--tech-border-subtle));
   border-radius: var(--tech-r-control);
   background: var(--tech-panel, #111722);
-  box-shadow: 0 6px 24px -8px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--tech-shadow-raised, 0 6px 24px -8px rgba(0, 0, 0, 0.6));
   z-index: 5;
 }
 .save-summary {

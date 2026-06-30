@@ -143,10 +143,10 @@
   font-size: 13px;
   line-height: 1.45;
   text-align: left;
-  color: #ff8189;
+  color: var(--tech-error, #ff8189);
   background: rgba(255, 92, 108, .12);
   border: 1px solid rgba(255, 92, 108, .34);
-  border-radius: 12px;
+  border-radius: var(--tech-r-control, 12px);
   mat-icon { flex: 0 0 auto; font-size: 17px; width: 17px; height: 17px; }
 }
 

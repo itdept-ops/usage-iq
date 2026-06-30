@@ -42,7 +42,7 @@
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--tech-radius, 12px);
   background: color-mix(in srgb, var(--tech-accent) 14%, transparent);
   mat-icon { color: var(--tech-accent); }
 }

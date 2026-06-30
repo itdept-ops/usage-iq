@@ -96,7 +96,7 @@
   border: 1px solid var(--tech-border, #26303f);
   background: var(--tech-panel, #111722);
   color: var(--tech-text, #e6edf6);
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   padding: 8px 14px;
   font-size: 0.85rem;
   cursor: pointer;
@@ -177,7 +177,7 @@
   font-size: 0.72rem;
   color: var(--tech-warn, #f2b340);
   background: var(--tech-warn-tint, rgba(242, 179, 64, 0.12));
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   padding: 3px 9px;
 
   mat-icon {
@@ -198,7 +198,7 @@
   color: var(--tech-text-dim, #8b97ab);
   background: var(--tech-bg-sunken, #0c1118);
   border: 1px solid var(--tech-border-subtle, #1c2533);
-  border-radius: 6px;
+  border-radius: var(--tech-r-control, 6px);
   padding: 2px 7px;
 }
 
@@ -217,7 +217,7 @@
   gap: 10px;
   background: var(--tech-error-tint, rgba(255, 92, 108, 0.12));
   border: 1px solid var(--tech-error, #ff5c6c);
-  border-radius: 10px;
+  border-radius: var(--tech-r-control, 10px);
   padding: 10px 14px;
   color: var(--tech-text, #e6edf6);
   font-size: 0.88rem;
@@ -242,7 +242,7 @@
   background: var(--tech-glass-chrome, rgba(10, 14, 20, 0.78));
   backdrop-filter: blur(12px);
   border: 1px solid var(--tech-border, #26303f);
-  border-radius: 14px;
+  border-radius: var(--tech-radius, 14px);
 }
 
 .ask__input {

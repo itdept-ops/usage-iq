@@ -190,8 +190,8 @@
     color: var(--ink-dim);
     background: var(--bg-base);
     border: 1px solid var(--hairline);
-    &[data-dir='up']   { color: #4ade80; }
-    &[data-dir='down'] { color: #fb7185; }
+    &[data-dir='up']   { color: var(--tech-success, #4ade80); }
+    &[data-dir='down'] { color: var(--tech-error, #fb7185); }
     &[data-dir='flat'] { color: var(--ink-dim); }
   }
 
@@ -242,8 +242,8 @@
   mat-icon { font-size: 13px; width: 13px; height: 13px; }
 
   &--med {
-    color: #fbbf24;
-    border-color: color-mix(in srgb, #fbbf24 35%, transparent);
+    color: var(--tech-warn, #fbbf24);
+    border-color: color-mix(in srgb, var(--tech-warn, #fbbf24) 35%, transparent);
   }
 }
 

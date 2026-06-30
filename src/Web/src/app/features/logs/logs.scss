@@ -120,10 +120,10 @@ mat-progress-bar {
   background: color-mix(in srgb, var(--tech-text-tertiary) 18%, transparent);
   color: var(--tech-text-secondary);
 
-  &[data-m="GET"]    { background: color-mix(in srgb, #3fd8d0 20%, transparent); color: #7fe9e3; }
-  &[data-m="POST"]   { background: color-mix(in srgb, #5aa9ff 22%, transparent); color: #9cc8ff; }
-  &[data-m="PUT"]    { background: color-mix(in srgb, #d8a23f 22%, transparent); color: #e8c27f; }
-  &[data-m="DELETE"] { background: color-mix(in srgb, #ff5c6c 22%, transparent); color: #ff9aa4; }
+  &[data-m="GET"]    { background: color-mix(in srgb, var(--tech-accent-cyan, #3fd8d0) 20%, transparent); color: var(--tech-accent-cyan, #7fe9e3); }
+  &[data-m="POST"]   { background: color-mix(in srgb, var(--tech-accent, #5aa9ff) 22%, transparent); color: var(--tech-accent, #9cc8ff); }
+  &[data-m="PUT"]    { background: color-mix(in srgb, var(--tech-warn, #d8a23f) 22%, transparent); color: var(--tech-warn, #e8c27f); }
+  &[data-m="DELETE"] { background: color-mix(in srgb, var(--tech-error, #ff5c6c) 22%, transparent); color: var(--tech-error, #ff9aa4); }
 }
 
 .status-badge {
@@ -133,10 +133,10 @@ mat-progress-bar {
   padding: 2px 8px;
   border-radius: var(--tech-r-pill, 999px);
 
-  &.st-2xx { background: color-mix(in srgb, #43d17a 20%, transparent); color: #79e6a4; }
-  &.st-3xx { background: color-mix(in srgb, #5aa9ff 20%, transparent); color: #9cc8ff; }
-  &.st-4xx { background: color-mix(in srgb, #d8a23f 22%, transparent); color: #e8c27f; }
-  &.st-5xx { background: color-mix(in srgb, #ff5c6c 24%, transparent); color: #ff9aa4; }
+  &.st-2xx { background: color-mix(in srgb, var(--tech-success, #43d17a) 20%, transparent); color: var(--tech-success, #79e6a4); }
+  &.st-3xx { background: color-mix(in srgb, var(--tech-accent, #5aa9ff) 20%, transparent); color: var(--tech-accent, #9cc8ff); }
+  &.st-4xx { background: color-mix(in srgb, var(--tech-warn, #d8a23f) 22%, transparent); color: var(--tech-warn, #e8c27f); }
+  &.st-5xx { background: color-mix(in srgb, var(--tech-error, #ff5c6c) 24%, transparent); color: var(--tech-error, #ff9aa4); }
 }
 
 /* ---- Expanded detail ---- */

@@ -211,7 +211,7 @@
 .home-check {
   flex: 0 0 auto; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; font-size: 13px; font-weight: 800;
+  color: var(--tech-text-on-accent, #fff); font-size: 13px; font-weight: 800;
   box-shadow: 0 3px 10px color-mix(in srgb, var(--accent-b) 38%, transparent);
 }
 

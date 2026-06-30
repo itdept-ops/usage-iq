@@ -15,6 +15,8 @@
 
   --accent-a: #818cf8;   // indigo
   --accent-b: #a855f7;   // violet
+  // Dark indigo-violet gradient needs white text on it (the kit default is near-black for lighter accents)
+  --ink-on-accent: #fff;
 }
 
 @include kit.beta-springs;
@@ -59,7 +61,7 @@
 
   &__title {
     margin: 0; font-size: clamp(28px, 8vw, 38px); font-weight: 800; letter-spacing: -0.02em;
-    color: var(--ink-0, var(--ink-1));
+    color: var(--ink, var(--ink-1));
   }
   &__sub { margin: 6px 0 0; max-width: 40ch; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
 
@@ -68,7 +70,7 @@
     display: inline-flex; align-items: center; gap: 6px;
     min-height: 42px; padding: 0 18px; border-radius: var(--r-pill);
     font: inherit; font-weight: 700; font-size: 14px;
-    color: var(--ink-0, #fff); cursor: pointer; border: none;
+    color: var(--ink-on-accent, #fff); cursor: pointer; border: none;
     background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
     box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-a) 30%, transparent);
     transition: transform var(--ease-spring, 160ms);
@@ -85,12 +87,12 @@
   animation: pm-slide 320ms var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1)) both;
 
   &__hint { margin: 0; font-size: 12px; color: var(--ink-3, var(--ink-2)); }
-  &__err { margin: 0; font-size: 12.5px; color: #fb7185; }
+  &__err { margin: 0; font-size: 12.5px; color: var(--tech-error, #fb7185); }
 
   &__go {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     min-height: 46px; border-radius: var(--r-pill); border: none;
-    font: inherit; font-weight: 700; font-size: 15px; color: var(--ink-0, #fff); cursor: pointer;
+    font: inherit; font-weight: 700; font-size: 15px; color: var(--ink-on-accent, #fff); cursor: pointer;
     background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
     box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-a) 30%, transparent);
     transition: transform var(--ease-spring, 160ms), opacity 140ms;
@@ -108,7 +110,7 @@
     color: var(--ink-3, var(--ink-2));
   }
   &__input {
-    min-height: 44px; padding: 0 13px; border-radius: 12px;
+    min-height: 44px; padding: 0 13px; border-radius: var(--r-tile, 12px);
     border: 1px solid var(--hair); background: var(--glass-2); color: var(--ink-1);
     font: inherit; font-size: 15px;
     &::placeholder { color: var(--ink-3, var(--ink-2)); }
@@ -128,7 +130,7 @@
   mat-icon { width: 16px; height: 16px; font-size: 16px; line-height: 16px; }
 
   &.is-on {
-    color: color-mix(in srgb, var(--accent-a) 92%, var(--ink-0));
+    color: color-mix(in srgb, var(--accent-a) 92%, var(--ink));
     background: color-mix(in srgb, var(--accent-a) 16%, var(--glass-2));
     border-color: color-mix(in srgb, var(--accent-a) 42%, var(--hair));
   }
@@ -136,7 +138,7 @@
 .pm-invitee__avatar {
   width: 22px; height: 22px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700; color: var(--ink-0, #fff);
+  font-size: 10px; font-weight: 700; color: var(--ink-on-accent, #fff);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
 }
 
@@ -181,7 +183,7 @@
 
   &__icon {
     flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px;
-    display: grid; place-items: center; color: var(--ink-0, #fff);
+    display: grid; place-items: center; color: var(--ink-on-accent, #fff);
     background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
     mat-icon { width: 24px; height: 24px; font-size: 24px; line-height: 24px; }
   }
@@ -205,7 +207,7 @@
 .pm-mchip {
   width: 26px; height: 26px; border-radius: 50%;
   display: inline-grid; place-items: center; margin-left: -6px;
-  font-size: 10px; font-weight: 700; color: var(--ink-0, #fff);
+  font-size: 10px; font-weight: 700; color: var(--ink-on-accent, #fff);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   box-shadow: 0 0 0 2px var(--glass-1);
   &:first-child { margin-left: 0; }
@@ -219,7 +221,7 @@
   mat-icon { width: 17px; height: 17px; font-size: 17px; line-height: 17px; }
 
   &--primary {
-    border: none; color: var(--ink-0, #fff);
+    border: none; color: var(--ink-on-accent, #fff);
     background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
   }
 }
@@ -230,12 +232,12 @@
 
 .pm-standing {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 12px; background: var(--glass-2);
+  padding: 8px 10px; border-radius: var(--r-tile, 12px); background: var(--glass-2);
 
   &__rank { flex: 0 0 auto; width: 18px; text-align: center; font-weight: 700; font-size: 13px; color: var(--ink-3, var(--ink-2)); }
   &__avatar {
     flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
-    display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--ink-0, #fff);
+    display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--ink-on-accent, #fff);
     background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   }
   &__name { flex: 1; min-width: 0; font-size: 14px; color: var(--ink-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

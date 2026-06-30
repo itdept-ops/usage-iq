@@ -182,12 +182,12 @@ import { bottomTabs } from '../../../core/nav-model';
         align-items: center;
         gap: 4px;
 
-        /* Dark immersive glass (matches .slimbar.glass) so the bar blends on every surface. */
-        background: rgba(10, 11, 18, 0.72);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        /* Theme-aware glass (follows the FiMobile light/dark palette) so the bar blends on every surface. */
+        background: var(--tech-glass-chrome);
+        border-bottom: 1px solid var(--tech-border);
         -webkit-backdrop-filter: blur(12px);
         backdrop-filter: blur(12px);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        box-shadow: inset 0 1px 0 var(--tech-glass-inset-hi);
       }
 
       /* Back affordance — a quiet icon button pinned light so it reads on the dark bar. */
@@ -202,7 +202,7 @@ import { bottomTabs } from '../../../core/nav-model';
         border: none;
         border-radius: var(--r-pill, 999px);
         background: transparent;
-        color: rgba(255, 255, 255, 0.72);
+        color: var(--tech-text-secondary);
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
         touch-action: manipulation;
@@ -214,13 +214,13 @@ import { bottomTabs } from '../../../core/nav-model';
         height: 19px;
       }
       .mtb__back:hover {
-        color: #fff;
+        color: var(--tech-text);
       }
       .mtb__back:active {
         opacity: 0.7;
       }
       .mtb__back:focus-visible {
-        outline: 2px solid var(--focus, #3d8bff);
+        outline: 2px solid var(--tech-accent);
         outline-offset: 2px;
       }
       /* Reserve the back button's footprint on tab roots so the brand never shifts horizontally. */
@@ -245,16 +245,16 @@ import { bottomTabs } from '../../../core/nav-model';
         filter: drop-shadow(0 0 6px rgba(61, 139, 255, 0.4));
       }
       .mtb__beta {
-        font-family: var(--font-ui, "Plus Jakarta Sans", system-ui, sans-serif);
+        font-family: var(--tech-font-ui);
         font-size: 10.5px;
         font-weight: 700;
         letter-spacing: 0.14em;
         line-height: 1;
         padding: 2px 6px;
         border-radius: var(--r-pill, 999px);
-        color: var(--accent-b, #3fd8d0);
-        border: 1px solid color-mix(in srgb, var(--accent-b, #3fd8d0) 35%, transparent);
-        background: color-mix(in srgb, var(--accent-b, #3fd8d0) 10%, transparent);
+        color: var(--tech-accent);
+        border: 1px solid color-mix(in srgb, var(--tech-accent) 35%, transparent);
+        background: color-mix(in srgb, var(--tech-accent) 12%, transparent);
       }
 
       .mtb__spacer {
@@ -287,7 +287,7 @@ import { bottomTabs } from '../../../core/nav-model';
         opacity: 0.8;
       }
       .mtb__avatar-btn:focus-visible {
-        outline: 2px solid var(--focus, #3d8bff);
+        outline: 2px solid var(--tech-accent);
         outline-offset: 2px;
       }
       .mtb__avatar {
@@ -300,12 +300,12 @@ import { bottomTabs } from '../../../core/nav-model';
         justify-content: center;
       }
       .mtb__avatar--init {
-        font-family: var(--font-ui, "Plus Jakarta Sans", system-ui, sans-serif);
+        font-family: var(--tech-font-ui);
         font-size: 12px;
         font-weight: 700;
         letter-spacing: 0.02em;
-        color: #fff;
-        background: linear-gradient(135deg, var(--accent-a, #3d8bff), var(--accent-b, #8b7cff));
+        color: var(--tech-text-on-accent);
+        background: linear-gradient(135deg, var(--tech-accent), var(--tech-accent-2));
       }
 
       /* Reduced-motion: collapse the transitions (decorative only). */

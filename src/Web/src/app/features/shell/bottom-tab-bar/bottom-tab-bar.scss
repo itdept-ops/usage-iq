@@ -7,10 +7,9 @@
 
 :host {
   @include kit.beta-host;
-  // The bar's own accent (drives the active tab's ink + indicator). The flagship
-  // violet→blue reads well on the dark glass and matches the Atrium home surface.
-  --accent-a: #7c5cff;
-  --accent-b: #3b82f6;
+  // The bar's accent (active tab ink/indicator + the Snap FAB) tracks the active FiMobile color scheme.
+  --accent-a: var(--tech-accent);
+  --accent-b: var(--tech-accent-2);
 
   // The bar is FIXED chrome, not a page body — undo beta-host's block-fill box so
   // it only occupies its own footprint and floats above the routed content.
@@ -37,6 +36,9 @@
   backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
   border-top: 1px solid var(--glass-edge);
+  // FiMobile footer signature: rounded top corners floating over the page.
+  border-top-left-radius: var(--tech-radius, 15px);
+  border-top-right-radius: var(--tech-radius, 15px);
   box-shadow: var(--lift-3);
 }
 

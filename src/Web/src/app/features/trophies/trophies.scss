@@ -4,8 +4,8 @@
 .trophies {
   --t-bronze: #c2774a;
   --t-silver: #9aa5b1;
-  --t-gold: #e0b341;
-  --t-complete: #6f57d6;
+  --t-gold: var(--tech-warn, #e0b341);
+  --t-complete: var(--tech-accent-2, #6f57d6);
 
   max-width: 1100px;
   margin: 0 auto;
@@ -42,7 +42,7 @@
   gap: 8px;
   padding: 8px 14px;
   border: 1px solid var(--tech-border);
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   background: var(--tech-panel);
   color: var(--tech-text);
   font-size: var(--tech-fs-body);
@@ -120,13 +120,13 @@
   color: var(--tech-text-tertiary);
   font-size: var(--tech-fs-small, 12px);
 }
-.badge__bar { margin-top: 8px; border-radius: 999px; overflow: hidden; }
+.badge__bar { margin-top: 8px; border-radius: var(--tech-r-pill, 999px); overflow: hidden; }
 
 .badge__tiers { display: flex; gap: 6px; margin-top: 8px; }
 .badge__tier {
   width: 18px;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--tech-r-pill, 999px);
   background: var(--tech-border);
 }
 .badge__tier--earned[data-tier='bronze'] { background: var(--t-bronze); }

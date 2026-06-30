@@ -75,28 +75,28 @@ $accents: (
 // to the --accent-a/--accent-b PER-PAGE CONTRACT, with the named map above for
 // reuse).
 @mixin beta-host {
-  // Dark-only (matches the rest of Usage IQ). Declaring the scheme makes the browser render dark UA
-  // chrome (scrollbars, form controls, tap highlights) and stops a light-mode device from flipping to
-  // light. A real opt-in light theme is a separate, app-wide feature.
-  color-scheme: dark;
+  // Theme-aware: the FiMobile engine (styles.scss) drives light/dark + the 9 schemes globally via
+  // <html data-theme>/<html data-scheme>. We DON'T pin color-scheme here (it's an inherited property),
+  // so the host follows the root, and we route the Strata surface/ink tokens to the global --tech-*
+  // tokens — this is what makes every mobile/beta page pick up light/dark + the scheme for free.
 
-  // ---- DARK (default) ----
-  --bg-base: #0d0e16;
-  --bg-rise: #15172a;
-  --bg-sink: #0a0b12;
-  --glass: rgba(26, 29, 52, .62);
-  --glass-edge: rgba(255, 255, 255, .10);
-  --hairline: rgba(255, 255, 255, .07);
-  --ink: #f3f4ff;
-  --ink-dim: #a4a7c6;
-  --ink-faint: #6d7194;
+  // ---- SURFACES + INK (routed to the global FiMobile palette) ----
+  --bg-base: var(--tech-bg, #0d0e16);
+  --bg-rise: var(--tech-panel, #15172a);
+  --bg-sink: var(--tech-bg-sunken, #0a0b12);
+  --glass: var(--tech-glass-popover, rgba(26, 29, 52, .62));
+  --glass-edge: var(--tech-glass-inset-hi, rgba(255, 255, 255, .10));
+  --hairline: var(--tech-border-subtle, rgba(255, 255, 255, .07));
+  --ink: var(--tech-text, #f3f4ff);
+  --ink-dim: var(--tech-text-secondary, #a4a7c6);
+  --ink-faint: var(--tech-text-tertiary, #6d7194);
 
   // ---- THE PER-PAGE ACCENT CONTRACT ----
   // A page OVERRIDES these two on its own :host to get its signature color. The kit
   // components read --accent-a/--accent-b for every gradient / dot / fill. Default is
   // the flagship calorie violet→blue so an un-themed page still looks intentional.
-  --accent-a: #7c5cff;
-  --accent-b: #3b82f6;
+  --accent-a: var(--tech-accent, #7c5cff);
+  --accent-b: var(--tech-accent-2, #3b82f6);
 
   // Readable INK for text/icons sitting ON the accent gradient. WHITE fails WCAG AA on
   // several of the lighter accent stops (amber/tan/sky); a near-black ink clears 4.5:1 on
@@ -115,26 +115,26 @@ $accents: (
 
   // Status hues (shared, not per-page): success green + over-goal warm amber (never red),
   // plus a focus ring that resolves to the page accent so the ring matches the brand.
-  --signal: #34d399;            // goal-hit / success green
-  --warn: #f0a35a;              // GRAFT(Daylight): over-goal / destructive = warm AMBER, never red
+  --signal: var(--tech-success, #34d399);   // goal-hit / success green (theme-aware)
+  --warn: var(--tech-warn, #f0a35a);         // over-goal / warm warn (theme-aware)
   --focus: var(--accent-a);     // visible focus ring tracks the page accent (>=3:1 on bg-base)
 
-  // ---- TYPE ----
-  --font-display: "Clash Display", system-ui, sans-serif;  // numerals only
-  --font-ui: "Plus Jakarta Sans", system-ui, sans-serif;   // labels / body
+  // ---- TYPE (unified with the app — Nunito display + Inter UI) ----
+  --font-display: var(--tech-font-display);
+  --font-ui: var(--tech-font-ui);
 
-  // ---- RADII ----
-  --r-glass: 28px;
-  --r-card: 24px;
-  --r-tile: 18px;
+  // ---- RADII (card/tile aligned to the FiMobile scale; pill stays fully round) ----
+  --r-glass: 22px;
+  --r-card: var(--tech-r-panel, 24px);
+  --r-tile: var(--tech-r-control, 18px);
   --r-ring: 32px;
   --r-pill: 999px;
 
-  // ---- ELEVATION (the depth system) ----
-  --lift-1: 0 2px 8px rgba(4, 6, 20, .35);                                        // sediment resting
-  --lift-2: 0 8px 24px rgba(4, 6, 20, .45), inset 0 1px 0 var(--glass-edge);      // raised card
-  --lift-3: 0 16px 48px rgba(4, 6, 20, .55), inset 0 1px 0 var(--glass-edge);     // floating glass
-  --press: inset 0 2px 8px rgba(4, 6, 20, .5);                                    // depressed well
+  // ---- ELEVATION (routed to the theme-aware app shadow recipes) ----
+  --lift-1: var(--tech-shadow-panel);
+  --lift-2: var(--tech-shadow-raised);
+  --lift-3: var(--tech-shadow-popover);
+  --press: inset 0 2px 8px rgba(0, 0, 0, .35);                                    // depressed well
 
   // ---- MOTION / EASING ----
   --ease-out: cubic-bezier(.22, 1, .36, 1);

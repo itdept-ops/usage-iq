@@ -91,7 +91,7 @@
 // A floating accent glyph badge in the header's top-right.
 .hh__glyph {
   flex: 0 0 auto; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 15px;
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #2a0a00;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--tech-text-on-accent, #2a0a00);
   box-shadow: 0 10px 26px color-mix(in srgb, var(--accent-a) 42%, transparent), inset 0 1px 0 rgba(255,255,255,.25);
 }
 .hh__glyph mat-icon { font-size: 26px; width: 26px; height: 26px; }

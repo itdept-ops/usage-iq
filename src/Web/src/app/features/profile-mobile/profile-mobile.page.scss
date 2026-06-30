@@ -21,7 +21,7 @@
   --accent-b: #a855f7;             // signature violet (end)
 
   // A faint indigo wash behind the whole column (still within the kit's dark contract).
-  background: radial-gradient(120% 80% at 50% -8%, #15132a 0%, var(--bg-base) 58%);
+  background: radial-gradient(120% 80% at 50% -8%, var(--tech-panel, #15132a) 0%, var(--bg-base) 58%);
 
   height: 100%; // fill the immersive shell frame; the pull-refresh owns the scroll
 }

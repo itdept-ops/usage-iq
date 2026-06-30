@@ -248,7 +248,7 @@ a.tile:focus-visible {
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--tech-radius, 12px);
   background: linear-gradient(135deg, rgba(61, 139, 255, 0.16), rgba(63, 216, 208, 0.16));
   mat-icon { color: var(--tech-accent-cyan); width: 22px; height: 22px; font-size: 22px; }
 }
@@ -1231,7 +1231,7 @@ a.tile:focus-visible {
   display: grid;
   place-items: center;
   width: 44px; height: 44px;
-  border-radius: 12px;
+  border-radius: var(--tech-radius, 12px);
   background: linear-gradient(135deg, rgba(61, 139, 255, 0.16), rgba(63, 216, 208, 0.16));
   mat-icon { color: var(--tech-accent-cyan); width: 22px; height: 22px; font-size: 22px; }
 }

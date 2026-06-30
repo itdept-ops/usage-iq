@@ -158,12 +158,12 @@
   background: var(--tech-panel-2, var(--tech-panel));
 
   &--done {
-    border-color: color-mix(in srgb, var(--tech-ok, #16a34a) 45%, var(--tech-border));
-    background: color-mix(in srgb, var(--tech-ok, #16a34a) 8%, var(--tech-panel));
+    border-color: color-mix(in srgb, var(--tech-success, #16a34a) 45%, var(--tech-border));
+    background: color-mix(in srgb, var(--tech-success, #16a34a) 8%, var(--tech-panel));
   }
 
   &--error {
-    border-color: color-mix(in srgb, var(--tech-danger, #dc2626) 45%, var(--tech-border));
+    border-color: color-mix(in srgb, var(--tech-error, #dc2626) 45%, var(--tech-border));
   }
 }
 
@@ -206,7 +206,7 @@
   font-weight: 600;
 
   &--done {
-    color: var(--tech-ok, #16a34a);
+    color: var(--tech-success, #16a34a);
     mat-icon { width: 18px; height: 18px; font-size: 18px; }
   }
 }
@@ -214,5 +214,5 @@
 .action-card__err {
   flex: 1 1 100%;
   font-size: var(--tech-fs-label);
-  color: var(--tech-danger, #dc2626);
+  color: var(--tech-error, #dc2626);
 }

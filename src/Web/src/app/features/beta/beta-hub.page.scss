@@ -269,7 +269,7 @@
 .bh-act--icon mat-icon { font-size: 21px; width: 21px; height: 21px; }
 .bh-act--primary {
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  border-color: transparent; color: #fff;
+  border-color: transparent; color: var(--tech-text-on-accent, #fff);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-a) 32%, transparent);
 }
 .bh-act--ghost { background: transparent; color: var(--ink-dim); }

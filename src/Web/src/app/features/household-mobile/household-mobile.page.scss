@@ -137,7 +137,7 @@
   border: none;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   box-shadow: var(--lift-2);
   cursor: pointer;
   transition: transform .16s var(--ease-out), opacity .16s var(--ease-out);
@@ -195,7 +195,7 @@
 
   &.is-owner {
     background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-    color: #fff;
+    color: var(--tech-text-on-accent, #fff);
     box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent-a) 40%, transparent);
   }
 }
@@ -325,7 +325,7 @@
   border: none;
   border-radius: var(--r-pill, 999px);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   font: inherit;
   font-weight: 700;
   box-shadow: var(--lift-2);
@@ -362,7 +362,7 @@
   height: 46px;
   border-radius: 14px;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   box-shadow: var(--lift-1);
   mat-icon { width: 24px; height: 24px; font-size: 24px; line-height: 24px; }
 }
@@ -435,7 +435,7 @@
   height: 26px;
   border-radius: 50%;
   border: 2px solid var(--hairline);
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   transition: background .16s var(--ease-out), border-color .16s var(--ease-out);
 
   &.is-on {
@@ -501,7 +501,7 @@
 
 .hm__btn--add {
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   box-shadow: var(--lift-2);
 }
 
@@ -514,8 +514,8 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2px solid color-mix(in oklab, #fff 55%, transparent);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in oklab, var(--tech-text-on-accent, #fff) 55%, transparent);
+  border-top-color: var(--tech-text-on-accent, #fff);
   animation: hh-spin .7s linear infinite;
 }
 

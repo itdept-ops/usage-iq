@@ -289,7 +289,7 @@
   display: inline-flex; align-items: center; gap: 6px;
   margin-top: 6px; padding: 11px 20px; border-radius: var(--r-pill, 999px);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; border: 0;
+  color: var(--tech-text-on-accent, #fff); border: 0;
   font-family: var(--font-ui); font-size: 14px; font-weight: 800;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
   box-shadow: var(--lift-2);
@@ -425,13 +425,13 @@
 }
 .if__btn--save {
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; box-shadow: var(--lift-2);
+  color: var(--tech-text-on-accent, #fff); box-shadow: var(--lift-2);
 }
 
 .if__spin {
   width: 16px; height: 16px; border-radius: 50%;
-  border: 2px solid color-mix(in srgb, #fff 50%, transparent);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, var(--tech-text-on-accent, #fff) 50%, transparent);
+  border-top-color: var(--tech-text-on-accent, #fff);
   animation: if-spin 700ms linear infinite;
 }
 @keyframes if-spin { to { transform: rotate(360deg); } }

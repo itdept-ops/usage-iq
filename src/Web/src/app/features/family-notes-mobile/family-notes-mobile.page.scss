@@ -190,7 +190,7 @@
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; border-radius: 50%;
   font-size: 10px; font-weight: 800; letter-spacing: .02em;
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   &--sm { width: 20px; height: 20px; font-size: 9.5px; }
 }
@@ -287,7 +287,7 @@
   &:active { transform: scale(.97); }
   &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   &:disabled { opacity: .5; pointer-events: none; }
-  &--del { color: var(--warn, #e11d48); border-color: color-mix(in srgb, var(--warn, #e11d48) 40%, var(--glass-edge)); }
+  &--del { color: var(--tech-error, #e11d48); border-color: color-mix(in srgb, var(--tech-error, #e11d48) 40%, var(--glass-edge)); }
   mat-icon { width: 18px; height: 18px; font-size: 18px; line-height: 18px; }
 }
 .nd__shared-note {
@@ -307,7 +307,7 @@
 .nd__switch-knob {
   position: absolute; top: 3px; left: 3px;
   width: 20px; height: 20px; border-radius: 50%;
-  background: #fff; box-shadow: var(--lift-1);
+  background: var(--tech-text-on-accent, #fff); box-shadow: var(--lift-1);
   transition: transform 160ms var(--ease-spring, var(--ease-out));
   .nd__switch.is-on & { transform: translateX(18px); }
 }
@@ -361,7 +361,7 @@
   align-self: flex-start; min-height: 40px; padding: 0 16px;
   border: none; border-radius: var(--r-pill);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; font-family: var(--font-ui); font-size: 13.5px; font-weight: 700;
+  color: var(--tech-text-on-accent, #fff); font-family: var(--font-ui); font-size: 13.5px; font-weight: 700;
   cursor: pointer; box-shadow: var(--lift-1); -webkit-tap-highlight-color: transparent;
   transition: transform 120ms var(--ease-out);
   &:active { transform: scale(.96); }
@@ -399,7 +399,7 @@
 }
 .nf__btn--ghost { border: 1px solid var(--glass-edge); background: var(--glass); color: var(--ink-dim); }
 .nf__btn--save {
-  border: none; color: #fff;
+  border: none; color: var(--tech-text-on-accent, #fff);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   box-shadow: var(--lift-2);
 }
@@ -407,8 +407,8 @@
 // small inline spinner for AI / Save buttons
 .nf__spin {
   width: 15px; height: 15px; border-radius: 50%;
-  border: 2px solid color-mix(in srgb, #fff 45%, transparent);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, var(--tech-text-on-accent, #fff) 45%, transparent);
+  border-top-color: var(--tech-text-on-accent, #fff);
   animation: nt-spin .7s linear infinite;
 }
 @keyframes nt-spin { to { transform: rotate(360deg); } }

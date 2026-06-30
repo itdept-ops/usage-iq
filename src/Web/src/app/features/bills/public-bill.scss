@@ -20,14 +20,14 @@
   h1 { margin: 0; font-size: clamp(18px, 5vw, 24px); font-weight: 700; letter-spacing: -0.02em;
     overflow-wrap: anywhere; }
   .pb-scope { font-size: 12px; color: var(--tech-text-tertiary, #8b97a8); }
-  .pb-settled { color: #6ee7a8; font-weight: 700; }
+  .pb-settled { color: var(--tech-success, #6ee7a8); font-weight: 700; }
 }
 
 .pb-note { display: flex; align-items: center; gap: 8px; border-radius: var(--tech-r-panel, 12px);
   padding: 12px 14px; margin-bottom: 18px; font-size: .9rem;
   mat-icon { font-size: 20px; height: 20px; width: 20px; flex: none; }
-  &--settled { background: rgba(110,231,168,.1); border: 1px solid rgba(110,231,168,.3); color: #aef0c8;
-    mat-icon { color: #6ee7a8; } } }
+  &--settled { background: rgba(110,231,168,.1); border: 1px solid rgba(110,231,168,.3); color: var(--tech-success-soft, #aef0c8);
+    mat-icon { color: var(--tech-success, #6ee7a8); } } }
 
 .pb-name { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px;
   label { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--tech-text-tertiary, #8b97a8); }
@@ -54,16 +54,16 @@
   color: var(--tech-text-secondary, #aab4c2); padding: 4px 10px; border-radius: 999px;
   background: var(--tech-panel-2, rgba(255,255,255,.05));
   mat-icon { font-size: 14px; height: 14px; width: 14px; }
-  &--paid { color: #6ee7a8; background: rgba(110,231,168,.12); }
+  &--paid { color: var(--tech-success, #6ee7a8); background: rgba(110,231,168,.12); }
   &--open { color: var(--tech-accent, #3fd8d0); background: transparent; border: 1px solid var(--tech-border); }
   &--taken { color: var(--tech-text-tertiary, #8b97a8); } }
 
 .pb-mine { margin-top: 18px; border: 1px solid var(--tech-accent, #3fd8d0); border-radius: var(--tech-r-panel, 12px);
-  background: rgba(63,216,208,.06); padding: 14px 16px; }
+  background: color-mix(in srgb, var(--tech-accent, #3fd8d0) 6%, transparent); padding: 14px 16px; }
 .pb-mine__row { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0;
   span:last-child { font-family: var(--tech-font-mono); }
   &--sub { color: var(--tech-text-secondary, #aab4c2); font-size: .88rem; }
-  &--total { margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(63,216,208,.3);
+  &--total { margin-top: 6px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--tech-accent, #3fd8d0) 30%, transparent);
     font-weight: 700; font-size: 1.1rem;
     span:last-child { color: var(--tech-accent, #3fd8d0); } } }
 

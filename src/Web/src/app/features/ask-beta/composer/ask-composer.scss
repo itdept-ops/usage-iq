@@ -119,14 +119,14 @@
 // While dictating: accent-filled + a soft glow halo.
 .cmp__mic--on {
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-a) 26%, transparent);
   animation: cmp-mic-glow 1.4s ease-in-out infinite;
 }
 
 .cmp__send {
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff;
+  color: var(--tech-text-on-accent, #fff);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-b) 38%, transparent);
 
   &:disabled {
@@ -140,8 +140,8 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2.5px solid rgba(255, 255, 255, .35);
-  border-top-color: #fff;
+  border: 2.5px solid color-mix(in srgb, var(--tech-text-on-accent, #fff) 35%, transparent);
+  border-top-color: var(--tech-text-on-accent, #fff);
   animation: cmp-spin .7s linear infinite;
 }
 

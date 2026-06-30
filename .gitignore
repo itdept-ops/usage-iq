@@ -40,3 +40,6 @@ TestResults/
 # Reporter ingest key saved by Run-UsageIqReporter.ps1 — secret, never commit
 reporter.key
 *.key
+
+# Themeforest source template (design reference only — not part of the app)
+ThemeforestMobileTemplate/

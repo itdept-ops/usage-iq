@@ -29,12 +29,12 @@
   box-shadow: var(--lift-1);
 }
 .cr__mono {
-  font-size: 18px; font-weight: 800; letter-spacing: .01em; color: #fff;
+  font-size: 18px; font-weight: 800; letter-spacing: .01em; color: var(--tech-text-on-accent, #fff);
   background: linear-gradient(135deg,
     hsl(var(--h, 220) 70% 56%), hsl(calc(var(--h, 220) + 36) 72% 48%));
 }
 .cr__hash {
-  font-size: 22px; font-weight: 800; color: #fff;
+  font-size: 22px; font-weight: 800; color: var(--tech-text-on-accent, #fff);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
 }
 .cr__dot {
@@ -70,7 +70,7 @@
   display: inline-grid; place-items: center;
   border-radius: var(--r-pill);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
+  color: var(--tech-text-on-accent, #fff); font-size: 11px; font-weight: 800; line-height: 1;
   box-shadow: var(--lift-1);
 }
 

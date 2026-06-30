@@ -4,6 +4,7 @@
 // Learn more about theming and how to use it for your application's
 // custom components at https://material.angular.dev/guide/theming
 @use '@angular/material' as mat;
+@use 'sass:map';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Self-hosted web fonts — Inter, JetBrains Mono, Material Icons.
@@ -28,6 +29,15 @@
   font-weight: 400 800;
   font-display: swap;
   src: url('/fonts/jetbrains-mono.woff2') format('woff2');
+}
+/* Nunito — the FiMobile template's heading face (rounded, friendly). Self-hosted (latin variable
+   400–800) alongside Inter so headings carry the template's character OFFLINE; degrades to Inter. */
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/nunito.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Material Icons';
@@ -407,6 +417,305 @@ iframe[src*="accounts.google.com"] { color-scheme: normal !important; }
 }
 
 /* =========================================================================
+   FIMOBILE THEME ENGINE  (ported from the Themeforest "FiMobile V2" template)
+   This layer REDEFINES the --tech-* + --mat-sys-* tokens (and adds the
+   --fimobile-* base scalars) so the whole app speaks the FiMobile design
+   language. It sits AFTER the legacy AXON token blocks and uses higher-
+   specificity [data-theme]/[data-scheme] selectors, so it wins the cascade
+   app-wide (the legacy values above survive only as a no-data-theme fallback).
+
+   Two axes, both driven by ThemeService + the index.html no-flash bootstrap:
+     • light / dark        → <html data-theme="light|dark">
+     • 9 color schemes     → <html data-scheme="indigo|purple|pink|red|orange|
+                              yellow|green|teal|cyan">   (absent = default blue)
+   Surfaces track light/dark; the ACCENT (+ hero gradient, glow, focus ring,
+   chart primary, Material primary) tracks the active scheme. Glows are built
+   with color-mix(var(--tech-accent)) so they follow the scheme automatically.
+   ========================================================================= */
+:root {
+  /* FiMobile base scalars */
+  --fimobile-rounded: 15px;
+  --fimobile-input-rounded: 10px;
+  --fimobile-padding: 15px;
+
+  /* Type — Nunito display headings + Inter UI body (FiMobile = Nunito + Open Sans) */
+  --tech-font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --tech-font-display: 'Nunito', 'Inter', system-ui, -apple-system, sans-serif;
+  --tech-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+  --tech-mono: var(--tech-font-mono);
+
+  /* Radii — FiMobile scale (15px cards / 10px controls / 30px pills) */
+  --tech-radius: var(--fimobile-rounded);
+  --tech-r-panel: var(--fimobile-rounded);
+  --tech-r-control: 10px;
+  --tech-r-chip: 8px;
+  --tech-r-pill: 30px;
+
+  /* Default-scheme (blue) hero gradient — FiMobile :root grad stops */
+  --tech-gradient-accent: linear-gradient(135deg, #57bdff 0%, #4f77fb 52%, #6528cf 100%);
+}
+@media screen and (max-width: 340px) {
+  :root { --fimobile-rounded: 12px; --fimobile-padding: 10px; }
+}
+
+/* ---- DARK palette (default) ---- */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --tech-bg-void: #03070f;
+  --tech-bg: #071124;
+  --tech-bg-base: #071124;
+  --tech-bg-sunken: #050d1c;
+  --tech-panel: #0e1c38;
+  --tech-panel-raised: #16294a;
+  --tech-input: rgba(255, 255, 255, 0.045);
+
+  --tech-glass-chrome: rgba(7, 17, 36, 0.78);
+  --tech-glass-popover: rgba(14, 28, 56, 0.9);
+  --tech-glass-scrim: rgba(2, 7, 15, 0.66);
+  --tech-glass-inset-hi: rgba(255, 255, 255, 0.06);
+
+  --tech-border-subtle: rgba(255, 255, 255, 0.07);
+  --tech-border: rgba(255, 255, 255, 0.12);
+  --tech-border-strong: rgba(127, 165, 255, 0.4);
+  --tech-border-neon: linear-gradient(100deg, #5b8cff 0%, #9b7bff 52%, #57bdff 100%);
+
+  --tech-accent: #5b8cff;
+  --tech-accent-bright: #82a8ff;
+  --tech-accent-2: #9b7bff;
+  --tech-accent-2-bright: #b6a0ff;
+  --tech-accent-cyan: #57bdff;
+  --tech-accent-magenta: #f472b6;
+
+  --tech-vendor-claude: #5b8cff;
+  --tech-vendor-codex: #9b7bff;
+
+  --tech-success: #34d399;
+  --tech-success-tint: rgba(52, 211, 153, 0.14);
+  --tech-warn: #ffc24d;
+  --tech-warn-tint: rgba(255, 189, 23, 0.16);
+  --tech-error: #ff5b78;
+  --tech-error-tint: rgba(247, 53, 99, 0.16);
+  --tech-badge-alert: #f0335c;
+  --tech-badge-alert-on: #ffffff;
+  --tech-info: #2ec5d3;
+  --tech-info-tint: rgba(10, 178, 190, 0.16);
+
+  --tech-text: #e9eefb;
+  --tech-text-secondary: #9fb0cc;
+  --tech-text-tertiary: #7d8ea8;
+  --tech-text-accent: #93b4ff;
+  --tech-text-on-accent: #04122e;
+
+  --tech-shadow-panel: 0 3px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --tech-shadow-raised: 0 16px 40px -14px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--tech-border);
+  --tech-shadow-popover: 0 24px 60px -20px rgba(0, 0, 0, 0.72);
+
+  --tech-glow: 0 0 0 1px color-mix(in srgb, var(--tech-accent) 55%, transparent), 0 0 18px -2px color-mix(in srgb, var(--tech-accent) 38%, transparent);
+  --tech-glow-blue: var(--tech-glow);
+  --tech-glow-violet: 0 0 0 1px rgba(155, 123, 255, 0.5), 0 0 18px -2px rgba(155, 123, 255, 0.35);
+  --tech-glow-cyan: 0 0 0 1px rgba(87, 189, 255, 0.5), 0 0 18px -2px rgba(87, 189, 255, 0.35);
+  --tech-glow-success: 0 0 0 1px rgba(52, 211, 153, 0.45), 0 0 16px -4px rgba(52, 211, 153, 0.4);
+  --tech-glow-error: 0 0 0 1px rgba(255, 91, 120, 0.45), 0 0 16px -4px rgba(255, 91, 120, 0.4);
+
+  --tech-focus-ring: 0 0 0 2px var(--tech-bg), 0 0 0 4px color-mix(in srgb, var(--tech-accent) 58%, transparent);
+  --tech-text-glow: 0 0 16px color-mix(in srgb, var(--tech-accent) 22%, transparent);
+
+  --tech-bg-overlay: rgba(0, 0, 0, 0.55);
+  --tech-text-on-overlay: #ffffff;
+
+  /* Material 3 — dark */
+  --mat-sys-background: #071124;
+  --mat-sys-surface: #0e1c38;
+  --mat-sys-surface-dim: #050d1c;
+  --mat-sys-surface-bright: #16294a;
+  --mat-sys-surface-container-lowest: #03070f;
+  --mat-sys-surface-container-low: #0b1830;
+  --mat-sys-surface-container: #0e1c38;
+  --mat-sys-surface-container-high: #16294a;
+  --mat-sys-surface-container-highest: #1d3157;
+  --mat-sys-surface-variant: #16294a;
+  --mat-sys-inverse-surface: #e9eefb;
+  --mat-sys-inverse-on-surface: #071124;
+
+  --mat-sys-primary: var(--tech-accent);
+  --mat-sys-on-primary: #04122e;
+  --mat-sys-primary-container: #15264a;
+  --mat-sys-on-primary-container: #cfe0ff;
+  --mat-sys-inverse-primary: #2a4fd6;
+  --mat-sys-secondary: var(--tech-accent-2);
+  --mat-sys-on-secondary: #0a0726;
+  --mat-sys-secondary-container: #241f4a;
+  --mat-sys-on-secondary-container: #e2dbff;
+  --mat-sys-tertiary: var(--tech-accent-cyan);
+  --mat-sys-on-tertiary: #04121a;
+  --mat-sys-tertiary-container: #0c3340;
+  --mat-sys-on-tertiary-container: #c6f1f8;
+
+  --mat-sys-error: var(--tech-error);
+  --mat-sys-on-error: #2a0008;
+  --mat-sys-error-container: #3a1320;
+  --mat-sys-on-error-container: #ffd9df;
+
+  --mat-sys-on-background: var(--tech-text);
+  --mat-sys-on-surface: var(--tech-text);
+  --mat-sys-on-surface-variant: var(--tech-text-secondary);
+
+  --mat-sys-outline: var(--tech-border);
+  --mat-sys-outline-variant: var(--tech-border-subtle);
+
+  --mat-sys-corner-extra-small: 6px;
+  --mat-sys-corner-small: 8px;
+  --mat-sys-corner-medium: 10px;
+  --mat-sys-corner-large: 15px;
+
+  --mat-sys-scrim: #03070f;
+}
+
+/* ---- LIGHT palette ---- */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --tech-bg-void: #e6ecf7;
+  --tech-bg: #f1f3f8;
+  --tech-bg-base: #f1f3f8;
+  --tech-bg-sunken: #e9eef7;
+  --tech-panel: #ffffff;
+  --tech-panel-raised: #ffffff;
+  --tech-input: #ffffff;
+
+  --tech-glass-chrome: rgba(255, 255, 255, 0.82);
+  --tech-glass-popover: rgba(255, 255, 255, 0.94);
+  --tech-glass-scrim: rgba(9, 24, 64, 0.34);
+  --tech-glass-inset-hi: rgba(255, 255, 255, 0.8);
+
+  --tech-border-subtle: rgba(9, 24, 64, 0.07);
+  --tech-border: #dadff6;
+  --tech-border-strong: #b7c2e6;
+  --tech-border-neon: linear-gradient(100deg, #2a4fd6 0%, #6f42c1 52%, #0aa6bf 100%);
+
+  --tech-accent: #2a4fd6;
+  --tech-accent-bright: #1d3fc0;
+  --tech-accent-2: #6f42c1;
+  --tech-accent-2-bright: #5a35b0;
+  --tech-accent-cyan: #0aa6bf;
+  --tech-accent-magenta: #c026a0;
+
+  --tech-vendor-claude: #2a4fd6;
+  --tech-vendor-codex: #6f42c1;
+
+  --tech-success: #0b7d3f;
+  --tech-success-tint: rgba(11, 125, 63, 0.12);
+  --tech-warn: #8a5a00;
+  --tech-warn-tint: rgba(138, 90, 0, 0.12);
+  --tech-error: #d11f3a;
+  --tech-error-tint: rgba(209, 31, 58, 0.12);
+  --tech-badge-alert: #d11f3a;
+  --tech-badge-alert-on: #ffffff;
+  --tech-info: #0a6f88;
+  --tech-info-tint: rgba(10, 111, 136, 0.12);
+
+  --tech-text: #0e1830;
+  --tech-text-secondary: #4a5a76;
+  --tech-text-tertiary: #66748f;
+  --tech-text-accent: #1c34a6;
+  --tech-text-on-accent: #ffffff;
+
+  --tech-shadow-panel: 0 3px 10px rgba(20, 40, 90, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --tech-shadow-raised: 0 14px 34px -16px rgba(20, 40, 90, 0.22), 0 0 0 1px var(--tech-border);
+  --tech-shadow-popover: 0 24px 56px -22px rgba(20, 40, 90, 0.28);
+
+  --tech-glow: 0 0 0 1px color-mix(in srgb, var(--tech-accent) 42%, transparent), 0 0 16px -4px color-mix(in srgb, var(--tech-accent) 28%, transparent);
+  --tech-glow-blue: var(--tech-glow);
+  --tech-glow-violet: 0 0 0 1px rgba(111, 66, 193, 0.4), 0 0 16px -4px rgba(111, 66, 193, 0.28);
+  --tech-glow-cyan: 0 0 0 1px rgba(10, 166, 191, 0.4), 0 0 16px -4px rgba(10, 166, 191, 0.28);
+  --tech-glow-success: 0 0 0 1px rgba(11, 125, 63, 0.4), 0 0 14px -4px rgba(11, 125, 63, 0.3);
+  --tech-glow-error: 0 0 0 1px rgba(209, 31, 58, 0.4), 0 0 14px -4px rgba(209, 31, 58, 0.3);
+
+  --tech-focus-ring: 0 0 0 2px var(--tech-bg), 0 0 0 4px color-mix(in srgb, var(--tech-accent) 50%, transparent);
+  --tech-text-glow: none;
+
+  /* Material 3 — light */
+  --mat-sys-background: #f1f3f8;
+  --mat-sys-surface: #ffffff;
+  --mat-sys-surface-dim: #e9eef7;
+  --mat-sys-surface-bright: #ffffff;
+  --mat-sys-surface-container-lowest: #ffffff;
+  --mat-sys-surface-container-low: #f5f7fc;
+  --mat-sys-surface-container: #eef2fa;
+  --mat-sys-surface-container-high: #e7ecf6;
+  --mat-sys-surface-container-highest: #dfe6f3;
+  --mat-sys-surface-variant: #eef2fa;
+  --mat-sys-inverse-surface: #0e1830;
+  --mat-sys-inverse-on-surface: #f1f3f8;
+
+  --mat-sys-primary: var(--tech-accent);
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #d3ddfd;
+  --mat-sys-on-primary-container: #0a2070;
+  --mat-sys-inverse-primary: #9fc0ff;
+  --mat-sys-secondary: var(--tech-accent-2);
+  --mat-sys-on-secondary: #ffffff;
+  --mat-sys-secondary-container: #e7e0ff;
+  --mat-sys-on-secondary-container: #2a1c63;
+  --mat-sys-tertiary: #0aa6bf;
+  --mat-sys-on-tertiary: #ffffff;
+  --mat-sys-tertiary-container: #cdeeee;
+  --mat-sys-on-tertiary-container: #06363d;
+
+  --mat-sys-error: #d11f3a;
+  --mat-sys-on-error: #ffffff;
+  --mat-sys-error-container: #ffdadd;
+  --mat-sys-on-error-container: #5a0a13;
+
+  --mat-sys-on-background: #0e1830;
+  --mat-sys-on-surface: #0e1830;
+  --mat-sys-on-surface-variant: #4a5a76;
+
+  --mat-sys-outline: #dadff6;
+  --mat-sys-outline-variant: rgba(9, 24, 64, 0.08);
+
+  --mat-sys-scrim: #0a1430;
+}
+
+/* ---- 9 color schemes — accent axis (data-scheme). Absent = default blue. ----
+   Each scheme shifts only the accent family + hero gradient + Material primary;
+   surfaces stay neutral per light/dark. `l`=light accent, `d`=dark accent,
+   `tl`/`td`=AA-tuned text/link accent, `ink`/`dink`=text on the accent fill. */
+$fimobile-schemes: (
+  'indigo': (l: #6610f2, d: #8b5cf6, tl: #5312c4, td: #b69bff, ink: #ffffff, dink: #ffffff, g1: #0897e9, g2: #5100d4, g3: #270069),
+  'purple': (l: #6f42c1, d: #a07be6, tl: #5a35a4, td: #cdb6ff, ink: #ffffff, dink: #ffffff, g1: #e908d8, g2: #5a2ab3, g3: #300284),
+  'pink':   (l: #d63384, d: #f06aac, tl: #b3236b, td: #ffa8cd, ink: #ffffff, dink: #ffffff, g1: #f38ac4, g2: #d11e78, g3: #5a1138),
+  'red':    (l: #f73563, d: #ff6b86, tl: #cf1f44, td: #ffb0c0, ink: #ffffff, dink: #ffffff, g1: #ffc107, g2: #e91547, g3: #77001c),
+  'orange': (l: #fd7e14, d: #ff9d47, tl: #a85408, td: #ffc89a, ink: #3a1d00, dink: #2a1500, g1: #ffc107, g2: #ec6c02, g3: #c70042),
+  'yellow': (l: #ffbd17, d: #ffce4d, tl: #7e5600, td: #ffe08a, ink: #2a1d00, dink: #2a1d00, g1: #ffdb6f, g2: #f0ac00, g3: #f03000),
+  'green':  (l: #1fa97e, d: #2bd29c, tl: #0b6e4f, td: #86e8c8, ink: #ffffff, dink: #04231a, g1: #a9e682, g2: #1fbb8a, g3: #0072c3),
+  'teal':   (l: #0a96a1, d: #2bcdd9, tl: #067079, td: #9deaf1, ink: #ffffff, dink: #00232a, g1: #a2fffa, g2: #00a2ad, g3: #3f51b5),
+  'cyan':   (l: #0bb6d8, d: #34d4f0, tl: #076f86, td: #9fe9f8, ink: #ffffff, dink: #00242e, g1: #9df5dc, g2: #00b5da, g3: #673ab7),
+);
+
+@each $name, $s in $fimobile-schemes {
+  :root[data-scheme='#{$name}'] {
+    --tech-accent: #{map.get($s, l)};
+    --tech-accent-bright: #{map.get($s, tl)};
+    --tech-text-accent: #{map.get($s, tl)};
+    --tech-vendor-claude: #{map.get($s, l)};
+    --tech-gradient-accent: linear-gradient(135deg, #{map.get($s, g1)} 0%, #{map.get($s, g2)} 52%, #{map.get($s, g3)} 100%);
+    --mat-sys-primary: #{map.get($s, l)};
+    --mat-sys-on-primary: #{map.get($s, ink)};
+  }
+  :root[data-theme='dark'][data-scheme='#{$name}'] {
+    --tech-accent: #{map.get($s, d)};
+    --tech-accent-bright: #{map.get($s, td)};
+    --tech-text-accent: #{map.get($s, td)};
+    --tech-vendor-claude: #{map.get($s, d)};
+    --mat-sys-primary: #{map.get($s, d)};
+    --mat-sys-on-primary: #{map.get($s, dink)};
+  }
+}
+
+/* =========================================================================
    Base / canvas
    ========================================================================= */
 * {
@@ -475,9 +784,9 @@ body::before {
    Typography helpers
    ========================================================================= */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--tech-font-ui);
+  font-family: var(--tech-font-display);
   color: var(--tech-text);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.01em;
   margin: 0;
 }

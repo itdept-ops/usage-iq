@@ -31,8 +31,8 @@
     radial-gradient(120% 80% at 50% -12%, #2a2519 0%, var(--bg-base) 62%);
 
   // Status hues stay shared, but tuned to the warm surface: claimed = green, owed = amber (never red).
-  --signal: #6fdc9a;                // claimed / settled green
-  --warn: #f0a35a;                  // amount owed / unclaimed = warm amber, NEVER red
+  --signal: var(--tech-success, #6fdc9a);   // claimed / settled green (theme-aware)
+  --warn: var(--tech-warn, #f0a35a);        // amount owed / unclaimed = warm amber, NEVER red (theme-aware)
 
   --bar-bottom-h: 78px;
 

@@ -36,7 +36,7 @@
   background: var(--tech-panel-raised, #141a24);
   border: 1px solid var(--tech-border, #26303f);
   border-left: 3px solid var(--tech-border, #26303f);
-  border-radius: 10px;
+  border-radius: var(--tech-radius, 10px);
 }
 
 .w-card-head {

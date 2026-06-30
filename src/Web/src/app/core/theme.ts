@@ -6,8 +6,42 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 /** The actually-applied palette after resolving 'system'. */
 export type ResolvedTheme = 'light' | 'dark';
 
-/** localStorage key — MUST match the no-flash bootstrap in index.html. */
+/**
+ * The FiMobile color-scheme axis — orthogonal to light/dark. 'default' is the template's blue;
+ * the other nine recolor the accent family (links, buttons, active states, charts, hero gradient).
+ * Applied as `<html data-scheme="…">` (omitted for 'default'); the CSS lives in styles.scss.
+ */
+export type ColorScheme =
+  | 'default'
+  | 'indigo'
+  | 'purple'
+  | 'pink'
+  | 'red'
+  | 'orange'
+  | 'yellow'
+  | 'green'
+  | 'teal'
+  | 'cyan';
+
+/** Ordered list for pickers, each with the representative swatch hex (the light-mode accent). */
+export const COLOR_SCHEMES: ReadonlyArray<{ value: ColorScheme; label: string; swatch: string }> = [
+  { value: 'default', label: 'Blue', swatch: '#2a4fd6' },
+  { value: 'indigo', label: 'Indigo', swatch: '#6610f2' },
+  { value: 'purple', label: 'Purple', swatch: '#6f42c1' },
+  { value: 'pink', label: 'Pink', swatch: '#d63384' },
+  { value: 'red', label: 'Red', swatch: '#f73563' },
+  { value: 'orange', label: 'Orange', swatch: '#fd7e14' },
+  { value: 'yellow', label: 'Yellow', swatch: '#ffbd17' },
+  { value: 'green', label: 'Green', swatch: '#1fa97e' },
+  { value: 'teal', label: 'Teal', swatch: '#0a96a1' },
+  { value: 'cyan', label: 'Cyan', swatch: '#0bb6d8' },
+];
+
+const VALID_SCHEMES = new Set<ColorScheme>(COLOR_SCHEMES.map((s) => s.value));
+
+/** localStorage keys — MUST match the no-flash bootstrap in index.html. */
 const THEME_KEY = 'uiq.theme';
+const SCHEME_KEY = 'uiq.scheme';
 
 /**
  * Owns the app's light/dark theme at runtime.
@@ -27,6 +61,10 @@ export class ThemeService {
   private readonly _mode = signal<ThemeMode>(this.readMode());
   readonly mode = this._mode.asReadonly();
 
+  /** The user's chosen color scheme (FiMobile accent axis), seeded from localStorage. */
+  private readonly _scheme = signal<ColorScheme>(this.readScheme());
+  readonly scheme = this._scheme.asReadonly();
+
   /** The OS preference (only consulted when mode === 'system'), kept live by the matchMedia listener. */
   private readonly _systemDark = signal<boolean>(this.systemPrefersDark());
 
@@ -45,6 +83,18 @@ export class ThemeService {
       const resolved = this.resolved();
       if (typeof document !== 'undefined') {
         document.documentElement.dataset['theme'] = resolved;
+      }
+    });
+
+    // Apply the color scheme as <html data-scheme>; 'default' (blue) carries no attribute so the
+    // base palette in styles.scss applies. Mirrors the no-flash bootstrap in index.html (idempotent).
+    effect(() => {
+      const scheme = this._scheme();
+      if (typeof document === 'undefined') return;
+      if (scheme === 'default') {
+        delete document.documentElement.dataset['scheme'];
+      } else {
+        document.documentElement.dataset['scheme'] = scheme;
       }
     });
 
@@ -72,6 +122,16 @@ export class ThemeService {
     }
   }
 
+  /** Switch the active color scheme and persist it; the effect re-applies `data-scheme`. */
+  setScheme(scheme: ColorScheme): void {
+    this._scheme.set(scheme);
+    try {
+      localStorage.setItem(SCHEME_KEY, scheme);
+    } catch {
+      /* private mode / storage disabled — runtime still updates, just not persisted */
+    }
+  }
+
   private readMode(): ThemeMode {
     try {
       const v = localStorage.getItem(THEME_KEY);
@@ -80,6 +140,16 @@ export class ThemeService {
       /* ignore */
     }
     return 'system';
+  }
+
+  private readScheme(): ColorScheme {
+    try {
+      const v = localStorage.getItem(SCHEME_KEY) as ColorScheme | null;
+      if (v && VALID_SCHEMES.has(v)) return v;
+    } catch {
+      /* ignore */
+    }
+    return 'default';
   }
 
   private systemPrefersDark(): boolean {

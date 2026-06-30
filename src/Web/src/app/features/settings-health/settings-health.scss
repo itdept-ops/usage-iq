@@ -132,8 +132,8 @@
   }
   &__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--tech-space-2, 12px); }
   &__cell {
-    border: 1px solid var(--tech-border); border-radius: 10px;
-    padding: 10px 12px; background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--tech-border); border-radius: var(--tech-r-control, 10px);
+    padding: 10px 12px; background: var(--tech-bg-sunken, rgba(255, 255, 255, 0.02));
   }
   &__label { display: block; font-size: var(--tech-fs-small); color: var(--tech-text-secondary); margin-bottom: 4px; }
   &__nums { font-size: var(--tech-fs-small); color: var(--tech-text-secondary); }
