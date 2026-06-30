@@ -1115,7 +1115,9 @@
 
 /* ════════════════════════════ RESPONSIVE ══════════════════════════════════ */
 @media (max-width: 920px) {
-  .hero {
+  /* `.landing .hero` to match the base rule's specificity (0,2,0) — otherwise the
+     two-column desktop grid leaks onto mobile and the hero never stacks. */
+  .landing .hero {
     grid-template-columns: 1fr;
     text-align: center;
     gap: 2.5rem;
