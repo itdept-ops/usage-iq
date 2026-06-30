@@ -742,6 +742,10 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   overflow-x: hidden;
+  /* Kill the document-level rubber-band bounce in the installed iOS PWA — overscrolling the shell
+     otherwise reveals the void bg behind it and reads as a stray scroll. Inner scroll regions keep
+     their own `overscroll-behavior: contain`, so this only stops the OUTER bounce. */
+  overscroll-behavior: none;
 }
 
 body {

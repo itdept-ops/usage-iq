@@ -4,7 +4,12 @@
     <meta charset="utf-8" />
     <title>Usage IQ</title>
     <base href="/" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- viewport-fit=cover is REQUIRED for env(safe-area-inset-*) to resolve to real values in an
+         installed iOS PWA: with apple-mobile-web-app-status-bar-style=black-translucent the web view goes
+         edge-to-edge under the notch / Dynamic Island + home indicator, and WITHOUT this flag those insets
+         stay 0 — so the top bar, bottom tab bar and sheets render under the system UI. This one flag
+         activates all the env(safe-area-inset-*) padding the shell already uses. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
     <!-- SEO + social cards. Positioning: "The Agentic Life OS — the operating system for your life." -->
     <meta
