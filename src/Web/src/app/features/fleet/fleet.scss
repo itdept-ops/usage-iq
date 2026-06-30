@@ -179,16 +179,11 @@ mat-progress-bar {
   &.kpi-cost .kpi-icon mat-icon { color: var(--tech-accent-magenta, #f472b6); }
 }
 
-/* ── Hero card: Total Cost is the primary fleet KPI — gradient-accent fill ── */
+/* ── Total Cost KPI — flat card matching siblings; value stays accent-magenta ── */
 .kpi.kpi-cost {
-  background: var(--tech-gradient-accent);
-  color: var(--tech-text-on-accent);
-  border-color: transparent;
-
-  .kpi-label { color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent); }
-  .kpi-icon mat-icon { color: color-mix(in srgb, var(--tech-text-on-accent) 80%, transparent); }
-  .kpi-value.cost { color: var(--tech-text-on-accent); }
-  .kpi-sub { color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent); }
+  background: var(--tech-panel);
+  border-color: var(--tech-border);
+  box-shadow: var(--tech-shadow-panel);
 }
 
 /* ───────────────────────── Leaderboard ───────────────────────── */

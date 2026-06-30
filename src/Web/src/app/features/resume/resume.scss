@@ -91,17 +91,6 @@
   box-shadow: var(--tech-shadow-panel);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 
-  /* first onboarding card (upload) gets the FiMobile hero gradient */
-  &:first-child {
-    background: var(--tech-gradient-accent);
-    color: var(--tech-text-on-accent);
-    border-color: transparent;
-
-    .onb__icon { color: color-mix(in srgb, var(--tech-text-on-accent) 90%, transparent); }
-    .onb__card-title { color: var(--tech-text-on-accent); }
-    .onb__card-sub { color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent); }
-  }
-
   &:hover {
     transform: translateY(-1px);
     box-shadow: var(--tech-shadow-raised);

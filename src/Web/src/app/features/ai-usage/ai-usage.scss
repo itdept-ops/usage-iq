@@ -76,19 +76,10 @@ mat-progress-bar {
   &.is-danger .stat-value { color: var(--tech-error, #ff9aa4); }
 }
 
-/* ─── Hero card: Calls (first card = primary metric) ─── */
+/* ─── Calls card: accent value only, flat surface matches siblings ─── */
 .stat-card:first-child {
-  background: var(--tech-gradient-accent) !important;
-  color: var(--tech-text-on-accent) !important;
-
-  .stat-label {
-    color: color-mix(in srgb, var(--tech-text-on-accent) 70%, transparent);
-  }
   .stat-value {
-    color: var(--tech-text-on-accent);
-  }
-  .stat-foot {
-    color: color-mix(in srgb, var(--tech-text-on-accent) 75%, transparent);
+    color: var(--tech-accent);
   }
 }
 
