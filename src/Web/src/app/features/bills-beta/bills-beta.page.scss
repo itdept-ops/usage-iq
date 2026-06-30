@@ -25,13 +25,13 @@
   --accent-b: #d9c08a;              // signature butter (end)  — the aged-receipt edge
 
   // Warm the layered base toward an inked-paper surface (still within the kit's dark contract).
-  --bg-base: #14130e;
-  --bg-rise: #1d1b14;
-  --bg-sink: #100f0a;
+  --bg-base: var(--tech-bg, #14130e);
+  --bg-rise: var(--tech-panel, #1d1b14);
+  --bg-sink: var(--tech-bg-sunken, #100f0a);
 
-  // A warm radial wash behind the whole column (cream bloom off the top).
+  // A warm radial wash behind the whole column (theme-aware — light in light mode).
   background:
-    radial-gradient(120% 80% at 50% -12%, #2a2519 0%, var(--bg-base) 62%);
+    radial-gradient(120% 80% at 50% -12%, var(--tech-panel-raised, #2a2519) 0%, var(--bg-base) 62%);
 
   // Status hues stay shared, but tuned to the warm surface: claimed = green, owed = amber (never red).
   --signal: var(--tech-success, #6fdc9a);   // claimed / settled green (theme-aware)

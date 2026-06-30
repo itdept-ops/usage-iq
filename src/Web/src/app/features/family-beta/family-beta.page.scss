@@ -22,12 +22,12 @@
   --accent-b: #fb7185;             // signature rose  (end)
 
   // Warm the layered base toward the Hearth-ember surface (still within the kit's dark contract).
-  --bg-base: #161015;
-  --bg-rise: #221a1d;
-  --bg-sink: #0f0a0e;
+  --bg-base: var(--tech-bg, #161015);
+  --bg-rise: var(--tech-panel, #221a1d);
+  --bg-sink: var(--tech-bg-sunken, #0f0a0e);
 
-  // A warm radial wash behind the whole column.
-  background: radial-gradient(120% 80% at 50% -10%, #2a1d1c 0%, var(--bg-base) 60%);
+  // A warm radial wash behind the whole column (theme-aware — light in light mode).
+  background: radial-gradient(120% 80% at 50% -10%, var(--tech-panel-raised, #2a1d1c) 0%, var(--bg-base) 60%);
 
   --bar-bottom-h: 76px;
 }

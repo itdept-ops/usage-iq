@@ -24,12 +24,12 @@
   --accent-b: #5b7cb8;             // restrained steel-blue pop (end)
 
   // Cool the layered base toward a slate surface (still within the kit's dark contract).
-  --bg-base: #0e1119;
-  --bg-rise: #161a26;
-  --bg-sink: #0a0c12;
+  --bg-base: var(--tech-bg, #0e1119);
+  --bg-rise: var(--tech-panel, #161a26);
+  --bg-sink: var(--tech-bg-sunken, #0a0c12);
 
-  // A cool slate wash behind the whole column.
-  background: radial-gradient(120% 80% at 50% -10%, #1b2233 0%, var(--bg-base) 58%);
+  // A cool slate wash behind the whole column (theme-aware — light in light mode).
+  background: radial-gradient(120% 80% at 50% -10%, var(--tech-panel-raised, #1b2233) 0%, var(--bg-base) 58%);
 }
 
 @include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)

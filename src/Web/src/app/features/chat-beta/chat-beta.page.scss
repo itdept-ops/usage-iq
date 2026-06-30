@@ -29,12 +29,12 @@
   --accent-b: #0ea5e9;             // signature sky  (end)
 
   // Cool the layered base slightly toward the messenger surface (still in the kit's dark contract).
-  --bg-base: #0b1016;
-  --bg-rise: #121a22;
-  --bg-sink: #080c11;
+  --bg-base: var(--tech-bg, #0b1016);
+  --bg-rise: var(--tech-panel, #121a22);
+  --bg-sink: var(--tech-bg-sunken, #080c11);
 
-  // A cool radial wash behind the whole surface.
-  background: radial-gradient(120% 80% at 50% -10%, #11252b 0%, var(--bg-base) 58%);
+  // A cool radial wash behind the whole surface (theme-aware — light in light mode).
+  background: radial-gradient(120% 80% at 50% -10%, var(--tech-panel-raised, #11252b) 0%, var(--bg-base) 58%);
 
   overflow: hidden;                // each pane owns its own scroll
 }
