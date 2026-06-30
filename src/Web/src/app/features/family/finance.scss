@@ -14,7 +14,7 @@
 
 // ── Finance hero accent ────────────────────────────────────────────────────
 .family__hero--finance .family__crest {
-  background: linear-gradient(135deg, rgba(61, 139, 255, 0.22), rgba(61, 214, 140, 0.22));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tech-accent) 22%, transparent), color-mix(in srgb, var(--tech-accent-2) 22%, transparent));
 }
 
 .fin__lock {

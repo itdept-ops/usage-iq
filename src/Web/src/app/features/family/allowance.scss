@@ -3,7 +3,7 @@
 .family__hero--allowance {
   background:
     radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--tech-positive, #34c759) 16%, transparent), transparent 55%),
-    radial-gradient(120% 140% at 100% 0%, rgba(139, 124, 255, 0.12), transparent 55%),
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--tech-accent) 12%, transparent), transparent 55%),
     var(--tech-panel);
   .family__crest mat-icon { color: var(--tech-positive, #34c759); }
 }
@@ -58,7 +58,7 @@
   font-weight: 800;
   font-size: 1rem;
   color: var(--tech-text-on-accent);
-  background: linear-gradient(135deg, var(--tech-accent), color-mix(in srgb, var(--tech-accent) 60%, #8b7cff));
+  background: linear-gradient(135deg, var(--tech-accent), var(--tech-accent-2));
 }
 .child-card__id { min-width: 0; }
 .child-card__name {

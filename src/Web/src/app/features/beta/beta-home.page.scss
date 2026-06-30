@@ -131,10 +131,10 @@
 .hh__glance {
   display: flex; align-items: center; gap: 8px;
   min-height: 38px; padding: 6px 12px; border-radius: var(--r-tile);
-  border: 1px solid color-mix(in srgb, #fb7185 28%, var(--hairline));
+  border: 1px solid color-mix(in srgb, var(--tech-error) 28%, var(--hairline));
   background: linear-gradient(135deg,
-    color-mix(in srgb, #f0a35a 12%, transparent),
-    color-mix(in srgb, #fb7185 10%, transparent));
+    color-mix(in srgb, var(--tech-accent) 12%, transparent),
+    color-mix(in srgb, var(--tech-error) 10%, transparent));
   color: var(--ink); text-decoration: none;
   transition: transform 120ms var(--ease-spring);
 }

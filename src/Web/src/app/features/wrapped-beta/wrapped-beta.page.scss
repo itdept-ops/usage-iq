@@ -62,7 +62,7 @@
   background:
     radial-gradient(1200px 700px at 50% -12%, color-mix(in srgb, var(--accent-a) 22%, transparent), transparent 68%),
     radial-gradient(900px 600px at 92% 8%, color-mix(in srgb, var(--accent-b) 14%, transparent), transparent 70%),
-    radial-gradient(120% 90% at 50% 110%, #190f2e 0%, transparent 60%),
+    radial-gradient(120% 90% at 50% 110%, var(--bg-sink) 0%, transparent 60%),
     var(--bg-base);
 
   --reel-pad: max(18px, env(safe-area-inset-left, 0px));

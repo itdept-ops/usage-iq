@@ -23,9 +23,10 @@
   --pa-bills:     #6ee7b7; --pb-bills:     #34d399;
   --pa-usage:     #c4b5fd; --pb-usage:     #a78bfa;
 
-  // The signature Wrapped purple→magenta (used by the hero glow + solid CTA).
-  --wr-a: #a855f7;
-  --wr-b: #ec4899;
+  // The signature Wrapped accent pair — routed to scheme tokens so all 9 color
+  // schemes apply here automatically (purple→magenta in the default scheme).
+  --wr-a: var(--tech-accent);
+  --wr-b: var(--tech-accent-2);
 
   // The Wrapped surfaces are an intentionally DARK, celebratory stage in BOTH themes (the gradient hero +
   // vivid cards only read on a deep backdrop), so pin our own ink/surface scale rather than the theme-flipping

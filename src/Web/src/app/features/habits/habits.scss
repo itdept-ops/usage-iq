@@ -58,7 +58,7 @@
 
 .hcard {
   display: flex; flex-direction: column; gap: 12px;
-  border-top: 3px solid var(--hc-accent, #4f46e5);
+  border-top: 3px solid var(--hc-accent, var(--tech-accent));
   border-radius: var(--tech-radius, 15px);
   box-shadow: var(--tech-shadow-panel);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -92,7 +92,7 @@
 
 .hcard__today { display: flex; flex-direction: column; gap: 6px; }
 .hcard__bar { height: 8px; border-radius: 999px; background: var(--tech-bg); overflow: hidden; }
-.hcard__bar-fill { display: block; height: 100%; background: var(--hc-accent, #4f46e5); border-radius: 999px; transition: width .25s; }
+.hcard__bar-fill { display: block; height: 100%; background: var(--hc-accent, var(--tech-accent)); border-radius: 999px; transition: width .25s; }
 .hcard__measured { font-size: 0.82rem; color: var(--tech-text-tertiary); }
 .hcard__valinput { width: 100px; padding: 5px 8px; border: 1px solid var(--tech-border); border-radius: var(--tech-r-control, 8px); background: var(--tech-panel); color: var(--tech-text); font: inherit; }
 .hcard__check {
@@ -208,14 +208,14 @@
   background: var(--tech-bg); color: var(--tech-text);
   &.is-out { opacity: 0.3; }
   &.is-today { outline: 2px solid var(--tech-text-tertiary); }
-  &.is-done { background: var(--hc-accent, #4f46e5); color: var(--tech-text-on-accent, #fff); font-weight: 700; }
+  &.is-done { background: var(--hc-accent, var(--tech-accent)); color: var(--tech-text-on-accent, #fff); font-weight: 700; }
   &.is-skip { background: repeating-linear-gradient(45deg, var(--tech-bg), var(--tech-bg) 4px, var(--tech-border) 4px, var(--tech-border) 8px); }
 }
 .hcal__legend {
   display: flex; gap: 16px; font-size: 0.76rem; color: var(--tech-text-tertiary);
   span { display: inline-flex; align-items: center; gap: 5px; }
   i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
-  i.is-done { background: var(--hc-accent, var(--tech-accent, #4f46e5)); }
+  i.is-done { background: var(--hc-accent, var(--tech-accent)); }
   i.is-skip { background: repeating-linear-gradient(45deg, var(--tech-bg), var(--tech-bg) 3px, var(--tech-border) 3px, var(--tech-border) 6px); }
 }
 

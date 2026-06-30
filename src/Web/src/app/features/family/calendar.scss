@@ -24,7 +24,7 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background:
-    radial-gradient(120% 140% at 50% 0%, rgba(63, 216, 208, 0.08), transparent 60%),
+    radial-gradient(120% 140% at 50% 0%, color-mix(in srgb, var(--tech-accent-cyan) 8%, transparent), transparent 60%),
     var(--tech-panel);
 }
 

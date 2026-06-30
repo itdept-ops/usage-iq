@@ -1,10 +1,10 @@
-/* Journal & Mood — a private daily check-in. Reuses the tracker design tokens (--tech-*). Accent: a calm
-   indigo → teal for the hero/reflection + the selected/active states. */
+/* Journal & Mood — a private daily check-in. Reuses the tracker design tokens (--tech-*). Accent:
+   primary via var(--tech-accent), calm secondary via var(--tech-accent-cyan). */
 
 .journal {
-  --jr-ink: #4f46e5;
-  --jr-ink-soft: rgba(79, 70, 229, 0.12);
-  --jr-warm: #0d9488;
+  --jr-ink: var(--tech-accent);
+  --jr-ink-soft: color-mix(in srgb, var(--tech-accent) 12%, transparent);
+  --jr-warm: var(--tech-accent-cyan);
 
   max-width: 1100px;
   margin: 0 auto;

@@ -41,8 +41,8 @@
   border: 1px solid var(--tech-border);
   border-radius: var(--tech-radius, 12px);
   background:
-    radial-gradient(120% 140% at 0% 0%, rgba(63, 216, 208, 0.10), transparent 55%),
-    radial-gradient(120% 140% at 100% 0%, rgba(139, 124, 255, 0.10), transparent 55%),
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--tech-accent) 10%, transparent), transparent 55%),
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--tech-accent-2) 10%, transparent), transparent 55%),
     var(--tech-panel);
   box-shadow: var(--tech-shadow-raised);
 }
@@ -60,7 +60,7 @@
   width: 56px;
   height: 56px;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(61, 139, 255, 0.18), rgba(63, 216, 208, 0.18));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tech-accent) 18%, transparent), color-mix(in srgb, var(--tech-accent-2) 18%, transparent));
   border: 1px solid var(--tech-border-strong);
   mat-icon {
     color: var(--tech-accent-cyan);
@@ -897,7 +897,7 @@ a.tile:focus-visible {
 .family__hero--today {
   background:
     radial-gradient(120% 140% at 0% 0%, rgba(255, 196, 0, 0.12), transparent 55%),
-    radial-gradient(120% 140% at 100% 0%, rgba(63, 216, 208, 0.12), transparent 55%),
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--tech-accent) 12%, transparent), transparent 55%),
     var(--tech-panel);
   .family__crest mat-icon { color: var(--tech-warn); }
 }
@@ -1082,7 +1082,7 @@ a.tile:focus-visible {
   border-radius: var(--tech-r-control, 10px);
   border: 1px solid var(--tech-border-subtle);
   background:
-    radial-gradient(120% 160% at 0% 0%, rgba(63, 216, 208, 0.12), transparent 60%),
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--tech-accent) 12%, transparent), transparent 60%),
     var(--tech-bg-sunken);
   transition: border-color 0.12s ease;
   &:hover { border-color: var(--tech-accent); }

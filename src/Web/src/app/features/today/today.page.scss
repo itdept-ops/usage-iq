@@ -23,7 +23,7 @@
   --da-family:    #fdba74; --db-family:    #fb923c;
   --da-location:  #67e8f9; --db-location:  #22d3ee;
   --da-finance:   #bef264; --db-finance:   #a3e635;
-  --da-primary:   #818cf8; --db-primary:   #c084fc;
+  --da-primary:   var(--tech-accent, #818cf8); --db-primary:   var(--tech-accent-2, #c084fc);
 }
 
 .td {
