@@ -69,6 +69,10 @@ export class SignIn {
         cancel_on_tap_outside: false,
         // FedCM is required for One Tap in current Chrome; without it prompt() is a no-op.
         use_fedcm_for_prompt: true,
+        // iOS Safari (and other ITP browsers) don't support FedCM and block the default popup's
+        // storage access — which left the Google sign-in window unable to take keyboard input on
+        // iPhone. itp_support enables GIS's ITP-compatible upgraded flow so sign-in works on Safari.
+        itp_support: true,
       });
 
       // Inline dark button. Its white backing (a cross-origin GIS iframe) is removed in CSS via
