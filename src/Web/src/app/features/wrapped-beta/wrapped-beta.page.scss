@@ -336,10 +336,11 @@
   align-items: center;
   text-align: center;
   justify-content: center;
-  // Extra bottom clearance so the "Swipe to begin" hint and range chip don't sit behind the
-  // centered Snap FAB (56px, half-overlapping the top of the tab bar at ~90px from screen bottom).
-  // The reel can scroll close to the FAB zone on short phones — push the hint up with room to breathe.
-  padding-bottom: max(72px, calc(40px + env(safe-area-inset-bottom, 0px)));
+  // Asymmetric padding pushes the content block upward in the slide so the top bloom area
+  // reads as intentional breathing room rather than dead space. Bottom clearance keeps the
+  // "Swipe to begin" hint above the FAB + tab-bar zone on short phones.
+  padding-top: 16px;
+  padding-bottom: max(96px, calc(72px + env(safe-area-inset-bottom, 0px)));
 }
 .wb-cover__kicker {
   margin: 0; font: 700 13px/1 var(--font-ui); letter-spacing: .26em; text-transform: uppercase;
@@ -347,7 +348,7 @@
 }
 .wb-cover__word {
   margin: 12px 0 0;
-  font: 600 clamp(52px, 17vw, 104px)/.92 var(--font-display);
+  font: 600 clamp(38px, 12vw, 72px)/.92 var(--font-display);
   letter-spacing: -.03em;
   color: var(--ink);
 }
@@ -360,7 +361,13 @@
   }
 }
 @keyframes wb-shine { to { background-position: 200% center; } }
-.wb-cover__name { margin: 16px 0 0; font: 600 18px/1.4 var(--font-ui); color: var(--ink); }
+.wb-cover__name {
+  margin: 16px 0 0;
+  font: 600 15px/1.4 var(--font-ui);
+  color: var(--ink);
+  max-width: 22ch;
+  text-wrap: balance;
+}
 .wb-cover__range {
   margin: 6px 0 0; font: 700 13px/1 var(--font-ui); letter-spacing: .02em; color: var(--ink-dim);
   display: inline-flex; align-items: center; gap: 7px;

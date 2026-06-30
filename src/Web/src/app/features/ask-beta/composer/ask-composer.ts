@@ -41,7 +41,7 @@ import {
         [(ngModel)]="text"
         name="q"
         rows="1"
-        [placeholder]="listening() ? 'Speak now…' : 'Ask anything about your life…'"
+        [placeholder]="listening() ? 'Speak now…' : 'Ask about your life…'"
         aria-label="Ask a question about your life"
         maxlength="1000"
         [disabled]="busy()"

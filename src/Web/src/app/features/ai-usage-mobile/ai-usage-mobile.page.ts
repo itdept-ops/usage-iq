@@ -285,7 +285,7 @@ export class AiUsageMobilePage {
   readonly outcomeSegments: Segment[] = [
     { key: '', label: 'All' },
     { key: 'ok', label: 'OK' },
-    { key: 'unavailable', label: 'Unavail.' },
+    { key: 'unavailable', label: 'N/A' },
     { key: 'rate-limited', label: 'Limited' },
     { key: 'error', label: 'Errors' },
   ];

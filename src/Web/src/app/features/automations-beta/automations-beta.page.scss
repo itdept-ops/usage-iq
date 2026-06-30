@@ -42,8 +42,9 @@
   gap: 12px;
   min-height: 100%;
   padding-top: calc(var(--safe-top) + 4px);
-  // Reserve room for the fixed extended FAB above the safe-area.
-  padding-bottom: calc(var(--safe-bottom) + 96px);
+  // Reserve room for the fixed extended FAB: FAB height (56px) + 16px gap + its bottom anchor.
+  // --fab-clear is set by the mobile shell to clear the bottom tab bar; fall back to safe-area + 16px.
+  padding-bottom: calc(var(--fab-clear, calc(env(safe-area-inset-bottom, 0px) + 16px)) + 56px + 16px);
   padding-inline: var(--gutter) var(--gutter-r);
   // Comfortable readable column on desktop; fluid on mobile.
   max-width: calc(var(--content-max) + var(--gutter) + var(--gutter-r));

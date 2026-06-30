@@ -168,7 +168,9 @@
 .mv-dose {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 10px 12px; border-radius: var(--tech-r-control, 11px);
-  background: var(--surface-2, var(--glass)); border: 1px solid var(--tech-border, var(--hairline));
+  background: var(--card); border: 1px solid var(--tech-border, var(--hairline));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1)),
+              inset 0 1px 0 var(--glass-edge, rgba(255,255,255,.09));
   &[data-status='taken'] { border-color: color-mix(in srgb, var(--tech-success, #34d399) 55%, transparent); }
   &[data-status='skipped'] { border-color: color-mix(in srgb, var(--tech-warn, #fbbf24) 50%, transparent); }
   &__when { font-size: 13.5px; font-weight: 600; color: var(--ink); }

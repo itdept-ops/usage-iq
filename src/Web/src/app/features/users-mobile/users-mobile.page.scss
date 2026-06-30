@@ -116,7 +116,12 @@
   mat-icon { font-size: 16px; width: 16px; height: 16px; }
 }
 
-.um-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 2px; }
+.um-chips {
+  display: flex; flex-wrap: nowrap; gap: 8px; padding: 0 2px 4px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
 .um-chip {
   display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 14px;
   // FiMobile chip: tinted bg + accented border when inactive

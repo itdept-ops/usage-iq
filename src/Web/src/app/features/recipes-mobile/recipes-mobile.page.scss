@@ -18,6 +18,11 @@
   // ---- ACCENT: follow the global scheme so the color picker drives this page ----
   --accent-a: var(--tech-accent);
   --accent-b: var(--tech-accent-2);
+
+  // ---- FAB clearance: override the kit default so the fixed FAB clears the
+  //      global bottom tab bar (~62px + safe-area). Mirrors the shell's own
+  //      --fab-clear rule; the fallback ensures it works even without the shell. ----
+  --fab-clear: calc(16px + var(--mobile-tabbar-h, calc(62px + env(safe-area-inset-bottom, 0px))));
 }
 
 @include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)
@@ -40,7 +45,7 @@
   width: 100%;
   box-sizing: border-box;
   padding-top: calc(var(--safe-top) + 8px);
-  padding-bottom: calc(var(--safe-bottom) + 96px);   // clears the fixed FAB
+  padding-bottom: calc(var(--fab-clear) + 16px);      // clears the fixed FAB above the tab bar
   padding-inline: var(--gutter) var(--gutter-r);
 }
 

@@ -163,10 +163,7 @@ interface SetupStep {
                   <p class="rp-empty__body">Switch the filter to see your other keys.</p>
                 } @else if (canCreate()) {
                   <h2 class="rp-empty__title">No ingest keys yet</h2>
-                  <p class="rp-empty__body">{{ canManage() ? 'No keys anywhere yet.' : 'You have no keys yet.' }} Mint one to connect a reporter.</p>
-                  <button type="button" class="rp-empty__cta" (click)="openCreate()">
-                    <mat-icon aria-hidden="true">add</mat-icon> Mint a key
-                  </button>
+                  <p class="rp-empty__body">{{ canManage() ? 'No keys anywhere yet.' : 'You have no keys yet.' }} Tap the + button below to mint one.</p>
                 } @else {
                   <h2 class="rp-empty__title">No ingest keys</h2>
                   <p class="rp-empty__body">There are no keys to show for your access.</p>

@@ -489,8 +489,10 @@
 
 // The Editor tab docks BOTH a fixed FAB and the .rm-savebar. The kit FAB reads --fab-clear, which the
 // mobile shell sets to (16px + tab-bar height) — that lands the FAB in the SAME band as the save bar.
-// Lift this page's FAB above its own save bar (~64px: 44px control + 2×10px padding) so they don't overlap.
-.rm-editor-fab { --fab-clear: calc(16px + var(--mobile-tabbar-h, 0px) + 64px); }
+// Lift this page's FAB above its own save bar (~64px: 44px control + 2x10px padding) so they don't overlap.
+// An extra 24px of clearance (88px total base) pushes the FAB above the zone where the Location input
+// field border typically appears, so the sparkle button sits cleanly above/outside the field group.
+.rm-editor-fab { --fab-clear: calc(16px + var(--mobile-tabbar-h, 0px) + 88px); }
 
 .rm-savebar {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 30;

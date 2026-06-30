@@ -348,8 +348,9 @@
 // ============================================================================
 
 // Spacer ensures the last content row clears the sticky save bar.
-// The bar has 76px tab-strip clearance + ~12px padding + ~46px button = ≈134px total painted area.
-.pm-savebar-spacer { height: 90px; }
+// The bar paints: 12px top-padding + 46px button + 76px tab-strip clearance = 134px minimum.
+// Use 144px so headings and content scroll fully clear the fixed footer on all devices.
+.pm-savebar-spacer { height: 144px; }
 
 .pm-savebar {
   position: absolute; left: 0; right: 0;

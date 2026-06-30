@@ -130,8 +130,8 @@ interface HourBar {
             <div class="cm-tiles cm-tiles--2">
               <app-bs-stat-tile [value]="'$' + fmtInt(m.costPerActiveHour)" label="$ / active hour" />
               <app-bs-stat-tile [value]="fmtInt(m.longestSessionMinutes)" unit="m" label="Longest session" />
-              <app-bs-stat-tile [value]="m.currentStreakDays" unit="d" label="Current streak" />
-              <app-bs-stat-tile [value]="fmtHour(m.busiestHour)" label="Busiest hour" />
+              <app-bs-stat-tile [value]="fmtInt(m.currentStreakDays)" unit="d" label="Current streak" />
+              <app-bs-stat-tile [value]="m.busiestHour >= 0 ? fmtHour(m.busiestHour) : '0'" label="Busiest hour" />
             </div>
           }
 

@@ -179,10 +179,7 @@ interface IngredientRow {
                 </span>
                 @if (tab() === 'mine') {
                   <h2 class="rc-empty__title">No recipes yet</h2>
-                  <p class="rc-empty__body">Tap the + to save your first go-to recipe.</p>
-                  <button type="button" class="rc-empty__cta" (click)="openCreate()">
-                    <mat-icon aria-hidden="true">add</mat-icon> New recipe
-                  </button>
+                  <p class="rc-empty__body">Tap the + button to save your first go-to recipe.</p>
                 } @else {
                   <h2 class="rc-empty__title">Nothing shared with you</h2>
                   <p class="rc-empty__body">When a mutual contact shares a recipe, it shows up here read-only.</p>

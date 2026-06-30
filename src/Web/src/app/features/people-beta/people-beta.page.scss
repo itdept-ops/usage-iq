@@ -77,18 +77,13 @@
   letter-spacing: -.02em; color: var(--ink);
 }
 
-// Hero "who's online" count chip.
+// Hero "who's online" count chip — flat on-scheme header chip (no card lift/glass).
 .hh__count {
   flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 0;
   min-width: 64px; padding: 8px 14px;
-  border-radius: var(--tech-radius, var(--r-card));
-  background: var(--glass);
-  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
-  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
-  border: 1px solid color-mix(in srgb, var(--accent-a) 24%, var(--tech-border, var(--glass-edge)));
-  // Rubric #2: surface card = shadow + inset top highlight
-  box-shadow: var(--tech-shadow-panel, var(--lift-2)),
-              inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+  border-radius: var(--tech-r-pill, 999px);
+  background: color-mix(in srgb, var(--accent-a) 14%, var(--bg-sink));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, transparent);
 }
 .hh__count-n {
   font-family: var(--font-display); font-variant-numeric: tabular-nums;
@@ -163,7 +158,7 @@ $hues: #fb7185, #f0a35a, #a78bfa, #38bdf8, #34d399, #f472b6;
 .hh__stat-sep { color: var(--ink-faint); }
 
 // Search box + order toggle row.
-.hh__tools { display: flex; flex-direction: column; gap: 10px; }
+.hh__tools { display: flex; flex-direction: column; gap: 16px; }
 
 .hh__search {
   position: relative; display: flex; align-items: center;

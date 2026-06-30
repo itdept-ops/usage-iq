@@ -121,7 +121,7 @@ interface ProposedReminder {
               <input class="fr-ai__input" type="text"
                      [ngModel]="aiText()" (ngModelChange)="aiText.set($event)"
                      name="ai" autocomplete="off"
-                     placeholder="“call the dentist next Tuesday at 3, every month”"
+                     placeholder="e.g. &quot;dentist next Tuesday at 3pm&quot;"
                      (keydown.enter)="addWithAi()" [disabled]="aiBusy()" />
               <button type="button" class="fr-ai__go" (click)="addWithAi()"
                       [disabled]="aiBusy() || !aiText().trim()" aria-label="Parse with AI">

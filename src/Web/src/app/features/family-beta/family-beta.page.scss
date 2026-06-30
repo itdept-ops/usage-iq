@@ -107,17 +107,15 @@
 .hh__finder mat-icon { font-size: 22px; width: 22px; height: 22px; }
 
 // Quick-action chip rail under the greeting — horizontal momentum scroll, hidden scrollbar.
-// A right-edge gutter + soft fade keeps the LAST chip ('Meals') fully readable (never clipped to 'M')
-// while signalling the rail is scrollable.
+// padding-inline-end ensures the last chip scrolls fully into view before the container edge.
+// No fade mask is applied so every chip label (including the 4th dining tab) is fully readable.
 .hh__quick {
   display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden;
   scroll-snap-type: x proximity; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   margin-inline: -2px;
   padding-block: 2px;
-  padding-inline: 2px var(--gutter-r, 16px);
-  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
-  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
+  padding-inline: 2px calc(var(--gutter-r, 16px) + 8px);
 }
 .hh__quick::-webkit-scrollbar { display: none; }
 .hh__chip {
