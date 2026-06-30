@@ -1242,5 +1242,33 @@ code, pre, kbd, samp {
 .mat-mdc-select-panel { border-radius: var(--tech-r-control) !important; }
 .mat-mdc-autocomplete-panel { border-radius: var(--tech-r-control) !important; }
 
+/* ---- Button-toggle groups — the OTHER segmented control the app uses (chart group-by,
+   calendar metric switch, etc.) → the same FiMobile pill-segment look as the tabs. ---- */
+.mat-button-toggle-group {
+  border: 1px solid var(--tech-border) !important;
+  border-radius: var(--tech-radius) !important;
+  background: var(--tech-bg-sunken);
+  padding: 4px;
+  gap: 2px;
+  overflow: hidden;
+  --mat-standard-button-toggle-divider-color: transparent;
+}
+.mat-button-toggle-group .mat-button-toggle {
+  border: 0 !important;
+  border-radius: var(--tech-r-control) !important;
+  background: transparent;
+  color: var(--tech-text-secondary);
+  transition: background var(--tech-t-control, 140ms) ease, color var(--tech-t-control, 140ms) ease;
+}
+.mat-button-toggle-group .mat-button-toggle .mat-button-toggle-button {
+  border-radius: var(--tech-r-control);
+}
+.mat-button-toggle-group .mat-button-toggle:hover { color: var(--tech-text); }
+.mat-button-toggle-group .mat-button-toggle-checked {
+  background: var(--tech-accent);
+  color: var(--tech-text-on-accent);
+}
+.mat-button-toggle-group .mat-button-toggle-checked .mat-button-toggle-label-content { color: var(--tech-text-on-accent); }
+
 /* ---- Slide toggle / progress — keep on the accent (tokens already drive color) ---- */
 .mat-mdc-progress-bar { border-radius: var(--tech-r-pill); overflow: hidden; }
