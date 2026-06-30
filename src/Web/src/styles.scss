@@ -1131,3 +1131,116 @@ code, pre, kbd, samp {
     }
   }
 }
+
+/* =========================================================================
+   FIMOBILE COMPONENT LAYER — reshapes Angular Material + the app's common
+   surfaces into the FiMobile template's *forms* (not just its colors). The
+   token layer above recolors; THIS gives every page the template's silhouette:
+   rounded-15 cards with a soft drop + inset top-highlight, segmented PILL tabs,
+   rounded buttons/inputs, pill chips, card-wrapped tables. Global on purpose so
+   it lands on every page at once. Cosmetic only (radius/shadow/bg/border) —
+   no layout-geometry changes.
+   ========================================================================= */
+
+/* ---- Cards (Material card + the app's .panel utility) — the FiMobile card ---- */
+.mat-mdc-card,
+.mat-mdc-card.mdc-card {
+  border-radius: var(--tech-radius) !important;
+  border: 1px solid var(--tech-border);
+  background: var(--tech-panel);
+  box-shadow: var(--tech-shadow-panel) !important;
+}
+.panel {
+  /* reinforce the inset top-highlight signature on the app's primary surface utility */
+  box-shadow: var(--tech-shadow-panel);
+}
+
+/* ---- Segmented PILL tabs — the FiMobile signature for Material tab groups ----
+   Turn the tab row into a sunken pill track; each tab is a pill; the active tab
+   fills with the accent; the underline ink-bar is hidden (the pill replaces it). */
+.mat-mdc-tab-group .mat-mdc-tab-header {
+  border-bottom: 0;
+  --mat-tab-header-divider-height: 0;
+}
+.mat-mdc-tab-group .mat-mdc-tab-labels {
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--tech-radius);
+  background: var(--tech-bg-sunken);
+  border: 1px solid var(--tech-border);
+}
+.mat-mdc-tab.mdc-tab {
+  border-radius: var(--tech-r-control);
+  min-width: 0;
+  padding: 0 16px;
+  flex: 1 1 auto;
+  transition: background var(--tech-t-control, 140ms) ease, color var(--tech-t-control, 140ms) ease;
+}
+.mat-mdc-tab.mdc-tab .mdc-tab-indicator { display: none; }
+.mat-mdc-tab.mdc-tab .mdc-tab__text-label { transition: color var(--tech-t-control, 140ms) ease; }
+.mat-mdc-tab.mdc-tab--active {
+  background: var(--tech-accent);
+}
+.mat-mdc-tab.mdc-tab--active .mdc-tab__text-label,
+.mat-mdc-tab.mdc-tab--active .mdc-tab__text-label,
+.mat-mdc-tab.mdc-tab--active.mdc-tab--active .mdc-tab__text-label {
+  color: var(--tech-text-on-accent) !important;
+}
+.mat-mdc-tab.mdc-tab:hover .mdc-tab__text-label { color: var(--tech-text); }
+
+/* ---- Buttons — FiMobile rounded controls; filled buttons carry a soft lift ---- */
+.mat-mdc-button,
+.mat-mdc-outlined-button,
+.mat-mdc-unelevated-button,
+.mat-mdc-raised-button,
+.mdc-button {
+  border-radius: var(--tech-r-control) !important;
+  letter-spacing: 0;
+}
+.mat-mdc-unelevated-button,
+.mat-mdc-raised-button {
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--tech-accent) 60%, transparent) !important;
+}
+.mat-mdc-unelevated-button:hover,
+.mat-mdc-raised-button:hover {
+  box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--tech-accent) 70%, transparent) !important;
+}
+.mat-mdc-icon-button { border-radius: var(--tech-r-pill) !important; }
+
+/* ---- Form fields — rounded FiMobile inputs (outline + fill variants) ---- */
+.mat-mdc-form-field .mdc-text-field--outlined .mdc-notched-outline__leading { border-radius: var(--tech-r-control) 0 0 var(--tech-r-control); }
+.mat-mdc-form-field .mdc-text-field--outlined .mdc-notched-outline__trailing { border-radius: 0 var(--tech-r-control) var(--tech-r-control) 0; }
+.mat-mdc-form-field .mdc-text-field--filled {
+  border-radius: var(--tech-r-control) var(--tech-r-control) 0 0;
+  background: var(--tech-input);
+}
+
+/* ---- Chips — pill ---- */
+.mat-mdc-chip,
+.mat-mdc-standard-chip {
+  border-radius: var(--tech-r-pill) !important;
+}
+
+/* ---- Tables — wrap in a FiMobile card + soft row dividers ---- */
+.mat-mdc-table {
+  border-radius: var(--tech-radius);
+  overflow: hidden;
+  background: var(--tech-panel);
+  border: 1px solid var(--tech-border);
+}
+.mat-mdc-header-row {
+  background: var(--tech-bg-sunken);
+}
+.mat-mdc-row .mat-mdc-cell,
+.mat-mdc-header-row .mat-mdc-header-cell {
+  border-bottom-color: var(--tech-border-subtle);
+}
+
+/* ---- Menus, dialogs, selects, bottom-sheets — FiMobile rounding ---- */
+.mat-mdc-menu-panel { border-radius: var(--tech-radius) !important; }
+.mat-mdc-dialog-surface { border-radius: var(--tech-radius) !important; }
+.mat-mdc-select-panel { border-radius: var(--tech-r-control) !important; }
+.mat-mdc-autocomplete-panel { border-radius: var(--tech-r-control) !important; }
+
+/* ---- Slide toggle / progress — keep on the accent (tokens already drive color) ---- */
+.mat-mdc-progress-bar { border-radius: var(--tech-r-pill); overflow: hidden; }
