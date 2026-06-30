@@ -42,10 +42,9 @@ const KINDS: readonly { key: PactKind; label: string; icon: string; unit: string
       <div class="pm-scroll" aria-live="polite">
 
         <header class="pm-hero">
-          <div class="pm-hero__bloom" aria-hidden="true"></div>
           <p class="pm-hero__eyebrow"><mat-icon aria-hidden="true">handshake</mat-icon> Accountability</p>
           <h1 class="pm-hero__title">Pacts</h1>
-          <p class="pm-hero__sub">Shared goals with your circle — pick an activity, set a target, race it.</p>
+          <p class="pm-hero__sub">Shared goals with your circle.</p>
           <button type="button" class="pm-hero__cta" (click)="toggleCreate()">
             <mat-icon aria-hidden="true">{{ showCreate() ? 'close' : 'add' }}</mat-icon>
             {{ showCreate() ? 'Cancel' : 'New pact' }}

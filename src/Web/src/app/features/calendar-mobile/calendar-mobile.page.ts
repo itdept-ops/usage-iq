@@ -77,15 +77,11 @@ interface HourBar {
     <app-bs-pull-refresh class="cm-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="cm-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + metric switch ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + metric switch ─── -->
         <header class="cm-hero">
-          <div class="cm-hero__bloom" aria-hidden="true"></div>
           <p class="cm-hero__eyebrow"><mat-icon aria-hidden="true">calendar_month</mat-icon> Activity</p>
           <h1 class="cm-hero__title">Usage calendar</h1>
-          <p class="cm-hero__sub">
-            How much you spend, send, and actually work with AI — active time estimated from message
-            timing (gaps over 30&nbsp;min count as idle).
-          </p>
+          <p class="cm-hero__sub">Spend, messages &amp; active time — gaps over 30&nbsp;min count as idle.</p>
 
           <div class="cm-seg-wrap">
             <app-bs-segmented class="cm-seg"

@@ -58,7 +58,6 @@ interface ToggleRow {
 
         <!-- ─── IMMERSIVE HEADER: title + the live name-preview chip ─── -->
         <header class="pm-hero">
-          <div class="pm-hero__bloom" aria-hidden="true"></div>
           <p class="pm-hero__kicker">
             <mat-icon aria-hidden="true">visibility</mat-icon> How others see you
           </p>

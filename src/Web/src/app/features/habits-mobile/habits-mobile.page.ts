@@ -74,10 +74,9 @@ function emptyDraft(): HabitDraft {
       <div class="hm-scroll" aria-live="polite">
 
         <header class="hm-hero">
-          <div class="hm-hero__bloom" aria-hidden="true"></div>
           <p class="hm-hero__kicker"><mat-icon aria-hidden="true">checklist</mat-icon> Habits</p>
           <h1 class="hm-hero__title">Build your streaks</h1>
-          <p class="hm-hero__sub">Daily, weekly, certain days, or X times a period — at your own pace.</p>
+          <p class="hm-hero__sub">Track habits daily, weekly, or on your own schedule.</p>
           @if (!loading() && !errored() && habits().length) {
             <div class="hm-hero__stats">
               <span class="hm-hero__stat"><b class="mono-num">{{ bestStreak() }}</b><i>best streak</i></span>

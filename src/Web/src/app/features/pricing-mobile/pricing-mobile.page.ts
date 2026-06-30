@@ -52,17 +52,13 @@ interface RateField {
     <app-bs-pull-refresh class="pr-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="pr-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + a tiny stat strip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + a tiny stat strip ─── -->
         <header class="pr-hero">
-          <div class="pr-hero__bloom" aria-hidden="true"></div>
           <p class="pr-hero__kicker">
             <mat-icon aria-hidden="true">payments</mat-icon> Rate config
           </p>
           <h1 class="pr-hero__title">Model pricing</h1>
-          <p class="pr-hero__sub">
-            Rates are <strong>USD per 1M tokens</strong>. Edits are stored in the DB; Recompute re-prices
-            existing rows.
-          </p>
+          <p class="pr-hero__sub">Edit <strong>USD per 1M token</strong> rates; Recompute re-prices existing usage rows.</p>
 
           @if (!loading() && !loadError()) {
             <div class="pr-stats">

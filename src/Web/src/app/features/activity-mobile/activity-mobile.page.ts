@@ -49,12 +49,11 @@ import {
     <app-bs-pull-refresh class="ac-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="ac-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + a tiny stat strip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + a tiny stat strip ─── -->
         <header class="ac-hero">
-          <div class="ac-hero__bloom" aria-hidden="true"></div>
           <p class="ac-hero__kicker"><mat-icon aria-hidden="true">timeline</mat-icon> Request Log</p>
           <h1 class="ac-hero__title">Activity</h1>
-          <p class="ac-hero__sub">Every API request and response, captured by middleware. Bodies are truncated and secrets redacted.</p>
+          <p class="ac-hero__sub">Every API request captured by middleware — bodies truncated, secrets redacted.</p>
 
           @if (!loading() && !errored()) {
             <div class="ac-stats">

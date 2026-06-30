@@ -2,7 +2,7 @@
   display: block;
   max-width: var(--tech-max-width);
   margin: 0 auto;
-  padding: var(--tech-space-4, 24px) var(--tech-space-3, 16px) var(--tech-space-6, 48px);
+  padding: 14px var(--tech-space-3, 16px) var(--tech-space-6, 48px);
 }
 
 /* =========================================================================
@@ -13,7 +13,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--tech-space-4);
-  margin-bottom: var(--tech-space-5, 32px);
+  margin-bottom: 18px;
 
   .head-text { flex: 1 1 0; min-width: 0; }
 

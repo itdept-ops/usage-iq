@@ -44,15 +44,6 @@
   isolation: isolate;
 }
 
-.hs-hero__bloom {
-  position: absolute;
-  inset: -40px -30% auto -10%;
-  height: 200px;
-  z-index: -1;
-  background: radial-gradient(60% 80% at 25% 0%, color-mix(in srgb, var(--accent-a) 32%, transparent), transparent 70%);
-  filter: blur(var(--blur-glass));
-  pointer-events: none;
-}
 
 .hs-hero__kicker {
   display: inline-flex;

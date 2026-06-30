@@ -107,7 +107,7 @@ $tabbar: 62px;
 // ─────────────── FLOATING HEADER ───────────────
 .fl-head {
   position: absolute;
-  top: calc(var(--safe-top, 0px) + 10px);
+  top: calc(var(--safe-top, 0px) + 8px);
   left: 14px;
   right: 14px;
   z-index: 5;
@@ -115,7 +115,7 @@ $tabbar: 62px;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px 14px;
+  padding: 10px 14px 10px;
   // FiMobile rounded card chrome — glass surface so the map shows through.
   background: var(--glass, rgba(12, 14, 22, 0.78));
   backdrop-filter: blur(16px) saturate(1.15);

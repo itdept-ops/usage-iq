@@ -51,9 +51,8 @@ import {
     <app-bs-pull-refresh class="fl-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="fl-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + a tiny stat strip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + a tiny stat strip ─── -->
         <header class="fl-hero">
-          <div class="fl-hero__bloom" aria-hidden="true"></div>
           <p class="fl-hero__kicker"><mat-icon aria-hidden="true">checklist</mat-icon> Family Lists</p>
           <h1 class="fl-hero__title">Lists</h1>
           <p class="fl-hero__sub">Your household's shared lists — add, check off, done together.</p>

@@ -43,7 +43,7 @@
   flex-direction: column;
   gap: 16px;
   min-height: 100%;
-  padding-top: calc(var(--safe-top) + 8px);
+  padding-top: calc(var(--safe-top) + 4px);
   padding-bottom: calc(var(--safe-bottom) + 28px);
   padding-inline: var(--gutter) var(--gutter-r);
 
@@ -62,19 +62,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 6px 2px 2px;
+  gap: 10px;
+  padding: 4px 2px 2px;
   isolation: isolate;
-}
-
-.hh__bloom {
-  position: absolute;
-  top: -40px; left: -30px; right: 30%;
-  height: 160px; z-index: -1; pointer-events: none;
-  background: radial-gradient(120px 90px at 30% 30%,
-    color-mix(in srgb, var(--accent-a) 46%, transparent), transparent 70%);
-  filter: blur(18px);
-  opacity: .9;
 }
 
 .hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -121,7 +111,7 @@
 // Glance row — machines + spend + tokens (Clash Display numerals) on a floating glass card.
 .hh__glance {
   display: flex; align-items: center; gap: 14px;
-  padding: 16px; border-radius: var(--tech-radius);
+  padding: 12px 16px; border-radius: var(--tech-radius);
   background: var(--glass);
   backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);

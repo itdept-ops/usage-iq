@@ -35,7 +35,7 @@ interface OptionRow {
  * rebuilt on the shared beta-ui "Strata" kit (`@use '../beta-ui/beta-kit'`). One signature accent — a cool
  * VIOLET → INDIGO ramp — re-skins the whole screen via the per-page accent contract.
  *
- * An immersive scrolling header (accent bloom + an open/closed stat strip), a {@link BetaSegmentedControl}
+ * A compact scrolling header (title + an open/closed stat strip), a {@link BetaSegmentedControl}
  * flipping the list between OPEN polls and CLOSED ones, a list of glassy poll cards (each option a big
  * tap-to-vote target with a live tally bar, voter initials, the caller's own multi-select highlighted, and
  * — once closed — the winner crowned), and a {@link BetaBottomSheet} CREATE form (Time or Choices, editable
@@ -66,12 +66,11 @@ interface OptionRow {
     <app-bs-pull-refresh class="pl-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="pl-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + a tiny stat strip ─── -->
+        <!-- ─── HEADER: title + stat strip ─── -->
         <header class="pl-hero">
-          <div class="pl-hero__bloom" aria-hidden="true"></div>
           <p class="pl-hero__kicker"><mat-icon aria-hidden="true">how_to_vote</mat-icon> Plan together</p>
           <h1 class="pl-hero__title">Polls</h1>
-          <p class="pl-hero__sub">Float a time or a choice, let everyone vote, then lock in the winner.</p>
+          <p class="pl-hero__sub">Float a time or choice, everyone votes, you lock in the winner.</p>
 
           @if (!loading() && !errored()) {
             <div class="pl-stats">

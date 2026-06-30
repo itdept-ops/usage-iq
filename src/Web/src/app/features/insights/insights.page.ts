@@ -60,8 +60,7 @@ interface KindGroup {
           </p>
           <h1 class="iq-head__title">Cross-domain insights</h1>
           <p class="iq-head__sub">
-            Correlations, trends, streaks &amp; anomalies across everything you track — computed only from
-            <strong>your</strong> own data. Statistical, not medical, advice.
+            Cross-domain stats from <strong>your</strong> data only — statistical signals, not medical advice.
           </p>
         </div>
         <div class="iq-head__windows" role="tablist" aria-label="Insight window">

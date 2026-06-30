@@ -80,9 +80,8 @@ const SURFACE_ACCENTS: Record<string, { a: string; b: string; desc?: string }> =
         <!-- Visually-hidden live region — announces reorder / hide / show / reset to screen readers. -->
         <p class="bh-sr-only" aria-live="polite" role="status">{{ status() }}</p>
 
-        <!-- Immersive page header — "Beta" + tagline + customize/count, with an accent bloom behind it. -->
+        <!-- Immersive page header — "Beta" + tagline + customize/count. -->
         <header class="bh-head">
-          <div class="bh-head__bloom" aria-hidden="true"></div>
           <div class="bh-head__top">
             <div class="bh-head__text">
               <span class="bh-head__eyebrow"><span class="bh-spark" aria-hidden="true"></span> Experimental</span>

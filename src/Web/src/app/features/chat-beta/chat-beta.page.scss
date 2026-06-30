@@ -110,13 +110,6 @@
   flex: 0 0 auto;
   padding: calc(var(--safe-top) + 12px) var(--gutter) 10px var(--gutter);
 }
-.lh__bloom {
-  position: absolute; top: -30px; left: -20px; width: 60%; height: 130px;
-  z-index: -1; pointer-events: none;
-  background: radial-gradient(130px 90px at 28% 30%,
-    color-mix(in srgb, var(--accent-a) 42%, transparent), transparent 70%);
-  filter: blur(20px); opacity: .9;
-}
 .lh__row { display: flex; align-items: center; gap: 10px; }
 .lh__title {
   margin: 0; font-family: var(--font-display); font-weight: 600;

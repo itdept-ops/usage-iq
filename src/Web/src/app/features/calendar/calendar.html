@@ -2,8 +2,7 @@
   <div class="head-text">
     <span class="micro-label head-eyebrow">~/calendar — activity over time</span>
     <h2>Usage calendar</h2>
-    <p class="sub">Daily spend, volume, and how much time you actually spend working with AI — estimated from
-      message timing (gaps over 30&nbsp;min count as idle).</p>
+    <p class="sub">Daily spend, token volume, and estimated active hours with AI.</p>
   </div>
   <mat-button-toggle-group class="metric-toggle" [value]="metric()" (change)="metric.set($event.value)" aria-label="Select metric" hideSingleSelectionIndicator>
     <mat-button-toggle value="cost">Cost</mat-button-toggle>

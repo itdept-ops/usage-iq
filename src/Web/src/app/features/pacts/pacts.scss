@@ -2,7 +2,7 @@
   display: block;
   max-width: var(--tech-max-width, 880px);
   margin: 0 auto;
-  padding: var(--tech-space-4, 24px) var(--tech-space-3, 16px) var(--tech-space-6, 48px);
+  padding: 12px var(--tech-space-3, 16px) var(--tech-space-6, 48px);
 }
 
 /* ---- Page header (display font + row layout with end-aligned CTA) ---- */
@@ -11,7 +11,7 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--tech-space-2, 12px);
-  margin-bottom: var(--tech-space-4, 24px);
+  margin-bottom: 16px;
 
   &__body { flex: 1 1 0; min-width: 0; }
 

@@ -78,24 +78,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 18px 18px 14px;
+  padding: 12px 16px 12px;
   isolation: isolate;
   border-radius: var(--tech-radius, var(--r-tile));
   border: 1px solid var(--tech-border, var(--hairline));
   background: var(--tech-panel, var(--glass));
   box-shadow: var(--tech-shadow-panel, var(--lift-1));
   overflow: hidden;
-}
-
-.hh-hero__bloom {
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 120%;
-  background: radial-gradient(80% 90% at 22% 0%,
-              color-mix(in oklab, var(--accent-a) 28%, transparent), transparent 70%);
-  filter: blur(var(--blur-glass));
-  z-index: -1;
-  pointer-events: none;
 }
 
 .hh-hero__kicker {

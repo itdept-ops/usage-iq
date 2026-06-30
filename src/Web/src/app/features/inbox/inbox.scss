@@ -2,11 +2,11 @@
   display: block;
   max-width: var(--tech-max-width, 880px);
   margin: 0 auto;
-  padding: var(--tech-space-4, 24px) var(--tech-space-3, 16px) var(--tech-space-6, 48px);
+  padding: 12px var(--tech-space-3, 16px) var(--tech-space-6, 48px);
 }
 
 .head {
-  margin-bottom: var(--tech-space-4, 24px);
+  margin-bottom: 16px;
 
   .head-eyebrow {
     display: block;

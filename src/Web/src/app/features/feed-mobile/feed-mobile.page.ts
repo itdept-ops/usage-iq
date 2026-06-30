@@ -62,14 +62,13 @@ interface FeedDayGroup {
     <app-bs-pull-refresh class="fm-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="fm-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + circle/self mode chip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + circle/self mode chip ─── -->
         <header class="fm-hero">
-          <div class="fm-hero__bloom" aria-hidden="true"></div>
           <p class="fm-hero__eyebrow"><mat-icon aria-hidden="true">bolt</mat-icon> Activity</p>
           <h1 class="fm-hero__title">Pulse</h1>
           <p class="fm-hero__sub">
             @if (viewsCircle()) {
-              What your circle's up to — workouts, challenge milestones &amp; goals hit.
+              Your circle's workouts, challenge days &amp; goals.
             } @else {
               You're seeing only your own activity right now.
             }

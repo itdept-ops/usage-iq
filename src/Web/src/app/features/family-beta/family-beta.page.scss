@@ -46,9 +46,9 @@
 .scroll {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-height: 100%;
-  padding-top: calc(var(--safe-top) + 10px);
+  padding-top: calc(var(--safe-top) + 8px);
   padding-bottom: calc(var(--bar-bottom-h) + var(--safe-bottom) + var(--beta-bar-bottom, 0px) + 16px);
   padding-inline: var(--gutter) var(--gutter-r);
   scroll-snap-type: y proximity;
@@ -60,22 +60,10 @@
 // ============================================================================
 
 .hh {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 6px 2px 4px;
-  isolation: isolate;
-}
-.hh__bloom {
-  position: absolute;
-  top: -40px; left: -30px; right: 30%;
-  height: 160px; z-index: -1; pointer-events: none;
-  background: radial-gradient(120px 90px at 30% 30%,
-    color-mix(in srgb, var(--accent-a) 44%, transparent),
-    transparent 70%);
-  filter: blur(18px);
-  opacity: .9;
+  gap: 12px;
+  padding: 4px 2px 2px;
 }
 
 .hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }

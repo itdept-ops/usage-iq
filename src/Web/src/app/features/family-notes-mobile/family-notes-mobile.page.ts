@@ -54,12 +54,11 @@ import {
     <app-bs-pull-refresh class="nt-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="nt-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + a tiny stat strip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + a tiny stat strip ─── -->
         <header class="nt-hero">
-          <div class="nt-hero__bloom" aria-hidden="true"></div>
           <p class="nt-hero__kicker"><mat-icon aria-hidden="true">sticky_note_2</mat-icon> Family Hub</p>
           <h1 class="nt-hero__title">Notes</h1>
-          <p class="nt-hero__sub">Shared notes for your household — pin the ones that matter, share read-only with a contact.</p>
+          <p class="nt-hero__sub">Household notes — pin what matters, share read-only with contacts.</p>
 
           @if (!loading() && !errored()) {
             <div class="nt-stats">

@@ -48,20 +48,8 @@
 .fm-hero {
   position: relative;
   isolation: isolate;
-  padding: calc(18px + var(--safe-top)) 4px 6px;
+  padding: calc(12px + var(--safe-top)) 4px 6px;
   overflow: hidden;
-
-  &__bloom {
-    position: absolute;
-    inset: -40% -20% auto -20%;
-    height: 220px;
-    background:
-      radial-gradient(60% 80% at 20% 0%, color-mix(in oklab, var(--accent-a) 38%, transparent), transparent 70%),
-      radial-gradient(60% 80% at 90% 10%, color-mix(in oklab, var(--accent-b) 34%, transparent), transparent 72%);
-    filter: blur(var(--blur-glass, 18px));
-    z-index: -1;
-    pointer-events: none;
-  }
 
   // ── Kicker row: icon badge + "MEAL PLAN" uppercase label ──
   &__kicker {
@@ -86,7 +74,7 @@
 
   // ── Display title below the kicker ──
   &__title {
-    margin: 0 0 14px;
+    margin: 0 0 10px;
     font-family: var(--font-display, var(--tech-font-display));
     font-size: var(--title-xl, 34px);
     font-weight: 800;

@@ -24,26 +24,10 @@
 .iq {
   max-width: 1180px;
   margin: 0 auto;
-  padding: var(--tech-space-6, 1.5rem);
+  padding: 14px var(--tech-space-6, 1.5rem) var(--tech-space-6, 1.5rem);
   display: flex;
   flex-direction: column;
-  gap: var(--tech-space-6, 1.5rem);
-  position: relative;
-
-  // A faint radial accent bloom behind the header — the page's depth signature
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0 20% auto -10%;
-    height: 300px;
-    background: radial-gradient(60% 80% at 20% 10%,
-      color-mix(in srgb, var(--tech-accent, #7c8cff) 8%, transparent),
-      transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  > * { position: relative; z-index: 1; }
+  gap: var(--tech-space-4, 1rem);
 }
 
 // ─────────── HEADER ───────────

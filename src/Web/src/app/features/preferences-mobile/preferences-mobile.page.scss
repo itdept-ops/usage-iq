@@ -63,13 +63,6 @@
 // ============================================================================
 
 .hh { position: relative; padding: 8px 2px 4px; isolation: isolate; }
-.hh__bloom {
-  position: absolute; top: -50px; left: -30px; right: 20%;
-  height: 180px; z-index: -1; pointer-events: none;
-  background: radial-gradient(140px 100px at 28% 32%,
-    color-mix(in srgb, var(--accent-b) 40%, transparent), transparent 72%);
-  filter: blur(20px); opacity: .85;
-}
 .hh__id { display: flex; align-items: center; gap: 14px; }
 .hh__avatar {
   flex: 0 0 auto; position: relative; display: grid; place-items: center;

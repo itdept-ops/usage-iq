@@ -55,12 +55,6 @@
   padding: 8px 4px 4px;
   isolation: isolate;
 }
-.rm-hero__bloom {
-  position: absolute; inset: -40px -20px auto -20px; height: 200px; z-index: -1;
-  background: radial-gradient(120% 80% at 18% 0%,
-    color-mix(in srgb, var(--accent-a) 30%, transparent), transparent 70%);
-  filter: blur(6px); pointer-events: none;
-}
 .rm-hero__kicker {
   display: inline-flex; align-items: center; gap: 6px; margin: 0;
   font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
@@ -75,7 +69,7 @@
   margin: 0; font-size: 13.5px; font-weight: 500; line-height: 1.4; color: var(--ink-dim);
 }
 
-.rm-stats { display: flex; gap: 10px; margin-top: 12px; }
+.rm-stats { display: flex; gap: 10px; margin-top: 8px; }
 .rm-stat {
   flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px;
   padding: 10px 12px;

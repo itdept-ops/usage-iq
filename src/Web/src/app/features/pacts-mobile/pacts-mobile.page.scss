@@ -46,18 +46,6 @@
   padding: 8px 4px 4px;
   isolation: isolate;
 
-  &__bloom {
-    position: absolute;
-    inset: -40% -30% auto -10%;
-    height: 220px;
-    z-index: -1;
-    background: radial-gradient(60% 60% at 30% 30%,
-      color-mix(in srgb, var(--accent-a) 40%, transparent), transparent 70%);
-    filter: blur(40px);
-    opacity: .6;
-    pointer-events: none;
-  }
-
   &__eyebrow {
     display: inline-flex; align-items: center; gap: 6px; margin: 0;
     font-size: .8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;

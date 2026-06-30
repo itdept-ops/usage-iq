@@ -3,7 +3,7 @@
 .bills {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 24px 20px 56px;
+  padding: 12px 20px 56px;
 }
 
 .bills__head {
@@ -13,13 +13,6 @@
   gap: 16px;
   flex-wrap: wrap;
   margin-bottom: 16px;
-
-  /* Hero card wrapper: give the title/subtitle area a FiMobile panel treatment */
-  padding: 18px 20px 16px;
-  border-radius: var(--tech-radius, 15px);
-  border: 1px solid var(--tech-border);
-  background: var(--tech-panel);
-  box-shadow: var(--tech-shadow-panel);
 
   h1 {
     margin: 0;

@@ -61,16 +61,11 @@ const RECURRENCE_LABEL: Record<FamilyChoreRecurrence, string> = {
     <app-bs-pull-refresh class="cm-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="cm-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + stat strip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + stat strip ─── -->
         <header class="cm-hero">
-          <div class="cm-hero__bloom" aria-hidden="true"></div>
           <p class="cm-hero__kicker"><mat-icon aria-hidden="true">checklist</mat-icon> Chores</p>
           <h1 class="cm-hero__title">{{ isChild() ? 'Earn your stars' : 'Chore Marketplace' }}</h1>
-          <p class="cm-hero__sub">
-            {{ isChild()
-                ? 'Grab a chore, get it done, and send it for a grown-up to approve.'
-                : 'The household pool — kids claim chores, you approve and award the stars.' }}
-          </p>
+          <p class="cm-hero__sub">{{ isChild() ? 'Claim a chore, finish it, and send it for approval.' : 'Kids claim chores from the pool; you approve and award stars.' }}</p>
 
           @if (!loading() && !errored()) {
             <div class="cm-stats">

@@ -17,7 +17,7 @@
 .mono-num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 
 .md {
-  padding: var(--tech-space-6, 1.5rem);
+  padding: .75rem var(--tech-space-6, 1.5rem) var(--tech-space-6, 1.5rem);
   display: flex;
   flex-direction: column;
   gap: 1.5rem;

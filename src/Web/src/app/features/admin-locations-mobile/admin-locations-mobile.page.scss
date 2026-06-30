@@ -100,7 +100,7 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   z-index: 10;
-  padding: calc(var(--safe-top) + 10px) var(--gutter-r) 12px var(--gutter);
+  padding: calc(var(--safe-top) + 10px) var(--gutter-r) 8px var(--gutter);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -113,17 +113,6 @@
 
   // …but the interactive bits inside re-enable pointer events.
   .al-back, .al-context, .al-head__titles { pointer-events: auto; }
-}
-
-.al-head__bloom {
-  position: absolute;
-  inset: -30px -10px auto -10px;
-  height: 160px;
-  z-index: -1;
-  background: radial-gradient(110% 80% at 14% 0%,
-    color-mix(in srgb, var(--accent-a) 26%, transparent), transparent 70%);
-  filter: blur(6px);
-  pointer-events: none;
 }
 
 .al-head__row {

@@ -48,8 +48,7 @@ interface StatChip {
           </p>
           <h1 class="td-head__title">Your day</h1>
           <p class="td-head__sub">
-            A chronological recap of <strong>your</strong> day across everything you track — computed only from
-            your own logs. Not medical advice.
+            <strong>Your</strong> day, every domain, one timeline.
           </p>
         </div>
 

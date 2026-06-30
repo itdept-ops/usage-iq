@@ -30,7 +30,7 @@
 .ag-scroll {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
   min-height: 100%;
   max-width: 720px;
   margin-inline: auto;
@@ -46,23 +46,10 @@
 // ============================================================================
 
 .ag-hero {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 8px 4px 4px;
-  isolation: isolate;
-}
-
-.ag-hero__bloom {
-  position: absolute;
-  inset: -40% -30% auto -10%;
-  height: 220px;
-  z-index: -1;
-  background: radial-gradient(60% 60% at 30% 30%, color-mix(in srgb, var(--accent-a) 40%, transparent), transparent 70%);
-  filter: blur(40px);
-  opacity: 0.6;
-  pointer-events: none;
 }
 
 .ag-hero__kicker {

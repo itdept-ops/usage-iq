@@ -106,9 +106,8 @@ const BUDGET_STATUS_LABEL: Record<FinanceBudgetStatus, string> = {
     <app-bs-pull-refresh class="ff-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="ff-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + month stepper ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + month stepper ─── -->
         <header class="ff-hero">
-          <div class="ff-hero__bloom" aria-hidden="true"></div>
           <p class="ff-hero__kicker"><mat-icon aria-hidden="true">account_balance_wallet</mat-icon> Family Finance</p>
           <h1 class="ff-hero__title">Ledger</h1>
           <p class="ff-hero__sub">Where the money went — private to your household, never shared out.</p>

@@ -67,9 +67,8 @@ interface FlowChoice { value: CycleFlowLevel; label: string; }
     <app-bs-pull-refresh class="cy-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="cy-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HERO: title + accent bloom + the current-phase summary ─── -->
+        <!-- ─── HERO: title + the current-phase summary ─── -->
         <header class="cy-hero">
-          <div class="cy-hero__bloom" aria-hidden="true"></div>
           <p class="cy-hero__kicker"><mat-icon aria-hidden="true">favorite</mat-icon> Cycle</p>
           <h1 class="cy-hero__title">Your private calendar</h1>
           <p class="cy-hero__sub">A gentle, non-medical companion — only you ever see your log.</p>

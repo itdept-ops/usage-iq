@@ -46,9 +46,8 @@ import { AutomationTemplate, TEMPLATES } from './automations-beta.model';
     <app-bs-pull-refresh class="ab-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
       <div class="ab-scroll">
 
-        <!-- Immersive header: title + accent bloom + active-rule glance. -->
+        <!-- Immersive header: title + active-rule glance. -->
         <header class="hh">
-          <div class="hh__bloom" aria-hidden="true"></div>
           <div class="hh__row">
             <div class="hh__text">
               <span class="hh__eyebrow"><span class="hh__spark" aria-hidden="true"></span> Automations</span>

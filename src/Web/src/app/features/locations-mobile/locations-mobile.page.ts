@@ -60,7 +60,6 @@ import {
 
       <!-- ─── TITLE OVERLAY (top), floating over the map ─── -->
       <header class="lm-hero">
-        <div class="lm-hero__bloom" aria-hidden="true"></div>
         <p class="lm-hero__kicker"><mat-icon aria-hidden="true">my_location</mat-icon> Wayfinding</p>
         <h1 class="lm-hero__title">My locations</h1>
         @if (!loading()) {

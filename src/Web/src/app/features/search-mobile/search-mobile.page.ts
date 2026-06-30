@@ -48,7 +48,6 @@ const DEBOUNCE_MS = 250;
 
       <!-- ─── STICKY SEARCH HEADER ─── -->
       <header class="sm-head">
-        <div class="sm-head__bloom" aria-hidden="true"></div>
         <h1 class="sm-head__title">Search</h1>
         <p class="sm-head__sub">Everything you can see — in one place.</p>
         <form class="sm-box" (submit)="submit(); $event.preventDefault()" role="search">

@@ -106,10 +106,9 @@ interface OverlayMember {
 
         <!-- ─── IMMERSIVE HEADER ─── -->
         <header class="fc-hero">
-          <div class="fc-hero__bloom" aria-hidden="true"></div>
           <p class="fc-hero__kicker"><mat-icon aria-hidden="true">event</mat-icon> Family</p>
           <h1 class="fc-hero__title">Calendar</h1>
-          <p class="fc-hero__sub">Your week at a glance — your events, shared family overlays, all in one agenda.</p>
+          <p class="fc-hero__sub">Your week at a glance — events and family overlays in one agenda.</p>
         </header>
 
         @if (loadingStatus()) {

@@ -3,8 +3,7 @@
   <div class="head-row">
     <div>
       <h2>Agent Inbox</h2>
-      <p class="sub">What your OS did for you while you were away — every nudge your proactive agents
-        delivered, grouped by when it arrived. Tap one to act on it, or mark it handled to clear it.</p>
+      <p class="sub">Every nudge your proactive agents delivered, grouped by when it arrived.</p>
     </div>
     @if (!loading() && !error() && unhandled() > 0) {
       <button type="button" class="btn-ghost" (click)="handleAll()" [disabled]="busyAll()">

@@ -1,9 +1,8 @@
 <app-bs-pull-refresh class="ab-ptr" [busy]="false" (refresh)="clearThread()">
   <div class="ab-scroll">
 
-    <!-- ── Immersive header: accent bloom + title ── -->
+    <!-- ── Immersive header: accent avatar + title ── -->
     <header class="abh">
-      <div class="abh__bloom" aria-hidden="true"></div>
       <div class="abh__avatar" aria-hidden="true">
         <mat-icon>auto_awesome</mat-icon>
       </div>
@@ -31,10 +30,7 @@
             <mat-icon>forum</mat-icon>
           </div>
           <h2 class="ab-empty__lead">Ask me anything about your life</h2>
-          <p class="ab-empty__sub">
-            Food, fitness, sleep, 75&nbsp;Hard, bills, family, AI spend — answers come straight from your
-            own numbers. Nothing is ever changed.
-          </p>
+          <p class="ab-empty__sub">Answers drawn from your own data — food, fitness, bills, family, AI spend.</p>
           <div class="ab-chips" role="list" aria-label="Suggested questions">
             @for (s of suggestions; track s.label; let i = $index) {
               <button

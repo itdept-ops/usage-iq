@@ -58,17 +58,6 @@
   isolation: isolate;
 }
 
-.im-hero__bloom {
-  position: absolute;
-  inset: -40px -20px auto -20px;
-  height: 220px;
-  z-index: -1;
-  background: radial-gradient(120% 80% at 20% 0%,
-    color-mix(in srgb, var(--accent-a) 34%, transparent), transparent 70%);
-  filter: blur(6px);
-  pointer-events: none;
-}
-
 .im-hero__kicker {
   display: inline-flex; align-items: center; gap: 6px;
   margin: 0;

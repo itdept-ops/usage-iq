@@ -62,10 +62,9 @@ interface IngredientRow {
 
         <!-- ─── IMMERSIVE HEADER: title + accent bloom + a tiny stat strip ─── -->
         <header class="rc-hero">
-          <div class="rc-hero__bloom" aria-hidden="true"></div>
           <p class="rc-hero__kicker"><mat-icon aria-hidden="true">menu_book</mat-icon> Cookbook</p>
           <h1 class="rc-hero__title">My Recipes</h1>
-          <p class="rc-hero__sub">Your go-to recipes, macros and all — share read-only with your contacts.</p>
+          <p class="rc-hero__sub">Your recipes with macros — share read-only with contacts.</p>
 
           @if (!loading() && !errored()) {
             <div class="rc-stats">

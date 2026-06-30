@@ -42,8 +42,8 @@
   grid-template-columns: 0.82fr 1.18fr;
   align-items: center;
   gap: clamp(32px, 6vw, 84px);
-  padding-top: clamp(56px, 9vw, 124px);
-  padding-bottom: clamp(48px, 7vw, 88px);
+  padding-top: clamp(12px, 2vw, 16px);
+  padding-bottom: clamp(16px, 2.5vw, 20px);
 
   @media (max-width: 880px) {
     grid-template-columns: 1fr;

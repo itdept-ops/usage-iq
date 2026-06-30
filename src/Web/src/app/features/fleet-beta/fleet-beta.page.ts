@@ -58,9 +58,8 @@ const EMPTY_FILTER: UsageFilter = {
     <app-bs-pull-refresh class="fb-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
       <div class="fb-scroll">
 
-        <!-- Immersive header: title + accent bloom + a fleet glance. -->
+        <!-- Immersive header: title + fleet glance. -->
         <header class="hh">
-          <div class="hh__bloom" aria-hidden="true"></div>
           <div class="hh__row">
             <div class="hh__text">
               <span class="hh__eyebrow"><span class="hh__spark" aria-hidden="true"></span> Fleet</span>

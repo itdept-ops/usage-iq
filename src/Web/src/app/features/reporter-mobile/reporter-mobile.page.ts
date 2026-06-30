@@ -60,15 +60,11 @@ interface SetupStep {
     <app-bs-pull-refresh class="rp-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="rp-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + stat strip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + stat strip ─── -->
         <header class="rp-hero">
-          <div class="rp-hero__bloom" aria-hidden="true"></div>
           <p class="rp-hero__kicker"><mat-icon aria-hidden="true">sensors</mat-icon> Reporter</p>
           <h1 class="rp-hero__title">Ingest keys</h1>
-          <p class="rp-hero__sub">
-            Mint a key, run a reporter on your machine, and stream usage here. Only token counts &amp;
-            metadata leave the machine — never prompts or responses.
-          </p>
+          <p class="rp-hero__sub">Mint a key, run a reporter, and stream token usage here — prompts never leave your machine.</p>
 
           @if (!loading() && !errored()) {
             <div class="rp-stats">

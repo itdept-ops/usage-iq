@@ -39,13 +39,13 @@
 .nt-scroll {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-height: 100%;
   max-width: 720px;          // centers on desktop; full-bleed within 390px
   margin-inline: auto;
   width: 100%;
   box-sizing: border-box;
-  padding-top: calc(var(--safe-top) + 8px);
+  padding-top: calc(var(--safe-top) + 4px);
   padding-bottom: calc(var(--safe-bottom) + 96px);   // clears the fixed FAB + global tab bar
   padding-inline: var(--gutter) var(--gutter-r);
 }
@@ -59,19 +59,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 4px 4px;
-  isolation: isolate;
-}
-
-.nt-hero__bloom {
-  position: absolute;
-  inset: -40px -20px auto -20px;
-  height: 200px;
-  z-index: -1;
-  background: radial-gradient(120% 80% at 18% 0%,
-    color-mix(in srgb, var(--accent-a) 32%, transparent), transparent 70%);
-  filter: blur(6px);
-  pointer-events: none;
+  padding: 4px 4px 0;
 }
 
 .nt-hero__kicker {
@@ -94,7 +82,7 @@
   font-size: 13.5px; font-weight: 500; line-height: 1.4; color: var(--ink-dim);
 }
 
-.nt-stats { display: flex; gap: 10px; margin-top: 12px; }
+.nt-stats { display: flex; gap: 10px; margin-top: 8px; }
 .nt-stat {
   flex: 1 1 0; min-width: 0;
   display: flex; flex-direction: column; gap: 2px;

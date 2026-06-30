@@ -50,19 +50,8 @@
 
 .cm-hero {
   position: relative;
-  padding: 14px 4px 4px;
+  padding: 8px 4px 4px;
   overflow: visible;
-
-  &__bloom {
-    position: absolute;
-    inset: -40px -30px auto -30px;
-    height: 180px;
-    background: radial-gradient(60% 100% at 30% 0%,
-      color-mix(in srgb, var(--accent-a) 26%, transparent), transparent 70%);
-    filter: blur(6px);
-    pointer-events: none;
-    z-index: 0;
-  }
 
   &__eyebrow,
   &__title,

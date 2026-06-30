@@ -48,7 +48,6 @@ import {
 
         <!-- ─── IMMERSIVE HEADER: kicker + household name (inline rename for owner) + count ─── -->
         <header class="hh-hero">
-          <div class="hh-hero__bloom" aria-hidden="true"></div>
           <p class="hh-hero__kicker"><mat-icon aria-hidden="true">home</mat-icon> Household</p>
 
           @if (loading()) {

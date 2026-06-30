@@ -44,27 +44,14 @@
 }
 
 // ============================================================================
-// IMMERSIVE HERO — title + accent bloom + stat strip.
+// HERO — compact title + stat strip.
 // ============================================================================
 
 .pl-hero {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px 4px 6px;
-  isolation: isolate;
-}
-
-.pl-hero__bloom {
-  position: absolute;
-  z-index: -1;
-  inset: -40px -20px auto -20px;
-  height: 200px;
-  background: radial-gradient(120% 80% at 22% 0%,
-    color-mix(in srgb, var(--accent-a) 30%, transparent), transparent 70%);
-  filter: blur(8px);
-  pointer-events: none;
+  padding: 8px 4px 6px;
 }
 
 .pl-hero__kicker {
@@ -102,7 +89,7 @@
 .pl-stats {
   display: flex;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .pl-stat {

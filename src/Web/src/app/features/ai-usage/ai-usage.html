@@ -2,11 +2,7 @@
   <div class="head-text">
     <span class="micro-label head-eyebrow">~/ai-usage — gemini call log</span>
     <h2 class="head-title">AI usage</h2>
-    <p class="sub">
-      Every AI (Gemini) call, captured at the service chokepoint: who called which feature, the
-      model, how it went, and the token counts. No prompt or response content is ever recorded; the
-      newest rows are kept.
-    </p>
+    <p class="sub">Every Gemini call logged at the service chokepoint — feature, model, outcome, and token counts; no prompt or response content is stored.</p>
   </div>
   <div class="head-actions">
     <button mat-stroked-button class="head-refresh-btn" (click)="reload()" [disabled]="loading()">

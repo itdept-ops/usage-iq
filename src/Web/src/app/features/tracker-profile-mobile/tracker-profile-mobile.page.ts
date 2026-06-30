@@ -97,7 +97,6 @@ const DIET_PATTERNS: { value: DietPattern; label: string }[] = [
 
         <!-- ─── IMMERSIVE HEADER ─── -->
         <header class="pm-hero">
-          <div class="pm-hero__bloom" aria-hidden="true"></div>
           <p class="pm-hero__kicker"><mat-icon aria-hidden="true">flag</mat-icon> My Plan</p>
           <h1 class="pm-hero__title">Profile &amp; Goal</h1>
           @if (!loading()) {

@@ -47,10 +47,8 @@ import {
     <app-bs-pull-refresh class="gm-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="gm-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: items-left ring + count, behind an accent bloom ─── -->
+        <!-- ─── IMMERSIVE HEADER: items-left ring + count ─── -->
         <header class="gm-hero">
-          <div class="gm-hero__bloom" aria-hidden="true"></div>
-
           @if (loading()) {
             <div class="gm-hero__skel">
               <app-bs-skeleton width="60%" height="26px" radius="var(--r-pill)" />

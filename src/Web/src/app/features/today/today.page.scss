@@ -29,7 +29,7 @@
 .td {
   max-width: 920px;
   margin: 0 auto;
-  padding: var(--tech-space-6, 1.5rem);
+  padding: var(--tech-space-3, .75rem) var(--tech-space-6, 1.5rem) var(--tech-space-6, 1.5rem);
   display: flex;
   flex-direction: column;
   gap: var(--tech-space-6, 1.5rem);
@@ -64,10 +64,10 @@
     color: var(--tech-text, #e6edf6);
   }
   &__sub {
-    margin: .5rem 0 0;
+    margin: .3rem 0 0;
     max-width: 56ch;
-    font-size: .95rem;
-    line-height: 1.5;
+    font-size: .9rem;
+    line-height: 1.4;
     color: var(--tech-text-secondary, #9ba9bd);
     strong { color: var(--tech-text, #e6edf6); font-weight: 600; }
   }

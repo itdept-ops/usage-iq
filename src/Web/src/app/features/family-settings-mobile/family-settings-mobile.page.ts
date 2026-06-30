@@ -103,10 +103,9 @@ type PickerKind = 'tz' | 'hour' | 'lead' | null;
 
         <!-- ─── IMMERSIVE HEADER ─── -->
         <header class="fs-hero">
-          <div class="fs-hero__bloom" aria-hidden="true"></div>
           <p class="fs-hero__kicker"><mat-icon aria-hidden="true">tune</mat-icon> Household</p>
           <h1 class="fs-hero__title">Family Settings</h1>
-          <p class="fs-hero__sub">How the hub behaves — the morning briefing, your timezone, weather and event heads-ups.</p>
+          <p class="fs-hero__sub">Briefing time, timezone, weather location and event heads-up.</p>
 
           @if (!loading() && !errored() && !canEdit()) {
             <p class="fs-hero__note">

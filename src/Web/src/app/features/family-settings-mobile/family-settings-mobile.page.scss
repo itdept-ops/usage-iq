@@ -32,13 +32,13 @@
 .fs-scroll {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   min-height: 100%;
   max-width: 720px;          // centers on desktop; full-bleed within 390px
   margin-inline: auto;
   width: 100%;
   box-sizing: border-box;
-  padding-top: calc(var(--safe-top) + 8px);
+  padding-top: calc(var(--safe-top) + 4px);
   padding-bottom: calc(var(--safe-bottom) + 28px);
   padding-inline: var(--gutter) var(--gutter-r);
 }
@@ -48,22 +48,10 @@
 // ============================================================================
 
 .fs-hero {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 4px 4px;
-  isolation: isolate;
-}
-
-.fs-hero__bloom {
-  position: absolute;
-  inset: -40px -30% auto -10%;
-  height: 200px;
-  z-index: -1;
-  background: radial-gradient(60% 80% at 25% 0%, color-mix(in srgb, var(--accent-a) 32%, transparent), transparent 70%);
-  filter: blur(var(--blur-glass));
-  pointer-events: none;
+  padding: 4px 4px 0;
 }
 
 .fs-hero__kicker {

@@ -77,12 +77,9 @@ interface ExportTarget {
 
         <!-- ─── IMMERSIVE HEADER ─── -->
         <header class="rm-hero">
-          <div class="rm-hero__bloom" aria-hidden="true"></div>
           <p class="rm-hero__kicker"><mat-icon aria-hidden="true">description</mat-icon> Resume Builder</p>
           <h1 class="rm-hero__title">{{ hasMaster() ? (title() || 'My Resume') : 'Build your resume' }}</h1>
-          <p class="rm-hero__sub">
-            One master resume, an AI assistant, and per-job tailored applications — export anywhere.
-          </p>
+          <p class="rm-hero__sub">AI-powered resume builder with per-job tailoring and export.</p>
 
           @if (!loading() && !errored() && hasMaster()) {
             <div class="rm-stats">

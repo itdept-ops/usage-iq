@@ -56,18 +56,6 @@
   isolation: isolate;
 }
 
-// Soft accent bloom behind the greeting — the page's "wow" gradient, never flat.
-.hh__bloom {
-  position: absolute;
-  top: -40px; left: -30px; right: 30%;
-  height: 160px; z-index: -1; pointer-events: none;
-  background: radial-gradient(120px 90px at 30% 30%,
-    color-mix(in srgb, var(--accent-a) 42%, transparent),
-    transparent 70%);
-  filter: blur(18px);
-  opacity: .9;
-}
-
 .hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .hh__text { min-width: 0; }
 .hh__date {

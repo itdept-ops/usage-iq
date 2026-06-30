@@ -70,7 +70,6 @@ const REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '🙏', '😢', '�
     <!-- ══════════════════════ LIST PANE ══════════════════════ -->
     <section class="pane list" [class.is-hidden]="!!activeId()" aria-label="Conversations">
       <header class="lh">
-        <div class="lh__bloom" aria-hidden="true"></div>
         <div class="lh__row">
           <h1 class="lh__title">Messages</h1>
           @if (totalUnread() > 0) {

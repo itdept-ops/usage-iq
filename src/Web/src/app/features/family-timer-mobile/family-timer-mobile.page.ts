@@ -70,12 +70,11 @@ const PRESETS: Preset[] = [
     <app-bs-pull-refresh class="ft-ptr" [busy]="refreshing()" (refresh)="reload(false)">
       <div class="ft-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + a tiny stat strip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + a tiny stat strip ─── -->
         <header class="ft-hero">
-          <div class="ft-hero__bloom" aria-hidden="true"></div>
           <p class="ft-hero__kicker"><mat-icon aria-hidden="true">timer</mat-icon> Family timers</p>
           <h1 class="ft-hero__title">Shared timers</h1>
-          <p class="ft-hero__sub">Countdowns the whole household sees ticking — start one for homework, cooking or screen time.</p>
+          <p class="ft-hero__sub">Household countdowns everyone sees in real time.</p>
 
           @if (!loading() && !error()) {
             <div class="ft-stats">

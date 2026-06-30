@@ -50,9 +50,8 @@ const PAGE_SIZE = 100;
     <app-bs-pull-refresh class="au-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="au-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + headline cost ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + headline cost ─── -->
         <header class="au-hero">
-          <div class="au-hero__bloom" aria-hidden="true"></div>
           <p class="au-hero__kicker"><mat-icon aria-hidden="true">insights</mat-icon> AI telemetry</p>
           <h1 class="au-hero__title">AI Usage</h1>
           <p class="au-hero__sub">Every model call — feature, outcome, tokens and estimated cost.</p>

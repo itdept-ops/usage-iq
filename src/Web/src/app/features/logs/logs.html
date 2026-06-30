@@ -2,9 +2,7 @@
   <div class="logs-header__copy">
     <span class="micro-label logs-header__eyebrow">~/activity — request log</span>
     <h1 class="logs-header__title">Activity</h1>
-    <p class="logs-header__sub">Every API request and response, captured by middleware. Bodies are
-      truncated and secrets/auth routes redacted; health and polling calls are skipped, and the newest
-      ~10k are kept.</p>
+    <p class="logs-header__sub">Every API request and response captured by middleware — bodies truncated, auth routes redacted, newest ~10k kept.</p>
   </div>
   <button mat-flat-button class="logs-header__refresh" (click)="load()" [disabled]="loading()"
           matTooltip="Reload the log">

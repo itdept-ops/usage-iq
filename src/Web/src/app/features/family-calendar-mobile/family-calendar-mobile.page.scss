@@ -62,15 +62,6 @@
   padding: 6px 2px 2px;
 }
 
-.fc-hero__bloom {
-  position: absolute;
-  top: -30px; left: -20px; right: 40%;
-  height: 130px; z-index: -1; pointer-events: none;
-  background: radial-gradient(120px 80px at 26% 30%,
-    color-mix(in oklab, var(--accent-a) 38%, transparent), transparent 70%);
-  filter: blur(8px);
-}
-
 .fc-hero__kicker {
   display: inline-flex; align-items: center; gap: 6px;
   margin: 0;

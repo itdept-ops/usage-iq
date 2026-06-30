@@ -4,7 +4,7 @@
 .habits {
   max-width: 1100px;
   margin: 0 auto;
-  padding: var(--tech-space-6, 1.5rem);
+  padding: var(--tech-space-3, 12px) var(--tech-space-6, 1.5rem) var(--tech-space-6, 1.5rem);
   display: flex;
   flex-direction: column;
   gap: var(--tech-space-4, 1rem);

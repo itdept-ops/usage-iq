@@ -60,7 +60,6 @@ interface RangePreset { key: string; label: string; days: number; }
 
         <!-- ─── IMMERSIVE HERO: title + accent bloom + the split ring ─── -->
         <header class="im-hero">
-          <div class="im-hero__bloom" aria-hidden="true"></div>
           <p class="im-hero__kicker"><mat-icon aria-hidden="true">hub</mat-icon> Identity Map</p>
           <h1 class="im-hero__title">Your roles</h1>
           <p class="im-hero__sub">Log time against the roles you play and watch the split.</p>

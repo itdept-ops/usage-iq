@@ -65,15 +65,6 @@
   isolation: isolate;
 }
 
-.au-hero__bloom {
-  position: absolute;
-  top: -44px; left: -30px; right: 32%;
-  height: 168px; z-index: -1; pointer-events: none;
-  background: radial-gradient(130px 96px at 30% 30%,
-    color-mix(in oklab, var(--accent-a) 42%, transparent), transparent 70%);
-  filter: blur(8px);
-}
-
 .au-hero__kicker {
   display: inline-flex; align-items: center; gap: 6px;
   margin: 0;

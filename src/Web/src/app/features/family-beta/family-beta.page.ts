@@ -76,10 +76,9 @@ import { LeaderboardCard } from './cards/leaderboard-card';
     <app-bs-pull-refresh class="fb-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
       <div class="scroll">
 
-        <!-- Immersive page header — greeting + date + quick actions, with an accent bloom; scrolls with
+        <!-- Immersive page header — greeting + date + quick actions; scrolls with
              the column (not the global app bar), reserving safe-area at the top. -->
         <header class="hh">
-          <div class="hh__bloom" aria-hidden="true"></div>
           <div class="hh__row">
             <div class="hh__text">
               <span class="hh__eyebrow"><span class="hh__spark" aria-hidden="true"></span> Family · Hearth</span>

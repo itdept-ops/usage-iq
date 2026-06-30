@@ -64,7 +64,6 @@ interface VitalMeta {
 
         <!-- ─── HERO ─── -->
         <header class="mv-hero">
-          <div class="mv-hero__bloom" aria-hidden="true"></div>
           <p class="mv-hero__kicker"><mat-icon aria-hidden="true">medication</mat-icon> Meds &amp; Vitals</p>
           <h1 class="mv-hero__title">Your private health log</h1>
           <p class="mv-hero__sub"><mat-icon aria-hidden="true">lock</mat-icon> Only you ever see this — not medical advice.</p>

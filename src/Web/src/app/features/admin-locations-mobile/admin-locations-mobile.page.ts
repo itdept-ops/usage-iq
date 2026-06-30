@@ -60,7 +60,6 @@ import {
 
       <!-- ─── SLIM FLOATING HEADER (title + context chip) ─── -->
       <header class="al-head">
-        <div class="al-head__bloom" aria-hidden="true"></div>
         <div class="al-head__row">
           <div class="al-head__titles">
             <p class="al-head__kicker">

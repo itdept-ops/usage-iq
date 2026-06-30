@@ -99,11 +99,9 @@ interface PickerState {
 
         <!-- ─── IMMERSIVE HEADER ─── -->
         <header class="ag-hero">
-          <div class="ag-hero__bloom" aria-hidden="true"></div>
           <p class="ag-hero__kicker"><mat-icon aria-hidden="true">smart_toy</mat-icon> Proactive</p>
           <h1 class="ag-hero__title">Agents</h1>
-          <p class="ag-hero__sub">Per-you assistants that run on a schedule and nudge your bell — a morning
-            briefing, streak rescue, budget alert and low-staples reminder. They only ever watch your own data.</p>
+          <p class="ag-hero__sub">Scheduled assistants that nudge you — only your own data, always.</p>
         </header>
 
         @if (loading()) {

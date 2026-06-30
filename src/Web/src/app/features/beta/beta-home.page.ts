@@ -54,9 +54,8 @@ import { ActivityWidget } from './widgets/activity-widget';
       <div class="atr-scroll">
 
         <!-- Immersive page header — greeting + date + quick actions. Scrolls with the column (not the
-             global app bar), with an accent bloom behind it; reserves safe-area at the top. -->
+             global app bar); reserves safe-area at the top. -->
         <header class="hh">
-          <div class="hh__bloom" aria-hidden="true"></div>
           <div class="hh__row">
             <div class="hh__text">
               @if (dateLabel(); as dl) { <span class="hh__date">{{ dl }}</span> }

@@ -5,14 +5,14 @@
 .prefs {
   max-width: 880px;
   margin: 0 auto;
-  padding: var(--tech-space-6) var(--tech-space-4) calc(var(--tech-space-6) + env(safe-area-inset-bottom, 0px));
+  padding: var(--tech-space-3) var(--tech-space-4) calc(var(--tech-space-6) + env(safe-area-inset-bottom, 0px));
 }
 
 .prefs__head {
   display: flex;
   align-items: center;
   gap: var(--tech-space-3);
-  margin-bottom: var(--tech-space-6);
+  margin-bottom: var(--tech-space-4);
 }
 .prefs__head-copy { flex: 1 1 auto; min-width: 0; }
 .prefs__title {
@@ -274,8 +274,8 @@
 
 // ---- Mobile ----
 @media (max-width: 640px) {
-  .prefs { padding: var(--tech-space-4) var(--tech-space-3) calc(var(--tech-space-6) + env(safe-area-inset-bottom, 0px)); }
-  .prefs__head { margin-bottom: var(--tech-space-5); }
+  .prefs { padding: var(--tech-space-3) var(--tech-space-3) calc(var(--tech-space-6) + env(safe-area-inset-bottom, 0px)); }
+  .prefs__head { margin-bottom: var(--tech-space-4); }
   .webhook__clear { margin-left: 0; }
   // Suppress card hover lift on touch so it doesn't stick
   .card:hover { transform: none; }

@@ -49,23 +49,10 @@
 // ============================================================================
 
 .rc-hero {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 4px 12px;    // extra bottom breathing room before the next section
-  isolation: isolate;
-}
-
-.rc-hero__bloom {
-  position: absolute;
-  inset: -40px -20px auto -20px;
-  height: 200px;
-  z-index: -1;
-  background: radial-gradient(120% 80% at 18% 0%,
-    color-mix(in srgb, var(--accent-a) 32%, transparent), transparent 70%);
-  filter: blur(6px);
-  pointer-events: none;
+  padding: 4px 4px 6px;
 }
 
 .rc-hero__kicker {
@@ -89,7 +76,7 @@
 }
 
 .rc-stats {
-  display: flex; gap: 10px; margin-top: 12px;
+  display: flex; gap: 10px; margin-top: 6px;
 }
 .rc-stat {
   flex: 1 1 0; min-width: 0;

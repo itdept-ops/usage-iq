@@ -40,9 +40,9 @@
 .pl-scroll {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-height: 100%;
-  padding-top: calc(var(--safe-top) + 8px);
+  padding-top: calc(var(--safe-top) + 4px);
   padding-bottom: calc(var(--safe-bottom) + 28px);
   padding-inline: var(--gutter) var(--gutter-r);
 }
@@ -55,19 +55,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 6px 2px 2px;
+  gap: 10px;
+  padding: 4px 2px 2px;
   isolation: isolate;
-}
-
-.hh__bloom {
-  position: absolute;
-  top: -40px; left: -30px; right: 25%;
-  height: 170px; z-index: -1; pointer-events: none;
-  background: radial-gradient(130px 96px at 28% 30%,
-    color-mix(in srgb, var(--accent-a) 48%, transparent), transparent 70%);
-  filter: blur(20px);
-  opacity: .9;
 }
 
 .hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }

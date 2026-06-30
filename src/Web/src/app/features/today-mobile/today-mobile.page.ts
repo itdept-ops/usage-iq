@@ -45,7 +45,6 @@ interface StatChip {
 
         <!-- ─── HERO + DAY NAV ─── -->
         <header class="td-hero">
-          <div class="td-hero__bloom" aria-hidden="true"></div>
           <p class="td-hero__kicker"><mat-icon aria-hidden="true">wb_twilight</mat-icon> Day in the Life</p>
           <h1 class="td-hero__title">Your day</h1>
           <p class="td-hero__sub">A moment-by-moment look at what you tracked.</p>

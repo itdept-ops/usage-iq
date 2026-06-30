@@ -74,16 +74,6 @@
   padding: 4px 2px 2px;
   isolation: isolate;
 }
-.hh__bloom {
-  position: absolute;
-  top: -54px; left: -34px; right: 24%;
-  height: 180px; z-index: -1; pointer-events: none;
-  background: radial-gradient(140px 100px at 28% 30%,
-    color-mix(in srgb, var(--accent-a) 40%, transparent),
-    transparent 70%);
-  filter: blur(20px);
-  opacity: .85;
-}
 .hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .hh__text { min-width: 0; }
 .hh__eyebrow {

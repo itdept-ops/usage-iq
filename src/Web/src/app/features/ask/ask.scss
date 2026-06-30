@@ -17,10 +17,10 @@
 .ask {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   max-width: 760px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 12px 16px 16px;
   /* Fill the viewport so the composer pins to the bottom on desktop and mobile. */
   min-height: calc(100dvh - 120px);
 }
@@ -30,30 +30,12 @@
   margin-bottom: 4px;
 }
 
-/* FiMobile hero block: relative container for the bloom layer */
+/* FiMobile hero block */
 .ask__hero {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 4px 4px;
-  isolation: isolate;
-}
-
-/* Ambient radial bloom behind the title — matches journal-mobile / agents-mobile pattern */
-.ask__hero-bloom {
-  position: absolute;
-  inset: -40% -30% auto -10%;
-  height: 220px;
-  z-index: -1;
-  background: radial-gradient(
-    60% 60% at 30% 30%,
-    color-mix(in srgb, var(--tech-accent-2) 35%, transparent),
-    transparent 70%
-  );
-  filter: blur(40px);
-  opacity: 0.55;
-  pointer-events: none;
+  padding: 4px 4px 4px;
 }
 
 /* Small-caps kicker: icon + label pair above the title */
@@ -404,10 +386,6 @@
     font-size: 1.55rem;
   }
 
-  .ask__hero-bloom {
-    opacity: 0.45;
-  }
-
   .turn__q,
   .turn__a {
     max-width: 95%;
@@ -415,10 +393,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ask__hero-bloom {
-    display: none;
-  }
-
   .chip {
     transition: none;
   }

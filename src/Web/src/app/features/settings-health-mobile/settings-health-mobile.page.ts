@@ -43,11 +43,9 @@ interface SignalToggle {
 
         <!-- ─── HERO ─── -->
         <header class="hs-hero">
-          <div class="hs-hero__bloom" aria-hidden="true"></div>
           <p class="hs-hero__kicker"><mat-icon aria-hidden="true">watch</mat-icon> Wearable</p>
           <h1 class="hs-hero__title">Health sync</h1>
-          <p class="hs-hero__sub">Link a wearable and your steps, sleep, resting heart rate and workouts flow
-            into your tracker automatically. Sleep and heart rate stay private to you.</p>
+          <p class="hs-hero__sub">Connect a wearable to auto-sync steps, sleep, heart rate and workouts.</p>
         </header>
 
         @if (loading()) {

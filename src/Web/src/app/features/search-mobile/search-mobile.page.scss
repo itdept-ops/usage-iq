@@ -43,21 +43,9 @@
   z-index: 5;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: calc(var(--safe-top) + 14px) 0 12px;
+  gap: 8px;
+  padding: calc(var(--safe-top) + 8px) 0 12px;
   background: linear-gradient(var(--bg-base) 72%, transparent);
-}
-
-.sm-head__bloom {
-  position: absolute;
-  inset: -40% -30% auto -30%;
-  height: 220px;
-  background: radial-gradient(60% 80% at 30% 0%,
-              color-mix(in srgb, var(--tech-accent) 30%, transparent), transparent 70%);
-  filter: blur(22px);
-  opacity: .85;
-  pointer-events: none;
-  z-index: -1;
 }
 
 .sm-head__title {

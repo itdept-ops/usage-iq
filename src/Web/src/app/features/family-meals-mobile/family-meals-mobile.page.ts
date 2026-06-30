@@ -81,9 +81,8 @@ const SLOT_ORDER: FamilyMealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
     <app-bs-pull-refresh class="fm-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="fm-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + week nav + macro stats ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + week nav + macro stats ─── -->
         <header class="fm-hero">
-          <div class="fm-hero__bloom" aria-hidden="true"></div>
           <p class="fm-hero__kicker"><mat-icon aria-hidden="true">restaurant</mat-icon> Meal plan</p>
           <h1 class="fm-hero__title">Your meals</h1>
 

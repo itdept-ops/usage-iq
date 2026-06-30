@@ -48,7 +48,6 @@ interface MoodChoice { value: string; label: string; emoji: string; }
       <div class="jr-scroll" aria-live="polite">
 
         <header class="jr-hero">
-          <div class="jr-hero__bloom" aria-hidden="true"></div>
           <p class="jr-hero__kicker"><mat-icon aria-hidden="true">menu_book</mat-icon> Journal</p>
           <h1 class="jr-hero__title">How was your day?</h1>
           <p class="jr-hero__sub">A gentle, private check-in — only you ever see your notes.</p>

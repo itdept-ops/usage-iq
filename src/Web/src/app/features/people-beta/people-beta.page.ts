@@ -60,9 +60,8 @@ type SortMode = 'online' | 'az';
     <app-bs-pull-refresh class="pl-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
       <div class="pl-scroll">
 
-        <!-- Immersive header: who's-online hero count + overlapping avatars + accent bloom. -->
+        <!-- Immersive header: who's-online hero count + overlapping avatars. -->
         <header class="hh">
-          <div class="hh__bloom" aria-hidden="true"></div>
           <div class="hh__row">
             <div class="hh__text">
               <span class="hh__eyebrow"><span class="hh__spark" aria-hidden="true"></span> Your circle</span>

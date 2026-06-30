@@ -57,18 +57,6 @@
   isolation: isolate;
 }
 
-// Soft accent bloom behind the title — the page's "wow" gradient, never flat.
-.bh-head__bloom {
-  position: absolute;
-  top: -52px; left: -34px; right: 24%;
-  height: 180px; z-index: -1; pointer-events: none;
-  background: radial-gradient(140px 100px at 28% 28%,
-    color-mix(in srgb, var(--accent-a) 46%, transparent),
-    transparent 70%);
-  filter: blur(20px);
-  opacity: .9;
-}
-
 .bh-head__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .bh-head__text { min-width: 0; }
 

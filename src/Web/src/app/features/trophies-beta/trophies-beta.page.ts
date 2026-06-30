@@ -98,10 +98,8 @@ interface BadgeGroup {
           </a>
         </div>
 
-        <!-- ─── IMMERSIVE HEADER: ring + "N of M" + name, behind an accent bloom ─── -->
+        <!-- ─── IMMERSIVE HEADER: ring + "N of M" + name ─── -->
         <header class="tr-hero">
-          <div class="tr-hero__bloom" aria-hidden="true"></div>
-
           @if (loading()) {
             <div class="tr-hero__skel">
               <app-bs-skeleton width="132px" height="132px" [circle]="true" />

@@ -84,9 +84,8 @@ interface LoginHistory {
     <app-bs-pull-refresh class="um-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="um-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + stat strip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + stat strip ─── -->
         <header class="um-hero">
-          <div class="um-hero__bloom" aria-hidden="true"></div>
           <p class="um-hero__kicker"><mat-icon aria-hidden="true">admin_panel_settings</mat-icon> Access control</p>
           <h1 class="um-hero__title">Users</h1>
           <p class="um-hero__sub">Manage who can sign in and exactly what each person can do.</p>

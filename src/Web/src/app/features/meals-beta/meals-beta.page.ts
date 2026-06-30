@@ -62,9 +62,8 @@ import { ForageMoveMealSheet } from './components/move-meal-sheet';
     <app-bs-pull-refresh class="mb-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
       <div class="mb-scroll">
 
-        <!-- Immersive header: week range + a planned glance, accent bloom, week nav. -->
+        <!-- Immersive header: week range + a planned glance, week nav. -->
         <header class="hh">
-          <div class="hh__bloom" aria-hidden="true"></div>
           <div class="hh__row">
             <div class="hh__text">
               <span class="hh__eyebrow"><span class="hh__spark" aria-hidden="true"></span> Meal plan</span>

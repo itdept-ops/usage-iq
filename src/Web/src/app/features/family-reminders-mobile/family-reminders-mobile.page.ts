@@ -85,12 +85,11 @@ interface ProposedReminder {
     <app-bs-pull-refresh class="fr-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="fr-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: title + accent bloom + a tiny stat strip ─── -->
+        <!-- ─── IMMERSIVE HEADER: title + a tiny stat strip ─── -->
         <header class="fr-hero">
-          <div class="fr-hero__bloom" aria-hidden="true"></div>
           <p class="fr-hero__kicker"><mat-icon aria-hidden="true">notifications_active</mat-icon> Reminders</p>
           <h1 class="fr-hero__title">Family nudges</h1>
-          <p class="fr-hero__sub">Scheduled reminders for your household — they ping the right person when they're due.</p>
+          <p class="fr-hero__sub">Household reminders that ping the right person when due.</p>
 
           @if (!loading() && !errored()) {
             <div class="fr-stats">

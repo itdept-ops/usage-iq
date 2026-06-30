@@ -62,10 +62,8 @@ const AUTO_ICON: Record<string, string> = {
     <app-bs-pull-refresh class="cm-ptr" [busy]="refreshing()" (refresh)="reload()">
       <div class="cm-scroll" aria-live="polite">
 
-        <!-- ─── IMMERSIVE HEADER: streak ring + numeral, behind a flame bloom ─── -->
+        <!-- ─── IMMERSIVE HEADER: streak ring + numeral ─── -->
         <header class="cm-hero">
-          <div class="cm-hero__bloom" aria-hidden="true"></div>
-
           @if (loading()) {
             <div class="cm-hero__skel">
               <app-bs-skeleton width="138px" height="138px" [circle]="true" />
@@ -77,8 +75,8 @@ const AUTO_ICON: Record<string, string> = {
             <span class="cm-hero__orb"><mat-icon aria-hidden="true">flag</mat-icon></span>
             <h1 class="cm-hero__title">Start your 75 Hard</h1>
             <p class="cm-hero__sub">
-              @if (errored()) { Couldn't load your challenge — pull to retry. }
-              @else { Six daily tasks, points &amp; a streak. Begin a run on the full page. }
+              @if (errored()) { Couldn't load — pull to retry. }
+              @else { Six tasks, streak &amp; points. Start a run on the full page. }
             </p>
             <a class="cm-hero__cta" routerLink="/challenge">
               Open the challenge <mat-icon aria-hidden="true">arrow_forward</mat-icon>

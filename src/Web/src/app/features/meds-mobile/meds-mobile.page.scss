@@ -44,12 +44,6 @@
 .mv-hero {
   position: relative; display: flex; flex-direction: column; gap: 4px;
   padding: 8px 4px 4px; overflow: hidden;
-  &__bloom {
-    position: absolute; top: -60px; right: -40px; width: 200px; height: 200px;
-    background: radial-gradient(closest-side,
-      color-mix(in srgb, var(--accent-a) 40%, transparent), transparent 70%);
-    filter: blur(8px); pointer-events: none;
-  }
   &__kicker {
     display: inline-flex; align-items: center; gap: 6px; margin: 0;
     font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;

@@ -67,10 +67,7 @@ interface WindowOpt { value: number; label: string; }
             <mat-icon aria-hidden="true">medication</mat-icon> Meds &amp; Vitals
           </p>
           <h1 class="md-head__title">Your private health log</h1>
-          <p class="md-head__sub">
-            Medications, doses &amp; vital readings — logged by you, for you. Informational only, not medical
-            advice.
-          </p>
+          <p class="md-head__sub">Track your meds, doses &amp; vitals — private to you, not medical advice.</p>
           <p class="md-private">
             <mat-icon aria-hidden="true">lock</mat-icon>
             Private to you — never shared with family, coaches, or contacts.

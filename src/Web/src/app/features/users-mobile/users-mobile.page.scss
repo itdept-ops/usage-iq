@@ -55,7 +55,7 @@
   margin-inline: auto;
   width: 100%;
   box-sizing: border-box;
-  padding-top: calc(var(--safe-top) + 8px);
+  padding-top: calc(var(--safe-top) + 4px);
   padding-bottom: calc(var(--safe-bottom) + 96px);
   padding-inline: var(--gutter) var(--gutter-r);
 }
@@ -63,12 +63,7 @@
 // ============================================================================
 // HERO
 // ============================================================================
-.um-hero { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 8px 4px 4px; isolation: isolate; }
-.um-hero__bloom {
-  position: absolute; inset: -40% -30% auto -30%; height: 220px; z-index: -1;
-  background: radial-gradient(60% 80% at 30% 0%, color-mix(in srgb, var(--accent-a) 38%, transparent), transparent 70%);
-  filter: blur(8px); pointer-events: none;
-}
+.um-hero { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 2px; isolation: isolate; }
 .um-hero__kicker {
   display: inline-flex; align-items: center; gap: 6px; margin: 0;
   font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
@@ -78,7 +73,7 @@
 .um-hero__title { margin: 2px 0 0; font-family: var(--font-display); font-size: var(--title-xl); line-height: 1.05; color: var(--ink); }
 .um-hero__sub { margin: 4px 0 0; font-size: 14px; color: var(--ink-dim); max-width: 46ch; }
 
-.um-stats { display: flex; gap: 10px; margin-top: 14px; }
+.um-stats { display: flex; gap: 10px; margin-top: 10px; }
 .um-stat {
   flex: 1; display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
   padding: 12px 14px; background: var(--glass);

@@ -4,7 +4,7 @@
 .family {
   max-width: 980px;
   margin: 0 auto;
-  padding: var(--tech-space-6, 24px);
+  padding: var(--tech-space-3, 12px) var(--tech-space-6, 24px) var(--tech-space-6, 24px);
   display: flex;
   flex-direction: column;
   gap: var(--tech-space-6, 24px);
@@ -1258,7 +1258,7 @@ a.tile:focus-visible {
 .settings-link__chev { flex: 0 0 auto; color: var(--tech-text-tertiary); }
 
 @media (max-width: 600px) {
-  .family { padding: var(--tech-space-4, 16px); }
+  .family { padding: var(--tech-space-3, 12px) var(--tech-space-4, 16px) var(--tech-space-4, 16px); }
   .family__hero { flex-direction: column; align-items: flex-start; }
   .note-board { grid-template-columns: 1fr; }
   .today-grid { grid-template-columns: 1fr; }

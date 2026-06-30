@@ -50,9 +50,8 @@ import { HomeOption, HOME_OPTIONS } from '../../core/home-options';
     <app-bs-pull-refresh class="bs-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
       <div class="scroll">
 
-        <!-- IMMERSIVE IDENTITY HEADER — avatar + name + a quick identity line, with a slate accent bloom. -->
+        <!-- IMMERSIVE IDENTITY HEADER — avatar + name + a quick identity line. -->
         <header class="hh">
-          <div class="hh__bloom" aria-hidden="true"></div>
           <div class="hh__id">
             <span class="hh__avatar" [class.hh__avatar--img]="!!avatarUrl()">
               @if (avatarUrl(); as url) {

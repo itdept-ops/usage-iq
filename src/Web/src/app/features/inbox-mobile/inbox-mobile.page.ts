@@ -74,11 +74,9 @@ interface InboxSection {
 
         <!-- ─── IMMERSIVE HEADER ─── -->
         <header class="ib-hero">
-          <div class="ib-hero__bloom" aria-hidden="true"></div>
           <p class="ib-hero__kicker"><mat-icon aria-hidden="true">inbox</mat-icon> Your OS</p>
           <h1 class="ib-hero__title">Agent Inbox</h1>
-          <p class="ib-hero__sub">What your agents did for you — grouped by when it landed. Tap to act, or mark
-            it handled to clear it.</p>
+          <p class="ib-hero__sub">Agent activity grouped by when it landed — tap to act or mark handled.</p>
 
           @if (!loading() && !errored() && items().length) {
             <div class="ib-hero__bar">

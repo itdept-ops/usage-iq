@@ -69,7 +69,6 @@ const SPEND_CATEGORIES: { value: AllowanceSpendCategory; label: string; icon: st
 
         <!-- ─── IMMERSIVE HEADER: total balance across all children ─── -->
         <header class="al-hero">
-          <div class="al-hero__bloom" aria-hidden="true"></div>
           <p class="al-hero__kicker"><mat-icon aria-hidden="true">savings</mat-icon> Allowance</p>
           <h1 class="al-hero__title">Allowance Manager</h1>
           <p class="al-hero__sub">Each child's earned credits — pay out cash, log a spend, or adjust.</p>

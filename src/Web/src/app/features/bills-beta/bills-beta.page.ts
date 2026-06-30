@@ -56,9 +56,8 @@ import { ReceiptReviewSheet, ReceiptReviewResult } from './ui/receipt-review-she
     <app-bs-pull-refresh class="bb-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
       <div class="scroll">
 
-        <!-- Immersive header: title + tally subtitle + a cream bloom + a "you're owed" pill. -->
+        <!-- Immersive header: title + tally subtitle + a "you're owed" pill. -->
         <header class="hh">
-          <div class="hh__bloom" aria-hidden="true"></div>
           <div class="hh__row">
             <div class="hh__text">
               <span class="hh__eyebrow"><mat-icon aria-hidden="true">receipt_long</mat-icon> Tally</span>
