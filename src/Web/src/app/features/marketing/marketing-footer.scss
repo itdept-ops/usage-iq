@@ -253,17 +253,21 @@
 /* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
   /* brand stacks above the columns; columns stay 3-across as long as they fit */
-  .mfoot-grid { grid-template-columns: 1fr; gap: 2.8rem; }
+  .mfoot-grid { grid-template-columns: 1fr; gap: 2.2rem; }
 }
 @media (max-width: 560px) {
-  .mfoot-cols { grid-template-columns: 1fr 1fr; gap: 1.8rem 1.2rem; }
-  .mfoot-col a { min-height: 32px; display: inline-flex; align-items: center; }
-  .mfoot-base { justify-content: flex-start; }
-}
-@media (max-width: 430px) {
-  /* 390–430px phones (iPhone 12–15, Pixel) get a clean single-column link
-     stack instead of a cramped 2-up. */
-  .mfoot-cols { grid-template-columns: 1fr; }
+  /* Compact mobile footer — a content-rich footer stacked 1-up ran ~870px (over a
+     full screen of "foot"). Keep links 2-up, trim the top padding + gaps, and drop
+     the redundant footer sign-in pill (the hero + final-CTA already sign in). */
+  .mfoot { padding-top: 2.4rem; }
+  .mfoot-grid { gap: 1.6rem; padding-bottom: 1.6rem; }
+  .mfoot-brand { gap: 0.55rem; }
+  .mfoot-cta { display: none; }
+  .mfoot-cols { grid-template-columns: 1fr 1fr; gap: 1.3rem 1.1rem; }
+  .mfoot-col { gap: 0.45rem; }
+  .mfoot-col h3 { margin-bottom: 0.3rem; }
+  .mfoot-col a { min-height: 30px; display: inline-flex; align-items: center; }
+  .mfoot-base { justify-content: flex-start; padding: 1rem 0 1.2rem; }
 }
 
 /* ── REDUCED MOTION ──────────────────────────────────────────────────────── */
