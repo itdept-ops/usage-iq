@@ -451,10 +451,12 @@ mat-progress-bar {
 }
 
 /* Per-card accent assignment (vendor/metric law) */
+/* All four orbs track the active scheme accent so the row is cohesive in ANY color scheme
+   (fixed blue/violet/cyan orbs looked off-palette under non-blue schemes). */
 .kpi-cost   { --accent: var(--tech-accent); }
 .kpi-tokens { --accent: var(--tech-accent); }
-.kpi-io     { --accent: var(--tech-accent-2); }
-.kpi-active { --accent: var(--tech-accent-cyan); }
+.kpi-io     { --accent: var(--tech-accent); }
+.kpi-active { --accent: var(--tech-accent); }
 
 /* Total cost is the headline metric but stays a UNIFORM flat FiMobile card like its three
    siblings — a lone gradient card in a 4-up row read as a "half-baked" mismatch. Its accent
