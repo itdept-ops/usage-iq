@@ -60,6 +60,57 @@ export function pickImage(): Promise<ImageRequest | null> {
 }
 
 /**
+ * PICK MULTIPLE images from the device gallery / files (the multi-select sibling of {@link pickImage}) —
+ * e.g. several photos of one spread, or shots of different meals to log in one go. Each chosen image is
+ * downscaled to <= {@link MAX_EDGE}px + re-encoded as JPEG, and the array of {@link ImageRequest}s is
+ * returned in pick order. Resolves to an EMPTY array when the user cancels (no files chosen). Rejects only
+ * if NONE of the chosen files are images / all fail to decode.
+ */
+export function pickImages(): Promise<ImageRequest[]> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true; // the OS gallery lets the user select several at once
+    input.style.display = 'none';
+
+    let settled = false;
+    let changeSeen = false;
+    const cleanup = () => {
+      window.removeEventListener('focus', onFocus, true);
+      input.remove();
+    };
+    const finish = (run: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      run();
+    };
+    const onFocus = () => {
+      setTimeout(() => {
+        if (changeSeen) return;
+        if (input.files && input.files.length > 0) return;
+        finish(() => resolve([]));
+      }, 1200);
+    };
+    input.addEventListener('change', () => {
+      changeSeen = true;
+      const files = Array.from(input.files ?? []).filter(f => f.type.startsWith('image/'));
+      if (files.length === 0) {
+        // Either a true cancel (no files) or a non-image selection.
+        if ((input.files?.length ?? 0) > 0) finish(() => reject(new Error('Please choose image files.')));
+        else finish(() => resolve([]));
+        return;
+      }
+      finish(() => Promise.all(files.map(downscaleToJpeg)).then(resolve, reject));
+    });
+
+    window.addEventListener('focus', onFocus, true);
+    input.click();
+  });
+}
+
+/**
  * Shared throwaway-`<input type=file>` picker for {@link captureImage} / {@link pickImage} (the only
  * difference is the `capture` attribute). Resolves with the downscaled {@link ImageRequest}, or `null`
  * when the user cancels.

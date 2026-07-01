@@ -16,7 +16,7 @@ import {
 import { OptimisticTracker } from '../state/optimistic-tracker';
 import { BottomSheet } from '../ui/bottom-sheet';
 import { group } from '../util/units';
-import { pickImage, confirmPhotoNotice } from '../../tracker/ai-image';
+import { pickImages, confirmPhotoNotice } from '../../tracker/ai-image';
 
 /**
  * Strata FOOD sheet — the primary food-logging surface of Tracker Beta.
@@ -76,13 +76,18 @@ interface ReviewItem {
   fatG: number;
   /** Whether this item is included in the commit (user can uncheck before adding). */
   keep: boolean;
+  /** The meal this item logs to — defaults per item, re-assignable in review so one batch can split
+   *  across breakfast/lunch/dinner/snack (multiple meals) or pile into one (parts of a meal). */
+  meal: Meal;
+  /** Which uploaded photo this item came from (1-based), for a grouping hint when several were snapped. */
+  photo?: number;
 }
 
-const MEALS: { value: Meal; label: string }[] = [
-  { value: 'breakfast', label: 'Breakfast' },
-  { value: 'lunch', label: 'Lunch' },
-  { value: 'dinner', label: 'Dinner' },
-  { value: 'snack', label: 'Snack' },
+const MEALS: { value: Meal; label: string; short: string }[] = [
+  { value: 'breakfast', label: 'Breakfast', short: 'B' },
+  { value: 'lunch', label: 'Lunch', short: 'L' },
+  { value: 'dinner', label: 'Dinner', short: 'D' },
+  { value: 'snack', label: 'Snack', short: 'S' },
 ];
 
 @Component({
@@ -151,8 +156,9 @@ const MEALS: { value: Meal; label: string }[] = [
             } @else if (review().length === 0) {
               <button type="button" class="fs-go" [disabled]="busy()" (click)="runSnap()">
                 <mat-icon aria-hidden="true">photo_camera</mat-icon>
-                {{ busy() ? 'Reading photo…' : 'Take / choose a photo' }}
+                {{ busy() ? 'Reading photos…' : 'Take / choose photos' }}
               </button>
+              <p class="fs-steer">Add one or several photos — a spread, or different meals — then set the meal for each item.</p>
               @if (snapMsg()) { <p class="fs-steer">{{ snapMsg() }}</p> }
             } @else {
               <ng-container [ngTemplateOutlet]="reviewTpl" />
@@ -251,28 +257,45 @@ const MEALS: { value: Meal; label: string }[] = [
 
       <!-- Shared review template for Snap + Brain-dump results -->
       <ng-template #reviewTpl>
-        <p class="fs-section-label">Review — uncheck anything wrong</p>
+        <div class="fs-review-head">
+          <p class="fs-section-label">Review — set a meal per item, uncheck anything wrong</p>
+          @if (pane() === 'snap') {
+            <button type="button" class="fs-morephotos" [disabled]="busy()" (click)="addMorePhotos()">
+              <mat-icon aria-hidden="true">add_a_photo</mat-icon>{{ busy() ? 'Reading…' : 'Add photos' }}
+            </button>
+          }
+        </div>
         <div class="fs-list">
           @for (r of review(); track r.key) {
-            <button type="button" class="fs-row" [class.on]="r.keep"
-                    [attr.aria-pressed]="r.keep" (click)="toggleReview(r.key)">
-              <span class="fs-check" aria-hidden="true">
-                <mat-icon>{{ r.keep ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
-              </span>
-              <span class="fs-row-main">
-                <span class="fs-row-name">{{ r.description }}</span>
-                <span class="fs-row-sub">P {{ group(r.proteinG) }} · C {{ group(r.carbG) }} · F {{ group(r.fatG) }}</span>
-              </span>
-              <span class="fs-row-kcal">{{ group(r.calories) }}<small>kcal</small></span>
-            </button>
+            <div class="fs-rrow" [class.off]="!r.keep">
+              <button type="button" class="fs-rcheck" (click)="toggleReview(r.key)"
+                      [attr.aria-pressed]="r.keep"
+                      [attr.aria-label]="(r.keep ? 'Exclude ' : 'Include ') + r.description">
+                <mat-icon aria-hidden="true">{{ r.keep ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+              </button>
+              <div class="fs-rbody">
+                <div class="fs-rtop">
+                  <span class="fs-row-name">{{ r.description }}</span>
+                  <span class="fs-row-kcal">{{ group(r.calories) }}<small>kcal</small></span>
+                </div>
+                <span class="fs-row-sub">P {{ group(r.proteinG) }} · C {{ group(r.carbG) }} · F {{ group(r.fatG) }}@if (r.photo) {<span class="fs-rphoto"> · photo {{ r.photo }}</span>}</span>
+                <div class="fs-rmeal" role="group" [attr.aria-label]="'Meal for ' + r.description">
+                  @for (m of MEALS; track m.value) {
+                    <button type="button" class="fs-rmeal-chip" [class.on]="r.meal === m.value"
+                            [attr.aria-pressed]="r.meal === m.value" [attr.aria-label]="m.label"
+                            (click)="setReviewMeal(r.key, m.value)">{{ m.short }}</button>
+                  }
+                </div>
+              </div>
+            </div>
           }
         </div>
         <div class="fs-tally">
           <div class="fs-tally-info">
             <strong>{{ reviewKept().length }} to add</strong>
-            <span class="fs-tally-macros">{{ group(reviewTally().calories) }} kcal</span>
+            <span class="fs-tally-macros">{{ group(reviewTally().calories) }} kcal@if (reviewMeals().length > 1) { · {{ reviewMeals().join(' · ') }} }</span>
           </div>
-          <button type="button" class="fs-ghost" (click)="resetReview()">Retake</button>
+          <button type="button" class="fs-ghost" (click)="resetReview()">Start over</button>
           <button type="button" class="fs-add" [disabled]="opt.readOnly() || busy() || reviewKept().length === 0"
                   (click)="commitReview()">Add {{ reviewKept().length }}</button>
         </div>
@@ -366,6 +389,55 @@ const MEALS: { value: Meal; label: string }[] = [
       color: var(--ink); display: flex; align-items: baseline; gap: 3px;
     }
     .fs-row-kcal small { font: 500 10px var(--font-ui); text-transform: uppercase; color: var(--ink-faint); }
+
+    /* ---- review rows (Snap + Brain): keep-toggle + per-item meal selector ---- */
+    .fs-review-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .fs-morephotos {
+      flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px;
+      min-height: 34px; padding: 0 12px; border-radius: var(--r-pill);
+      border: 1px solid var(--glass-edge); background: var(--bg-rise); color: var(--ink);
+      font: 600 12.5px var(--font-ui); cursor: pointer;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    }
+    .fs-morephotos mat-icon { font-size: 18px; width: 18px; height: 18px; }
+    .fs-morephotos:active:not(:disabled) { transform: scale(.97); }
+    .fs-morephotos:disabled { opacity: .5; cursor: default; }
+
+    .fs-rrow {
+      display: flex; align-items: flex-start; gap: 10px; width: 100%;
+      padding: 10px 12px; border-radius: var(--r-tile); border: 1px solid transparent;
+      background: color-mix(in srgb, var(--tech-accent, var(--cal-a)) 12%, var(--bg-sink));
+      transition: opacity 120ms var(--ease-out), background 120ms var(--ease-out);
+    }
+    .fs-rrow.off { opacity: .55; background: var(--bg-sink); }
+    .fs-rcheck {
+      flex: 0 0 auto; display: flex; align-items: center; margin-top: 1px; padding: 2px;
+      border: 0; background: transparent; color: var(--tech-accent, var(--cal-a)); cursor: pointer;
+      -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    }
+    .fs-rrow.off .fs-rcheck { color: var(--ink-faint); }
+    .fs-rcheck mat-icon { font-size: 24px; width: 24px; height: 24px; }
+    .fs-rcheck:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 50%; }
+    .fs-rbody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .fs-rtop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .fs-rphoto { color: var(--ink-faint); }
+
+    /* Per-item meal segment (B/L/D/S) — full labels sit on the header chips just above. */
+    .fs-rmeal { display: flex; gap: 4px; margin-top: 2px; }
+    .fs-rmeal-chip {
+      flex: 1 1 0; min-width: 0; min-height: 32px; padding: 0 4px;
+      border-radius: var(--r-pill); border: 1px solid var(--glass-edge);
+      background: var(--bg-rise); color: var(--ink-dim);
+      font: 700 12px var(--font-ui); cursor: pointer;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      transition: background 120ms var(--ease-out), color 120ms var(--ease-out), border-color 120ms var(--ease-out);
+    }
+    .fs-rmeal-chip.on {
+      background: linear-gradient(135deg, var(--cal-a), var(--cal-b));
+      border-color: transparent; color: #fff;
+    }
+    .fs-rmeal-chip:active { transform: scale(.95); }
+    .fs-rmeal-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
     /* ---- fast-lane pane fields ---- */
     .fs-pane { display: flex; flex-direction: column; gap: 12px; }
@@ -605,32 +677,73 @@ export class FoodSheet {
   protected async runSnap(): Promise<void> {
     if (this.busy()) return;
     if (!(await confirmPhotoNotice())) return;
-    let image;
+    let images;
     try {
-      // No `capture` attribute → the OS offers BOTH "Take Photo" and "Photo Library", so the user can snap
-      // a new photo OR attach an existing one (the mobile food log was previously camera-only).
-      image = await pickImage();
+      // Multi-select: the OS gallery lets the user attach SEVERAL photos at once (one spread, or different
+      // meals). They can also add more in batches via "Add photos" in the review.
+      images = await pickImages();
     } catch {
-      this.snapMsg.set('Couldn’t read that image. Try a different photo.');
+      this.snapMsg.set('Couldn’t read those images. Try different photos.');
       return;
     }
-    if (!image) return; // user cancelled the picker
+    if (images.length === 0) return; // user cancelled the picker
+    await this.analyzePhotos(images, this.meal());
+  }
+
+  /** Add MORE photos to an in-progress snap review (appended to the existing items). */
+  protected async addMorePhotos(): Promise<void> {
+    if (this.busy()) return;
+    let images;
+    try {
+      images = await pickImages();
+    } catch {
+      this.snapMsg.set('Couldn’t read those images. Try different photos.');
+      return;
+    }
+    if (images.length === 0) return;
+    // New photos default to the meal of the last reviewed item (keeps a multi-shot session coherent).
+    const last = this.review();
+    const defMeal = last.length > 0 ? last[last.length - 1].meal : this.meal();
+    await this.analyzePhotos(images, defMeal, last.length);
+  }
+
+  /**
+   * Analyze each photo through photo-meal IN PARALLEL and APPEND the recognized items to the review,
+   * tagged with their source photo (1-based, continuing from `photoBase`) and defaulted to `defaultMeal`
+   * (re-assignable per item). A single photo that fails is skipped; an all-503 batch steers to search.
+   */
+  private async analyzePhotos(images: { imageBase64: string; mimeType: string }[], defaultMeal: Meal, photoBase = 0): Promise<void> {
     this.busy.set(true);
     this.snapMsg.set('');
+    let anyDown = false;
     try {
-      const res = await firstValueFrom(this.api.photoMeal(image));
-      const items = (res.items ?? []).map((m, i) => this.fromMealItem(m, `snap-${i}`));
-      if (items.length === 0) {
-        this.snapMsg.set('No food recognized in that photo — try a clearer shot or search by name.');
+      const results = await Promise.all(images.map(img =>
+        firstValueFrom(this.api.photoMeal(img)).catch((e: unknown) => {
+          if (e instanceof HttpErrorResponse && e.status === 503) anyDown = true;
+          return null;
+        }),
+      ));
+      const fresh: ReviewItem[] = [];
+      let i = this.review().length;
+      results.forEach((res, idx) => {
+        for (const m of res?.items ?? []) {
+          fresh.push({ ...this.fromMealItem(m, `snap-${i++}`, defaultMeal), photo: photoBase + idx + 1 });
+        }
+      });
+      if (fresh.length === 0) {
+        if (this.review().length === 0) {
+          this.snapMsg.set(anyDown
+            ? 'Photo logging is offline right now — search for the food by name instead.'
+            : 'No food recognized in those photos — try clearer shots or search by name.');
+          if (anyDown) this.laneDown.set('Photo logging is offline right now — search for the food by name instead.');
+        } else {
+          this.snapMsg.set('Nothing new recognized in those photos.');
+        }
         return;
       }
-      this.review.set(items);
-    } catch (e) {
-      if (e instanceof HttpErrorResponse && e.status === 503) {
-        this.laneDown.set('Photo logging is offline right now — search for the food by name instead.');
-      } else {
-        this.snapMsg.set('Couldn’t read that photo. Try again or search by name.');
-      }
+      this.review.update(rs => [...rs, ...fresh]);
+    } catch {
+      this.snapMsg.set('Couldn’t read those photos. Try again or search by name.');
     } finally {
       this.busy.set(false);
     }
@@ -646,7 +759,9 @@ export class FoodSheet {
     try {
       const res = await firstValueFrom(this.api.buildDay({ text, date: this.opt.date() }));
       this.brainBuildId = res.buildId;
-      // Flatten the drafted meals' food items into a reviewable list.
+      // Flatten the drafted meals' food items — PRESERVING each item's meal (the day-builder already
+      // splits "eggs for breakfast, a burrito for lunch" across meals), so the review lands pre-grouped
+      // and the user just confirms. Falls back to the header meal if the draft omitted one.
       const items: ReviewItem[] = [];
       let i = 0;
       for (const m of res.draft.meals ?? []) {
@@ -654,6 +769,7 @@ export class FoodSheet {
           items.push({
             key: `brain-${i++}`, description: f.description,
             calories: f.calories, proteinG: f.proteinG, carbG: f.carbG, fatG: f.fatG, keep: true,
+            meal: m.meal ?? this.meal(),
           });
         }
       }
@@ -678,6 +794,17 @@ export class FoodSheet {
   protected toggleReview(key: string): void {
     this.review.update(rs => rs.map(r => (r.key === key ? { ...r, keep: !r.keep } : r)));
   }
+
+  /** Re-assign one reviewed item to a meal (so a single snap/brain batch can split across meals). */
+  protected setReviewMeal(key: string, meal: Meal): void {
+    this.review.update(rs => rs.map(r => (r.key === key ? { ...r, meal } : r)));
+  }
+
+  /** Distinct meals across the KEPT items — drives the "→ Breakfast · Lunch" hint on the Add button. */
+  protected readonly reviewMeals = computed(() => {
+    const set = new Set(this.reviewKept().map(r => r.meal));
+    return MEALS.filter(m => set.has(m.value)).map(m => m.label);
+  });
 
   protected resetReview(): void {
     this.review.set([]);
@@ -712,7 +839,7 @@ export class FoodSheet {
     }
 
     const bodies = kept.map(r => ({
-      date: this.opt.date(), meal: this.meal(), description: r.description,
+      date: this.opt.date(), meal: r.meal, description: r.description,
       quantity: 1, calories: r.calories, proteinG: r.proteinG, carbG: r.carbG, fatG: r.fatG,
       source: 'custom',
     } satisfies AddFoodRequest));
@@ -727,14 +854,17 @@ export class FoodSheet {
    * exercise / water / weight from their own sheets).
    */
   private buildCommitDraft(kept: ReviewItem[]) {
+    // Group the kept items by their (re-assignable) meal so a single brain-dump can land across
+    // breakfast/lunch/dinner/snack — one draft meal entry per distinct meal, in canonical order.
+    const draftItem = (r: ReviewItem) => ({
+      description: r.description, calories: r.calories, proteinG: r.proteinG,
+      carbG: r.carbG, fatG: r.fatG, confidence: 1, clamped: false,
+    });
+    const meals = MEALS
+      .map(m => ({ meal: m.value, items: kept.filter(r => r.meal === m.value).map(draftItem) }))
+      .filter(g => g.items.length > 0);
     return {
-      meals: [{
-        meal: this.meal(),
-        items: kept.map(r => ({
-          description: r.description, calories: r.calories, proteinG: r.proteinG,
-          carbG: r.carbG, fatG: r.fatG, confidence: 1, clamped: false,
-        })),
-      }],
+      meals,
       exercises: [], hydration: [], weight: null, activity: null,
       assumptions: [], summary: '',
     };
@@ -782,11 +912,11 @@ export class FoodSheet {
     };
   }
 
-  private fromMealItem(m: MealItemDto, key: string): ReviewItem {
+  private fromMealItem(m: MealItemDto, key: string, meal: Meal): ReviewItem {
     // NOTE: MealItemDto uses `carbsG` (USDA-style), our entries use `carbG`.
     return {
       key, description: m.description, calories: m.calories,
-      proteinG: m.proteinG, carbG: m.carbsG, fatG: m.fatG, keep: true,
+      proteinG: m.proteinG, carbG: m.carbsG, fatG: m.fatG, keep: true, meal,
     };
   }
 
