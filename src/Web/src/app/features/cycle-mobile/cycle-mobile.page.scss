@@ -754,6 +754,12 @@
     font-weight: 700;
     color: var(--ink-faint);
     &.is-ok { color: var(--phase-fertile); }
+    &.is-logged {
+      display: inline-flex;
+      align-items: center;
+      gap: .18rem;
+      mat-icon { font-size: 15px; width: 15px; height: 15px; color: var(--ink-faint); }
+    }
   }
 }
 

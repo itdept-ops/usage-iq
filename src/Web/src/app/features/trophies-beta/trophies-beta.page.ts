@@ -246,6 +246,19 @@ interface BadgeGroup {
                         {{ caption(b) }}
                       }
                     </span>
+                    <!-- Inline tier ladder: every rung, earned-lit, with its threshold visible (no tap-in). -->
+                    @if (b.tiers.length > 1) {
+                      <span class="tr-tile__tiers" [attr.aria-label]="tiersAria(b)">
+                        @for (t of b.tiers; track t.name) {
+                          <span class="tr-tile__tier"
+                                [class.is-earned]="t.earned"
+                                [attr.data-tier]="t.name">
+                            <span class="tr-tile__tier-dot" aria-hidden="true"></span>
+                            <span class="tr-tile__tier-thr">{{ fmt(t.threshold) }}</span>
+                          </span>
+                        }
+                      </span>
+                    }
                     @if (!b.earned) {
                       <span class="tr-tile__bar" aria-hidden="true">
                         <span class="tr-tile__bar-fill" [style.width.%]="pct(b)"></span>
@@ -542,6 +555,14 @@ export class TrophiesBetaPage {
   /** Progress 0..100 for a tile/sheet bar. */
   pct(b: TrophyBadgeDto): number {
     return Math.round(Math.max(0, Math.min(1, b.progressToNext)) * 100);
+  }
+
+  /** A spoken summary of the inline tier ladder ("Bronze 5 earned, Silver 25, Gold 50"). */
+  tiersAria(b: TrophyBadgeDto): string {
+    const rungs = b.tiers.map(t =>
+      `${this.tierLabel(t.name)} ${this.fmt(t.threshold)}${t.earned ? ' earned' : ''}`,
+    );
+    return `Tiers: ${rungs.join(', ')}.`;
   }
 
   /** A full aria label for a tile (the tile is icon-led, so it names itself). */

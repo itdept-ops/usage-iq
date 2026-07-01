@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, inject, signal,
+  ChangeDetectionStrategy, Component, computed, inject, signal,
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,6 +10,7 @@ import {
 } from '../../core/models';
 import {
   BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaToaster, ToastController, BetaErrorState,
+  BetaEmptyState,
 } from '../beta-ui';
 
 /** Static catalog metadata for one agent kind. */
@@ -60,6 +61,10 @@ interface AgentRow extends AgentMeta {
   preview: AgentPreviewResult | null;
   previewing: boolean;
   testing: boolean;
+  /** Persistent inline result from the last Send-a-test (mirrors the toast; cleared on next test/save). */
+  testMsg: string | null;
+  /** Per-row inline save error; cleared on the next successful save. */
+  error: string | null;
 }
 
 /** Which value an open picker sheet is choosing for which row. */
@@ -92,6 +97,7 @@ interface PickerState {
   imports: [
     MatIconModule,
     BetaPullRefresh, BetaBottomSheet, BetaSkeleton, BetaToaster, BetaErrorState,
+    BetaEmptyState,
   ],
   template: `
     <app-bs-pull-refresh class="ag-ptr" [busy]="refreshing()" [disabled]="loading()" (refresh)="reload()">
@@ -117,6 +123,12 @@ interface PickerState {
             title="Couldn't load agents"
             body="Something went wrong fetching your agents. Give it another go."
             (retry)="reload()" />
+
+        } @else if (isEmpty()) {
+          <app-bs-empty
+            icon="smart_toy"
+            title="No agents are available right now"
+            body="There are no scheduled assistants to configure yet. Pull to refresh to check again." />
 
         } @else {
           @for (r of rows(); track r.kind) {
@@ -195,6 +207,22 @@ interface PickerState {
                 </button>
               </div>
 
+              @if (r.saving) {
+                <p class="ag-note ag-note--saving" aria-live="polite">
+                  <mat-icon aria-hidden="true">sync</mat-icon> Saving…
+                </p>
+              }
+              @if (r.error) {
+                <p class="ag-note ag-note--error" role="alert">
+                  <mat-icon aria-hidden="true">error_outline</mat-icon> {{ r.error }}
+                </p>
+              }
+              @if (r.testMsg) {
+                <p class="ag-note ag-note--test" aria-live="polite">
+                  <mat-icon aria-hidden="true">check_circle</mat-icon> {{ r.testMsg }}
+                </p>
+              }
+
               @if (r.preview) {
                 <div class="ag-preview">
                   <p class="ag-preview__head">
@@ -247,6 +275,9 @@ export class AgentsMobilePage {
   readonly pickerOpen = signal(false);
   readonly picker = signal<PickerState | null>(null);
 
+  /** No agent rows came back from the API (and we're settled, not loading/errored). */
+  readonly isEmpty = computed(() => !this.loading() && !this.errored() && this.rows().length === 0);
+
   constructor() {
     void this.reload();
   }
@@ -297,6 +328,8 @@ export class AgentsMobilePage {
       preview: null,
       previewing: false,
       testing: false,
+      testMsg: null,
+      error: null,
     };
   }
 
@@ -330,13 +363,15 @@ export class AgentsMobilePage {
       quietEndLocalHour: r.quietOn ? r.quietEnd : null,
       timeZone: r.dto.timeZone ?? null,
     };
-    this.patch(kind, (x) => ({ ...x, saving: true }));
+    this.patch(kind, (x) => ({ ...x, saving: true, error: null }));
     try {
       const dto = await firstValueFrom(this.api.updateAgent(kind, body));
-      this.patch(kind, (x) => ({ ...this.seed(x, dto), preview: x.preview }));
+      // Re-seed from the authoritative DTO; keep the transient preview + test message.
+      this.patch(kind, (x) => ({ ...this.seed(x, dto), preview: x.preview, testMsg: x.testMsg }));
     } catch (e) {
-      this.toast.show(this.messageOf(e, "Couldn't save — try again"), { tone: 'warn' });
-      this.patch(kind, (x) => ({ ...x, saving: false }));
+      const msg = this.messageOf(e, "Couldn't save — try again");
+      this.toast.show(msg, { tone: 'warn' });
+      this.patch(kind, (x) => ({ ...x, saving: false, error: msg }));
     }
   }
 
@@ -386,13 +421,13 @@ export class AgentsMobilePage {
 
   async test(r: AgentRow): Promise<void> {
     if (r.testing) return;
-    this.patch(r.kind, (x) => ({ ...x, testing: true }));
+    this.patch(r.kind, (x) => ({ ...x, testing: true, testMsg: null, error: null }));
     try {
       const res: AgentTestResult = await firstValueFrom(this.api.testAgent(r.kind));
-      this.toast.show(
-        res.delivered ? 'Sent — check your bell' : (res.message ?? 'Nothing to send right now'),
-        { tone: res.delivered ? 'success' : 'warn', durationMs: 2200 },
-      );
+      const msg = res.delivered ? 'Sent — check your bell' : (res.message ?? 'Nothing to send right now');
+      this.toast.show(msg, { tone: res.delivered ? 'success' : 'warn', durationMs: 2200 });
+      // Persistent inline echo of the result so it survives after the toast fades.
+      this.patch(r.kind, (x) => ({ ...x, testMsg: msg }));
     } catch (e) {
       this.toast.show(this.messageOf(e, "Couldn't send a test"), { tone: 'warn' });
     } finally {

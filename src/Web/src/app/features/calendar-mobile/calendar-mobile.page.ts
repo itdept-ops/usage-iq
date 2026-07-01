@@ -4,11 +4,13 @@ import {
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { MatIconModule } from '@angular/material/icon';
+import type { EChartsOption } from 'echarts';
 
 import { Api } from '../../core/api';
 import {
   CalendarDay, HeatmapCell, SessionDetail, SummaryBucket, UsageFilter, UsageStats,
 } from '../../core/models';
+import { ChartComponent } from '../../shared/chart';
 import {
   BetaBottomSheet, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaStatTile,
   type Segment,
@@ -30,11 +32,20 @@ interface DayBar {
   readonly isToday: boolean;
 }
 
-/** One hour-of-day column in the "when you work" distribution. */
-interface HourBar {
+/** One cell in the hour×weekday heatmap. */
+interface HeatCell {
+  readonly weekday: number;
   readonly hour: number;
   readonly count: number;
+  /** 0..1 of the busiest cell, for the tint intensity. */
   readonly frac: number;
+}
+
+/** One weekday row (24 hour cells) in the hour×weekday heatmap. */
+interface HeatRow {
+  readonly weekday: number;
+  readonly dow: string;
+  readonly cells: HeatCell[];
 }
 
 /**
@@ -42,19 +53,20 @@ interface HourBar {
  * beta-ui "Strata" kit (`@use '../beta-ui/beta-kit'`). One signature accent — a cool CYAN → INDIGO —
  * re-skins the whole screen via the per-page accent contract.
  *
- * echarts is HEAVY and the live calendar/hour-weekday heatmaps don't read on a phone, so this twin
- * SKIPS the chart entirely in favour of compact, glanceable surfaces: an immersive header with a
- * Cost / Tokens / Active-hours {@link BetaSegmentedControl}; the four headline {@link BetaStatTile}s
- * (total active time, avg/active day, sessions, total spend) plus an efficiency row (when `stats`
- * resolves); a horizontally-scrolling RECENT-ACTIVITY strip of pure-CSS day bars coloured by the
- * active metric; a "WHEN YOU WORK" 24-hour distribution (pure-CSS bars from the heatmap cells); and a
- * TOP-SESSIONS list. Tapping a session opens a {@link BetaBottomSheet} that lazily fetches
- * {@link Api.session} and shows the per-message drill-down (model · tokens · cost). Pull-to-refresh
- * re-fetches everything.
+ * The heavy full-calendar echarts view doesn't read on a phone, so this twin favours compact,
+ * glanceable surfaces: an immersive header with a Cost / Tokens / Active-hours
+ * {@link BetaSegmentedControl}; the four headline {@link BetaStatTile}s (total active time, avg/active
+ * day + busiest-day sub-label, sessions, total spend) plus an efficiency row (when `stats` resolves)
+ * carrying avg-session and most-active-weekday sub-labels; a horizontally-scrolling RECENT-ACTIVITY
+ * strip of pure-CSS day bars coloured by the active metric; a "WHEN YOU WORK" hour×weekday heatmap
+ * (pure-CSS 7×24 grid from the heatmap cells); and a TOP-SESSIONS list. Tapping a session opens a
+ * {@link BetaBottomSheet} that lazily fetches {@link Api.session} and shows the per-message drill-down
+ * (start/end timestamps, a cumulative-cost step-line {@link ChartComponent}, and model · tokens · cost
+ * per message to 4 decimals) — mirroring the live SessionDialog. Pull-to-refresh re-fetches everything.
  *
  * DATA PARITY: every figure comes from the SAME endpoints the live page calls — {@link Api.calendar}
  * (per-day rollup), {@link Api.stats} (active-time / streak stats), {@link Api.heatmap} (hour×weekday
- * cells, collapsed here to an hour-of-day distribution), {@link Api.summary} grouped by `session`
+ * cells, rendered as the full 7×24 grid), {@link Api.summary} grouped by `session`
  * (top sessions) and {@link Api.session} (the drill-down). No client-side re-aggregation; the server
  * does all dedup + sidechain handling. The all-time filter matches the live page VERBATIM.
  *
@@ -70,7 +82,7 @@ interface HourBar {
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './calendar-mobile.page.scss',
   imports: [
-    MatIconModule,
+    MatIconModule, ChartComponent,
     BetaPullRefresh, BetaSegmentedControl, BetaStatTile, BetaSkeleton, BetaBottomSheet,
   ],
   template: `
@@ -111,8 +123,11 @@ interface HourBar {
             <app-bs-stat-tile
               [value]="fmtInt(stats().totalHours)" unit="h" label="Active time"
               [ringValue]="null" />
-            <app-bs-stat-tile
-              [value]="fmt1(stats().avgHoursPerDay)" unit="h" label="Avg / active day" />
+            <div class="cm-tile-wrap">
+              <app-bs-stat-tile
+                [value]="fmt1(stats().avgHoursPerDay)" unit="h" label="Avg / active day" />
+              <span class="cm-tile-sub">busiest {{ fmt1(stats().maxDayHours) }}h / day</span>
+            </div>
             <app-bs-stat-tile
               [value]="fmtCompact(stats().totalSessions)" label="Sessions" />
             <app-bs-stat-tile
@@ -129,9 +144,15 @@ interface HourBar {
           @if (metrics(); as m) {
             <div class="cm-tiles cm-tiles--2">
               <app-bs-stat-tile [value]="'$' + fmtInt(m.costPerActiveHour)" label="$ / active hour" />
-              <app-bs-stat-tile [value]="fmtInt(m.longestSessionMinutes)" unit="m" label="Longest session" />
+              <div class="cm-tile-wrap">
+                <app-bs-stat-tile [value]="fmtInt(m.longestSessionMinutes)" unit="m" label="Longest session" />
+                <span class="cm-tile-sub">avg {{ fmtInt(m.avgSessionMinutes) }}m / session</span>
+              </div>
               <app-bs-stat-tile [value]="fmtInt(m.currentStreakDays)" unit="d" label="Current streak" />
-              <app-bs-stat-tile [value]="m.busiestHour >= 0 ? fmtHour(m.busiestHour) : '0'" label="Busiest hour" />
+              <div class="cm-tile-wrap">
+                <app-bs-stat-tile [value]="m.busiestHour >= 0 ? fmtHour(m.busiestHour) : '0'" label="Busiest hour" />
+                @if (mostActiveWeekday(); as wd) { <span class="cm-tile-sub">most active {{ wd }}</span> }
+              </div>
             </div>
           }
 
@@ -157,21 +178,26 @@ interface HourBar {
             </section>
           }
 
-          <!-- ─── WHEN YOU WORK: 24-hour distribution ─── -->
-          @if (hourBars().length) {
+          <!-- ─── WHEN YOU WORK: hour × weekday heatmap (full 24h × 7-weekday grid) ─── -->
+          @if (heatGrid().length) {
             <section class="cm-card">
               <div class="cm-card__head">
                 <h2 class="cm-card__title">When you work</h2>
-                <span class="cm-card__hint">messages by hour</span>
+                <span class="cm-card__hint">messages · hour × weekday</span>
               </div>
-              <div class="cm-hours" role="img" [attr.aria-label]="hourAria()">
-                @for (h of hourBars(); track h.hour) {
-                  <span class="cm-hbar" [class.is-peak]="h.hour === peakHour()">
-                    <span class="cm-hbar__fill" [style.height.%]="h.frac * 100"></span>
+              <div class="cm-heat" role="img" [attr.aria-label]="hourAria()">
+                @for (row of heatGrid(); track row.weekday) {
+                  <span class="cm-heat__dow" aria-hidden="true">{{ row.dow }}</span>
+                  <span class="cm-heat__row">
+                    @for (c of row.cells; track c.hour) {
+                      <span class="cm-heat__cell"
+                            [class.is-peak]="c.weekday === peakCell().weekday && c.hour === peakCell().hour"
+                            [style.--i]="c.frac"></span>
+                    }
                   </span>
                 }
               </div>
-              <div class="cm-hours__axis" aria-hidden="true">
+              <div class="cm-heat__axis" aria-hidden="true">
                 <span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>11p</span>
               </div>
             </section>
@@ -245,11 +271,17 @@ interface HourBar {
             <p class="cm-empty__hint">Give it another go by closing and reopening.</p>
           </div>
         } @else if (sessionDetail(); as d) {
+          <p class="sd__range">{{ fmtStamp(d.startUtc, true) }} → {{ fmtStamp(d.endUtc, false) }}</p>
+
           <div class="sd__stats">
             <span class="sd__stat"><b>{{ fmtCompact(d.messages) }}</b> messages</span>
             <span class="sd__stat"><b>{{ fmtCompact(d.tokens) }}</b> tokens</span>
             <span class="sd__stat"><b>{{ '$' + fmt2(d.cost) }}</b> cost</span>
           </div>
+
+          @if (d.items.length) {
+            <div class="sd__chart"><app-chart [option]="sessionChart()" /></div>
+          }
 
           @if (!d.items.length) {
             <div class="cm-empty">
@@ -263,7 +295,7 @@ interface HourBar {
                 <li class="sd__msg" [class.is-side]="m.isSidechain">
                   <span class="sd__msg-top">
                     <span class="sd__msg-model">{{ m.model || '—' }}</span>
-                    <span class="sd__msg-cost">{{ '$' + fmt2(m.cost) }}</span>
+                    <span class="sd__msg-cost">{{ '$' + fmt4(m.cost) }}</span>
                   </span>
                   <span class="sd__msg-bot">
                     <span class="sd__msg-time">{{ fmtTime(m.timestampUtc) }}</span>
@@ -371,6 +403,9 @@ export class CalendarMobilePage {
       totalHours: totalMin / 60,
       activeDays: active.length,
       avgHoursPerDay: active.length ? totalMin / 60 / active.length : 0,
+      // Busiest single day by active hours — the sub-label under the avg/active-day tile (mirrors
+      // the live page's `stats.maxDayHours`).
+      maxDayHours: active.reduce((mx, d) => Math.max(mx, d.activeMinutes / 60), 0),
       totalSessions,
       totalCost,
       totalMsgs,
@@ -410,23 +445,55 @@ export class CalendarMobilePage {
     });
   });
 
-  /** Collapse the hour×weekday heatmap to an hour-of-day distribution (0..23). */
-  readonly hourBars = computed<HourBar[]>(() => {
+  /**
+   * The FULL hour×weekday heatmap (7 weekday rows × 24 hour columns) — restores the weekday
+   * dimension the live page carries (previously collapsed to an hour-of-day strip). Each cell's
+   * `frac` (0..1 of the busiest cell) drives its tint via the `--i` custom property in SCSS.
+   */
+  readonly heatGrid = computed<HeatRow[]>(() => {
     const cells = this.heat();
-    const byHour = new Array<number>(24).fill(0);
+    if (!cells.length) return [];
+    // grid[weekday][hour] = count
+    const grid: number[][] = Array.from({ length: 7 }, () => new Array<number>(24).fill(0));
+    let max = 0;
     for (const c of cells) {
-      if (c.hour >= 0 && c.hour < 24) byHour[c.hour] += c.count;
+      if (c.day >= 0 && c.day < 7 && c.hour >= 0 && c.hour < 24) {
+        grid[c.day][c.hour] += c.count;
+        if (grid[c.day][c.hour] > max) max = grid[c.day][c.hour];
+      }
     }
-    const max = Math.max(...byHour, 0);
     if (max <= 0) return [];
-    return byHour.map((count, hour) => ({ hour, count, frac: count / max }));
+    const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return grid.map((row, weekday) => ({
+      weekday,
+      dow: dowNames[weekday],
+      cells: row.map((count, hour) => ({ weekday, hour, count, frac: count / max })),
+    }));
   });
 
-  /** The hour with the most messages (for the peak highlight); -1 when no data. */
-  readonly peakHour = computed(() => {
-    const bars = this.hourBars();
-    if (!bars.length) return -1;
-    return bars.reduce((peak, b) => (b.count > bars[peak].count ? b.hour : peak), 0);
+  /** The single busiest cell (weekday+hour) for the peak highlight; {-1,-1} when no data. */
+  readonly peakCell = computed<{ weekday: number; hour: number; count: number }>(() => {
+    let best = { weekday: -1, hour: -1, count: -1 };
+    for (const row of this.heatGrid()) {
+      for (const c of row.cells) {
+        if (c.count > best.count) best = { weekday: c.weekday, hour: c.hour, count: c.count };
+      }
+    }
+    return best;
+  });
+
+  /** The weekday with the most total messages, as a short name (or '' when no data). */
+  readonly mostActiveWeekday = computed<string>(() => {
+    const rows = this.heatGrid();
+    if (!rows.length) return '';
+    let bestIdx = -1;
+    let bestTotal = -1;
+    for (const row of rows) {
+      const total = row.cells.reduce((a, c) => a + c.count, 0);
+      if (total > bestTotal) { bestTotal = total; bestIdx = row.weekday; }
+    }
+    const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return bestIdx >= 0 && bestTotal > 0 ? dowNames[bestIdx] : '';
   });
 
   // ─────────────── SESSION DRILL-DOWN ───────────────
@@ -455,6 +522,38 @@ export class CalendarMobilePage {
     return Number.isFinite(ms) ? Math.max(0, Math.round(ms / 60000)) : 0;
   }
 
+  /**
+   * Cumulative-cost step-line for the open session — a mobile-flavoured twin of the live
+   * SessionDialog chart. Sums each message's cost in timestamp order and plots the running total as a
+   * step ('end') line; chrome/axes are themed by the shared ChartComponent. Empty when no items.
+   */
+  readonly sessionChart = computed<EChartsOption>(() => {
+    const d = this.sessionDetail();
+    if (!d || !d.items.length) return {};
+    let cum = 0;
+    const points = d.items.map(m => {
+      cum += m.cost;
+      return [m.timestampUtc, +cum.toFixed(4)] as [string, number];
+    });
+    return {
+      tooltip: { trigger: 'axis', valueFormatter: (v) => '$' + Number(v).toFixed(2) },
+      grid: { left: 56, right: 16, top: 14, bottom: 30 },
+      xAxis: { type: 'time' },
+      yAxis: { type: 'value', name: 'Cumulative $', axisLabel: { formatter: '${value}' } },
+      series: [
+        {
+          type: 'line',
+          step: 'end',
+          symbol: 'none',
+          data: points,
+          areaStyle: { opacity: 0.14 },
+          itemStyle: { color: 'var(--accent-a)' },
+          lineStyle: { color: 'var(--accent-a)', width: 2 },
+        },
+      ],
+    };
+  });
+
   // ─────────────── ARIA STRINGS ───────────────
 
   recentAria(): string {
@@ -464,10 +563,10 @@ export class CalendarMobilePage {
   }
 
   hourAria(): string {
-    const h = this.peakHour();
-    return h >= 0
-      ? `Message volume by hour of day; busiest hour ${this.fmtHour(h)}.`
-      : 'Message volume by hour of day.';
+    const p = this.peakCell();
+    if (p.weekday < 0 || p.hour < 0) return 'Message volume by hour of day and weekday.';
+    const dowNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return `Message volume by hour of day and weekday; busiest ${dowNames[p.weekday]} at ${this.fmtHour(p.hour)}.`;
   }
 
   sessionAria(s: SummaryBucket): string {
@@ -507,6 +606,12 @@ export class CalendarMobilePage {
     return n.toFixed(2);
   }
 
+  /** Per-message cost to 4 decimals (matches the live dialog's 1.2-4 currency format). */
+  fmt4(n: number | null | undefined): string {
+    if (n == null || !Number.isFinite(n)) return '0.0000';
+    return n.toFixed(4);
+  }
+
   /** Compact large numbers (1.2K / 3.4M / 1.1B) for tokens + message counts. */
   fmtCompact(n: number | null | undefined): string {
     if (n == null || !Number.isFinite(n)) return '0';
@@ -529,5 +634,17 @@ export class CalendarMobilePage {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  /**
+   * Session start/end timestamp. The start carries the date (mirrors the live dialog's
+   * `MMM d, HH:mm → HH:mm`); the end is time-only since it usually shares the day.
+   */
+  fmtStamp(iso: string, withDate: boolean): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return withDate
+      ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   }
 }

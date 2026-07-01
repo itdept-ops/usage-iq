@@ -228,6 +228,23 @@
   font-family: var(--font-ui); font-size: 12px; color: var(--ink-dim);
 }
 
+// Contextual confirmation callout (shown when Appear-offline is ON).
+.pm-callout {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-tile);
+  background: color-mix(in oklab, var(--accent-a) 10%, var(--bg-sink));
+  border: 1px solid color-mix(in oklab, var(--accent-a) 24%, var(--hairline));
+  font-family: var(--font-ui); font-size: 12.5px; line-height: 1.45;
+  color: var(--ink-dim);
+
+  mat-icon {
+    flex: 0 0 auto;
+    font-size: 18px; width: 18px; height: 18px;
+    color: color-mix(in oklab, var(--accent-a) 60%, var(--ink-dim));
+  }
+}
+
 // ============================================================================
 // TOGGLE ROWS — the presence / sharing switches.
 // ============================================================================

@@ -548,6 +548,29 @@
   }
 }
 
+// ---- Manual-copy fallback: the created public URL echoed as visible, selectable text ----
+// Parity with the desktop `linkCopied` echo — shown after a successful create so a blocked
+// clipboard still leaves the user a readable link they can select + copy by hand.
+.wb-recap__link {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 0 18px calc(16px + var(--safe-bottom));
+  padding: 12px 14px; border-radius: var(--r-tile);
+  background: color-mix(in srgb, var(--accent-a) 12%, var(--bg-rise));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, var(--glass-edge));
+}
+.wb-recap__link-ico {
+  flex: 0 0 auto; font-size: 20px; width: 20px; height: 20px; margin-top: 1px;
+  color: var(--accent-a);
+}
+.wb-recap__link-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.wb-recap__link-head {
+  font: 700 11px/1.3 var(--font-ui); letter-spacing: .02em; color: var(--ink-dim);
+}
+.wb-recap__link-url {
+  font: 600 13px/1.4 var(--font-ui); color: var(--ink);
+  user-select: all; word-break: break-all;
+}
+
 // A small "what's in this wrap" tail list of the remaining cards (below the share card).
 .wb-tail {
   margin: 18px var(--reel-pad) 4px;

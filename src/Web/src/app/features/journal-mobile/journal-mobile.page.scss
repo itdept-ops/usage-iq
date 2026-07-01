@@ -87,6 +87,15 @@
   margin: 0; font-size: .96rem; line-height: 1.45; color: var(--ink-on-accent, #fff);
   &.is-muted { color: color-mix(in srgb, var(--ink-on-accent, #fff) 72%, transparent); }
 }
+// Deterministic-floor badge: a quiet pill on the solid accent fill, only shown when the AI upgrade
+// was available but the plain floor was used (r.fellBackToPlain && hasAi()).
+.jr-reflect__tag {
+  align-self: flex-start; margin-top: 4px; padding: 2px 9px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--ink-on-accent, #fff) 16%, transparent);
+  font-size: .64rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink-on-accent, #fff) 82%, transparent);
+}
 
 // ============================================================================
 // SUMMARY
@@ -178,6 +187,13 @@
   &:focus-visible { outline: 2px solid var(--focus, var(--accent-a)); outline-offset: 2px; }
 }
 .ls__day-now { flex: 1; text-align: center; display: flex; flex-direction: column; line-height: 1.1; }
+// Arbitrary date-jump beside the chevrons: compact native date control, on-brand form styling.
+.ls__day-date {
+  flex: none; box-sizing: border-box; padding: 9px 10px;
+  border: 1px solid var(--tech-border, var(--hairline)); border-radius: var(--r-tile);
+  background: var(--bg-base); color: var(--ink); font: inherit; font-size: .82rem; cursor: pointer;
+  &:focus-visible { outline: none; border-color: var(--accent-a); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-a) 22%, transparent); }
+}
 .ls__day-l { font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-faint); }
 .ls__day-v { font-size: 1.05rem; font-weight: 800; color: var(--ink); }
 .ls__save { font-style: normal; font-size: .72rem; font-weight: 700; color: var(--ink-faint); &.is-ok { color: var(--accent-b); } }

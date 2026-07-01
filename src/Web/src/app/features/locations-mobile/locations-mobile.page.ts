@@ -11,7 +11,7 @@ import { LocationFix } from '../../core/models';
 import { timeAgo } from '../../shared/format';
 import { LocationMap, MapPin, MapTrail } from '../location/location-map';
 import {
-  BetaSkeleton, BetaFab, BetaToaster, ToastController,
+  BetaSkeleton, BetaFab, BetaToaster, BetaBottomSheet, ToastController,
 } from '../beta-ui';
 
 /**
@@ -43,7 +43,7 @@ import {
   providers: [ToastController],
   imports: [
     DecimalPipe, MatIconModule,
-    LocationMap, BetaSkeleton, BetaFab, BetaToaster,
+    LocationMap, BetaSkeleton, BetaFab, BetaToaster, BetaBottomSheet,
   ],
   template: `
     <div class="lm">
@@ -130,6 +130,34 @@ import {
             <span class="lt__switch" aria-hidden="true"><span class="lt__switch-knob"></span></span>
           </button>
 
+          <!-- share-with-household row (mirrors the live "Share with my household" opt-in; only
+               meaningful while capture is on, so it's disabled + muted when capture is off) -->
+          <button type="button" class="lt__toggle lt__toggle--share" role="switch"
+                  [class.is-on]="shareOn()"
+                  [class.is-muted]="!captureOn()"
+                  [attr.aria-checked]="shareOn()"
+                  [disabled]="savingSettings() || !captureOn()"
+                  (click)="toggleShare(!shareOn())">
+            <span class="lt__toggle-ic" aria-hidden="true">
+              <mat-icon>{{ shareOn() ? 'group' : 'group_off' }}</mat-icon>
+            </span>
+            <span class="lt__toggle-body">
+              <span class="lt__toggle-title">Share with my household</span>
+              <span class="lt__toggle-blurb">
+                Let household members see your approximate city (never your precise location) next to your name.
+              </span>
+            </span>
+            <span class="lt__switch" aria-hidden="true"><span class="lt__switch-knob"></span></span>
+          </button>
+
+          <!-- persistent permission-denied warning (not just a transient toast) -->
+          @if (capture.permissionDenied()) {
+            <div class="lt__warn" role="status">
+              <mat-icon aria-hidden="true">gpp_bad</mat-icon>
+              <span>Your browser denied the location permission. Allow it in your site settings, then try sharing again.</span>
+            </div>
+          }
+
           @if (loading()) {
             <div class="lt__list" aria-hidden="true">
               @for (n of skeletonCells; track n) {
@@ -194,6 +222,20 @@ import {
       }
     </div>
 
+    <!-- ─── BRANDED CLEAR-HISTORY CONFIRM SHEET (replaces the native confirm()) ─── -->
+    <app-bs-sheet [(open)]="confirmOpen" detent="half" label="Clear location history">
+      <div class="lc">
+        <span class="lc__orb" aria-hidden="true"><mat-icon>delete_sweep</mat-icon></span>
+        <h3 class="lc__title">Clear my history?</h3>
+        <p class="lc__line">Permanently delete all of your recorded locations? This cannot be undone.</p>
+        <div class="lc__actions">
+          <button type="button" class="lc__btn lc__btn--ghost" (click)="confirmOpen.set(false)">Cancel</button>
+          <button type="button" class="lc__btn lc__btn--danger" [disabled]="clearing()"
+                  (click)="confirmClear()">Delete history</button>
+        </div>
+      </div>
+    </app-bs-sheet>
+
     <app-bs-toaster />
   `,
   styleUrl: './locations-mobile.page.scss',
@@ -221,6 +263,10 @@ export class LocationsMobilePage implements OnDestroy {
 
   /** The opt-in capture state (the live page's gate). */
   readonly captureOn = computed(() => !!this.capture.settings()?.locationEnabled);
+  /** The "share approximate city with household" opt-in (only meaningful while capture is on). */
+  readonly shareOn = computed(() => !!this.capture.settings()?.shareHousehold);
+  /** Two-way open state for the branded clear-history confirm sheet. */
+  readonly confirmOpen = signal(false);
   /** One-shot "share now" in-flight (from the capture service). */
   readonly capturing = this.capture.capturing;
 
@@ -327,13 +373,30 @@ export class LocationsMobilePage implements OnDestroy {
     if (enabled) this.load();
   }
 
-  /** Destructive: permanently clear the caller's own history (confirm first). */
-  async clearHistory(): Promise<void> {
-    if (!this.history().length || this.clearing()) return;
-    if (typeof confirm === 'function' &&
-        !confirm('Permanently delete all of your recorded locations? This cannot be undone.')) {
+  /** Flip the "share with my household" opt-in (only meaningful while capture is enabled). */
+  async toggleShare(share: boolean): Promise<void> {
+    if (!this.captureOn()) return;
+    this.savingSettings.set(true);
+    const saved = await this.capture.applySettings({ shareHousehold: share });
+    this.savingSettings.set(false);
+    if (!saved) {
+      this.toast.show('Could not update the sharing setting.', { tone: 'warn' });
       return;
     }
+    this.toast.show(share ? 'Sharing your city with household.' : 'Stopped sharing your city.',
+      { tone: 'success', durationMs: 2400 });
+  }
+
+  /** Destructive: open the branded confirm sheet before clearing the caller's own history. */
+  clearHistory(): void {
+    if (!this.history().length || this.clearing()) return;
+    this.confirmOpen.set(true);
+  }
+
+  /** Confirmed from the sheet: permanently clear the caller's own history. */
+  async confirmClear(): Promise<void> {
+    if (!this.history().length || this.clearing()) return;
+    this.confirmOpen.set(false);
     this.clearing.set(true);
     try {
       const res = await firstValueFrom(this.api.clearMyLocations());

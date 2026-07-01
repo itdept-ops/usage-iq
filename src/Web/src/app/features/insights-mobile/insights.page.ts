@@ -2,12 +2,14 @@ import {
   ChangeDetectionStrategy, Component, computed, inject, signal,
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
+import type { EChartsOption } from 'echarts';
 import { firstValueFrom } from 'rxjs';
 
 import { Api } from '../../core/api';
 import {
   InsightCard, InsightKind, InsightWindow, InsightsNarrateResponse, InsightsResponse,
 } from '../../core/models';
+import { ChartComponent } from '../../shared/chart';
 import {
   BetaEmptyState, BetaErrorState, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, type Segment,
 } from '../beta-ui';
@@ -16,7 +18,11 @@ import {
 interface FeedCard extends InsightCard {
   readonly sectionLabel: string;
   readonly sectionIcon: string;
+  readonly sectionBlurb: string;
+  readonly sectionCount: number;
   readonly isFirstOfKind: boolean;
+  /** Stable id ("kind:index") for the expandable correlation chart. */
+  readonly cardId: string;
 }
 
 /**
@@ -42,7 +48,7 @@ interface FeedCard extends InsightCard {
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './insights.page.scss',
   imports: [
-    MatIconModule,
+    MatIconModule, ChartComponent,
     BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaEmptyState, BetaErrorState,
   ],
   template: `
@@ -108,9 +114,15 @@ interface FeedCard extends InsightCard {
           <div class="im-feed" role="list" aria-label="Your insights">
             @for (c of feed(); track c.title) {
               @if (c.isFirstOfKind) {
-                <p class="im-section" aria-hidden="true">
-                  <mat-icon aria-hidden="true">{{ c.sectionIcon }}</mat-icon> {{ c.sectionLabel }}
-                </p>
+                <div class="im-section" [attr.aria-label]="c.sectionLabel">
+                  <p class="im-section__head" aria-hidden="true">
+                    <span class="im-section__lead">
+                      <mat-icon aria-hidden="true">{{ c.sectionIcon }}</mat-icon> {{ c.sectionLabel }}
+                    </span>
+                    <span class="im-section__count">{{ c.sectionCount }}</span>
+                  </p>
+                  <p class="im-section__blurb">{{ c.sectionBlurb }}</p>
+                </div>
               }
               <article class="im-card" role="listitem"
                        [style.--da]="accentA(c.domain)" [style.--db]="accentB(c.domain)">
@@ -127,12 +139,29 @@ interface FeedCard extends InsightCard {
                     <mat-icon aria-hidden="true">scatter_plot</mat-icon>
                     {{ c.dataPoints }} {{ c.kind === 'correlation' ? 'paired days' : 'data points' }}
                   </span>
+                  @if (c.kind === 'correlation') {
+                    <button type="button" class="im-card__expand"
+                            [attr.aria-expanded]="expanded() === c.cardId"
+                            (click)="toggle(c.cardId)">
+                      <mat-icon aria-hidden="true">{{ expanded() === c.cardId ? 'expand_less' : 'show_chart' }}</mat-icon>
+                      {{ expanded() === c.cardId ? 'Hide chart' : 'Show chart' }}
+                    </button>
+                  }
                 </footer>
                 @if (c.kind === 'correlation') {
                   <div class="im-card__chips">
                     <span class="im-chip"><mat-icon aria-hidden="true">link_off</mat-icon> Association, not causation</span>
                     <span class="im-chip im-chip--med"><mat-icon aria-hidden="true">medical_information</mat-icon> Not medical advice</span>
                   </div>
+                  @if (expanded() === c.cardId) {
+                    <div class="im-card__chart">
+                      <app-chart [option]="scatterOption(c)" />
+                      <p class="im-card__chart-note">
+                        Illustrative scatter — depicts the published strength (r) &amp; direction over
+                        {{ c.dataPoints }} paired days, not raw logged values.
+                      </p>
+                    </div>
+                  }
                 }
                 @if (c.kind === 'trend' && hasProjection(c)) {
                   <p class="im-card__est"><mat-icon aria-hidden="true">trending_flat</mat-icon> Estimate, not a prediction.</p>
@@ -168,6 +197,8 @@ export class InsightsMobilePage {
   readonly loading = signal(true);
   readonly errored = signal(false);
   readonly refreshing = signal(false);
+  /** The id ("kind:index") of the correlation card whose mini-chart is open, or null. */
+  readonly expanded = signal<string | null>(null);
 
   readonly cards = computed<InsightCard[]>(() => this.data()?.cards ?? []);
   readonly hasData = computed(() => !!this.data()?.hasData && this.cards().length > 0);
@@ -183,12 +214,26 @@ export class InsightsMobilePage {
     const sorted = [...this.cards()].sort(
       (a, b) => order.indexOf(a.kind as InsightKind) - order.indexOf(b.kind as InsightKind),
     );
+    const counts = new Map<string, number>();
+    for (const c of sorted) counts.set(c.kind, (counts.get(c.kind) ?? 0) + 1);
     let prevKind: string | null = null;
+    let indexInKind = 0;
     return sorted.map(c => {
-      const meta = InsightsMobilePage.KIND_META[c.kind as InsightKind] ?? { label: 'Insights', icon: 'insights' };
+      const meta = InsightsMobilePage.KIND_META[c.kind as InsightKind]
+        ?? { label: 'Insights', icon: 'insights', blurb: '' };
       const first = c.kind !== prevKind;
+      indexInKind = first ? 0 : indexInKind + 1;
+      const card: FeedCard = {
+        ...c,
+        sectionLabel: meta.label,
+        sectionIcon: meta.icon,
+        sectionBlurb: meta.blurb,
+        sectionCount: counts.get(c.kind) ?? 0,
+        isFirstOfKind: first,
+        cardId: `${c.kind}:${indexInKind}`,
+      };
       prevKind = c.kind;
-      return { ...c, sectionLabel: meta.label, sectionIcon: meta.icon, isFirstOfKind: first };
+      return card;
     });
   });
 
@@ -200,6 +245,7 @@ export class InsightsMobilePage {
     const w = (Number(key) as InsightWindow) || 30;
     if (w === this.window()) return;
     this.window.set(w);
+    this.expanded.set(null);
     this.reload();
   }
 
@@ -208,6 +254,7 @@ export class InsightsMobilePage {
     if (wasLoaded) this.refreshing.set(true); else this.loading.set(true);
     this.errored.set(false);
     this.narrative.set(null);
+    this.expanded.set(null);
     const w = this.window();
     try {
       const res = await firstValueFrom(this.api.insights(w));
@@ -226,6 +273,12 @@ export class InsightsMobilePage {
       const n = await firstValueFrom(this.api.insightsNarrate(w));
       if (w === this.window()) this.narrative.set(n);
     } catch { /* progressive enhancement */ }
+  }
+
+  // ─────────────── CARD EXPAND ───────────────
+
+  toggle(id: string): void {
+    this.expanded.update(cur => (cur === id ? null : id));
   }
 
   // ─────────────── DISPLAY HELPERS ───────────────
@@ -263,16 +316,97 @@ export class InsightsMobilePage {
     return InsightsMobilePage.DOMAIN_ICONS[this.domainKey(d)] ?? 'auto_graph';
   }
 
+  // ─────────────── CORRELATION SCATTER (illustrative) ───────────────
+
+  /**
+   * Build an ILLUSTRATIVE scatter + regression-line option for a correlation card. The wire carries only the
+   * aggregate stat (r + n), NOT raw values, so this fabricates NO logged data — it draws `dataPoints` points
+   * with deterministic jitter whose spread scales with (1 − |r|) around a line whose slope sign matches the
+   * correlation direction. It's a faithful depiction of the published strength/direction, labeled as such.
+   */
+  scatterOption(c: InsightCard): EChartsOption {
+    const r = this.parseR(c);
+    const n = Math.max(2, Math.min(c.dataPoints || 12, 60));
+    const dir = r < 0 ? -1 : 1;
+    const strength = Math.min(Math.abs(r), 0.98);
+    const spread = (1 - strength) * 0.9 + 0.05; // tighter cloud for stronger |r|
+
+    // deterministic pseudo-random so the chart is stable across re-renders (no layout thrash).
+    const rnd = (k: number) => {
+      const x = Math.sin((k + 1) * 12.9898 + n * 78.233) * 43758.5453;
+      return x - Math.floor(x);
+    };
+
+    const pts: [number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      const x = rnd(i * 2);                       // 0..1
+      const base = x;                             // perfect-correlation y
+      const noise = (rnd(i * 2 + 1) - 0.5) * 2 * spread;
+      let y = dir < 0 ? 1 - base : base;
+      y += noise;
+      y = Math.max(0, Math.min(1, y));
+      pts.push([Number((x * 100).toFixed(1)), Number((y * 100).toFixed(1))]);
+    }
+
+    // regression line endpoints (direction-aware), drawn across the cloud.
+    const line: [number, number][] = dir < 0 ? [[0, 90], [100, 10]] : [[0, 10], [100, 90]];
+    const accent = '#7c8cff';
+
+    return {
+      grid: { left: 8, right: 14, top: 14, bottom: 18, containLabel: true },
+      xAxis: { type: 'value', min: 0, max: 100, name: this.axisX(c), nameGap: 18, nameLocation: 'middle',
+        nameTextStyle: { fontSize: 10 }, axisLabel: { show: false } },
+      yAxis: { type: 'value', min: 0, max: 100, name: this.axisY(c), nameGap: 22, nameLocation: 'middle',
+        nameTextStyle: { fontSize: 10 }, axisLabel: { show: false } },
+      tooltip: { show: false },
+      series: [
+        {
+          type: 'line', data: line, symbol: 'none', silent: true,
+          lineStyle: { color: accent, width: 2, type: 'dashed', opacity: 0.7 }, z: 1,
+        },
+        {
+          type: 'scatter', data: pts, symbolSize: 7, z: 2,
+          itemStyle: { color: accent, opacity: 0.75, borderColor: 'rgba(255,255,255,0.18)', borderWidth: 0.5 },
+        },
+      ],
+    };
+  }
+
+  /** Extract the |r| (signed) value out of a correlation stat like "r=0.61 · moderate" / "r=-0.43 …". */
+  private parseR(c: InsightCard): number {
+    const m = `${c.stat} ${c.detail}`.match(/r\s*=\s*(-?\d*\.?\d+)/i);
+    let r = m ? Number(m[1]) : 0.5;
+    if (!Number.isFinite(r)) r = 0.5;
+    // honour an explicit "negative" magnitude even if the printed r is unsigned.
+    if (r > 0 && (c.magnitude ?? '').toLowerCase().includes('negative')) r = -r;
+    return Math.max(-1, Math.min(1, r));
+  }
+
+  /** Split a "A vs B" title into rough axis labels (illustrative). */
+  private axisX(c: InsightCard): string {
+    const parts = c.title.split(/\bvs\b|→|↔/i);
+    return (parts[0] ?? 'A').trim().slice(0, 22) || 'A';
+  }
+  private axisY(c: InsightCard): string {
+    const parts = c.title.split(/\bvs\b|→|↔/i);
+    return (parts[1] ?? parts[0] ?? 'B').trim().slice(0, 22) || 'B';
+  }
+
   // ─────────────── KIND ORDER + META ───────────────
 
   private static readonly KIND_ORDER: InsightKind[] = [
     'correlation', 'trend', 'streak', 'anomaly', 'bestworst',
   ];
-  private static readonly KIND_META: Record<InsightKind, { label: string; icon: string }> = {
-    correlation: { label: 'Correlations', icon: 'sync_alt' },
-    trend: { label: 'Trends', icon: 'trending_up' },
-    streak: { label: 'Streaks', icon: 'local_fire_department' },
-    anomaly: { label: 'Anomalies', icon: 'warning_amber' },
-    bestworst: { label: 'Best & worst', icon: 'emoji_events' },
+  private static readonly KIND_META: Record<InsightKind, { label: string; icon: string; blurb: string }> = {
+    correlation: { label: 'Correlations', icon: 'sync_alt',
+      blurb: 'Paired-day associations across domains (≥10 days). Association, not causation.' },
+    trend: { label: 'Trends', icon: 'trending_up',
+      blurb: 'Where a metric is drifting — with a bounded estimate, not a prediction.' },
+    streak: { label: 'Streaks', icon: 'local_fire_department',
+      blurb: 'Your longest & current qualifying runs.' },
+    anomaly: { label: 'Anomalies', icon: 'warning_amber',
+      blurb: 'Statistical outlier days (|z| ≥ 2).' },
+    bestworst: { label: 'Best & worst', icon: 'emoji_events',
+      blurb: 'Your standout high & low days per metric.' },
   };
 }

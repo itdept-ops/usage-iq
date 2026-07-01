@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, computed, inject, signal,
+  ChangeDetectionStrategy, Component, computed, effect, inject, signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -136,6 +136,9 @@ const DEBOUNCE_MS = 250;
                     @if (r.snippet) { <span class="sm-row__snippet" [title]="r.snippet">{{ r.snippet }}</span> }
                     @if (r.subtitle) { <span class="sm-row__subtitle" [title]="r.subtitle">{{ r.subtitle }}</span> }
                   </span>
+                  @if (whenLabel(r.whenUtc); as w) {
+                    <span class="sm-row__when">{{ w }}</span>
+                  }
                   <mat-icon class="sm-row__go" aria-hidden="true">chevron_right</mat-icon>
                 </button>
               }
@@ -213,6 +216,17 @@ export class SearchMobilePage {
       this.query.set(seed);
       void this.run(seed);
     }
+
+    // Mirror the (ran) query into the URL's ?q= so a search is shareable/back-nav friendly and round-trips
+    // with the ⌘K palette, without pushing history on every keystroke.
+    effect(() => {
+      const q = this.ranQuery();
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: q ? { q } : {},
+        replaceUrl: true,
+      });
+    });
   }
 
   onInput(value: string): void {
@@ -276,5 +290,13 @@ export class SearchMobilePage {
 
   open(item: SearchResultItem): void {
     void this.router.navigateByUrl(item.deepLink);
+  }
+
+  /** A short relative-ish label for a result's timestamp (or '' when none). */
+  whenLabel(iso: string | null): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 }

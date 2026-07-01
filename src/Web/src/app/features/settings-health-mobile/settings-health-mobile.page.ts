@@ -120,8 +120,9 @@ interface SignalToggle {
               <section class="hs-card hs-summary">
                 <p class="hs-summary__head">
                   <mat-icon aria-hidden="true">task_alt</mat-icon>
-                  @if (r.fromDate && r.toDate) { Synced {{ r.fromDate }} → {{ r.toDate }} }
-                  @else { Sync complete }
+                  @if (r.fromDate && r.toDate) {
+                    Synced {{ r.fromDate }} → {{ r.toDate }} — {{ summaryTotal(r) }} entr{{ summaryTotal(r) === 1 ? 'y' : 'ies' }} written
+                  } @else { Sync complete }
                 </p>
                 @for (row of summaryRows(r); track row.label) {
                   <div class="hs-summary__row">
@@ -169,6 +170,7 @@ interface SignalToggle {
               <mat-icon aria-hidden="true">link_off</mat-icon>
               @if (disconnecting()) { Disconnecting… } @else { Disconnect wearable }
             </button>
+            <p class="hs-disconnect__hint">Stops syncing and forgets your token. Already-synced entries stay in your tracker.</p>
           }
         }
       </div>
@@ -208,8 +210,17 @@ export class SettingsHealthMobilePage {
     return !!s?.connected && s.lastSyncStatus === 'AuthExpired';
   });
 
-  readonly statusTone = computed<'ok' | 'warn'>(() =>
-    this.status()?.lastSyncStatus === 'Ok' ? 'ok' : 'warn');
+  readonly statusTone = computed<'ok' | 'warn' | 'idle'>(() => {
+    const s = this.status();
+    if (!s?.connected) return 'idle';
+    switch (s.lastSyncStatus) {
+      case 'Ok': return 'ok';
+      case 'AuthExpired':
+      case 'RateLimited':
+      case 'Error': return 'warn';
+      default: return 'idle';
+    }
+  });
 
   readonly lastSyncLabel = computed(() => {
     const iso = this.status()?.lastSyncUtc;
@@ -322,6 +333,12 @@ export class SettingsHealthMobilePage {
     } finally {
       this.disconnecting.set(false);
     }
+  }
+
+  /** Total rows touched across all signals (drives the summary's headline). */
+  summaryTotal(r: HealthSyncNowResult): number {
+    const each = (x: { imported: number; updated: number }) => x.imported + x.updated;
+    return each(r.steps) + each(r.sleep) + each(r.heartRate) + each(r.workouts);
   }
 
   summaryRows(r: HealthSyncNowResult): { label: string; imported: number; updated: number; skipped: number }[] {

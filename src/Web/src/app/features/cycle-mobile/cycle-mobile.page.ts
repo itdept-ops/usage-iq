@@ -270,6 +270,9 @@ interface FlowChoice { value: CycleFlowLevel; label: string; }
             <mat-icon aria-hidden="true">edit_note</mat-icon> How are you, {{ logDateLabel().toLowerCase() }}?
             @if (daySaving()) { <em class="ls__save">Saving…</em> }
             @else if (daySaved()) { <em class="ls__save is-ok">Saved</em> }
+            @else if (hasDayLog()) {
+              <em class="ls__save is-logged"><mat-icon aria-hidden="true">edit_note</mat-icon> Logged</em>
+            }
           </span>
 
           <!-- mood -->
@@ -332,7 +335,7 @@ interface FlowChoice { value: CycleFlowLevel; label: string; }
           <!-- notes -->
           <label class="ls__field">
             <span class="ls__label">Notes</span>
-            <textarea class="ls__input ls__area" rows="2" [ngModel]="editNotes()"
+            <textarea class="ls__input ls__area" rows="2" maxlength="500" [ngModel]="editNotes()"
                       (ngModelChange)="onNotesChange($event)" name="dnotes"
                       placeholder="Anything to remember (private)"></textarea>
           </label>

@@ -70,8 +70,16 @@ interface MoodChoice { value: string; label: string; emoji: string; }
             <span class="jr-reflect__ic" aria-hidden="true"><mat-icon>auto_awesome</mat-icon></span>
             <div class="jr-reflect__body">
               <span class="jr-reflect__h">This week</span>
-              @if (reflection(); as r) { <p class="jr-reflect__note">{{ r.note }}</p> }
-              @else { <p class="jr-reflect__note is-muted">Log a few days to see a gentle reflection.</p> }
+              @if (reflectionLoading()) {
+                <p class="jr-reflect__note is-muted">Composing your reflection…</p>
+              } @else if (reflection(); as r) {
+                <p class="jr-reflect__note">{{ r.note }}</p>
+                @if (r.fellBackToPlain && hasAi()) {
+                  <span class="jr-reflect__tag">Deterministic summary</span>
+                }
+              } @else {
+                <p class="jr-reflect__note is-muted">Log a few days to see a gentle reflection.</p>
+              }
             </div>
           </section>
 
@@ -133,6 +141,8 @@ interface MoodChoice { value: string; label: string; emoji: string; }
             @if (daySaving()) { <em class="ls__save">Saving…</em> } @else if (daySaved()) { <em class="ls__save is-ok">Saved</em> }
           </div>
           <button type="button" class="ls__day-nav" (click)="nextDay()" aria-label="Next day" [disabled]="logDate() >= today"><mat-icon aria-hidden="true">chevron_right</mat-icon></button>
+          <input class="ls__day-date" type="date" [max]="today" [ngModel]="logDate()"
+                 (ngModelChange)="onDateInput($event)" name="jdate" aria-label="Jump to a date" enterkeyhint="done" />
         </div>
         @if (logDate() !== today) {
           <button type="button" class="ls__today" (click)="logToday()"><mat-icon aria-hidden="true">today</mat-icon> Jump to today</button>
@@ -218,6 +228,7 @@ export class JournalMobilePage implements OnDestroy {
   readonly entries = signal<JournalEntryDto[]>([]);
   readonly summary = signal<JournalSummaryDto | null>(null);
   readonly reflection = signal<JournalReflectionDto | null>(null);
+  readonly reflectionLoading = signal(false);
 
   readonly logOpen = signal(false);
 
@@ -255,7 +266,8 @@ export class JournalMobilePage implements OnDestroy {
   readonly logDateLabel = computed(() =>
     this.logDate() === this.today ? 'Today' : this.friendlyDate(this.logDate()));
 
-  private readonly hasAi = computed(() => {
+  /** Whether the caller may get the warm AI upgrade — used to surface the deterministic-summary badge. */
+  readonly hasAi = computed(() => {
     this.auth.permissions();
     return this.auth.hasPermission(PERM.trackerAi);
   });
@@ -294,10 +306,13 @@ export class JournalMobilePage implements OnDestroy {
   }
 
   private async loadReflection(): Promise<void> {
+    this.reflectionLoading.set(true);
     try {
       this.reflection.set(await firstValueFrom(this.api.journalReflection()));
     } catch {
       this.reflection.set(null);
+    } finally {
+      this.reflectionLoading.set(false);
     }
   }
 
@@ -314,6 +329,11 @@ export class JournalMobilePage implements OnDestroy {
   prevDay(): void { this.shiftDate(-1); }
   nextDay(): void { this.shiftDate(1); }
   logToday(): void { this.selectDate(this.today); }
+
+  /** Arbitrary date-jump from the daybar's native date input (guard empty clears). */
+  onDateInput(value: string): void {
+    if (value) this.selectDate(value);
+  }
 
   private shiftDate(delta: number): void {
     const d = this.parseIso(this.logDate());

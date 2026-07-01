@@ -375,6 +375,15 @@
 // FiMobile: sub-subtitle in tertiary ink for the clear hierarchy
 .sm-row__subtitle { color: var(--ink-faint); font-size: 11.5px; }
 
+// FiMobile: trailing timestamp in tertiary ink, tabular so widths stay steady
+.sm-row__when {
+  flex: none;
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 // FiMobile: trailing chevron in tertiary ink
 .sm-row__go { flex: none; color: var(--ink-faint); }
 

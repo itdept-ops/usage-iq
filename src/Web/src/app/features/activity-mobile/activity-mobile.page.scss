@@ -249,12 +249,21 @@
 }
 
 .ac-card__path {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: .84rem; font-weight: 600;
   color: var(--ink);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   direction: rtl; text-align: left;        // keep the tail (the meaningful end of the path) visible
+}
+
+// Query string trailing the path — mirrors the live logs `.qs` (muted tertiary, tail-truncated).
+.ac-card__qs {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: .78rem; font-weight: 600;
+  color: var(--tech-text-tertiary, var(--ink-dim));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .ac-card__meta {

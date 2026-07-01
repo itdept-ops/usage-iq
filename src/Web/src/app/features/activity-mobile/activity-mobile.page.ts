@@ -131,6 +131,7 @@ import {
                   <span class="ac-card__line">
                     <span class="ac-method-badge" [attr.data-m]="r.method">{{ r.method }}</span>
                     <span class="ac-card__path mono-num">{{ r.path }}</span>
+                    @if (r.queryString) { <span class="ac-card__qs mono-num">{{ r.queryString }}</span> }
                   </span>
                   <span class="ac-card__meta mono-num">
                     {{ r.whenUtc | date: 'HH:mm:ss' }}

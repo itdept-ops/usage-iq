@@ -535,6 +535,72 @@ $tabbar: 62px;
   &:active { transform: scale(.97); }
 }
 
+// ---- share-with-household row: dim when capture is off (parity with the live muted row) ----
+.lt__toggle--share.is-muted {
+  opacity: .55;
+  .lt__toggle-ic { background: color-mix(in oklab, var(--ink) 8%, transparent); color: var(--ink-dim); }
+}
+
+// ============================================================================
+// PERSISTENT PERMISSION-DENIED WARNING — an inline banner (not a transient toast).
+// ============================================================================
+
+.lt__warn {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--warn) 40%, transparent);
+  border-radius: var(--r-tile);
+  background: color-mix(in oklab, var(--warn) 12%, transparent);
+  color: var(--ink);
+  font-family: var(--font-ui); font-size: 12.5px; line-height: 1.35;
+
+  mat-icon {
+    flex: none;
+    font-size: 18px; width: 18px; height: 18px;
+    color: var(--warn);
+  }
+}
+
+// ============================================================================
+// CLEAR-HISTORY CONFIRM SHEET — branded body inside the beta bottom sheet
+// (mirrors the users-mobile sensitive-confirm layout, scoped locally).
+// ============================================================================
+
+.lc {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 8px; padding: 8px 22px 24px;
+}
+.lc__orb {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 60px; height: 60px; border-radius: 50%;
+  background: color-mix(in oklab, var(--warn) 22%, var(--glass));
+  box-shadow: var(--lift-2); margin-bottom: 4px;
+  mat-icon { font-size: 28px; width: 28px; height: 28px; color: var(--warn); }
+}
+.lc__title { margin: 0; font-family: var(--font-display, var(--font-ui)); font-size: 18px; font-weight: 800; color: var(--ink); }
+.lc__line { margin: 0; font-family: var(--font-ui); font-size: 13px; color: var(--ink-dim); max-width: 40ch; line-height: 1.4; }
+.lc__actions { display: flex; gap: 10px; margin-top: 12px; width: 100%; }
+.lc__btn {
+  flex: 1; min-height: 46px; border: 0;
+  border-radius: var(--r-tile);
+  cursor: pointer; font-family: var(--font-ui); font-weight: 700; font-size: 14px;
+  transition: filter .15s var(--ease-out, 160ms), transform .15s var(--ease-out, 160ms);
+  &:focus-visible { outline: 2px solid var(--tech-focus-ring, var(--accent-a)); outline-offset: 2px; }
+  &:active { transform: scale(.96); }
+  &:disabled { opacity: .55; cursor: default; }
+}
+.lc__btn--ghost {
+  background: color-mix(in oklab, var(--accent-a) 8%, var(--bg-sink));
+  border: 1px solid color-mix(in oklab, var(--accent-a) 18%, var(--hairline));
+  color: var(--ink);
+  &:hover { background: color-mix(in oklab, var(--accent-a) 14%, var(--bg-sink)); }
+}
+.lc__btn--danger {
+  background: var(--warn); color: #1a1206;
+  box-shadow: var(--lift-1);
+  &:hover:not(:disabled) { filter: brightness(1.06); }
+}
+
 // ============================================================================
 // mono numerals helper (matches the other twins).
 // ============================================================================

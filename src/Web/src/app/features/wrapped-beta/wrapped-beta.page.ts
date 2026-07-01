@@ -264,6 +264,15 @@ interface RecapCell { readonly num: string; readonly label: string; readonly acc
                 <mat-icon aria-hidden="true">ios_share</mat-icon> Share
               </button>
             </div>
+            @if (sharedUrl(); as url) {
+              <div class="wb-recap__link" aria-live="polite">
+                <mat-icon class="wb-recap__link-ico" aria-hidden="true">check_circle</mat-icon>
+                <span class="wb-recap__link-body">
+                  <span class="wb-recap__link-head">Public link ready — copy it manually if needed</span>
+                  <span class="wb-recap__link-url">{{ url }}</span>
+                </span>
+              </div>
+            }
           </article>
 
           <!-- the remaining-cards tail (everything, glanceable) -->
@@ -314,6 +323,12 @@ export class WrappedBetaPage {
   readonly refreshing = signal(false);
   /** True while a public share link is being created (debounces the buttons). */
   readonly sharing = signal(false);
+  /**
+   * The most-recently-created public share URL, echoed as visible copyable text under the recap card
+   * (parity with the desktop `linkCopied` fallback). Set on EVERY successful create — so even when the
+   * clipboard is blocked and the toast can't confirm a copy, the user can still read/select the URL by hand.
+   */
+  readonly sharedUrl = signal<string | null>(null);
 
   /** Index of the slide currently snapped into view (drives the dots + count-up). */
   readonly active = signal(0);
@@ -424,6 +439,7 @@ export class WrappedBetaPage {
     if (p === this.period()) return;
     this.period.set(p);
     this.active.set(0);
+    this.sharedUrl.set(null);
     this.scrollReelTo(0, 'auto');
     this.reload();
   }
@@ -596,10 +612,14 @@ export class WrappedBetaPage {
     const d = this.data();
     if (!d || !this.cards().length || this.sharing()) return;
     this.sharing.set(true);
+    this.sharedUrl.set(null);
     try {
       const created = await firstValueFrom(this.api.createWrappedShare({ period: this.period() }));
       const origin = typeof location !== 'undefined' ? location.origin : '';
       const url = `${origin}${created.path}`;
+      // Echo the URL as visible, copyable text no matter what happens with the native sheet / clipboard —
+      // so a blocked clipboard degrades to "here's the link, copy it yourself", never a dead-end warning.
+      this.sharedUrl.set(url);
 
       const nav: (Navigator & { share?: (d: ShareData) => Promise<void>; clipboard?: Clipboard }) | undefined =
         typeof navigator !== 'undefined' ? navigator : undefined;

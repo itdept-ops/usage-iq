@@ -300,7 +300,7 @@ interface IngredientRow {
         <label class="rf__field">
           <span class="rf__label">Title</span>
           <input class="rf__input" type="text" [ngModel]="fTitle()" (ngModelChange)="fTitle.set($event)"
-                 name="title" placeholder="e.g. Sunday chili" autocomplete="off" maxlength="120" required />
+                 name="title" placeholder="e.g. Sunday chili" autocomplete="off" maxlength="200" required />
         </label>
 
         <div class="rf__row">

@@ -144,6 +144,10 @@ interface VitalMeta {
                   <button type="button" class="mv-icon-btn" (click)="openEditMed(m)" aria-label="Edit medication">
                     <mat-icon aria-hidden="true">edit</mat-icon>
                   </button>
+                  <button type="button" class="mv-icon-btn" (click)="deactivate(m)"
+                          [attr.aria-label]="'Deactivate ' + m.name">
+                    <mat-icon aria-hidden="true">delete_outline</mat-icon>
+                  </button>
                 </div>
                 @if (m.todaySlots?.length) {
                   <div class="mv-doses">
@@ -558,14 +562,21 @@ export class MedsMobilePage implements OnDestroy {
     }
   }
 
-  async deactivate(): Promise<void> {
-    const id = this.editingId();
+  /**
+   * Deactivate a medication — one tap from either the med card (pass the row) or the edit sheet (no arg →
+   * falls back to the editing id). Matches the desktop per-card deactivate action; confirms by name, drops
+   * the row locally, refreshes adherence, and toasts.
+   */
+  async deactivate(med?: Medication): Promise<void> {
+    const id = med?.id ?? this.editingId();
     if (id == null) return;
-    if (typeof confirm === 'function' && !confirm('Deactivate this medication? It leaves your daily checklist.')) return;
+    const name = med?.name ?? this.meds().find((x) => x.id === id)?.name ?? 'this medication';
+    if (typeof confirm === 'function' &&
+        !confirm(`Deactivate ${name}? It stops appearing in your daily checklist.`)) return;
     try {
       await firstValueFrom(this.api.deleteMed(id));
       this.meds.update((list) => list.filter((x) => x.id !== id));
-      this.medSheetOpen.set(false);
+      if (this.editingId() === id) this.medSheetOpen.set(false);
       void this.refreshAdherence();
       this.toast.show('Deactivated', { tone: 'success', durationMs: 1600 });
     } catch {

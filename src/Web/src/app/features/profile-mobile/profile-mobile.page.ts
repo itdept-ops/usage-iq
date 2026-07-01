@@ -125,10 +125,10 @@ interface ToggleRow {
               <label class="pm-field">
                 <span class="pm-field__label">Nickname</span>
                 <input class="pm-field__input" type="text" inputmode="text"
-                       maxlength="40" autocomplete="off"
+                       maxlength="64" autocomplete="off"
                        [value]="nickname()" (input)="onNickname($event)"
                        placeholder="e.g. Sky" aria-label="Nickname" />
-                <span class="pm-field__help">Falls back to “First L.” if left blank.</span>
+                <span class="pm-field__help">Up to 64 characters. Leave blank to fall back to “First&nbsp;L.”.</span>
               </label>
             }
           </section>
@@ -144,9 +144,10 @@ interface ToggleRow {
             </div>
             <label class="pm-field">
               <input class="pm-field__input" type="text" inputmode="text"
-                     maxlength="80" autocomplete="off"
+                     maxlength="120" autocomplete="off"
                      [value]="status()" (input)="onStatus($event)"
                      placeholder="What are you up to?" aria-label="Status message" />
+              <span class="pm-field__help">Up to 120 characters. Leave blank to clear.</span>
             </label>
           </section>
 
@@ -176,6 +177,14 @@ interface ToggleRow {
                 </button>
               }
             </div>
+
+            <!-- Contextual confirmation when Appear-offline is ON (mirrors the live page's callout). -->
+            @if (appearOffline()) {
+              <div class="pm-callout" role="note">
+                <mat-icon aria-hidden="true">visibility_off</mat-icon>
+                <span>You're hidden — others won't see you in their online roster. You'll still see everyone else.</span>
+              </div>
+            }
           </section>
 
           <!-- ─── DATA EXPORT (gated, mirrors the live page's dashboard.export) ─── -->

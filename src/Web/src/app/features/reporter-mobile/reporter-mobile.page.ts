@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
@@ -51,7 +52,7 @@ interface SetupStep {
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ToastController],
   imports: [
-    DatePipe, FormsModule, MatIconModule,
+    DatePipe, FormsModule, RouterLink, MatIconModule,
     BetaPullRefresh, BetaSegmentedControl, BetaBottomSheet, BetaSkeleton,
     BetaFab, BetaToaster,
   ],
@@ -90,6 +91,46 @@ interface SetupStep {
             <mat-icon class="rp-guidebtn__go" aria-hidden="true">chevron_right</mat-icon>
           </button>
         </header>
+
+        <!-- ─── SELF-SERVICE EXPLAINER (only when the caller manages just their own keys) ─── -->
+        @if (selfServiceOnly()) {
+          <section class="rp-explain">
+            <div class="rp-explain__head">
+              <span class="rp-explain__ic" aria-hidden="true"><mat-icon>badge</mat-icon></span>
+              <div class="rp-explain__titles">
+                <h2 class="rp-explain__title">Get your own reporter token</h2>
+                <p class="rp-explain__sub">Mint and revoke keys for <b>your own</b> usage — no admin needed.
+                  Anything a key reports shows up under
+                  <b class="mono">{{ auth.session()?.email }}</b> on the <a routerLink="/fleet">Fleet</a> page.</p>
+              </div>
+            </div>
+            <ol class="rp-explain__steps">
+              <li><b>Mint a key</b> below and copy it (shown only once).</li>
+              <li><b>Pick a reporter</b> for the machine your AI agent runs on — the desktop agent is easiest.</li>
+              <li><b>Point it here</b> with your key — it parses logs locally and pushes only token counts.</li>
+            </ol>
+          </section>
+        }
+
+        <!-- ─── TWO WAYS TO REPORT — chooser ─── -->
+        @if (!loading() && !errored()) {
+          <section class="rp-ways">
+            <h2 class="rp-ways__title">Two ways to report</h2>
+            <div class="rp-ways__grid">
+              <button type="button" class="rp-way rp-way--rec" (click)="guideOpen.set(true)">
+                <span class="rp-way__badge">Recommended</span>
+                <mat-icon class="rp-way__ic" aria-hidden="true">desktop_windows</mat-icon>
+                <span class="rp-way__name">Desktop agent</span>
+                <span class="rp-way__blurb">A Windows tray app with a one-screen Settings panel and run-at-sign-in. No terminal.</span>
+              </button>
+              <button type="button" class="rp-way" (click)="guideOpen.set(true)">
+                <mat-icon class="rp-way__ic" aria-hidden="true">terminal</mat-icon>
+                <span class="rp-way__name">Console reporter</span>
+                <span class="rp-way__blurb">A cross-platform .NET console app for headless servers, CI, systemd, Task Scheduler, or cron.</span>
+              </button>
+            </div>
+          </section>
+        }
 
         @if (loading()) {
           <!-- skeleton list -->
@@ -139,7 +180,7 @@ interface SetupStep {
                         </span>
                         <span class="rp-card__sep" aria-hidden="true">·</span>
                         @if (k.lastUsedUtc) {
-                          <span class="rp-card__used">used {{ k.lastUsedUtc | date: 'MMM d, HH:mm' }}</span>
+                          <span class="rp-card__used">used {{ k.lastUsedUtc | date: 'MMM d, HH:mm' }}@if (k.lastUsedIp) { · {{ k.lastUsedIp }}}</span>
                         } @else {
                           <span class="rp-card__used rp-card__used--never">never used</span>
                         }
@@ -171,6 +212,17 @@ interface SetupStep {
               </div>
             }
           }
+
+          <!-- ─── WHERE USAGE SHOWS UP — Fleet attribution ─── -->
+          <a class="rp-where" routerLink="/fleet">
+            <span class="rp-where__ic" aria-hidden="true"><mat-icon>hub</mat-icon></span>
+            <span class="rp-where__body">
+              <span class="rp-where__title">Where your usage shows up</span>
+              <span class="rp-where__sub">Whatever reporter you run, its usage is attributed to its
+                <b>machine</b> and the <b>account</b> that owns the key — ranked by spend on the Fleet page.</span>
+            </span>
+            <mat-icon class="rp-where__go" aria-hidden="true">chevron_right</mat-icon>
+          </a>
         }
       </div>
     </app-bs-pull-refresh>
@@ -273,6 +325,25 @@ interface SetupStep {
           </section>
         }
 
+        <!-- CLI options reference — the console reporter's flags -->
+        <section class="rg__step">
+          <div class="rg__step-head">
+            <span class="rg__step-ic" aria-hidden="true"><mat-icon>tune</mat-icon></span>
+            <div class="rg__step-titles">
+              <h4 class="rg__step-title">Console reporter options</h4>
+              <p class="rg__step-blurb">All flags for <code class="mono">usage-iq-reporter</code> — <code class="mono">--url</code> and <code class="mono">--key</code> are required.</p>
+            </div>
+          </div>
+          <dl class="rg__opts">
+            @for (o of cliOptions(); track o.flag) {
+              <div class="rg__opt">
+                <dt class="rg__opt-flag mono">{{ o.flag }}</dt>
+                <dd class="rg__opt-desc">{{ o.desc }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+
         <p class="rg__foot">
           <mat-icon aria-hidden="true">lock</mat-icon>
           The server stays authoritative — it prices, resolves the project, and de-dupes, so re-runs are
@@ -325,6 +396,8 @@ export class ReporterMobilePage {
   readonly canCreate = computed(() =>
     this.auth.hasAnyPermission(PERM.reporterManage, PERM.reporterSelf),
   );
+  /** Self-service only (own keys) — drives the "get your own token" explainer card. */
+  readonly selfServiceOnly = computed(() => this.canCreate() && !this.canManage());
 
   readonly activeCount = computed(() => this.keys().filter(k => !k.revoked).length);
   readonly revokedCount = computed(() => this.keys().filter(k => k.revoked).length);
@@ -388,6 +461,11 @@ export class ReporterMobilePage {
               + 'ExecStart=/opt/usage-iq/usage-iq-reporter\nRestart=always',
           },
           {
+            label: 'Windows (Task Scheduler)',
+            cmd: 'schtasks /create /tn "UsageIQ Reporter" /sc onlogon ^\n'
+              + `  /tr "usage-iq-reporter.exe --url ${url} --key uiq_…"`,
+          },
+          {
             label: 'cron (hourly --once)',
             cmd: `0 * * * * usage-iq-reporter --url ${url} --key uiq_… --once`,
           },
@@ -395,6 +473,18 @@ export class ReporterMobilePage {
       },
     ];
   });
+
+  /** Console-reporter CLI flags — mirrors the live page's options reference. */
+  readonly cliOptions = computed<{ flag: string; desc: string }[]>(() => [
+    { flag: '-u, --url', desc: `This server: ${this.serverUrl()} (required)` },
+    { flag: '-k, --key', desc: 'Ingest key from step 1 (required, secret)' },
+    { flag: '-m, --machine', desc: 'Label this machine reports under (default: hostname)' },
+    { flag: '--claude-path', desc: 'Claude logs dir (default ~/.claude/projects)' },
+    { flag: '--codex-path', desc: 'Codex logs dir (default ~/.codex)' },
+    { flag: '--once', desc: 'Single pass then exit (otherwise watches)' },
+    { flag: '--interval', desc: 'Watch poll seconds, 5–3600 (default 60)' },
+    { flag: '--batch', desc: 'Rows per request, 1–5000 (default 500)' },
+  ]);
 
   constructor() {
     void this.reload();

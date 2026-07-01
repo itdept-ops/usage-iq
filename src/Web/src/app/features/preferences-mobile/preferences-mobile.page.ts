@@ -190,6 +190,14 @@ interface LinkOut {
                 <span class="link-chev" aria-hidden="true">›</span>
               </button>
             </section>
+          } @else if (discordError()) {
+            <section class="rise" [style.--i]="3">
+              <app-bs-section-header title="Forward to Discord" subtitle="Mirror alerts to your server" icon="forum" />
+              <app-bs-error compact icon="link_off"
+                            title="Couldn't load Discord settings"
+                            body="Check your connection and try again."
+                            ctaLabel="Retry" (retry)="loadDiscord()" />
+            </section>
           }
         }
 
@@ -240,19 +248,29 @@ interface LinkOut {
         }
 
         <!-- ───────────── LOCATION (location-gated) ───────────── -->
-        @if (canLocation() && location(); as loc) {
-          <section class="rise" [style.--i]="6">
-            <app-bs-section-header title="Location" subtitle="Private by default" icon="place" />
-            <div class="card card--list">
-              <app-beta-toggle-row title="Enable capture" subtitle="Record your location history"
-                                   icon="my_location" [checked]="loc.locationEnabled"
-                                   (toggle)="setLocation('locationEnabled', $event)" />
-              <app-beta-toggle-row title="Share with household" subtitle="Coarse city on the family map"
-                                   icon="groups" [checked]="loc.shareHousehold"
-                                   [disabled]="!loc.locationEnabled"
-                                   (toggle)="setLocation('shareHousehold', $event)" />
-            </div>
-          </section>
+        @if (canLocation()) {
+          @if (location(); as loc) {
+            <section class="rise" [style.--i]="6">
+              <app-bs-section-header title="Location" subtitle="Private by default" icon="place" />
+              <div class="card card--list">
+                <app-beta-toggle-row title="Enable capture" subtitle="Record your location history"
+                                     icon="my_location" [checked]="loc.locationEnabled"
+                                     (toggle)="setLocation('locationEnabled', $event)" />
+                <app-beta-toggle-row title="Share with household" subtitle="Coarse city on the family map"
+                                     icon="groups" [checked]="loc.shareHousehold"
+                                     [disabled]="!loc.locationEnabled"
+                                     (toggle)="setLocation('shareHousehold', $event)" />
+              </div>
+            </section>
+          } @else if (locationError()) {
+            <section class="rise" [style.--i]="6">
+              <app-bs-section-header title="Location" subtitle="Private by default" icon="place" />
+              <app-bs-error compact icon="location_off"
+                            title="Couldn't load location settings"
+                            body="Check your connection and try again."
+                            ctaLabel="Retry" (retry)="loadLocation()" />
+            </section>
+          }
         }
 
         <!-- ───────────── SYNC & TIME (settings.manage) ───────────── -->
@@ -388,6 +406,10 @@ export class PreferencesMobilePage {
   readonly sync = signal<Settings | null>(null);
   readonly refreshing = signal(false);
 
+  // ── per-section load-failure flags (drive an inline error + retry, matching the desktop page) ──
+  readonly discordError = signal(false);
+  readonly locationError = signal(false);
+
   // ── Discord builder state ──
   readonly webhookSheet = signal(false);
   readonly webhookInput = signal('');
@@ -496,11 +518,11 @@ export class PreferencesMobilePage {
   private loadAll(): void {
     if (this.canChat()) {
       this.api.getNotificationPreferences().subscribe({ next: p => this.prefs.set(p), error: () => {} });
-      this.api.myDiscord().subscribe({ next: d => this.discord.set(d), error: () => {} });
+      this.loadDiscord();
     }
     this.loadProfile();
     if (this.canLocation()) {
-      this.api.locationSettings().subscribe({ next: l => this.location.set(l), error: () => {} });
+      this.loadLocation();
     }
     if (this.canManageSync()) {
       this.api.settings().subscribe({ next: s => this.sync.set(s), error: () => {} });
@@ -527,7 +549,27 @@ export class PreferencesMobilePage {
   refreshNotifications(): void {
     if (!this.canChat()) return;
     this.api.getNotificationPreferences().subscribe({ next: p => this.prefs.set(p), error: () => {} });
-    this.api.myDiscord().subscribe({ next: d => this.discord.set(d), error: () => {} });
+    this.loadDiscord();
+  }
+
+  /** Load (or retry) the per-user Discord settings; a failure flips {@link discordError} so the section shows an inline error + retry. */
+  loadDiscord(): void {
+    if (!this.canChat()) return;
+    this.discordError.set(false);
+    this.api.myDiscord().subscribe({
+      next: d => { this.discord.set(d); this.discordError.set(false); },
+      error: () => this.discordError.set(true),
+    });
+  }
+
+  /** Load (or retry) the location settings; a failure flips {@link locationError} so the section shows an inline error + retry. */
+  loadLocation(): void {
+    if (!this.canLocation()) return;
+    this.locationError.set(false);
+    this.api.locationSettings().subscribe({
+      next: l => { this.location.set(l); this.locationError.set(false); },
+      error: () => this.locationError.set(true),
+    });
   }
 
   async refreshAll(): Promise<void> {

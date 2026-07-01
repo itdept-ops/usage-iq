@@ -136,6 +136,137 @@
 }
 
 // ============================================================================
+// SELF-SERVICE EXPLAINER CARD.
+// ============================================================================
+
+.rp-explain {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px;
+  background: color-mix(in oklab, var(--accent-a) 7%, var(--bg-rise));
+  border: 1px solid color-mix(in oklab, var(--accent-a) 30%, var(--tech-border, var(--hairline)));
+  border-radius: var(--tech-radius, var(--r-card));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1)), inset 0 1px 0 var(--glass-edge, rgba(255,255,255,.10));
+}
+
+.rp-explain__head { display: flex; align-items: flex-start; gap: 11px; }
+
+.rp-explain__ic {
+  flex: 0 0 auto;
+  width: 40px; height: 40px; border-radius: var(--tech-r-control, var(--r-tile));
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: var(--tech-text-on-accent, var(--ink-on-accent));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
+  mat-icon { font-size: 22px; width: 22px; height: 22px; }
+}
+
+.rp-explain__titles { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rp-explain__title { margin: 0; font-family: var(--font-ui); font-weight: 800; font-size: 16px; color: var(--ink); }
+.rp-explain__sub {
+  margin: 0; font-family: var(--font-ui); font-size: 12.5px; line-height: 1.45; color: var(--ink-dim);
+  word-break: break-word;
+  a { color: var(--accent-a); font-weight: 700; text-decoration: underline; }
+}
+
+.rp-explain__steps {
+  margin: 0; padding-left: 18px;
+  display: flex; flex-direction: column; gap: 5px;
+  font-family: var(--font-ui); font-size: 12.5px; line-height: 1.45; color: var(--ink-dim);
+  b { color: var(--ink); font-weight: 700; }
+}
+
+// ============================================================================
+// TWO WAYS TO REPORT — chooser.
+// ============================================================================
+
+.rp-ways { display: flex; flex-direction: column; gap: 10px; }
+
+.rp-ways__title {
+  margin: 0 2px; font-family: var(--font-ui); font-weight: 800; font-size: 15px; color: var(--ink);
+}
+
+.rp-ways__grid { display: flex; flex-direction: column; gap: 10px; }
+
+.rp-way {
+  position: relative;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  text-align: left;
+  padding: 14px; padding-top: 16px;
+  background: var(--bg-rise);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-radius, var(--r-card));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1)), inset 0 1px 0 var(--glass-edge, rgba(255,255,255,.10));
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out), border-color 160ms var(--ease-out);
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised, var(--lift-2)), inset 0 1px 0 var(--glass-edge, rgba(255,255,255,.10));
+  }
+  &:active { transform: none; background: var(--bg-sink); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  &--rec { border-color: color-mix(in oklab, var(--accent-a) 40%, var(--tech-border, var(--hairline))); }
+}
+
+.rp-way__badge {
+  position: absolute; top: 10px; right: 10px;
+  padding: 1px 8px; border-radius: var(--tech-r-pill, var(--r-pill));
+  background: color-mix(in oklab, var(--accent-a) 22%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent-a) 30%, transparent);
+  color: var(--accent-a);
+  font-family: var(--font-ui); font-size: 9.5px; font-weight: 800;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+
+.rp-way__ic {
+  font-size: 26px; width: 26px; height: 26px; color: var(--accent-a);
+}
+
+.rp-way__name { font-family: var(--font-ui); font-weight: 800; font-size: 15px; color: var(--ink); }
+.rp-way__blurb { font-family: var(--font-ui); font-size: 12px; line-height: 1.45; color: var(--ink-dim); }
+
+// ============================================================================
+// WHERE USAGE SHOWS UP — Fleet attribution card.
+// ============================================================================
+
+.rp-where {
+  display: flex; align-items: center; gap: 11px;
+  padding: 14px;
+  background: var(--bg-rise);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-radius, var(--r-card));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1)), inset 0 1px 0 var(--glass-edge, rgba(255,255,255,.10));
+  text-decoration: none; color: inherit;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--tech-shadow-raised, var(--lift-2)), inset 0 1px 0 var(--glass-edge, rgba(255,255,255,.10));
+  }
+  &:active { transform: none; background: var(--bg-sink); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+}
+
+.rp-where__ic {
+  flex: 0 0 auto;
+  width: 40px; height: 40px; border-radius: var(--tech-r-control, var(--r-tile));
+  display: grid; place-items: center;
+  background: color-mix(in oklab, var(--accent-a) 14%, transparent);
+  color: var(--accent-a);
+  mat-icon { font-size: 22px; width: 22px; height: 22px; }
+}
+
+.rp-where__body { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-width: 0; }
+.rp-where__title { font-family: var(--font-ui); font-weight: 700; font-size: 14px; color: var(--ink); }
+.rp-where__sub {
+  font-family: var(--font-ui); font-size: 12px; line-height: 1.45; color: var(--ink-dim);
+  b { color: var(--ink); font-weight: 700; }
+}
+.rp-where__go { flex: 0 0 auto; color: var(--ink-dim); }
+
+// ============================================================================
 // KEY LIST.
 // ============================================================================
 
@@ -596,6 +727,25 @@
   display: block; margin: 0;
   font-size: 12.5px; line-height: 1.5; color: var(--ink);
   white-space: pre-wrap; word-break: break-word;
+}
+
+// ---- CLI options reference ----
+.rg__opts { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.rg__opt {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px;
+  background: var(--tech-bg-sunken, var(--bg-base));
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-control, var(--r-card));
+}
+
+.rg__opt-flag {
+  margin: 0; font-size: 12.5px; font-weight: 700; color: var(--accent-a);
+}
+
+.rg__opt-desc {
+  margin: 0; font-family: var(--font-ui); font-size: 12px; line-height: 1.4; color: var(--ink-dim);
 }
 
 .rg__foot {

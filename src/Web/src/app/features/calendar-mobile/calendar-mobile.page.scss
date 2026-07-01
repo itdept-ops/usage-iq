@@ -119,6 +119,27 @@
   color: var(--ink-dim);
 }
 
+// A stat tile paired with a small caption underneath (busiest-day / avg-session / most-active-weekday
+// sub-labels). Occupies one grid cell so the 2-col tile grid stays intact.
+.cm-tile-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cm-tile-sub {
+  padding: 0 4px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--tech-text-secondary, var(--ink-dim));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 // ============================================================================
 // CARDS (recent activity / hours / sessions)
 // ============================================================================
@@ -244,44 +265,55 @@
   &.is-today &__track { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-a) 45%, transparent); }
 }
 
-// ---- WHEN YOU WORK: 24-hour distribution ----
-.cm-hours {
+// ---- WHEN YOU WORK: hour × weekday heatmap (7 weekday rows × 24 hour cols) ----
+// A weekday-label column + a 24-cell row per weekday. Each cell tints by its `--i` intensity
+// (0..1 of the busiest cell) via color-mix, so the whole grid follows the page accent.
+.cm-heat {
   display: grid;
-  grid-template-columns: repeat(24, 1fr);
-  align-items: flex-end;
-  gap: 2px;
-  height: 96px;
-}
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 6px;
 
-.cm-hbar {
-  display: flex;
-  align-items: flex-end;
-  height: 100%;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  overflow: hidden;
-
-  &__fill {
-    width: 100%;
-    min-height: 2px;
-    border-radius: 3px;
-    background: linear-gradient(180deg,
-      color-mix(in srgb, var(--accent-a) 80%, transparent), var(--accent-b));
-    transition: height 360ms var(--ease-spring, var(--ease-out));
+  &__dow {
+    font-family: var(--font-ui);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    text-align: right;
+    padding-right: 2px;
   }
 
-  &.is-peak &__fill {
-    background: linear-gradient(180deg, var(--accent-a), var(--accent-b));
-    box-shadow: 0 0 10px color-mix(in srgb, var(--accent-a) 55%, transparent);
+  &__row {
+    display: grid;
+    grid-template-columns: repeat(24, 1fr);
+    gap: 2px;
   }
 
-  &__axis { display: none; }
+  &__cell {
+    --i: 0;
+    aspect-ratio: 1 / 1;
+    min-height: 10px;
+    border-radius: 2px;
+    // Empty cells read as a faint track; busier cells lerp toward the accent via --i.
+    background: color-mix(in srgb,
+      var(--accent-a) calc(var(--i) * 88%),
+      color-mix(in srgb, var(--ink) 7%, transparent));
+    transition: background-color 320ms var(--ease-out);
+
+    &.is-peak {
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-a) 60%, transparent),
+        0 0 8px color-mix(in srgb, var(--accent-a) 45%, transparent);
+    }
+  }
 }
 
-.cm-hours__axis {
+.cm-heat__axis {
   display: flex;
   justify-content: space-between;
-  margin-top: 8px;
+  // Offset to line up under the 24-col row (skip the weekday-label column ~ 26px + gap).
+  margin: 8px 0 0 32px;
   font-family: var(--font-ui);
   font-size: 10px;
   font-weight: 600;
@@ -515,6 +547,27 @@
   }
 
   &__sub { font-family: var(--font-ui); font-size: 12px; font-weight: 600; color: var(--tech-text-secondary, var(--ink-dim)); }
+
+  // Session start → end timestamps (start carries the date). Monospace for tabular alignment.
+  &__range {
+    margin: -6px 0 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--tech-text-secondary, var(--ink-dim));
+    font-variant-numeric: tabular-nums;
+  }
+
+  // Cumulative-cost chart host — fixed height so the echarts canvas lays out (same idea as meds-mobile).
+  &__chart {
+    height: 220px;
+    padding: 8px;
+    border-radius: var(--tech-r-control, var(--r-tile));
+    background: var(--bg-sink);
+    border: 1px solid var(--tech-border, var(--hairline));
+    box-shadow: var(--tech-shadow-panel, var(--lift-1)),
+      inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  }
 
   &__skel { display: flex; flex-direction: column; gap: 10px; }
 

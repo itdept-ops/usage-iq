@@ -468,6 +468,25 @@
 .tr-tile.is-earned .tr-tile__meta { color: color-mix(in srgb, var(--tile-h, var(--accent-a)) 70%, var(--ink)); }
 .tr-tile__meta-ic { font-size: 14px; width: 14px; height: 14px; }
 
+// Inline tier ladder — one rung per tier, threshold visible, earned rungs lit by hue.
+.tr-tile__tiers {
+  display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 8px;
+}
+.tr-tile__tier {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 800; line-height: 1;
+  color: var(--ink-faint);
+}
+.tr-tile__tier-dot {
+  width: 14px; height: 4px; border-radius: var(--r-pill, 999px);
+  background: var(--bg-sink); flex: none;
+}
+.tr-tile__tier.is-earned { color: var(--ink-dim); }
+.tr-tile__tier.is-earned[data-tier='bronze']   .tr-tile__tier-dot { background: var(--t-bronze); }
+.tr-tile__tier.is-earned[data-tier='silver']   .tr-tile__tier-dot { background: var(--t-silver); }
+.tr-tile__tier.is-earned[data-tier='gold']     .tr-tile__tier-dot { background: var(--t-gold); }
+.tr-tile__tier.is-earned[data-tier='complete'] .tr-tile__tier-dot { background: var(--t-complete); }
+
 // Locked progress hairline at the very bottom.
 .tr-tile__bar {
   position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
