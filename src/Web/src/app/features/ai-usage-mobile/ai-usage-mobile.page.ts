@@ -10,7 +10,8 @@ import { Api } from '../../core/api';
 import { AiUsageRow, AiUsageSummary } from '../../core/models';
 import {
   BetaPullRefresh, BetaSegmentedControl, BetaBottomSheet, BetaStatTile, BetaSkeleton,
-  BetaSectionHeader, BetaToaster, ToastController, type Segment,
+  BetaSectionHeader, BetaToaster, BetaDonut, BetaTooltip, ToastController,
+  type Segment, type DonutSegment,
 } from '../beta-ui';
 
 const PAGE_SIZE = 100;
@@ -50,7 +51,7 @@ interface FilterOption {
   imports: [
     DecimalPipe, FormsModule, MatIconModule,
     BetaPullRefresh, BetaSegmentedControl, BetaBottomSheet, BetaStatTile, BetaSkeleton,
-    BetaSectionHeader, BetaToaster,
+    BetaSectionHeader, BetaToaster, BetaDonut, BetaTooltip,
   ],
   template: `
     <!-- ─────────────── PULL-TO-REFRESH OWNS THE SCROLL ─────────────── -->
@@ -127,6 +128,30 @@ interface FilterOption {
                   </div>
                 }
               </div>
+            }
+
+            <!-- ─── SPEND-BY-MODEL COMPOSITION (donut) ─── -->
+            @if (modelSegments().length) {
+              <section class="au-donut-card" aria-label="Spend by model">
+                <div class="au-donut-card__head">
+                  <span class="au-donut-card__title">
+                    <mat-icon aria-hidden="true">donut_small</mat-icon>
+                    {{ modelByCost() ? 'Spend by model' : 'Tokens by model' }}
+                  </span>
+                  <app-bs-tooltip
+                    [text]="modelByCost()
+                      ? 'Estimated USD cost on this page, split across the models that produced it. Unpriced models are excluded.'
+                      : 'Total tokens on this page, split across the models that produced them (no priced cost was available).'"
+                    label="How is spend by model calculated?" />
+                </div>
+                <app-bs-donut
+                  [segments]="modelSegments()"
+                  [headline]="modelHeadline()"
+                  [caption]="modelCaption()"
+                  [legend]="true"
+                  [showPercent]="true"
+                  [size]="176" />
+              </section>
             }
 
             @if (s.hasUnpricedModels) {
@@ -262,12 +287,21 @@ interface FilterOption {
               <h3 class="ad__title">{{ r.feature }}</h3>
               <span class="ad__sub">
                 <span class="au-row__pill" [class]="'ocp-' + outcomeTone(r.outcome)">{{ outcomeLabel(r.outcome) }}</span>
+                <app-bs-tooltip
+                  text="Outcome: OK = the model answered; Unavailable / Rate-limited = a transient upstream refusal; Parse-failed / Error = the response couldn't be used."
+                  label="What does the outcome mean?" />
                 · {{ fmtTime(r.whenUtc) }}
               </span>
             </div>
           </div>
 
           <!-- token + cost breakdown -->
+          <div class="ad__macros-head">
+            <span class="ad__macros-title">Tokens &amp; cost</span>
+            <app-bs-tooltip
+              text="Prompt + output tokens the call consumed, and the estimated USD cost (model rates × tokens). Cost shows “—” for a model with no price."
+              label="What do tokens and cost mean?" />
+          </div>
           <div class="ad__macros">
             <div class="ad__macro"><span class="ad__macro-n mono-num">{{ fmtNum(r.promptTokens) }}</span><span class="ad__macro-l">prompt</span></div>
             <div class="ad__macro"><span class="ad__macro-n mono-num">{{ fmtNum(r.outputTokens) }}</span><span class="ad__macro-l">output</span></div>
@@ -483,6 +517,74 @@ export class AiUsageMobilePage {
 
   /** Total tokens, compacted (e.g. "1.2M") so the tile numeral never overflows. */
   readonly tokensLabel = computed(() => this.compact(this.summary()?.totalTokens ?? 0));
+
+  // ─────────────── SPEND-BY-MODEL (donut, derived from the loaded page rows) ───────────────
+
+  /** A small, fixed hue ramp for the model slices (accent-led, then distinct kit-friendly hues). */
+  private readonly modelColors = [
+    'var(--accent-a)', 'var(--accent-b)', '#a78bfa', '#f59e0b', '#34d399', '#f472b6',
+  ];
+
+  /**
+   * Composition of this page's spend across models, derived ENTIRELY from the already-loaded
+   * {@link rows} (model + est. cost). Rows are grouped by model and summed by priced cost; if no row
+   * on the page carried a priced cost we fall back to grouping by TOTAL TOKENS (so the ring is never
+   * empty when there's data), which {@link modelByCost} reflects in the labels. Top 5 models keep their
+   * own slice; the remainder rolls into an "Other" slice. Reuses `rows()` — no new API call.
+   */
+  private readonly modelGroups = computed(() => {
+    const rows = this.rows();
+    const byCost = new Map<string, number>();
+    const byTok = new Map<string, number>();
+    let costTotal = 0;
+    let tokTotal = 0;
+    for (const r of rows) {
+      const m = r.model || 'unknown';
+      if (r.estimatedCostUsd != null && r.estimatedCostUsd > 0) {
+        byCost.set(m, (byCost.get(m) ?? 0) + r.estimatedCostUsd);
+        costTotal += r.estimatedCostUsd;
+      }
+      if (r.totalTokens != null && r.totalTokens > 0) {
+        byTok.set(m, (byTok.get(m) ?? 0) + r.totalTokens);
+        tokTotal += r.totalTokens;
+      }
+    }
+    const byCostMode = costTotal > 0;
+    const src = byCostMode ? byCost : byTok;
+    const total = byCostMode ? costTotal : tokTotal;
+    return { src, total, byCostMode };
+  });
+
+  /** True when the donut splits by priced USD cost; false when it fell back to token share. */
+  readonly modelByCost = computed(() => this.modelGroups().byCostMode);
+
+  /** The donut segments: top 5 models by share + an "Other" rollup, colored from {@link modelColors}. */
+  readonly modelSegments = computed<DonutSegment[]>(() => {
+    const { src } = this.modelGroups();
+    const entries = [...src.entries()].sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return [];
+    const TOP = 5;
+    const head = entries.slice(0, TOP);
+    const rest = entries.slice(TOP);
+    const segs: DonutSegment[] = head.map(([label, value], i) => ({
+      label, value, color: this.modelColors[i % this.modelColors.length],
+    }));
+    if (rest.length) {
+      const otherVal = rest.reduce((s, [, v]) => s + v, 0);
+      segs.push({ label: `Other (${rest.length})`, value: otherVal, color: 'var(--ink-faint, #64748b)' });
+    }
+    return segs;
+  });
+
+  /** The centered headline: total priced spend, or the compacted token total when in fall-back mode. */
+  readonly modelHeadline = computed(() => {
+    const { total, byCostMode } = this.modelGroups();
+    return byCostMode ? this.fmtCost(total) : this.compact(total);
+  });
+
+  /** The muted caption under the headline: what the ring is splitting. */
+  readonly modelCaption = computed(() =>
+    this.modelByCost() ? 'est. spend · this page' : 'tokens · this page');
 
   /** The section-header subtitle: how many rows are on this page + the active filter. */
   readonly listSub = computed(() => {

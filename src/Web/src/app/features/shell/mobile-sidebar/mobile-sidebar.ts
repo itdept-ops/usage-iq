@@ -87,6 +87,11 @@ import { navGroups, type NavGroupModel } from '../../../core/nav-model';
             <span class="srow__label">My profile</span>
             <mat-icon class="srow__chev" aria-hidden="true">chevron_right</mat-icon>
           </a>
+          <a class="srow" routerLink="/help" (click)="nav.close()">
+            <span class="srow__ic"><mat-icon aria-hidden="true">help_outline</mat-icon></span>
+            <span class="srow__label">Help &amp; FAQ</span>
+            <mat-icon class="srow__chev" aria-hidden="true">chevron_right</mat-icon>
+          </a>
           <button type="button" class="srow" (click)="switchToDesktop()">
             <span class="srow__ic"><mat-icon aria-hidden="true">desktop_windows</mat-icon></span>
             <span class="srow__label">Switch to desktop site</span>

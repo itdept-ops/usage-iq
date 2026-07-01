@@ -11,7 +11,8 @@ import {
 } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
 import {
-  BetaEmptyState, BetaErrorState, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, type Segment,
+  BetaDonut, BetaEmptyState, BetaErrorState, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton,
+  BetaTooltip, type DonutSegment, type Segment,
 } from '../beta-ui';
 
 /** One feed card augmented with its kind-section label so the swipe stack reads as grouped. */
@@ -50,6 +51,7 @@ interface FeedCard extends InsightCard {
   imports: [
     MatIconModule, ChartComponent,
     BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaEmptyState, BetaErrorState,
+    BetaDonut, BetaTooltip,
   ],
   template: `
     <!-- ─────────── STICKY GLASS TOP: window switcher ─────────── -->
@@ -94,6 +96,24 @@ interface FeedCard extends InsightCard {
             ctaLink="/tracker-beta" />
 
         } @else {
+          <!-- ─── summary VIZ: the insight mix by kind ─── -->
+          <section class="im-mix" aria-label="Insight mix">
+            <p class="im-mix__head" aria-hidden="true">
+              <span class="im-mix__lead">
+                <mat-icon aria-hidden="true">donut_small</mat-icon> Your insight mix
+              </span>
+              <app-bs-tooltip
+                label="What is the insight mix?"
+                text="How this window's signals break down by kind — correlations, trends, streaks, anomalies and best/worst days. These are statistical patterns in your own logs — association, not causation, and never medical advice." />
+            </p>
+            <app-bs-donut
+              [segments]="mixSegments()"
+              [headline]="String(cards().length)"
+              caption="signals"
+              [size]="164" [stroke]="15" [legend]="true" [showPercent]="false"
+              label="Insights by kind" />
+          </section>
+
           <!-- ─── optional AI narrative banner (tracker.ai only) ─── -->
           @if (showNarrative()) {
             <article class="im-ai">
@@ -132,7 +152,18 @@ interface FeedCard extends InsightCard {
                   <span class="im-card__mag" [attr.data-dir]="dirOf(c)">{{ c.magnitude }}</span>
                 </header>
                 <h3 class="im-card__title">{{ c.title }}</h3>
-                <p class="im-card__stat">{{ c.stat }}</p>
+                <p class="im-card__stat">
+                  <span>{{ c.stat }}</span>
+                  @if (c.kind === 'correlation') {
+                    <app-bs-tooltip class="im-card__stat-tip"
+                      label="What does r mean?"
+                      text="r is the correlation coefficient (−1 to +1): its sign is the direction and its size is the strength of the paired-day association. It measures association only — not causation — and is never medical advice." />
+                  } @else if (c.kind === 'anomaly') {
+                    <app-bs-tooltip class="im-card__stat-tip"
+                      label="What is an anomaly?"
+                      text="An outlier day where the value sits at least 2 standard deviations from your own baseline (|z| ≥ 2) — statistically unusual for you, not a diagnosis." />
+                  }
+                </p>
                 <p class="im-card__detail">{{ c.detail }}</p>
                 <footer class="im-card__foot">
                   <span class="im-card__points">
@@ -206,6 +237,26 @@ export class InsightsMobilePage {
   readonly showNarrative = computed(() => {
     const n = this.narrative();
     return !!n && !n.fellBackToPlain && !!n.narrative;
+  });
+
+  /**
+   * The summary VIZ segments: this window's insights grouped by KIND (Correlations / Trends / Streaks /
+   * Anomalies / Best & worst), in the canonical section order. Feeds the top-of-feed composition donut;
+   * derived purely from the already-loaded {@link cards}. Empty kinds are dropped so the ring reads clean.
+   */
+  readonly mixSegments = computed<DonutSegment[]>(() => {
+    const counts = new Map<InsightKind, number>();
+    for (const c of this.cards()) {
+      const k = c.kind as InsightKind;
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    return InsightsMobilePage.KIND_ORDER
+      .filter(k => (counts.get(k) ?? 0) > 0)
+      .map(k => ({
+        label: InsightsMobilePage.KIND_META[k].label,
+        value: counts.get(k) ?? 0,
+        color: InsightsMobilePage.KIND_COLORS[k],
+      }));
   });
 
   /** The feed: cards sorted into kind order, each tagged with whether it opens a new section. */
@@ -408,5 +459,14 @@ export class InsightsMobilePage {
       blurb: 'Statistical outlier days (|z| ≥ 2).' },
     bestworst: { label: 'Best & worst', icon: 'emoji_events',
       blurb: 'Your standout high & low days per metric.' },
+  };
+
+  /** Per-kind ring hues for the summary donut — the page's indigo→violet family plus warm accents. */
+  private static readonly KIND_COLORS: Record<InsightKind, string> = {
+    correlation: '#a78bfa',
+    trend: '#7dd3fc',
+    streak: '#f9a8d4',
+    anomaly: '#fbbf24',
+    bestworst: '#5eead4',
   };
 }

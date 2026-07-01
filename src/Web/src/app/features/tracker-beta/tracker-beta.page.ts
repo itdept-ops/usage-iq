@@ -17,6 +17,7 @@ import { UnitService } from '../../core/unit.service';
 import { FormsModule } from '@angular/forms';
 
 import { OptimisticTracker } from './state/optimistic-tracker';
+import { BetaDonut, DonutSegment } from '../beta-ui/bs-donut';
 import { HeroRing, HeroFace } from './hero/hero-ring';
 import { QuickRail, QuickTile } from './ui/quick-rail';
 import { BaselineGate } from './ui/baseline-gate';
@@ -74,6 +75,7 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
   providers: [OptimisticTracker],
   imports: [
     MatIconModule, FormsModule, BottomSheet,
+    BetaDonut,
     HeroRing, QuickRail, BaselineGate,
     FuelCard, WaterCard, MoveCard, CoffeeCard, SleepCard, WeightCard, AiCard,
     LogMenuSheet, FoodSheet, FoodEditSheet, WeightSheet, WatchSheet, CoffeeSheet, ExerciseSheet, SleepSheet, SupplementSheet,
@@ -138,6 +140,16 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
         <section class="tb-hero">
           <app-hero-ring [day]="day()" [(face)]="heroFace" />
         </section>
+
+        <!-- MACRO SPLIT — energy-total headline over a protein/carb/fat composition ring. Only once
+             something's logged (an empty ring reads as broken); mirrors the hero's macro colours. -->
+        @if (hasMacros()) {
+          <section class="tb-card tb-macro-card">
+            <span class="tb-macro-title">Macro split</span>
+            <app-bs-donut [segments]="macroDonut()" [headline]="macroKcal()" caption="kcal"
+                          [size]="150" [stroke]="15" [legend]="true" [showPercent]="true" />
+          </section>
+        }
 
         <!-- QUICK RAIL (hidden in read-only — nothing to one-tap) -->
         @if (!readOnly()) {
@@ -308,6 +320,17 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
     .tb-streak mat-icon { width: 22px; height: 22px; font-size: 22px; }
     .tb-streak-n { font: 700 16px/1 var(--font-display); font-variant-numeric: tabular-nums; }
 
+    /* Macro-split donut card — centers the ring + legend under a quiet section label. */
+    .tb-macro-card {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 16px 16px 18px;
+    }
+    .tb-macro-title {
+      align-self: flex-start;
+      font-family: var(--font-ui); font-size: 11px; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim);
+    }
+
     /* Skeleton sizing — reserve the real layout dims so first paint is CLS≈0 */
     .tb-card-skeleton { min-height: 96px; }
     .tb-rail-skeleton { display: flex; gap: 10px; padding: 2px; overflow: hidden; }
@@ -348,6 +371,30 @@ export class TrackerBetaPage {
 
   // ── hero face (two-way with the hero-ring) ──
   protected readonly heroFace = signal<HeroFace>('rings');
+
+  /**
+   * Macro composition for the top donut: the day's protein / carb / fat grams weighted to CALORIES
+   * (4·4·9 kcal/g) so the ring shows the true ENERGY split, in each macro's hero identity colour. The
+   * legend reads raw grams. Reads the same day() macro totals the hero ring uses (OptimisticTracker keeps
+   * them recomputed sub-second). Empty (no macros logged) → the donut renders its empty track.
+   */
+  protected readonly macroDonut = computed<DonutSegment[]>(() => {
+    const d = this.day();
+    const pro = Math.round(d?.proteinG ?? 0);
+    const carb = Math.round(d?.carbG ?? 0);
+    const fat = Math.round(d?.fatG ?? 0);
+    return [
+      { label: 'Protein', value: pro, color: 'var(--pro-a)' },
+      { label: 'Carbs', value: carb, color: 'var(--cal-b)' },
+      { label: 'Fat', value: fat, color: 'var(--move-a)' },
+    ];
+  });
+
+  /** Whether any macro grams are logged (drives showing the donut card at all). */
+  protected readonly hasMacros = computed(() => this.macroDonut().some(s => s.value > 0));
+
+  /** Total food+supplement calories for the donut headline (the same figure the hero centers). */
+  protected readonly macroKcal = computed(() => Math.round(this.day()?.caloriesIn ?? 0).toLocaleString('en-US'));
 
   // ── sheet open states ──
   protected readonly logOpen = signal(false);

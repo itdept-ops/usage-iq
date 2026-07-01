@@ -18,7 +18,7 @@ import {
 
 import {
   BetaPullRefresh, BetaBottomSheet, BetaToaster, ToastController, BetaSkeleton,
-  BetaSwipeRow, BetaFab, BetaSegmentedControl, type Segment,
+  BetaSwipeRow, BetaFab, BetaSegmentedControl, BetaChip, type Segment,
 } from '../beta-ui';
 import { ConversationRow } from './conversation-row';
 import { MessageBubble } from './message-bubble';
@@ -89,7 +89,7 @@ const REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '🙏', '😢', '�
   imports: [
     FormsModule, MatIconModule,
     BetaPullRefresh, BetaBottomSheet, BetaToaster, BetaSkeleton, BetaSwipeRow,
-    BetaFab, BetaSegmentedControl,
+    BetaFab, BetaSegmentedControl, BetaChip,
     ConversationRow, MessageBubble,
   ],
   template: `
@@ -271,8 +271,17 @@ const REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '🙏', '😢', '�
 
           @if (typingLabel(); as tl) {
             <div class="typing" aria-live="polite">
+              <span class="typing__stack" aria-hidden="true">
+                @for (p of typingPeople(); track p.userId) {
+                  @if (p.picture) {
+                    <img class="typing__ava" [src]="p.picture" alt="" referrerpolicy="no-referrer" loading="lazy" />
+                  } @else {
+                    <span class="typing__ava typing__mono" [style.--h]="p.hue">{{ p.initials }}</span>
+                  }
+                }
+              </span>
               <span class="typing__dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="typing__t">{{ tl }}</span>
+              <app-bs-chip class="typing__chip" [label]="tl" [badge]="false" variant="soft" />
             </div>
           }
           <div class="th__foot" aria-hidden="true"></div>
@@ -697,6 +706,28 @@ export class ChatBetaPage implements OnDestroy {
     if (who.length === 1) return `${firstName(who[0].name)} is typing…`;
     if (who.length === 2) return `${firstName(who[0].name)} and ${firstName(who[1].name)} are typing…`;
     return 'Several people are typing…';
+  });
+
+  /**
+   * The typing users of the open thread, resolved to avatar data (photo from the channel roster when
+   * known, else a monogram + stable hue — mirrors the message bubble). Drives the avatar bubble beside
+   * the typing dots. Capped at 3 so a busy channel doesn't overflow the row.
+   */
+  protected readonly typingPeople = computed<{ userId: number; name: string; picture: string | null; initials: string; hue: number }[]>(() => {
+    const id = this.activeId();
+    if (id == null) return [];
+    const who: TypingUser[] = this.rt.typing()[id] ?? [];
+    const members = this.active()?.members ?? [];
+    return who.slice(0, 3).map(u => {
+      const name = u.name || members.find(m => m.userId === u.userId)?.name || '?';
+      return {
+        userId: u.userId,
+        name,
+        picture: members.find(m => m.userId === u.userId)?.picture || null,
+        initials: initialsOf(name),
+        hue: (u.userId * 47) % 360,
+      };
+    });
   });
 
   // ── thread header derivations ──

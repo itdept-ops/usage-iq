@@ -153,6 +153,29 @@
   mat-icon { flex: 0 0 auto; font-size: 16px; width: 16px; height: 16px; color: var(--accent-a); margin-top: 1px; }
 }
 
+// spend-by-model composition card (donut)
+.au-donut-card {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 14px 14px 16px;
+  background: var(--bg-rise);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-radius, var(--r-card, var(--r-tile)));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1)), inset 0 1px 0 var(--glass-edge);
+}
+
+.au-donut-card__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  width: 100%;
+}
+
+.au-donut-card__title {
+  display: inline-flex; align-items: center; gap: 7px; min-width: 0;
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim);
+
+  mat-icon { flex: 0 0 auto; font-size: 17px; width: 17px; height: 17px; color: var(--accent-a); }
+}
+
 // ============================================================================
 // OUTCOME FILTER + SECTION HEADER
 // ============================================================================
@@ -449,6 +472,17 @@
 .ad__sub {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--font-ui); font-size: 12.5px; color: var(--ink-dim);
+}
+
+// header row above the token/cost grid, carrying the explainer tooltip
+.ad__macros-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  margin-bottom: -2px;
+}
+
+.ad__macros-title {
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--ink-dim);
 }
 
 // token / cost breakdown grid — 4-col; collapses to 2-col on very narrow screens (≥360px target)

@@ -130,6 +130,47 @@
   padding-top: .25rem;
 }
 
+// ─────────── SUMMARY MIX VIZ ───────────
+.im-mix {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  padding: 1rem 1.1rem 1.15rem;
+  border-radius: var(--tech-radius);
+  background: var(--bg-rise);
+  border: 1px solid var(--tech-border);
+  box-shadow: var(--tech-shadow-panel), inset 0 1px 0 var(--glass-edge);
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    margin: 0;
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  &__lead {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    mat-icon { font-size: 17px; width: 17px; height: 17px; color: var(--accent-b); }
+  }
+
+  app-bs-donut { align-self: center; }
+}
+
+// tap "?" bubble tucked beside the correlation/anomaly stat
+.im-card__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: .1rem;
+}
+.im-card__stat-tip { flex: none; }
+
 // ─────────── AI BANNER ───────────
 .im-ai {
   border-radius: var(--tech-radius);

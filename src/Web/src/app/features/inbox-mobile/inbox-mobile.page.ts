@@ -9,6 +9,7 @@ import { Api } from '../../core/api';
 import { AgentInbox, AgentInboxItem, AgentInboxPeriod } from '../../core/models';
 import {
   BetaPullRefresh, BetaSkeleton, BetaToaster, ToastController, BetaEmptyState, BetaErrorState,
+  BetaTimeline, TimelineItem,
 } from '../beta-ui';
 
 /** Per-agent-kind presentation: glyph + a signature hue for the per-card tint. */
@@ -42,7 +43,10 @@ interface InboxSection {
   period: AgentInboxPeriod;
   label: string;
   icon: string;
-  rows: InboxRow[];
+  /** Deliveries still awaiting triage — kept as interactive cards (Open / Handled). */
+  pending: InboxRow[];
+  /** Settled deliveries, mapped to the read-only chronological timeline rail. */
+  settled: TimelineItem[];
 }
 
 /**
@@ -66,7 +70,7 @@ interface InboxSection {
   providers: [ToastController],
   imports: [
     MatIconModule,
-    BetaPullRefresh, BetaSkeleton, BetaToaster, BetaEmptyState, BetaErrorState,
+    BetaPullRefresh, BetaSkeleton, BetaToaster, BetaEmptyState, BetaErrorState, BetaTimeline,
   ],
   template: `
     <app-bs-pull-refresh class="ib-ptr" [busy]="refreshing()" [disabled]="loading()" (refresh)="reload()">
@@ -122,11 +126,12 @@ interface InboxSection {
               <h2 class="ib-sec__head">
                 <mat-icon aria-hidden="true">{{ sec.icon }}</mat-icon>
                 {{ sec.label }}
-                <span class="ib-sec__count">{{ sec.rows.length }}</span>
+                <span class="ib-sec__count">{{ sec.pending.length + sec.settled.length }}</span>
               </h2>
 
-              @for (row of sec.rows; track row.id) {
-                <article class="ib-card" [class.is-handled]="row.handled" [style.--item-hue]="row.meta.hue">
+              <!-- Still-pending deliveries stay interactive cards (Open / Mark handled). -->
+              @for (row of sec.pending; track row.id) {
+                <article class="ib-card" [style.--item-hue]="row.meta.hue">
                   <span class="ib-card__ic" aria-hidden="true"><mat-icon>{{ row.meta.icon }}</mat-icon></span>
 
                   <div class="ib-card__body">
@@ -134,7 +139,7 @@ interface InboxSection {
                       <span class="ib-card__agent">{{ row.agentLabel }}</span>
                       <span class="ib-card__dot" aria-hidden="true">·</span>
                       <time class="ib-card__time">{{ relTime(row.createdUtc) }}</time>
-                      @if (!row.handled) { <span class="ib-card__new" aria-label="Not yet handled">New</span> }
+                      <span class="ib-card__new" aria-label="Not yet handled">New</span>
                     </p>
                     <p class="ib-card__summary">{{ row.summary }}</p>
 
@@ -144,16 +149,21 @@ interface InboxSection {
                           <mat-icon aria-hidden="true">open_in_new</mat-icon> Open
                         </button>
                       }
-                      @if (!row.handled) {
-                        <button type="button" class="ib-btn" (click)="markHandled(row)">
-                          <mat-icon aria-hidden="true">check</mat-icon> Handled
-                        </button>
-                      } @else {
-                        <span class="ib-card__done"><mat-icon aria-hidden="true">check_circle</mat-icon> Handled</span>
-                      }
+                      <button type="button" class="ib-btn" (click)="markHandled(row)">
+                        <mat-icon aria-hidden="true">check</mat-icon> Handled
+                      </button>
                     </div>
                   </div>
                 </article>
+              }
+
+              <!-- Settled deliveries become the chronological narrative rail. -->
+              @if (sec.settled.length) {
+                <app-bs-timeline
+                  class="ib-timeline"
+                  [items]="sec.settled"
+                  [label]="sec.label + ' — handled activity'"
+                  compact />
               }
             </section>
           }
@@ -191,8 +201,30 @@ export class InboxMobilePage {
     }
     return PERIOD_ORDER
       .filter((p) => byPeriod.has(p))
-      .map((p) => ({ period: p, label: PERIOD_META[p].label, icon: PERIOD_META[p].icon, rows: byPeriod.get(p)! }));
+      .map((p) => {
+        const rows = byPeriod.get(p)!;
+        return {
+          period: p,
+          label: PERIOD_META[p].label,
+          icon: PERIOD_META[p].icon,
+          pending: rows.filter((r) => !r.handled),
+          settled: rows.filter((r) => r.handled).map((r) => this.toTimelineItem(r)),
+        };
+      });
   });
+
+  /** Map a settled delivery to a chronological timeline row: stamp = relative time, title = agent,
+   *  subtitle = what it said, icon = the agent glyph, accent = the agent-kind hue. */
+  private toTimelineItem(row: InboxRow): TimelineItem {
+    return {
+      id: row.id,
+      title: row.agentLabel,
+      subtitle: row.summary,
+      icon: row.meta.icon,
+      stamp: this.relTime(row.createdUtc),
+      accent: `hsl(${row.meta.hue}, 72%, 66%)`,
+    };
+  }
 
   readonly isEmpty = computed(() => !this.loading() && !this.errored() && this.itemsSig().length === 0);
 

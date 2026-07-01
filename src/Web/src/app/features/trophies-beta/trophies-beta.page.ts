@@ -8,9 +8,22 @@ import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../../core/api';
 import { TrophiesResponse, TrophyBadgeDto, TrophyTierDto } from '../../core/models';
 import {
-  BetaBottomSheet, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaSvgRing,
-  type Segment,
+  BetaBottomSheet, BetaChip, BetaChipGroup, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton,
+  BetaSvgRing, type Segment,
 } from '../beta-ui';
+
+/**
+ * Client-side XP weight per earned tier rung — the ONLY invented figure on this page. There is no
+ * points value in {@link TrophiesResponse}, so "XP" is DERIVED from the badges the API already returns
+ * (each earned rung on each badge's ladder is worth its tier weight) and is always labelled "derived".
+ * Higher rungs are worth more so climbing a ladder reads as progress, not just breadth.
+ */
+const TIER_XP: Record<string, number> = {
+  bronze: 10,
+  silver: 25,
+  gold: 50,
+  complete: 40,
+};
 
 /**
  * Map a badge's catalog icon token (a lucide-ish name from the API) to a Material Symbols glyph.
@@ -80,6 +93,7 @@ interface BadgeGroup {
   imports: [
     MatIconModule, RouterLink,
     BetaPullRefresh, BetaSegmentedControl, BetaSvgRing, BetaBottomSheet, BetaSkeleton,
+    BetaChip, BetaChipGroup,
   ],
   template: `
     <!-- ─────────────── PULL-TO-REFRESH OWNS THE SCROLL ─────────────── -->
@@ -136,6 +150,29 @@ interface BadgeGroup {
             }
           }
         </header>
+
+        <!-- ─── GAMIFICATION: derived XP / earned / tiers balance strip ─── -->
+        @if (!loading() && !errored() && badges().length) {
+          <div class="tr-xp" aria-label="Rewards balance (derived from your trophies)">
+            <div class="tr-xp__cell tr-xp__cell--xp">
+              <span class="tr-xp__ic" aria-hidden="true"><mat-icon>bolt</mat-icon></span>
+              <span class="tr-xp__num">{{ xp() }}</span>
+              <span class="tr-xp__lbl">XP <i>· derived</i></span>
+            </div>
+            <span class="tr-xp__div" aria-hidden="true"></span>
+            <div class="tr-xp__cell">
+              <span class="tr-xp__ic" aria-hidden="true"><mat-icon>emoji_events</mat-icon></span>
+              <span class="tr-xp__num">{{ earnedCount() }}<b>/{{ totalCount() }}</b></span>
+              <span class="tr-xp__lbl">Badges</span>
+            </div>
+            <span class="tr-xp__div" aria-hidden="true"></span>
+            <div class="tr-xp__cell">
+              <span class="tr-xp__ic" aria-hidden="true"><mat-icon>military_tech</mat-icon></span>
+              <span class="tr-xp__num">{{ tiersUnlocked() }}<b>/{{ tiersTotal() }}</b></span>
+              <span class="tr-xp__lbl">Tiers</span>
+            </div>
+          </div>
+        }
 
         @if (loading()) {
           <!-- skeleton grid -->
@@ -238,14 +275,16 @@ interface BadgeGroup {
                       <mat-icon aria-hidden="true">{{ b.earned ? icon(b) : 'lock' }}</mat-icon>
                     </span>
                     <span class="tr-tile__label">{{ b.label }}</span>
-                    <span class="tr-tile__meta">
+                    <!-- Tier / unlock-requirement tags as kit chips (earned = solid tier, locked = outline goal). -->
+                    <app-bs-chip-group class="tr-tile__chips" [label]="tileAria(b)">
                       @if (b.earned) {
-                        <mat-icon class="tr-tile__meta-ic" aria-hidden="true">check_circle</mat-icon>
-                        {{ tierLabel(b.tier) }}
+                        <app-bs-chip [label]="tierLabel(b.tier)" icon="✓"
+                                     variant="solid" [badge]="false" />
                       } @else {
-                        {{ caption(b) }}
+                        <app-bs-chip [label]="caption(b)" icon="🎯"
+                                     variant="outline" [badge]="false" />
                       }
-                    </span>
+                    </app-bs-chip-group>
                     <!-- Inline tier ladder: every rung, earned-lit, with its threshold visible (no tap-in). -->
                     @if (b.tiers.length > 1) {
                       <span class="tr-tile__tiers" [attr.aria-label]="tiersAria(b)">
@@ -296,6 +335,18 @@ interface BadgeGroup {
               </span>
             </div>
           </div>
+
+          <!-- Category + tier-requirement tags -->
+          <app-bs-chip-group class="trd__chips" label="Trophy tags">
+            <app-bs-chip [label]="b.group" icon="🏷️" variant="soft" [badge]="false" />
+            @if (b.nextTier; as nt) {
+              <app-bs-chip [label]="'Next: ' + tierLabel(nt.name) + ' at ' + fmt(nt.threshold)"
+                           icon="🎯" variant="outline" [badge]="false" />
+            } @else {
+              <app-bs-chip [label]="b.earned ? 'Maxed out' : 'Single goal'" icon="✦"
+                           variant="soft" [badge]="false" />
+            }
+          </app-bs-chip-group>
 
           <p class="trd__desc">{{ b.description }}</p>
 
@@ -396,6 +447,28 @@ export class TrophiesBetaPage {
   });
 
   readonly allEarned = computed(() => this.totalCount() > 0 && this.earnedCount() >= this.totalCount());
+
+  /**
+   * Total tier RUNGS earned across every badge (a badge can contribute several — bronze + silver + …).
+   * DERIVED from the ladder the API already returns; drives the "tiers unlocked" stat + the XP figure.
+   */
+  readonly tiersUnlocked = computed(() =>
+    this.badges().reduce((sum, b) => sum + b.tiers.filter(t => t.earned).length, 0));
+
+  /** Total earnable tier rungs across every badge — the denominator for tiers unlocked. */
+  readonly tiersTotal = computed(() =>
+    this.badges().reduce((sum, b) => sum + b.tiers.length, 0));
+
+  /**
+   * A DERIVED points/XP figure (there is no XP field in the DTO): each earned tier rung scores its
+   * {@link TIER_XP} weight. Labelled "derived" everywhere it surfaces so it's never mistaken for a
+   * server value.
+   */
+  readonly xp = computed(() =>
+    this.badges().reduce(
+      (sum, b) => sum + b.tiers.reduce((s, t) => s + (t.earned ? (TIER_XP[t.name] ?? 10) : 0), 0),
+      0,
+    ));
 
   /** A warm one-liner under the hero numeral. */
   readonly subline = computed(() => {

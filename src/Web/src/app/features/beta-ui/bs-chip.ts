@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, computed, inject, input, output,
+  ChangeDetectionStrategy, Component, booleanAttribute, computed, inject, input, output,
 } from '@angular/core';
 import { Haptics } from '../../core/haptics';
 
@@ -139,16 +139,16 @@ export class BetaChip {
   readonly icon = input<string>('');
   /** Visual weight. */
   readonly variant = input<ChipVariant>('soft');
-  /** Show the trailing × delete affordance. */
-  readonly removable = input<boolean>(false);
+  /** Show the trailing × delete affordance. Accepts a bare attribute (`removable`). */
+  readonly removable = input(false, { transform: booleanAttribute });
   /** Toggle-pill behavior (role=button + aria-pressed). */
-  readonly selectable = input<boolean>(false);
+  readonly selectable = input(false, { transform: booleanAttribute });
   /** Selected state (only meaningful when selectable). */
-  readonly selected = input<boolean>(false);
+  readonly selected = input(false, { transform: booleanAttribute });
   /** Show the auto initial-badge when no icon is set. */
-  readonly badge = input<boolean>(true);
+  readonly badge = input(true, { transform: booleanAttribute });
   /** When true the chip is inert. */
-  readonly disabled = input<boolean>(false);
+  readonly disabled = input(false, { transform: booleanAttribute });
   /** Fired when the × delete affordance is activated. */
   readonly removed = output<void>();
   /** Fired with the NEXT selected state when a selectable chip is toggled. */

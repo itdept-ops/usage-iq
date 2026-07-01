@@ -370,9 +370,22 @@
 // ---- typing indicator ----
 .typing {
   display: flex; align-items: center; gap: 8px;
-  margin: 8px 2px 4px; padding-left: 36px;
+  margin: 8px 2px 4px;
   animation: rise-in 240ms var(--ease-out) both;
 }
+// avatar bubble(s) beside the dots — photo, or a stable-hue monogram (mirrors the message bubble)
+.typing__stack { display: inline-flex; flex: 0 0 auto; }
+.typing__stack > * + * { margin-left: -8px; }
+.typing__ava {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; object-fit: cover;
+  box-shadow: 0 0 0 2px var(--bg-base); // ring so overlapped avatars read apart
+}
+.typing__mono {
+  font-size: 11px; font-weight: 800; color: var(--tech-text-on-accent, #fff);
+  background: linear-gradient(135deg, hsl(var(--h,220) 70% 56%), hsl(calc(var(--h,220) + 36) 72% 48%));
+}
+.typing__chip { min-height: 34px; } // trim the kit chip's default touch height for this inline label
 .typing__dots {
   display: inline-flex; align-items: center; gap: 3px;
   padding: 9px 12px; border-radius: 16px 16px 16px 6px;
@@ -388,7 +401,6 @@
   0%, 60%, 100% { transform: translateY(0); opacity: .5; }
   30% { transform: translateY(-4px); opacity: 1; }
 }
-.typing__t { font-size: 12px; font-weight: 600; color: var(--ink-faint); }
 
 // ============================================================================
 // COMPOSER BAR — fixed at the bottom of the thread pane, glass, safe-area.

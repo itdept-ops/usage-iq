@@ -1,0 +1,139 @@
+// ============================================================================
+// Help Center (mobile) — searchable FAQ on the shared beta-ui "Strata" foundation.
+//
+// One line adopts the whole Strata token contract (layered bg, ink scale, radii, lift depth, easing,
+// env() safe-area, the a11y killswitches); then HELP picks a calm, friendly signature accent (a teal →
+// indigo pair) so the section header dot, the accordion chevrons, and the focus ring all carry one hue.
+// ISOLATED + un-gated (public-or-authed route): consumes the kit, never modifies it, adds no deps.
+// ============================================================================
+
+@use '../beta-ui/beta-kit' as kit;
+
+:host {
+  @include kit.beta-host;          // the whole Strata token contract on :host
+
+  // ---- HELP'S SIGNATURE ACCENT: calm teal → indigo (the per-page contract override) ----
+  --accent-a: var(--tech-accent, #3bb6a6);
+  --accent-b: var(--tech-accent-2, #6a7cff);
+
+  --bg-base: var(--tech-bg, #0e1119);
+  --bg-rise: var(--tech-panel, #161a26);
+  --bg-sink: var(--tech-bg-sunken, #0a0c12);
+
+  // A soft accent wash behind the column (theme-aware — light in light mode).
+  background: radial-gradient(120% 80% at 50% -10%,
+    color-mix(in srgb, var(--accent-a) 12%, var(--bg-base)) 0%, var(--bg-base) 58%);
+}
+
+@include kit.beta-springs;          // @supports linear() spring upgrade (top-level, once)
+@include kit.beta-a11y;             // reduced-motion + reduced-transparency/contrast killswitches (once)
+
+// ============================================================================
+// SHELL
+// ============================================================================
+
+.scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding-top: calc(var(--safe-top) + 10px);
+  padding-bottom: calc(var(--safe-bottom) + 28px);
+  padding-inline: var(--gutter) var(--gutter-r);
+}
+.scroll__foot { height: 4px; }
+
+// ============================================================================
+// HERO — title + tagline + search field.
+// ============================================================================
+
+.hero {
+  position: relative;
+  padding: 4px 2px 2px;
+  animation: help-rise 520ms var(--ease-spring-up) both;
+}
+.hero__eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent-b) 60%, var(--ink-dim));
+}
+.hero__title {
+  margin: 4px 0 0; font-family: var(--font-display); font-weight: 600; font-size: 30px;
+  line-height: 1.05; letter-spacing: -.02em; color: var(--ink);
+}
+.hero__sub {
+  margin: 6px 0 0; font-size: 14px; line-height: 1.45; color: var(--ink-dim);
+}
+
+.search {
+  position: relative;
+  display: flex; align-items: center;
+  margin-top: 16px;
+  border-radius: var(--r-pill);
+  background: var(--bg-rise);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--lift-1);
+  transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
+}
+.search:focus-within {
+  border-color: color-mix(in srgb, var(--accent-b) 60%, var(--hairline));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-b) 18%, transparent);
+}
+.search__ic {
+  flex: 0 0 auto; margin-left: 14px;
+  font-family: 'Material Icons'; font-size: 20px; line-height: 1; font-style: normal;
+  color: var(--ink-dim);
+}
+.search__input {
+  flex: 1 1 auto; min-width: 0; box-sizing: border-box;
+  min-height: 46px; padding: 0 8px 0 10px;
+  border: none; background: transparent; color: var(--ink);
+  font-family: var(--font-ui); font-size: 16px; // 16px avoids iOS zoom-on-focus
+  -webkit-appearance: none; appearance: none; outline: none;
+}
+.search__input::placeholder { color: var(--ink-faint); }
+// hide the native search "×" so we control it with our own button
+.search__input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.search__clear {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 30px; height: 30px; margin-right: 8px;
+  border: none; border-radius: 50%;
+  background: var(--bg-sink); color: var(--ink-dim);
+  font-size: 20px; line-height: 1; cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.search__clear:active { transform: scale(.94); }
+
+// ============================================================================
+// ANSWER BODY — the projected prose inside each expanded accordion row.
+// ============================================================================
+
+.ans {
+  margin: 0;
+  font-size: 14px; line-height: 1.55; color: var(--ink-dim);
+}
+
+.foot {
+  margin: 12px 4px 0; font-size: 12.5px; line-height: 1.5;
+  color: var(--ink-faint); text-align: center;
+}
+
+@keyframes help-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero { animation: none; }
+}
+
+// Own visible focus ring (tracks the page accent via --focus).
+:host ::ng-deep :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--r-tile);
+}
+
+// No horizontal overflow: everything is fluid by construction.
+:host, .scroll { max-width: 100vw; }

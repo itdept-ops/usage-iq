@@ -12,6 +12,7 @@ import {
 } from '../../../core/models';
 import { OptimisticTracker } from '../state/optimistic-tracker';
 import { BottomSheet } from '../ui/bottom-sheet';
+import { BetaStepper } from '../../beta-ui/bs-stepper';
 
 /*
  * sheets/quick-sheets.ts — the three "fast lane" per-domain add sheets for Tracker Beta ("Strata"):
@@ -93,6 +94,8 @@ const SHEET_STYLES = `
   .qs-stepper {
     display: grid; grid-template-columns: 56px 1fr 56px; align-items: stretch; gap: 8px;
   }
+  /* beta-ui stepper primitive — stretch the pill to the field width so it reads as a form row. */
+  .qs-stepper-primitive { display: flex; width: 100%; }
   .qs-step-btn {
     display: flex; align-items: center; justify-content: center;
     min-height: 48px; min-width: 44px;
@@ -187,7 +190,7 @@ const SHEET_STYLES = `
   selector: 'app-coffee-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, BottomSheet],
+  imports: [FormsModule, BottomSheet, BetaStepper],
   template: `
     <app-bottom-sheet [(open)]="open" detent="half" label="Log coffee">
       <div class="qs-head" style="--accent-edge: var(--coffee-b);">
@@ -211,11 +214,8 @@ const SHEET_STYLES = `
 
         <div>
           <span class="qs-label" id="cf-cups-lbl">Cups</span>
-          <div class="qs-stepper" role="group" aria-labelledby="cf-cups-lbl">
-            <button type="button" class="qs-step-btn" (click)="bump(-1)" [disabled]="cups() <= 1" aria-label="Fewer cups">−</button>
-            <div class="qs-step-val" aria-live="polite">{{ cups() }}</div>
-            <button type="button" class="qs-step-btn" (click)="bump(1)" [disabled]="cups() >= 20" aria-label="More cups">+</button>
-          </div>
+          <app-bs-stepper class="qs-stepper-primitive" [(value)]="cups" [min]="1" [max]="20" [step]="1"
+                          label="Cups" [disabled]="busy() || tracker.readOnly()" />
         </div>
 
         <div>
@@ -265,10 +265,6 @@ export class CoffeeSheet {
         this.announce.set('');
       }
     });
-  }
-
-  protected bump(delta: number): void {
-    this.cups.update(c => Math.min(20, Math.max(1, c + delta)));
   }
 
   /** One-tap log of a usual drink, then dismiss. */
@@ -325,7 +321,7 @@ const SLEEP_QUALITIES: readonly SleepQuality[] = [
   selector: 'app-sleep-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, BottomSheet],
+  imports: [FormsModule, BottomSheet, BetaStepper],
   template: `
     <app-bottom-sheet [(open)]="open" detent="half" [label]="editing() ? 'Edit sleep' : 'Log sleep'" (closed)="onClosed()">
       <div class="qs-head" style="--accent-edge: var(--sleep-b);">
@@ -336,11 +332,9 @@ const SLEEP_QUALITIES: readonly SleepQuality[] = [
       <div class="qs-form" style="--cta-a: var(--sleep-a); --cta-b: var(--sleep-b); --accent-edge: var(--sleep-b);">
         <div>
           <span class="qs-label" id="sl-hours-lbl">Hours slept</span>
-          <div class="qs-stepper" role="group" aria-labelledby="sl-hours-lbl">
-            <button type="button" class="qs-step-btn" (click)="bump(-0.5)" [disabled]="hours() <= 0.5" aria-label="Less sleep">−</button>
-            <div class="qs-step-val" aria-live="polite">{{ hours() }}</div>
-            <button type="button" class="qs-step-btn" (click)="bump(0.5)" [disabled]="hours() >= 24" aria-label="More sleep">+</button>
-          </div>
+          <app-bs-stepper class="qs-stepper-primitive" [(value)]="hours" [min]="0.5" [max]="24" [step]="0.5"
+                          [formatValue]="fmtHours" label="Hours slept"
+                          [disabled]="busy() || tracker.readOnly()" />
         </div>
 
         <div>
@@ -420,9 +414,8 @@ export class SleepSheet {
     });
   }
 
-  protected bump(delta: number): void {
-    this.hours.update(h => Math.min(24, Math.max(0.5, Math.round((h + delta) * 2) / 2)));
-  }
+  /** Rich readout for the hours stepper — whole hours read "8h", half-hours "7.5h". */
+  protected readonly fmtHours = (v: number): string => `${Number.isInteger(v) ? v : v.toFixed(1)}h`;
 
   protected async add(): Promise<void> {
     if (this.busy() || this.tracker.readOnly()) return;

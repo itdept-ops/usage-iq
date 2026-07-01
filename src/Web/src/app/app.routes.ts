@@ -18,6 +18,7 @@ const PUBLIC_ROUTES: Routes = [
   { path: 'signin', loadComponent: () => import('./features/signin/signin').then(m => m.SignIn), title: 'Usage IQ · Sign in' },
   { path: 'intro', loadComponent: () => import('./features/intro/intro.page').then(m => m.IntroPage), title: 'Usage IQ · Welcome' },
   { path: 'about', loadComponent: () => import('./features/about/about').then(m => m.About), title: 'Usage IQ · About' },
+  { path: 'help', loadComponent: () => import('./features/help/help.page').then(m => m.HelpPage), title: 'Usage IQ · Help' },
   { path: 'welcome', canActivate: [authGuard], loadComponent: () => import('./features/welcome/welcome').then(m => m.Welcome), title: 'Usage IQ · Welcome' },
 ];
 

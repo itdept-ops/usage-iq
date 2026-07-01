@@ -122,6 +122,51 @@
 .tr-page-header__action mat-icon { font-size: 17px; width: 17px; height: 17px; }
 
 // ============================================================================
+// GAMIFICATION — the derived XP / badges / tiers balance strip. Three glass cells
+// on a lifted card; the XP cell leads with the accent gradient number + a "derived"
+// tag so the invented points figure is never mistaken for a server value.
+// ============================================================================
+
+.tr-xp {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 12px 6px;
+  border-radius: var(--r-card);
+  background: var(--glass);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--lift-1);
+}
+.tr-xp__cell {
+  flex: 1 1 0;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 0; text-align: center;
+}
+.tr-xp__ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-dim);
+}
+.tr-xp__ic mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.tr-xp__cell--xp .tr-xp__ic {
+  color: color-mix(in srgb, var(--accent-a) 80%, var(--ink));
+}
+.tr-xp__num {
+  font-family: var(--font-display, var(--font-ui));
+  font-size: 22px; font-weight: 800; line-height: 1; color: var(--ink);
+}
+.tr-xp__num b { font-weight: 700; font-size: 14px; color: var(--ink-dim); }
+.tr-xp__cell--xp .tr-xp__num {
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tr-xp__lbl {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.tr-xp__lbl i { font-style: normal; opacity: .7; text-transform: none; letter-spacing: 0; }
+.tr-xp__div { width: 1px; align-self: stretch; margin: 2px 0; background: var(--hairline); }
+
+// ============================================================================
 // IMMERSIVE HERO — progress ring + "N of M" numeral + name, behind a gold bloom.
 // ============================================================================
 
@@ -461,12 +506,14 @@
   font-weight: 700; font-size: 13.5px; line-height: 1.2; color: var(--ink);
   display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.tr-tile__meta {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11.5px; font-weight: 700; color: var(--ink-dim);
+// Tier / requirement tag chips on a tile — the kit chip is 44px tall by default; shrink it
+// to a compact meta pill so it sits inside the tile without dominating (still >=24px tap-safe,
+// and this is a decorative label inside the already-tappable tile button).
+.tr-tile__chips { gap: 6px; }
+.tr-tile__chips ::ng-deep .bs-chip {
+  min-height: 24px; padding: 3px 9px; font-size: 11px; pointer-events: none;
 }
-.tr-tile.is-earned .tr-tile__meta { color: color-mix(in srgb, var(--tile-h, var(--accent-a)) 70%, var(--ink)); }
-.tr-tile__meta-ic { font-size: 14px; width: 14px; height: 14px; }
+.tr-tile__chips ::ng-deep .bs-chip-label { max-width: 16ch; }
 
 // Inline tier ladder — one rung per tier, threshold visible, earned rungs lit by hue.
 .tr-tile__tiers {
@@ -589,6 +636,7 @@
 .trd__status.is-earned { color: color-mix(in srgb, var(--accent-a) 76%, var(--ink)); }
 .trd__status mat-icon { font-size: 16px; width: 16px; height: 16px; }
 
+.trd__chips { margin-top: -4px; }
 .trd__desc { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--ink-dim); }
 
 // ---- How to earn it / earned confirmation ----

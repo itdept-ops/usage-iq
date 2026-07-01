@@ -25,8 +25,9 @@ import {
 import { StatsInputs, ageFrom, computeStats } from '../tracker/units';
 import { OnboardingCard, OnboardingResult } from '../tracker/onboarding-card';
 import {
-  BetaBottomSheet, BetaEmptyState, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton,
-  BetaStatTile, BetaToaster, ToastController, type Segment,
+  BetaAccordion, BetaAccordionItem, BetaBottomSheet, BetaChip, BetaChipGroup, BetaEmptyState,
+  BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaStatTile, BetaSuccess, BetaToaster,
+  ToastController, type Segment,
 } from '../beta-ui';
 
 const GOALS: { value: string; label: string; icon: string }[] = [
@@ -111,7 +112,7 @@ const CHECKIN_STALE_DAYS = 90;
   imports: [
     FormsModule, MatIconModule,
     BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaStatTile, BetaBottomSheet, BetaToaster,
-    BetaEmptyState,
+    BetaEmptyState, BetaAccordion, BetaAccordionItem, BetaChip, BetaChipGroup, BetaSuccess,
     OnboardingCard,
   ],
   template: `
@@ -127,7 +128,16 @@ const CHECKIN_STALE_DAYS = 90;
           }
         </header>
 
-        @if (loading()) {
+        @if (baselineDone()) {
+          <!-- BRIEF COMPLETION CONFIRMATION (after the blocking onboarding baseline saves) -->
+          <app-bs-success
+            icon="celebration" tone="success"
+            title="You're all set"
+            body="Your baseline is saved. Let's dial in your goal and daily targets."
+            primaryLabel="Build my plan" primaryIcon="arrow_forward"
+            (primary)="baselineDone.set(false)" />
+
+        } @else if (loading()) {
           <!-- SKELETON -->
           <div class="pm-skel">
             <app-bs-skeleton height="132px" radius="var(--r-card)" />
@@ -407,132 +417,170 @@ const CHECKIN_STALE_DAYS = 90;
             </button>
 
             @if (refineOpen()) {
-              <div class="pm-fields pm-fine__body">
-                <!-- weekly pace -->
-                <label class="pm-field">
-                  <span class="pm-field__lbl">Weekly pace (− lose / + gain)</span>
-                  <span class="pm-field__in">
-                    <input type="number" inputmode="decimal" [step]="rateStep" [ngModel]="weeklyRateDisp()" (ngModelChange)="weeklyRateDisp.set($event)" placeholder="Auto" />
-                    <span class="pm-field__suf">{{ rateUnit }}</span>
-                  </span>
-                </label>
+              <div class="pm-fine__body">
+                <app-bs-accordion [single]="true">
 
-                <!-- body fat + navy-tape estimate -->
-                <label class="pm-field">
-                  <span class="pm-field__lbl">Body fat</span>
-                  <span class="pm-field__in">
-                    <input type="number" inputmode="decimal" [ngModel]="bodyFatPct()" (ngModelChange)="bodyFatPct.set($event)" placeholder="Optional" />
-                    <span class="pm-field__suf">%</span>
-                  </span>
-                </label>
-                <div class="pm-macros" [class.pm-macros--3]="sex() === 'Female'" [class.pm-macros--2]="sex() !== 'Female'">
-                  <label class="pm-field pm-field--macro">
-                    <span class="pm-field__lbl">Neck</span>
-                    <span class="pm-field__in">
-                      <input type="number" inputmode="decimal" [ngModel]="neckDisp()" (ngModelChange)="neckDisp.set($event)" placeholder="—" />
-                      <span class="pm-field__suf">{{ lengthUnit }}</span>
-                    </span>
-                  </label>
-                  <label class="pm-field pm-field--macro">
-                    <span class="pm-field__lbl">Waist</span>
-                    <span class="pm-field__in">
-                      <input type="number" inputmode="decimal" [ngModel]="waistDisp()" (ngModelChange)="waistDisp.set($event)" placeholder="—" />
-                      <span class="pm-field__suf">{{ lengthUnit }}</span>
-                    </span>
-                  </label>
-                  @if (sex() === 'Female') {
-                    <label class="pm-field pm-field--macro">
-                      <span class="pm-field__lbl">Hip</span>
-                      <span class="pm-field__in">
-                        <input type="number" inputmode="decimal" [ngModel]="hipDisp()" (ngModelChange)="hipDisp.set($event)" placeholder="—" />
-                        <span class="pm-field__suf">{{ lengthUnit }}</span>
-                      </span>
-                    </label>
-                  }
-                </div>
-                @if (navyBodyFatPct(); as bf) {
-                  <button type="button" class="pm-mini pm-fine__navy" (click)="applyNavyBodyFat()">
-                    <mat-icon aria-hidden="true">straighten</mat-icon> Use tape estimate: {{ bf }}%
-                  </button>
-                }
+                  <!-- PACE & COMPOSITION -->
+                  <app-bs-accordion-item label="Pace &amp; body composition">
+                    <div class="pm-fields">
+                      <!-- weekly pace -->
+                      <label class="pm-field">
+                        <span class="pm-field__lbl">Weekly pace (− lose / + gain)</span>
+                        <span class="pm-field__in">
+                          <input type="number" inputmode="decimal" [step]="rateStep" [ngModel]="weeklyRateDisp()" (ngModelChange)="weeklyRateDisp.set($event)" placeholder="Auto" />
+                          <span class="pm-field__suf">{{ rateUnit }}</span>
+                        </span>
+                      </label>
 
-                <!-- diet pattern -->
-                <label class="pm-field">
-                  <span class="pm-field__lbl">Diet pattern</span>
-                  <span class="pm-field__in pm-field__in--select">
-                    <select [ngModel]="dietPattern()" (ngModelChange)="dietPattern.set($event)">
-                      @for (d of dietPatterns; track d.value) { <option [value]="d.value">{{ d.label }}</option> }
-                    </select>
-                  </span>
-                </label>
+                      <!-- body fat + navy-tape estimate -->
+                      <label class="pm-field">
+                        <span class="pm-field__lbl">Body fat</span>
+                        <span class="pm-field__in">
+                          <input type="number" inputmode="decimal" [ngModel]="bodyFatPct()" (ngModelChange)="bodyFatPct.set($event)" placeholder="Optional" />
+                          <span class="pm-field__suf">%</span>
+                        </span>
+                      </label>
+                      <div class="pm-macros" [class.pm-macros--3]="sex() === 'Female'" [class.pm-macros--2]="sex() !== 'Female'">
+                        <label class="pm-field pm-field--macro">
+                          <span class="pm-field__lbl">Neck</span>
+                          <span class="pm-field__in">
+                            <input type="number" inputmode="decimal" [ngModel]="neckDisp()" (ngModelChange)="neckDisp.set($event)" placeholder="—" />
+                            <span class="pm-field__suf">{{ lengthUnit }}</span>
+                          </span>
+                        </label>
+                        <label class="pm-field pm-field--macro">
+                          <span class="pm-field__lbl">Waist</span>
+                          <span class="pm-field__in">
+                            <input type="number" inputmode="decimal" [ngModel]="waistDisp()" (ngModelChange)="waistDisp.set($event)" placeholder="—" />
+                            <span class="pm-field__suf">{{ lengthUnit }}</span>
+                          </span>
+                        </label>
+                        @if (sex() === 'Female') {
+                          <label class="pm-field pm-field--macro">
+                            <span class="pm-field__lbl">Hip</span>
+                            <span class="pm-field__in">
+                              <input type="number" inputmode="decimal" [ngModel]="hipDisp()" (ngModelChange)="hipDisp.set($event)" placeholder="—" />
+                              <span class="pm-field__suf">{{ lengthUnit }}</span>
+                            </span>
+                          </label>
+                        }
+                      </div>
+                      @if (navyBodyFatPct(); as bf) {
+                        <button type="button" class="pm-mini pm-fine__navy" (click)="applyNavyBodyFat()">
+                          <mat-icon aria-hidden="true">straighten</mat-icon> Use tape estimate: {{ bf }}%
+                        </button>
+                      }
+                    </div>
+                  </app-bs-accordion-item>
 
-                <!-- protein basis + training type -->
-                <div class="pm-macros pm-macros--2">
-                  <label class="pm-field pm-field--macro">
-                    <span class="pm-field__lbl">Protein basis</span>
-                    <span class="pm-field__in pm-field__in--select">
-                      <select [ngModel]="proteinBasis()" (ngModelChange)="proteinBasis.set($event)">
-                        @for (b of proteinBases; track b.value) { <option [value]="b.value">{{ b.label }}</option> }
-                      </select>
-                    </span>
-                  </label>
-                  <label class="pm-field pm-field--macro">
-                    <span class="pm-field__lbl">Training</span>
-                    <span class="pm-field__in pm-field__in--select">
-                      <select [ngModel]="trainingType()" (ngModelChange)="trainingType.set($event)">
-                        @for (t of trainingTypes; track t.value) { <option [value]="t.value">{{ t.label }}</option> }
-                      </select>
-                    </span>
-                  </label>
-                </div>
+                  <!-- DIET & TRAINING -->
+                  <app-bs-accordion-item label="Diet &amp; training">
+                    <div class="pm-fields">
+                      <!-- diet pattern -->
+                      <label class="pm-field">
+                        <span class="pm-field__lbl">Diet pattern</span>
+                        <span class="pm-field__in pm-field__in--select">
+                          <select [ngModel]="dietPattern()" (ngModelChange)="dietPattern.set($event)">
+                            @for (d of dietPatterns; track d.value) { <option [value]="d.value">{{ d.label }}</option> }
+                          </select>
+                        </span>
+                      </label>
 
-                <!-- life stage (+ trimester) -->
-                <div class="pm-macros" [class.pm-macros--2]="showTrimester()">
-                  <label class="pm-field" [class.pm-field--macro]="showTrimester()">
-                    <span class="pm-field__lbl">Life stage</span>
-                    <span class="pm-field__in pm-field__in--select">
-                      <select [ngModel]="lifeStage()" (ngModelChange)="lifeStage.set($event)">
-                        @for (l of lifeStages; track l.value) { <option [value]="l.value">{{ l.label }}</option> }
-                      </select>
-                    </span>
-                  </label>
-                  @if (showTrimester()) {
-                    <label class="pm-field pm-field--macro">
-                      <span class="pm-field__lbl">Trimester</span>
-                      <span class="pm-field__in">
-                        <input type="number" inputmode="numeric" min="1" max="3" [ngModel]="trimester()" (ngModelChange)="trimester.set($event)" placeholder="1–3" />
-                      </span>
-                    </label>
-                  }
-                </div>
+                      <!-- protein basis + training type -->
+                      <div class="pm-macros pm-macros--2">
+                        <label class="pm-field pm-field--macro">
+                          <span class="pm-field__lbl">Protein basis</span>
+                          <span class="pm-field__in pm-field__in--select">
+                            <select [ngModel]="proteinBasis()" (ngModelChange)="proteinBasis.set($event)">
+                              @for (b of proteinBases; track b.value) { <option [value]="b.value">{{ b.label }}</option> }
+                            </select>
+                          </span>
+                        </label>
+                        <label class="pm-field pm-field--macro">
+                          <span class="pm-field__lbl">Training</span>
+                          <span class="pm-field__in pm-field__in--select">
+                            <select [ngModel]="trainingType()" (ngModelChange)="trainingType.set($event)">
+                              @for (t of trainingTypes; track t.value) { <option [value]="t.value">{{ t.label }}</option> }
+                            </select>
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </app-bs-accordion-item>
 
-                <!-- meals per day + eating window -->
-                <div class="pm-macros pm-macros--2">
-                  <label class="pm-field pm-field--macro">
-                    <span class="pm-field__lbl">Meals / day</span>
-                    <span class="pm-field__in">
-                      <input type="number" inputmode="numeric" min="1" max="8" [ngModel]="mealsPerDay()" (ngModelChange)="mealsPerDay.set($event)" placeholder="—" />
-                    </span>
-                  </label>
-                  <label class="pm-field pm-field--macro">
-                    <span class="pm-field__lbl">Eating window</span>
-                    <span class="pm-field__in pm-field__in--select">
-                      <select [ngModel]="eatingWindow()" (ngModelChange)="eatingWindow.set($event)">
-                        @for (w of eatingWindows; track w.value) { <option [value]="w.value">{{ w.label }}</option> }
-                      </select>
-                    </span>
-                  </label>
-                </div>
+                  <!-- MEALS & LIFE STAGE -->
+                  <app-bs-accordion-item label="Meals &amp; life stage">
+                    <div class="pm-fields">
+                      <!-- life stage (+ trimester) -->
+                      <div class="pm-macros" [class.pm-macros--2]="showTrimester()">
+                        <label class="pm-field" [class.pm-field--macro]="showTrimester()">
+                          <span class="pm-field__lbl">Life stage</span>
+                          <span class="pm-field__in pm-field__in--select">
+                            <select [ngModel]="lifeStage()" (ngModelChange)="lifeStage.set($event)">
+                              @for (l of lifeStages; track l.value) { <option [value]="l.value">{{ l.label }}</option> }
+                            </select>
+                          </span>
+                        </label>
+                        @if (showTrimester()) {
+                          <label class="pm-field pm-field--macro">
+                            <span class="pm-field__lbl">Trimester</span>
+                            <span class="pm-field__in">
+                              <input type="number" inputmode="numeric" min="1" max="3" [ngModel]="trimester()" (ngModelChange)="trimester.set($event)" placeholder="1–3" />
+                            </span>
+                          </label>
+                        }
+                      </div>
 
-                <!-- allergies / restrictions -->
-                <label class="pm-field">
-                  <span class="pm-field__lbl">Allergies &amp; restrictions</span>
-                  <span class="pm-field__in">
-                    <input type="text" [ngModel]="restrictions()" (ngModelChange)="restrictions.set($event || null)"
-                           placeholder="e.g. peanuts, shellfish, dairy" />
-                  </span>
-                </label>
-                <p class="pm-fine__note">Comma-separated. Used only to constrain AI meal ideas — never a calorie input.</p>
+                      <!-- meals per day + eating window -->
+                      <div class="pm-macros pm-macros--2">
+                        <label class="pm-field pm-field--macro">
+                          <span class="pm-field__lbl">Meals / day</span>
+                          <span class="pm-field__in">
+                            <input type="number" inputmode="numeric" min="1" max="8" [ngModel]="mealsPerDay()" (ngModelChange)="mealsPerDay.set($event)" placeholder="—" />
+                          </span>
+                        </label>
+                        <label class="pm-field pm-field--macro">
+                          <span class="pm-field__lbl">Eating window</span>
+                          <span class="pm-field__in pm-field__in--select">
+                            <select [ngModel]="eatingWindow()" (ngModelChange)="eatingWindow.set($event)">
+                              @for (w of eatingWindows; track w.value) { <option [value]="w.value">{{ w.label }}</option> }
+                            </select>
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </app-bs-accordion-item>
+
+                  <!-- ALLERGIES & RESTRICTIONS (chips) -->
+                  <app-bs-accordion-item label="Allergies &amp; restrictions"
+                                         [hint]="restrictionList().length ? (restrictionList().length + ' set') : ''">
+                    <div class="pm-fields">
+                      <label class="pm-field">
+                        <span class="pm-field__lbl">Add a restriction</span>
+                        <span class="pm-field__in">
+                          <input type="text" [ngModel]="restrictionDraft()" (ngModelChange)="restrictionDraft.set($event)"
+                                 (keydown.enter)="$event.preventDefault(); addRestriction()"
+                                 placeholder="e.g. peanuts" />
+                          <button type="button" class="pm-restrict__add" aria-label="Add restriction"
+                                  [disabled]="!restrictionDraft().trim()" (click)="addRestriction()">
+                            <mat-icon aria-hidden="true">add</mat-icon>
+                          </button>
+                        </span>
+                      </label>
+
+                      @if (restrictionList().length) {
+                        <app-bs-chip-group label="Allergies and restrictions">
+                          @for (r of restrictionList(); track r; let i = $index) {
+                            <app-bs-chip [label]="r" icon="🚫" removable (removed)="removeRestriction(i)" />
+                          }
+                        </app-bs-chip-group>
+                      }
+
+                      <p class="pm-fine__note">Used only to constrain AI meal ideas — never a calorie input.</p>
+                    </div>
+                  </app-bs-accordion-item>
+
+                </app-bs-accordion>
               </div>
             }
           </section>
@@ -579,8 +627,8 @@ const CHECKIN_STALE_DAYS = 90;
       </div>
     </app-bs-pull-refresh>
 
-    <!-- ─── STICKY SAVE BAR (hidden during the onboarding gate) ─── -->
-    @if (!loading() && !needsBaseline()) {
+    <!-- ─── STICKY SAVE BAR (hidden during the onboarding gate + the completion confirmation) ─── -->
+    @if (!loading() && !needsBaseline() && !baselineDone()) {
       <div class="pm-savebar">
         <button type="button" class="pm-back" (click)="backToTracker()" aria-label="Back to tracker">
           <mat-icon aria-hidden="true">arrow_back</mat-icon>
@@ -655,6 +703,8 @@ export class TrackerProfileMobilePage {
   readonly refreshing = signal(false);
   readonly saving = signal(false);
   readonly savingBaseline = signal(false);
+  /** Brief full-screen confirmation shown once the blocking onboarding baseline is saved. */
+  readonly baselineDone = signal(false);
 
   readonly plans = signal<GoalPlanDto[]>([]);
   readonly plansLoading = signal(false);
@@ -689,7 +739,10 @@ export class TrackerProfileMobilePage {
   readonly trimester = signal<number | null>(null);
   readonly mealsPerDay = signal<number | null>(null);
   readonly eatingWindow = signal<EatingWindow>('None');
+  /** Canonical restrictions field the save() serializes — a comma-string; the chip UI mutates only this. */
   readonly restrictions = signal<string | null>(null);
+  /** In-flight text for the "add a restriction" input above the chip group. */
+  readonly restrictionDraft = signal('');
 
   // ---- Navy-tape circumferences, held in the DISPLAYED unit (in or cm) ----
   readonly neckDisp = signal<number | null>(null);
@@ -820,7 +873,7 @@ export class TrackerProfileMobilePage {
         await this.store.logWeight({ date: today, weightKg: result.weightKg });
       }
       await this.reload();
-      this.toast.show('Baseline saved', { tone: 'success', durationMs: 1800 });
+      this.baselineDone.set(true);
     } catch {
       this.toast.show('Could not save your baseline', { tone: 'warn' });
     } finally {
@@ -1015,6 +1068,33 @@ export class TrackerProfileMobilePage {
   applyNavyBodyFat(): void {
     const bf = this.navyBodyFatPct();
     if (bf != null) this.bodyFatPct.set(bf);
+  }
+
+  // ─────────────── DIETARY RESTRICTIONS AS CHIPS (mutate only restrictions()) ───────────────
+
+  /** The restrictions comma-string parsed into trimmed, non-empty tokens for chip rendering. */
+  readonly restrictionList = computed<string[]>(() =>
+    (this.restrictions() ?? '')
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0),
+  );
+
+  /** Commit the draft as a new restriction chip (de-duped, case-insensitive); no-op when blank/dup. */
+  addRestriction(): void {
+    const raw = this.restrictionDraft().trim();
+    if (!raw) return;
+    const list = this.restrictionList();
+    if (!list.some((t) => t.toLowerCase() === raw.toLowerCase())) {
+      this.restrictions.set([...list, raw].join(', '));
+    }
+    this.restrictionDraft.set('');
+  }
+
+  /** Remove the restriction at the given index (from the × on its chip). */
+  removeRestriction(index: number): void {
+    const next = this.restrictionList().filter((_, i) => i !== index);
+    this.restrictions.set(next.length ? next.join(', ') : null);
   }
 
   /** A compact read-only digest of what the AI meal recommenders are told (eating style · restrictions · pace). */
