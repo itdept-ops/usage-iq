@@ -417,6 +417,19 @@
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
   border-top: 1px solid var(--hairline);
 }
+/* Read-only notice — occupies the composer slot when the caller lacks chat.send (mirrors desktop). */
+.composer-ro {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px var(--gutter) max(14px, calc(var(--safe-bottom) - var(--kb-inset, 0px))) var(--gutter);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+  border-top: 1px solid var(--hairline);
+  color: var(--ink-dim); font-size: 13px; text-align: center;
+}
+.composer-ro mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--ink-faint); }
+
 .composer__in {
   flex: 1 1 auto; min-width: 0;
   resize: none; overflow-y: auto;

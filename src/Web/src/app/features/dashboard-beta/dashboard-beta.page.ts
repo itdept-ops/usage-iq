@@ -9,7 +9,7 @@ import { catchError } from 'rxjs/operators';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
-  CacheEfficiency, GroupBy, IngestionSource, MachineStat, ModelStat, PagedResult,
+  CacheEfficiency, CalendarDay, GroupBy, IngestionSource, MachineStat, ModelStat, PagedResult,
   ProjectDto, SavedView, SummaryResponse, UsageFilter, UsageRecord, PERM,
 } from '../../core/models';
 import { ShareDialog } from '../share/share-dialog';
@@ -25,6 +25,17 @@ import { PulseFilterSheet } from './sheets/filter-sheet';
 import { PulseTickerMobile } from '../pulse-ticker/pulse-ticker-mobile';
 
 const PAGE_SIZE = 25;
+
+/**
+ * True for Mon–Fri. Parses the calendar's display-local "yyyy-MM-dd" by its components (not
+ * `new Date(str)`, which parses as UTC and could shift the weekday across timezones). Copied
+ * VERBATIM from the live dashboard so the active-weekday denominator matches exactly.
+ */
+function isWeekday(localDate: string): boolean {
+  const [y, m, d] = localDate.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay(); // 0 = Sun … 6 = Sat, local time on a date-only value
+  return dow >= 1 && dow <= 5;
+}
 
 /**
  * Dashboard "Pulse" — the mobile-first usage-analytics cockpit, rebuilt on the shared beta-ui "Strata"
@@ -111,7 +122,8 @@ const PAGE_SIZE = 25;
         <div class="rise" [style.--i]="0">
           <app-pulse-hero
             [summary]="summary()" [prevSummary]="prevSummary()" [cacheEff]="cacheEff()"
-            [loading]="loading()" [rangeLabel]="rangeLabel()" [prevLabel]="prevLabel()" />
+            [loading]="loading()" [rangeLabel]="rangeLabel()" [prevLabel]="prevLabel()"
+            [activeHours]="activeHours()" [dailyAvgHours]="dailyAvgHours()" [activeWeekdays]="activeWeekdays()" />
         </div>
 
         <!-- Activity Pulse ticker — self-gates on feed visibility + ≥1 moment, so it adds no empty card. -->
@@ -135,6 +147,13 @@ const PAGE_SIZE = 25;
           <app-pulse-breakdown
             [slices]="breakdownSlices()" [dim]="breakdownDim()" [loading]="loading()"
             (dimChange)="setBreakdownDim($event)" (widen)="setDatePreset('all')" />
+          <!-- Placeholder-pricing note — shown when any range model uses estimated rates (mirrors live). -->
+          @if (hasPlaceholder()) {
+            <p class="pb-ph-note">
+              <mat-icon aria-hidden="true">info</mat-icon>
+              <span>Some models use placeholder pricing — set real rates in <a routerLink="/pricing">Pricing</a>.</span>
+            </p>
+          }
         </div>
 
         @if (showEfficiency()) {
@@ -236,6 +255,8 @@ export class DashboardBetaPage {
   readonly cacheEff = signal<CacheEfficiency | null>(null);
   /** Per-dimension breakdown summary (grouped by model/source/project via the SAME summary endpoint). */
   readonly breakdownSummary = signal<SummaryResponse | null>(null);
+  /** Per-day estimated active engagement (gap-based) for the current filter — from `Api.calendar`. */
+  readonly calendarDays = signal<CalendarDay[]>([]);
 
   readonly loading = signal(false);
   readonly loadingMore = signal(false);
@@ -317,6 +338,25 @@ export class DashboardBetaPage {
       }))
       .sort((a, b) => b.costUsd - a.costUsd);
   });
+
+  // ---- Active-hours KPI (mirrors the live dashboard's activeHours/activeWeekdays/dailyAvgHours) ----
+  /** Total estimated active engagement hours over the range (weekends included in the total). */
+  readonly activeHours = computed(() => this.calendarDays().reduce((a, d) => a + d.activeMinutes, 0) / 60);
+  /** Weekdays (Mon–Fri) with measurable engaged time — the average's denominator (weekends excluded). */
+  readonly activeWeekdays = computed(() =>
+    this.calendarDays().filter(d => d.activeMinutes > 0 && isWeekday(d.date)).length);
+  /** Avg active hours per active weekday: total active hours (incl. weekends) ÷ active weekdays. */
+  readonly dailyAvgHours = computed(() => {
+    const days = this.activeWeekdays();
+    return days > 0 ? this.activeHours() / days : 0;
+  });
+
+  /**
+   * True when any model in the range prices with placeholder/estimated rates (and actually cost money) —
+   * drives the "set real rates in Pricing" note. Copied from the live dashboard's `hasPlaceholder`.
+   */
+  readonly hasPlaceholder = computed(() =>
+    this.modelStats().some(m => m.isPlaceholderPricing && m.costUsd > 0));
 
   constructor() {
     this.hydrateFromUrl();
@@ -462,6 +502,8 @@ export class DashboardBetaPage {
       summary: this.api.summary(this.filter(), this.groupBy()),
       records: this.api.records(this.filter(), 1, PAGE_SIZE, this.recordSort(), true),
       cacheEff: this.api.cacheEfficiency(this.filter()).pipe(catchError(() => of<CacheEfficiency | null>(null))),
+      // Estimated active-hours source — best-effort (empty when unavailable, so the KPI just hides).
+      calendar: this.api.calendar(this.filter()).pipe(catchError(() => of<CalendarDay[]>([]))),
       // Prior-period summary for the delta — best-effort (null when no prior window or it errors).
       prev: prior ? this.api.summary(prior, this.groupBy()).pipe(catchError(() => of<SummaryResponse | null>(null))) : of<SummaryResponse | null>(null),
     }).subscribe({
@@ -469,6 +511,7 @@ export class DashboardBetaPage {
         this.summary.set(r.summary);
         this.records.set(r.records);
         this.cacheEff.set(r.cacheEff);
+        this.calendarDays.set(r.calendar);
         this.prevSummary.set(r.prev);
         this.loading.set(false);
       },
@@ -507,6 +550,7 @@ export class DashboardBetaPage {
       summary: this.api.summary(this.filter(), this.groupBy()).pipe(catchError(() => of<SummaryResponse | null>(null))),
       records: this.api.records(this.filter(), 1, PAGE_SIZE, this.recordSort(), true).pipe(catchError(() => of<PagedResult<UsageRecord> | null>(null))),
       cacheEff: this.api.cacheEfficiency(this.filter()).pipe(catchError(() => of<CacheEfficiency | null>(null))),
+      calendar: this.api.calendar(this.filter()).pipe(catchError(() => of<CalendarDay[]>([]))),
       breakdown: this.api.summary(this.filter(), this.breakdownDim()).pipe(catchError(() => of<SummaryResponse | null>(null))),
       prev: prior ? this.api.summary(prior, this.groupBy()).pipe(catchError(() => of<SummaryResponse | null>(null))) : of<SummaryResponse | null>(null),
     }).subscribe({
@@ -514,6 +558,7 @@ export class DashboardBetaPage {
         if (r.summary) this.summary.set(r.summary);
         if (r.records) this.records.set(r.records);
         this.cacheEff.set(r.cacheEff);
+        this.calendarDays.set(r.calendar);
         if (r.breakdown) this.breakdownSummary.set(r.breakdown);
         this.prevSummary.set(r.prev);
         this.page.set(1);

@@ -11,8 +11,8 @@ import {
   FamilyMeal, FamilyMealDay, HouseholdMember, PERM, TrackerProfileDto,
 } from '../../core/models';
 import {
-  BetaFab, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaSvgRing, BetaSwipeRow,
-  BetaToaster, Segment, ToastController,
+  BetaChip, BetaChipGroup, BetaFab, BetaPullRefresh, BetaSegmentedControl, BetaSkeleton, BetaSvgRing,
+  BetaSwipeRow, BetaToaster, Segment, ToastController,
 } from '../beta-ui';
 
 import {
@@ -57,7 +57,7 @@ import { ForageAddToTrackerSheet, AddToTrackerResult } from './components/add-to
   providers: [ToastController],
   imports: [
     MatIconModule, BetaPullRefresh, BetaFab, BetaToaster, BetaSkeleton, BetaSvgRing, BetaSwipeRow,
-    BetaSegmentedControl,
+    BetaSegmentedControl, BetaChip, BetaChipGroup,
     ForageDayStrip, ForageMealCard, ForagePlanSheet, ForageEatSheet, ForageGrocerySheet, ForageMealActionsSheet,
     ForageMoveMealSheet, ForageEditMealSheet, ForageRefineMealSheet, ForageAddToTrackerSheet,
   ],
@@ -112,6 +112,21 @@ import { ForageAddToTrackerSheet, AddToTrackerResult } from './components/add-to
           </div>
         </header>
 
+        <!-- On-hand pantry chips (from a Snap & Route hand-off) — bias the AI plan. -->
+        @if (onHand().length) {
+          <section class="mb-onhand" aria-label="On-hand ingredients from your pantry snap">
+            <span class="mb-onhand-lbl">
+              <mat-icon aria-hidden="true">kitchen</mat-icon>
+              On hand — your plan will lean on these
+            </span>
+            <app-bs-chip-group class="mb-onhand-chips" [scroll]="true" label="On-hand ingredients">
+              @for (ing of onHand(); track ing) {
+                <app-bs-chip [label]="ing" variant="soft" removable (removed)="removeOnHand(ing)" />
+              }
+            </app-bs-chip-group>
+          </section>
+        }
+
         <!-- Day | Week view toggle. -->
         <app-bs-segmented class="mb-view" [segments]="viewSegments" [(value)]="viewMode" label="View" />
 
@@ -151,6 +166,20 @@ import { ForageAddToTrackerSheet, AddToTrackerResult } from './components/add-to
             <div class="mb-day-h-txt">
               <h2 class="mb-day-title">{{ selectedCell()?.weekdayLong || 'Day' }}</h2>
               <span class="mb-day-sub">{{ selectedCell()?.dateLabel }}</span>
+              @if (selectedCell()?.rollup?.hasMacros) {
+                <span class="mb-day-roll" aria-label="Planned macros for the day">
+                  <span class="mb-day-roll-cal">
+                    <b>{{ dayRollCal() }}</b>@if (showGoals()) {<span class="mb-day-roll-goal"> / {{ calorieGoal() }}</span>} kcal
+                  </span>
+                  <span class="mb-day-roll-p">
+                    @if (showGoals() && proteinGoal() != null) {
+                      {{ selectedCell()!.rollup.proteinG }}/{{ proteinGoal() }}g P
+                    } @else {
+                      {{ selectedCell()!.rollup.proteinG }}g P
+                    }
+                  </span>
+                </span>
+              }
             </div>
             <div class="mb-day-h-btns">
               <button type="button" class="mb-day-gro" (click)="addMeal()"
@@ -211,6 +240,33 @@ import { ForageAddToTrackerSheet, AddToTrackerResult } from './components/add-to
         </section>
         }
 
+        <!-- Week-total macro rollup (sum of the visible week vs 7× the daily goal). -->
+        @if (hasWeekMacros()) {
+          <section class="mb-weekroll" aria-label="Planned macros for the week">
+            <span class="mb-weekroll-lbl">
+              <mat-icon aria-hidden="true">insights</mat-icon> This week (planned)
+            </span>
+            <span class="mb-weekroll-cal">
+              <b>{{ weekRollCal() }}</b>@if (showGoals()) {<span class="mb-weekroll-goal"> / {{ weekCalorieGoal() }}</span>} kcal
+            </span>
+            <span class="mb-weekroll-pcf">
+              @if (showGoals() && proteinGoal() != null) {
+                {{ weekRollProtein() }}/{{ weekProteinGoal() }}g P
+              } @else {
+                {{ weekRollProtein() }}g P
+              }
+              · {{ weekRollCarb() }}g C · {{ weekRollFat() }}g F
+            </span>
+            <span class="mb-weekroll-note">
+              @if (showGoals()) {
+                Per-serving totals vs your daily goal ×7
+              } @else {
+                Sum of each meal's per-serving macros
+              }
+            </span>
+          </section>
+        }
+
         <!-- Quick actions row. -->
         <div class="mb-quick">
           <button type="button" class="mb-q" (click)="openEat()">
@@ -238,7 +294,8 @@ import { ForageAddToTrackerSheet, AddToTrackerResult } from './components/add-to
     <app-bs-fab icon="auto_awesome" label="Plan my week" [extended]="true" [fixed]="true" (action)="openPlan()" />
 
     <!-- Sheets. -->
-    <app-forage-plan-sheet #planSheet [weekStart]="weekStartIso()" (planned)="onPlanned($event)" />
+    <app-forage-plan-sheet #planSheet [weekStart]="weekStartIso()" [ingredientsOnHand]="onHand()"
+      (planned)="onPlanned($event)" />
     <app-forage-eat-sheet #eatSheet />
     <app-forage-grocery-sheet #grocerySheet (changed)="noop()" />
     <app-forage-meal-actions-sheet #mealSheet
@@ -309,6 +366,17 @@ export class MealsBetaPage {
   });
   readonly calorieGoal = computed(() =>
     this.canTrack() ? (this.trackerProfile()?.dailyCalorieGoal ?? null) : null);
+  readonly proteinGoal = computed(() =>
+    this.canTrack() ? (this.trackerProfile()?.proteinGoalG ?? null) : null);
+  /** Show goal comparisons only when the caller holds tracker.self AND has a daily calorie goal set. */
+  readonly showGoals = computed(() => this.canTrack() && this.calorieGoal() != null);
+
+  /**
+   * "On hand" ingredients handed off from the Snap & Route pantry capture (sessionStorage, read + cleared on
+   * init — same `usage_iq_pantry_on_hand` key the live planner uses). When present they show as removable
+   * chips and bias the "Plan my week" AI plan toward what the caller already has (passed to the plan sheet).
+   */
+  readonly onHand = signal<string[]>([]);
 
   /** True while the whole-week "add to grocery" call is in flight (locks the quick action). */
   readonly addingWeek = signal(false);
@@ -375,6 +443,25 @@ export class MealsBetaPage {
   readonly hasWeekMacros = computed(() => this.weekRollup().hasMacros);
   readonly weekKcal = computed(() => Math.round(this.weekRollup().calories).toLocaleString());
 
+  // ---- macro-rollup display (mirrors the live planner's per-day + per-week rollup rows) ----
+  /** The selected day's planned kcal numeral (e.g. "1,850"). */
+  readonly dayRollCal = computed(() =>
+    Math.round(this.selectedCell()?.rollup.calories ?? 0).toLocaleString());
+  /** Whole-week planned macro numerals (kcal + P/C/F), pre-formatted for the week-total row. */
+  readonly weekRollCal = computed(() => Math.round(this.weekRollup().calories).toLocaleString());
+  readonly weekRollProtein = computed(() => this.weekRollup().proteinG.toLocaleString());
+  readonly weekRollCarb = computed(() => this.weekRollup().carbG.toLocaleString());
+  readonly weekRollFat = computed(() => this.weekRollup().fatG.toLocaleString());
+  /** 7× the daily goals for the week-total comparison (null-safe; only read when showGoals()). */
+  readonly weekCalorieGoal = computed(() => {
+    const g = this.calorieGoal();
+    return g != null ? (g * 7).toLocaleString() : '';
+  });
+  readonly weekProteinGoal = computed(() => {
+    const g = this.proteinGoal();
+    return g != null ? (g * 7).toLocaleString() : '';
+  });
+
   /** The selected day's planned kcal as a fraction of the daily goal (null without a goal or macros). */
   readonly dayGoalFrac = computed<number | null>(() => {
     const goal = this.calorieGoal();
@@ -434,11 +521,42 @@ export class MealsBetaPage {
 
   constructor() {
     this.reload(true);
+    this.consumePantryHandoff();
     if (this.canTrack()) {
       this.api.trackerProfile()
         .pipe(catchError(() => of<TrackerProfileDto | null>(null)), takeUntilDestroyed(this.destroyRef))
         .subscribe(p => this.trackerProfile.set(p));
     }
+  }
+
+  /**
+   * Read (and immediately CLEAR) the Snap & Route pantry hand-off from sessionStorage — the SAME
+   * `usage_iq_pantry_on_hand` key + read-once semantics the live planner uses. Clearing on consume means the
+   * chips only appear on the visit right after a pantry snap; a later normal visit won't re-apply stale chips.
+   * Malformed JSON / non-array / unavailable storage all degrade silently to no chips.
+   */
+  private consumePantryHandoff(): void {
+    try {
+      const raw = sessionStorage.getItem('usage_iq_pantry_on_hand');
+      if (!raw) return;
+      sessionStorage.removeItem('usage_iq_pantry_on_hand');
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const items = Array.from(new Set(
+        parsed
+          .filter((x): x is string => typeof x === 'string')
+          .map(x => x.trim())
+          .filter(x => x.length > 0),
+      ));
+      if (items.length) this.onHand.set(items);
+    } catch {
+      /* malformed JSON or sessionStorage unavailable → no on-hand chips, non-fatal. */
+    }
+  }
+
+  /** Remove one on-hand chip (it then drops from the next "Plan my week" request's bias). */
+  removeOnHand(ingredient: string): void {
+    this.onHand.update(list => list.filter(x => x !== ingredient));
   }
 
   // ---- week navigation ----

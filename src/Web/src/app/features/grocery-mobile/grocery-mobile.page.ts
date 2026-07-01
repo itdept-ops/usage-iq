@@ -194,6 +194,9 @@ import {
                       <mat-icon>check</mat-icon>
                     </span>
                     <span class="gm-row__name">{{ baseName(it.text) }}</span>
+                    @if (it.doneByName) {
+                      <span class="gm-row__by">· by {{ it.doneByName }}</span>
+                    }
                     @if (itemQty(it.text) > 1) {
                       <span class="gm-row__qty" aria-hidden="true">×{{ itemQty(it.text) }}</span>
                     }

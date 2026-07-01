@@ -76,6 +76,20 @@ import { CompactPipe } from '../../../shared/format';
           <span class="stat__val">{{ (summary()?.total?.records ?? 0) | compact }}</span>
           <span class="stat__key">records</span>
         </div>
+        <!-- Prompt (input) vs completion (output) token split — mirrors the live "Input / Output" KPI. -->
+        <div class="stat stat--io" title="prompt (input) vs completion (output)">
+          <span class="stat__val">
+            {{ (summary()?.total?.inputTokens ?? 0) | compact }}<span class="stat__slash"> / </span>{{ (summary()?.total?.outputTokens ?? 0) | compact }}
+          </span>
+          <span class="stat__key">in / out</span>
+        </div>
+        <!-- Estimated active engagement (gap-based, from the calendar) + avg per active weekday. -->
+        @if (showActive()) {
+          <div class="stat stat--active" [title]="activeSubText()">
+            <span class="stat__val">{{ activeHoursText() }}<span class="stat__unit">h</span></span>
+            <span class="stat__key">{{ activeSubText() }}</span>
+          </div>
+        }
         @if (showCache()) {
           <div class="stat stat--cache">
             <span class="stat__val">{{ cachePct() }}%</span>
@@ -151,6 +165,9 @@ import { CompactPipe } from '../../../shared/format';
     .stat__val { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
     .stat__key { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-dim); }
     .stat--cache .stat__val { color: var(--signal); }
+    .stat__slash { color: var(--ink-faint); font-weight: 500; }
+    .stat__unit { font-size: 13px; color: var(--ink-dim); margin-left: 1px; }
+    .stat--active .stat__val { color: var(--accent-b); }
   `],
 })
 export class PulseHeroCard {
@@ -162,6 +179,14 @@ export class PulseHeroCard {
   readonly rangeLabel = input<string>('All time');
   /** Human label for the prior window (for the delta tooltip), e.g. "previous 30d". */
   readonly prevLabel = input<string>('the previous period');
+
+  /**
+   * Estimated active engagement hours over the range + its per-active-weekday average, derived on the
+   * page from the SAME calendar endpoint the live dashboard uses. -1 avgHours signals "no calendar yet".
+   */
+  readonly activeHours = input<number>(0);
+  readonly dailyAvgHours = input<number>(0);
+  readonly activeWeekdays = input<number>(0);
 
   /** Unique gradient ids so the sparkline strokes/fills don't collide. */
   protected readonly lineId = `hero-line-${Math.random().toString(36).slice(2, 8)}`;
@@ -202,6 +227,24 @@ export class PulseHeroCard {
     const c = this.cacheEff();
     if (!c) return false;
     return !(c.cacheReadTokens === 0 && c.inputTokens === 0 && c.cacheWriteTokens === 0);
+  });
+
+  /** Active-hours stat: show only once there's measurable engaged time in the range. */
+  readonly showActive = computed(() => this.activeHours() > 0);
+  /** Active hours to 1 decimal, matching the live "{{ activeHours() | number: '1.0-1' }}". */
+  readonly activeHoursText = computed(() =>
+    this.activeHours().toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 }),
+  );
+  /**
+   * Sub-line mirroring the live KPI: avg per active weekday when there are any, else "weekend activity"
+   * (hours but no weekdays), else "estimated time with AI".
+   */
+  readonly activeSubText = computed(() => {
+    if (this.activeWeekdays() > 0) {
+      const avg = this.dailyAvgHours().toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+      return `avg ${avg}h/weekday`;
+    }
+    return this.activeHours() > 0 ? 'weekend activity' : 'estimated time with AI';
   });
 
   /** Build the hero sparkline from the current summary's cost buckets (≥2 points needed). */

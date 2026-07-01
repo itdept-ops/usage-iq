@@ -53,8 +53,18 @@ interface ThreadRow {
   daySep: string | null; // a day-separator label to render ABOVE this bubble, or null
 }
 
-/** The emoji set offered in the react sheet (kept small + universal). */
-const REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '🙏', '😢', '🎉'] as const;
+/**
+ * The curated reaction set offered in the react sheet — the same 40 emotes the desktop /chat picker
+ * offers (chat.ts REACTION_EMOJIS). The first eight are the quick favourites; the rest round out
+ * reactions for everyday needs. No external emoji dependency.
+ */
+const REACTIONS = [
+  '👍', '❤️', '😂', '🎉', '😮', '😢', '🙏', '🔥',
+  '👏', '😀', '😅', '😉', '😍', '🤔', '🙄', '😎',
+  '😴', '😱', '🤯', '🥳', '😭', '😡', '👀', '💯',
+  '✅', '❌', '⚡', '🚀', '💡', '⭐', '✨', '💪',
+  '🤝', '👋', '🙌', '🤷', '👌', '🤞', '☕', '🐛',
+] as const;
 
 /**
  * Chat Beta — "Messenger". A NEW, beta-only mobile-first iMessage-feel chat experience rebuilt on the
@@ -330,22 +340,28 @@ const REACTIONS = ['❤️', '👍', '😂', '🔥', '😮', '🙏', '😢', '�
             </ul>
           }
 
-          <form class="composer" (submit)="send($event)">
-            @if (canSendPerm()) {
+          @if (canSendPerm()) {
+            <form class="composer" (submit)="send($event)">
               <button type="button" class="composer__ai" (click)="composeOpen.set(true)"
                       [disabled]="composeBusy()" aria-label="AI compose assist">
                 <mat-icon aria-hidden="true">auto_awesome</mat-icon>
               </button>
-            }
-            <textarea #composer class="composer__in" [(ngModel)]="draft" name="draft"
-                      rows="1" placeholder="Message…" aria-label="Message"
-                      enterkeyhint="send" autocomplete="off"
-                      (input)="onDraftInput()" (keydown)="onKeydown($event)"
-                      (blur)="closeMentionsSoon()"></textarea>
-            <button type="submit" class="composer__send" [disabled]="!canSend()" aria-label="Send">
-              <mat-icon aria-hidden="true">arrow_upward</mat-icon>
-            </button>
-          </form>
+              <textarea #composer class="composer__in" [(ngModel)]="draft" name="draft"
+                        rows="1" placeholder="Message…" aria-label="Message"
+                        enterkeyhint="send" autocomplete="off"
+                        (input)="onDraftInput()" (keydown)="onKeydown($event)"
+                        (blur)="closeMentionsSoon()"></textarea>
+              <button type="submit" class="composer__send" [disabled]="!canSend()" aria-label="Send">
+                <mat-icon aria-hidden="true">arrow_upward</mat-icon>
+              </button>
+            </form>
+          } @else {
+            <!-- Read-only access (no chat.send perm): mirror desktop's inline notice. -->
+            <div class="composer-ro" role="status">
+              <mat-icon aria-hidden="true">visibility</mat-icon>
+              <span>You have read-only access to this conversation.</span>
+            </div>
+          }
         </div>
       </section>
     }

@@ -2,8 +2,10 @@ import {
   ChangeDetectionStrategy, Component, computed, inject, signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { forkJoin } from 'rxjs';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -26,8 +28,8 @@ interface PermGroup {
   isAi: boolean;
 }
 
-/** How the list is filtered by capability axis. */
-type CapFilter = 'all' | 'ai' | 'enabled' | 'disabled';
+/** How the list is filtered by capability axis. `perm` narrows to holders of a specific permission key. */
+type CapFilter = 'all' | 'ai' | 'enabled' | 'disabled' | 'perm';
 
 /** A landing-page option for the "Lands on" picker (route + label), offered only when reachable. */
 interface HomeOption {
@@ -89,7 +91,7 @@ interface ContactsState {
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ToastController],
   imports: [
-    DatePipe, FormsModule, MatIconModule,
+    DatePipe, RouterLink, FormsModule, MatIconModule,
     BetaPullRefresh, BetaBottomSheet, BetaSkeleton,
     BetaFab, BetaToaster,
   ],
@@ -102,6 +104,17 @@ interface ContactsState {
           <p class="um-hero__kicker"><mat-icon aria-hidden="true">admin_panel_settings</mat-icon> Access control</p>
           <h1 class="um-hero__title">Users</h1>
           <p class="um-hero__sub">Manage who can sign in and exactly what each person can do.</p>
+
+          @if (auth.hasPermission(PERM.usersView)) {
+            <button type="button" class="um-reveal-toggle" [class.is-on]="emailsRevealed()"
+                    [disabled]="revealing()" [attr.aria-pressed]="emailsRevealed()"
+                    [attr.aria-label]="emailsRevealed() ? 'Hide email addresses' : 'Show email addresses (requires a key)'"
+                    (click)="toggleEmails()">
+              @if (revealing()) { <mat-icon class="um-spin" aria-hidden="true">progress_activity</mat-icon> }
+              @else { <mat-icon aria-hidden="true">{{ emailsRevealed() ? 'lock_open' : 'lock' }}</mat-icon> }
+              {{ emailsRevealed() ? 'Hide emails' : 'Show emails' }}
+            </button>
+          }
 
           @if (!loading() && !errored()) {
             <div class="um-stats">
@@ -148,7 +161,8 @@ interface ContactsState {
               <mat-icon class="um-search__ic" aria-hidden="true">search</mat-icon>
               <input class="um-search__input" type="search" inputmode="search"
                      [ngModel]="search()" (ngModelChange)="search.set($event)"
-                     placeholder="Search by name" autocomplete="off" aria-label="Search users" />
+                     [placeholder]="emailsRevealed() ? 'Search by name or email' : 'Search by name'"
+                     autocomplete="off" aria-label="Search users" />
               @if (search()) {
                 <button type="button" class="um-search__clear" (click)="search.set('')" aria-label="Clear search">
                   <mat-icon aria-hidden="true">close</mat-icon>
@@ -165,6 +179,11 @@ interface ContactsState {
                 <mat-icon aria-hidden="true">{{ c.icon }}</mat-icon> {{ c.label }}
               </button>
             }
+            <button type="button" class="um-chip um-chip--perm" [class.is-on]="capFilter() === 'perm'"
+                    [attr.aria-pressed]="capFilter() === 'perm'" (click)="openPermPicker()">
+              <mat-icon aria-hidden="true">tune</mat-icon>
+              {{ capFilter() === 'perm' && filterPermLabel() ? 'Can do: ' + filterPermLabel() : 'Can do…' }}
+            </button>
             <button type="button" class="um-chip um-chip--policy" (click)="openPolicy()">
               <mat-icon aria-hidden="true">policy</mat-icon> Policy
             </button>
@@ -220,6 +239,9 @@ interface ContactsState {
                     <span class="um-card__avatar" [class.off]="!u.isEnabled" aria-hidden="true">{{ userInitial(u) }}</span>
                     <span class="um-card__body">
                       <span class="um-card__name">{{ u.name || 'Unnamed user' }}</span>
+                      @if (emailsRevealed() && u.email) {
+                        <span class="um-card__email">{{ u.email }}</span>
+                      }
                       <span class="um-card__summary">{{ oneLineSummary(u) }}</span>
                       <span class="um-card__tags">
                         <span class="um-tag um-tag--role">{{ roleLabel(u) }}</span>
@@ -261,6 +283,13 @@ interface ContactsState {
                   <li class="um-audit__row">
                     <span class="um-audit__when mono-num">{{ a.whenUtc | date: 'MMM d, HH:mm' }}</span>
                     <span class="um-audit__action">{{ a.action }}</span>
+                    @if (emailsRevealed() && (a.actorEmail || a.targetEmail)) {
+                      <span class="um-audit__who">
+                        @if (a.actorEmail) { {{ a.actorEmail }} }
+                        @if (a.actorEmail && a.targetEmail) { → }
+                        @if (a.targetEmail) { {{ a.targetEmail }} }
+                      </span>
+                    }
                     @if (a.detail) { <span class="um-audit__detail">{{ a.detail }}</span> }
                   </li>
                 }
@@ -281,6 +310,7 @@ interface ContactsState {
             <span class="ud__avatar" [class.off]="!draftEnabled()" aria-hidden="true">{{ userInitial(u) }}</span>
             <div class="ud__titles">
               <h3 class="ud__name">{{ u.name || 'Unnamed user' }}</h3>
+              @if (emailsRevealed() && u.email) { <span class="ud__email">{{ u.email }}</span> }
               <span class="ud__sub">
                 <span class="ud__role-badge">{{ draftRoleLabel() }}</span>
                 @if (u.lastLoginUtc) {
@@ -399,6 +429,19 @@ interface ContactsState {
             </div>
           }
 
+          <!-- ADMIN LOCATION HISTORY LINK — gated location.view.all (mirrors the desktop page) -->
+          @if (auth.hasPermission(PERM.locationViewAll)) {
+            <div class="ud__block">
+              <span class="ud__block-title"><mat-icon aria-hidden="true">map</mat-icon> Location history</span>
+              <a class="ud__map-link" [routerLink]="['/admin/locations']" [queryParams]="{ user: u.id }"
+                 (click)="detailOpen.set(false)"
+                 [attr.aria-label]="'View ' + (u.name || 'this user') + ' on the admin map'">
+                <mat-icon aria-hidden="true">location_on</mat-icon> View on map
+                <mat-icon class="ud__map-go" aria-hidden="true">chevron_right</mat-icon>
+              </a>
+            </div>
+          }
+
           <!-- LOGIN HISTORY (lazy) -->
           <div class="ud__block">
             <span class="ud__block-title"><mat-icon aria-hidden="true">history</mat-icon> Recent sign-ins</span>
@@ -414,7 +457,7 @@ interface ContactsState {
                 <p class="ud__logins-empty">No recorded sign-ins yet.</p>
               } @else {
                 <ul class="ud__logins">
-                  @for (e of ls.events.slice(0, 6); track e.id) {
+                  @for (e of visibleLogins(); track e.id) {
                     <li class="ud__login" [class.failed]="!e.success">
                       <mat-icon class="ud__login-ic" aria-hidden="true">{{ e.success ? 'login' : 'gpp_bad' }}</mat-icon>
                       <span class="ud__login-body">
@@ -427,6 +470,12 @@ interface ContactsState {
                     </li>
                   }
                 </ul>
+                @if (hasMoreLogins()) {
+                  <button type="button" class="ud__logins-more" (click)="loginsExpanded.set(!loginsExpanded())">
+                    <mat-icon aria-hidden="true">{{ loginsExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+                    {{ loginsExpanded() ? 'Show fewer' : 'Show all (' + ls.events.length + ')' }}
+                  </button>
+                }
               }
             }
           </div>
@@ -599,6 +648,80 @@ interface ContactsState {
           </button>
         </div>
       }
+    </app-bs-sheet>
+
+    <!-- ─────────────── "CAN DO" PERMISSION-FILTER PICKER SHEET ─────────────── -->
+    <app-bs-sheet [(open)]="permPickerOpen" detent="full" label="Filter by capability">
+      <div class="up">
+        <div class="up__head">
+          <h3 class="up__title"><mat-icon aria-hidden="true">tune</mat-icon> Can do…</h3>
+          <button type="button" class="up__close" (click)="permPickerOpen.set(false)" aria-label="Close">
+            <mat-icon aria-hidden="true">close</mat-icon>
+          </button>
+        </div>
+        <p class="up__sub">Narrow the list to users who hold a specific capability.</p>
+
+        <button type="button" class="ud__perm" role="option" [attr.aria-selected]="!filterPerm()"
+                [class.is-on]="!filterPerm()" (click)="setFilterPerm('')">
+          <span class="ud__perm-body">
+            <span class="ud__perm-label">Any capability</span>
+            <span class="ud__perm-desc">Clear the capability filter.</span>
+          </span>
+          @if (!filterPerm()) { <mat-icon aria-hidden="true">check</mat-icon> }
+        </button>
+
+        @for (g of groups(); track g.name) {
+          <div class="up__group">
+            <span class="up__group-name">{{ g.name }}</span>
+            <div class="ud__perms">
+              @for (perm of g.perms; track perm.key) {
+                <button type="button" class="ud__perm" role="option"
+                        [class.is-on]="filterPerm() === perm.key" [attr.aria-selected]="filterPerm() === perm.key"
+                        (click)="setFilterPerm(perm.key)">
+                  <span class="ud__perm-body">
+                    <span class="ud__perm-label">{{ perm.label }}</span>
+                    <span class="ud__perm-desc">{{ perm.description }}</span>
+                  </span>
+                  @if (filterPerm() === perm.key) { <mat-icon aria-hidden="true">check</mat-icon> }
+                </button>
+              }
+            </div>
+          </div>
+        }
+        <div class="ud__savebar-spacer" aria-hidden="true"></div>
+      </div>
+    </app-bs-sheet>
+
+    <!-- ─────────────── REVEAL-KEY SHEET (email reveal) ─────────────── -->
+    <app-bs-sheet [(open)]="revealOpen" detent="half" [dismissable]="!revealing()" label="Show emails">
+      <div class="up">
+        <div class="up__head">
+          <h3 class="up__title"><mat-icon aria-hidden="true">lock</mat-icon> Show emails</h3>
+          <button type="button" class="up__close" (click)="revealOpen.set(false)" aria-label="Close" [disabled]="revealing()">
+            <mat-icon aria-hidden="true">close</mat-icon>
+          </button>
+        </div>
+        <p class="up__sub">
+          Enter the reveal key to show real email addresses on this page. The key is held in memory only
+          for this session and is never saved.
+        </p>
+        <form (ngSubmit)="submitRevealKey()">
+          <label class="ud__block">
+            <span class="ud__block-title"><mat-icon aria-hidden="true">key</mat-icon> Reveal key</span>
+            <input class="um-textfield" type="password" autocomplete="off" name="revealKey"
+                   [ngModel]="revealKeyInput()" (ngModelChange)="revealKeyInput.set($event)"
+                   placeholder="Reveal key" aria-label="Email reveal key" />
+          </label>
+        </form>
+      </div>
+      <div class="ud__savebar is-dirty">
+        <span class="ud__savebar-hint">Emails stay masked until verified</span>
+        <button type="button" class="ud__savebar-btn" [disabled]="revealing() || !revealKeyInput().trim()"
+                (click)="submitRevealKey()">
+          @if (revealing()) { <mat-icon class="um-spin" aria-hidden="true">progress_activity</mat-icon> Checking… }
+          @else { <mat-icon aria-hidden="true">lock_open</mat-icon> Show emails }
+        </button>
+      </div>
     </app-bs-sheet>
 
     <!-- ─────────────── ADD-USER SHEET ─────────────── -->
@@ -783,7 +906,8 @@ interface ContactsState {
 
     <!-- ADD-USER FAB (canManage; hidden while any sheet or bulk mode is up) -->
     @if (canManage() && !loading() && !errored() && !detailOpen() && !policyOpen()
-         && !addOpen() && !bulkSheetOpen() && !confirmOpen() && !bulkMode()) {
+         && !addOpen() && !bulkSheetOpen() && !confirmOpen() && !permPickerOpen()
+         && !revealOpen() && !bulkMode()) {
       <app-bs-fab icon="person_add" label="Add user" [fixed]="true" (action)="openAddUser()" />
     }
 
@@ -809,6 +933,10 @@ export class UsersMobilePage {
   // ---- list search + filter ----
   readonly search = signal('');
   readonly capFilter = signal<CapFilter>('all');
+  /** The permission key the `perm` capability filter narrows to ('' = none). */
+  readonly filterPerm = signal('');
+  /** The "Can do" per-permission picker sheet (chooses which key the `perm` filter narrows to). */
+  readonly permPickerOpen = signal(false);
 
   readonly capChips: readonly { key: CapFilter; label: string; icon: string }[] = [
     { key: 'all', label: 'All', icon: 'groups' },
@@ -816,6 +944,22 @@ export class UsersMobilePage {
     { key: 'enabled', label: 'Enabled', icon: 'check_circle' },
     { key: 'disabled', label: 'Disabled', icon: 'block' },
   ];
+
+  // ---- email reveal (key-gated; mirrors the desktop page) ----
+  // The key lives in COMPONENT MEMORY ONLY — never localStorage, never a URL. Null => emails masked.
+  private revealKey: string | null = null;
+  /** True once a key has yielded real emails — drives the toggle label/icon + the reveal-key sheet. */
+  readonly emailsRevealed = signal(false);
+  /** In-flight guard for the reveal/hide re-fetch (disables the toggle, shows a spinner). */
+  readonly revealing = signal(false);
+  /** The reveal-key entry sheet + its bound input. */
+  readonly revealOpen = signal(false);
+  readonly revealKeyInput = signal('');
+
+  /** The caller's own email (their own email is always returned real — used to detect a real reveal). */
+  private get myEmail(): string | null {
+    return this.auth.session()?.email?.toLowerCase() ?? null;
+  }
 
   // ---- master-detail ----
   readonly detailOpen = signal(false);
@@ -832,6 +976,10 @@ export class UsersMobilePage {
 
   // login history (lazy, per user)
   readonly logins = signal<Map<number, LoginHistory>>(new Map());
+  /** Collapsed by default: the sign-in list shows a preview until "show all" is tapped (per selected user). */
+  readonly loginsExpanded = signal(false);
+  /** Preview cap for the sign-in list before "show all" (desktop shows up to 200; we lazy-expand). */
+  private static readonly LOGIN_PREVIEW = 6;
 
   // sensitive-confirm sheet
   readonly confirmOpen = signal(false);
@@ -965,14 +1113,25 @@ export class UsersMobilePage {
     () => !!this.search().trim() || this.capFilter() !== 'all' || !!this.filterRole(),
   );
 
+  /** Label of the permission the `perm` filter narrows to (for the active "Can do" chip). */
+  readonly filterPermLabel = computed(
+    () => this.permByKey().get(this.filterPerm())?.label ?? '',
+  );
+
   readonly filteredUsers = computed<ManagedUser[]>(() => {
     const q = this.search().trim().toLowerCase();
     const cap = this.capFilter();
+    const permKey = this.filterPerm();
     const ai = this.aiKeys();
     const role = this.presets().find((p) => p.key === this.filterRole());
     const roleSet = role ? new Set(role.permissions) : null;
+    const emails = this.emailsRevealed();
     return this.users().filter((u) => {
-      if (q && !(u.name ?? '').toLowerCase().includes(q)) return false;
+      if (q) {
+        // Match name always; match email only when revealed (mirrors the desktop search axis).
+        const hay = emails ? `${u.name ?? ''} ${u.email ?? ''}`.toLowerCase() : (u.name ?? '').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
       if (roleSet) {
         if (u.permissions.length !== roleSet.size) return false;
         if (!u.permissions.every((k) => roleSet.has(k))) return false;
@@ -981,6 +1140,7 @@ export class UsersMobilePage {
         case 'ai': return u.permissions.some((k) => ai.has(k));
         case 'enabled': return u.isEnabled;
         case 'disabled': return !u.isEnabled;
+        case 'perm': return !permKey || u.permissions.includes(permKey);
       }
       return true;
     });
@@ -1071,6 +1231,17 @@ export class UsersMobilePage {
     return id == null ? undefined : this.logins().get(id);
   });
 
+  /** The sign-in rows to render: capped to a preview until expanded, then up to the server's 200. */
+  readonly visibleLogins = computed<LoginEvent[]>(() => {
+    const events = this.loginState()?.events ?? [];
+    return this.loginsExpanded() ? events.slice(0, 200) : events.slice(0, UsersMobilePage.LOGIN_PREVIEW);
+  });
+
+  /** True when the sign-in history has more rows than the collapsed preview shows. */
+  readonly hasMoreLogins = computed(
+    () => (this.loginState()?.events.length ?? 0) > UsersMobilePage.LOGIN_PREVIEW,
+  );
+
   constructor() {
     void this.reload();
   }
@@ -1083,7 +1254,7 @@ export class UsersMobilePage {
     this.errored.set(false);
     try {
       const [users, perms, presets] = await Promise.all([
-        firstValueFrom(this.api.users()),          // masked emails — this twin never reveals them
+        firstValueFrom(this.api.users(this.revealKey ?? undefined)), // pass the key when revealed
         firstValueFrom(this.api.permissionCatalog()),
         firstValueFrom(this.api.permissionPresets()),
       ]);
@@ -1122,7 +1293,7 @@ export class UsersMobilePage {
 
   private loadAudit(): void {
     if (!this.canManage()) return;
-    this.api.auditLog().subscribe({ // masked emails — this twin never reveals them
+    this.api.auditLog(this.revealKey ?? undefined).subscribe({ // pass the key when revealed
       next: (a) => this.audit.set(a),
       error: () => { /* non-critical — the Recent-changes section just hides */ },
     });
@@ -1141,12 +1312,87 @@ export class UsersMobilePage {
 
   toggleCap(cap: CapFilter): void {
     this.capFilter.update((c) => (c === cap ? 'all' : cap));
+    if (this.capFilter() !== 'perm') this.filterPerm.set('');
   }
 
   clearFilters(): void {
     this.search.set('');
     this.capFilter.set('all');
+    this.filterPerm.set('');
     this.filterRole.set('');
+  }
+
+  // ─────────────── "Can do" per-permission filter ───────────────
+
+  /** Open the permission-catalog picker that drives the `perm` capability filter. */
+  openPermPicker(): void {
+    this.permPickerOpen.set(true);
+  }
+
+  /** Narrow the list to holders of a permission key (or clear when key is ''). */
+  setFilterPerm(key: string): void {
+    this.filterPerm.set(key);
+    this.capFilter.set(key ? 'perm' : 'all');
+    this.permPickerOpen.set(false);
+  }
+
+  // ─────────────── EMAIL REVEAL (key-gated) ───────────────
+
+  /** Toggle the reveal: hide immediately, or open the key-entry sheet. Mirrors the desktop page. */
+  toggleEmails(): void {
+    if (this.emailsRevealed()) { this.hideEmails(); return; }
+    this.revealKeyInput.set('');
+    this.revealOpen.set(true);
+  }
+
+  /** Submit the entered key: re-fetch users + audit WITH the key and reveal only if real emails came back. */
+  submitRevealKey(): void {
+    const key = this.revealKeyInput().trim();
+    if (!key || this.revealing()) return;
+    this.revealing.set(true);
+    forkJoin({ users: this.api.users(key), audit: this.api.auditLog(key) }).subscribe({
+      next: ({ users, audit }) => {
+        this.revealing.set(false);
+        if (this.didReveal(users, audit)) {
+          this.revealKey = key;
+          this.users.set(users ?? []);
+          this.audit.set(audit ?? []);
+          const u = this.selected();
+          if (u) {
+            const next = (users ?? []).find((x) => x.id === u.id);
+            if (next) this.seedDraft(next);
+          }
+          this.emailsRevealed.set(true);
+          this.revealOpen.set(false);
+          this.toast.show('Emails revealed', { tone: 'success', durationMs: 2000 });
+        } else {
+          this.revealKey = null;
+          this.toast.show('Incorrect key', { tone: 'warn', durationMs: 4000 });
+        }
+      },
+      error: () => {
+        this.revealing.set(false);
+        this.revealKey = null;
+        this.toast.show('Incorrect key', { tone: 'warn', durationMs: 4000 });
+      },
+    });
+  }
+
+  /** A reveal succeeded when any OTHER user's / audit entry's email came back real (mine is always real). */
+  private didReveal(users: ManagedUser[], audit: AuditEntry[]): boolean {
+    const mine = this.myEmail;
+    const isOther = (e: string | null) => !!e && e.toLowerCase() !== mine;
+    return (
+      (users ?? []).some((u) => isOther(u.email)) ||
+      (audit ?? []).some((a) => isOther(a.actorEmail) || isOther(a.targetEmail))
+    );
+  }
+
+  /** Drop the key + re-fetch masked (the plain reload path already omits the key). */
+  private hideEmails(): void {
+    this.revealKey = null;
+    this.emailsRevealed.set(false);
+    void this.reload();
   }
 
   /** Toggle the exact-role filter chip (clicking the active one clears it). */
@@ -1220,6 +1466,7 @@ export class UsersMobilePage {
     }
     this.selectedId.set(u.id);
     this.seedDraft(u);
+    this.loginsExpanded.set(false);
     this.detailOpen.set(true);
     if (!this.logins().has(u.id)) this.loadLogins(u.id);
     if (this.canManageContacts()) {
@@ -1344,15 +1591,18 @@ export class UsersMobilePage {
         lines,
         confirmLabel: 'Save changes',
         danger: disabling,
-        onConfirm: () => { this.confirmOpen.set(false); this.commitSave(u); },
+        onConfirm: () => { this.confirmOpen.set(false); this.commitSave(u, /*announceUndo*/ false); },
       });
       this.confirmOpen.set(true);
       return;
     }
-    this.commitSave(u);
+    // Routine (non-sensitive) save — offer an Undo that re-saves the prior grant set.
+    this.commitSave(u, /*announceUndo*/ true);
   }
 
-  private commitSave(u: ManagedUser): void {
+  /** The per-user PUT. On the routine path, offer an Undo toast that re-saves the PRIOR grant set. */
+  private commitSave(u: ManagedUser, announceUndo: boolean): void {
+    const prior = { permissions: [...u.permissions], isEnabled: u.isEnabled };
     this.saving.set(true);
     const body = {
       name: u.name,
@@ -1364,13 +1614,35 @@ export class UsersMobilePage {
         this.saving.set(false);
         this.users.update((list) => list.map((x) => (x.id === updated.id ? updated : x)));
         this.seedDraft(updated);
-        this.toast.show(`Saved ${updated.name || 'user'}`, { tone: 'success', durationMs: 2000 });
+        this.loadAudit();
+        if (announceUndo) {
+          this.toast.undo(`Saved ${updated.name || 'user'}`, () => this.undoSave(u.id, prior));
+        } else {
+          this.toast.show(`Saved ${updated.name || 'user'}`, { tone: 'success', durationMs: 2000 });
+        }
       },
       error: (err: HttpErrorResponse) => {
         this.saving.set(false);
         this.toast.show(err.error?.message ?? 'Save failed', { tone: 'warn' });
       },
     });
+  }
+
+  /** Re-save a user's prior grant set (the Undo action of a routine save). */
+  private undoSave(id: number, prior: { permissions: string[]; isEnabled: boolean }): void {
+    const u = this.users().find((x) => x.id === id);
+    const name = u ? this.userLabel(u) : `user #${id}`;
+    this.api
+      .updateUser(id, { name: u?.name, isEnabled: prior.isEnabled, permissions: prior.permissions })
+      .subscribe({
+        next: (updated) => {
+          this.users.update((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+          if (this.selectedId() === id) this.seedDraft(updated);
+          this.loadAudit();
+          this.toast.show(`Reverted ${name}`, { tone: 'success', durationMs: 2200 });
+        },
+        error: () => this.toast.show('Could not undo', { tone: 'warn', durationMs: 4000 }),
+      });
   }
 
   /** Open the sensitive-confirm sheet with a named action button; runs `onConfirm` on accept. */

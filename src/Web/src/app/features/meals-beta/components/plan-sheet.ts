@@ -227,6 +227,11 @@ export class ForagePlanSheet {
   readonly open = signal(false);
   /** The viewed week's Monday ("YYYY-MM-DD") — anchors the plan. */
   readonly weekStart = input.required<string>();
+  /**
+   * On-hand ingredients (from a Snap & Route pantry hand-off) that bias the AI plan toward what the caller
+   * already has. Null/empty leaves planner behaviour unchanged. Mirrors the live planner's openPlanMyWeek.
+   */
+  readonly ingredientsOnHand = input<string[]>([]);
   /** Emitted with the number of meals added on a successful commit. */
   readonly planned = output<number>();
 
@@ -260,10 +265,12 @@ export class ForagePlanSheet {
     const days = Number(this.daysKey()) || 3;
     const refine = this.constraints().trim();
     try {
+      const onHand = this.ingredientsOnHand();
       const res = await firstValueFrom(this.api.planMeals({
         days,
         weekStart: this.weekStart(),
         constraints: refine || null,
+        ingredientsOnHand: onHand.length ? onHand : null,
       }));
       this.aiUsed.set(res.aiUsed);
       this.days.set(res.days ?? []);

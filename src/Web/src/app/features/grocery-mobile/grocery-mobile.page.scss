@@ -337,6 +337,18 @@
     padding: 2px 9px;
     font-variant-numeric: tabular-nums;
   }
+
+  // who checked this off — small muted attribution on the done rows
+  &__by {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 .gm-row--done {

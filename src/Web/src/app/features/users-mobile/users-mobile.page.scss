@@ -694,3 +694,59 @@
   padding: 2px 8px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--accent-a) 12%, var(--glass));
 }
 .um-audit__detail { flex: 1 1 100%; font-size: 12px; color: var(--ink-dim); }
+// Revealed actor → target emails on an audit row (only shown once emails are revealed).
+.um-audit__who { flex: 1 1 100%; font-size: 12px; font-weight: 600; color: var(--ink); word-break: break-all; }
+
+// ============================================================================
+// EMAIL REVEAL — hero toggle + revealed email lines
+// ============================================================================
+.um-reveal-toggle {
+  align-self: flex-start; margin-top: 10px;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px;
+  background: color-mix(in srgb, var(--accent-a) 8%, var(--glass));
+  border: 1px solid color-mix(in srgb, var(--accent-a) 22%, var(--glass-edge));
+  border-radius: var(--r-pill);
+  color: var(--ink-dim); font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--accent-b); }
+  &.is-on {
+    background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+    color: var(--tech-text-on-accent, var(--ink-on-accent)); border-color: transparent;
+    mat-icon { color: inherit; }
+  }
+  &:disabled { opacity: .6; cursor: progress; }
+  &:active:not(:disabled) { transform: scale(.97); }
+}
+.um-card__email {
+  font-size: 12px; color: var(--accent-b); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ud__email { font-size: 12px; color: var(--accent-b); font-weight: 600; word-break: break-all; }
+
+// ============================================================================
+// "CAN DO" filter chip + login "show all" + admin location link
+// ============================================================================
+.um-chip--perm mat-icon { color: var(--accent-b); }
+.um-chip--perm.is-on mat-icon { color: inherit; }
+
+.ud__logins-more {
+  align-self: flex-start; margin-top: 8px;
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px;
+  background: none; border: 0; color: var(--accent-b); font-family: var(--font-ui);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  &:active { transform: scale(.96); }
+}
+
+.ud__map-link {
+  display: flex; align-items: center; gap: 8px; padding: 12px 14px;
+  background: var(--glass);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-radius, var(--r-tile));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1)), inset 0 1px 0 var(--glass-edge);
+  color: var(--ink); font-family: var(--font-ui); font-size: 14px; font-weight: 700;
+  text-decoration: none;
+  mat-icon { font-size: 20px; width: 20px; height: 20px; color: var(--accent-b); }
+  .ud__map-go { margin-inline-start: auto; color: var(--ink-faint); }
+  &:active { transform: scale(.99); }
+}
