@@ -2,6 +2,7 @@ import {
   AfterViewInit,
   Component,
   computed,
+  DestroyRef,
   effect,
   ElementRef,
   HostListener,
@@ -113,6 +114,11 @@ export class App implements AfterViewInit {
   private snack = inject(MatSnackBar);
   private dialog = inject(MatDialog);
   private host = inject(ElementRef<HTMLElement>);
+  /** Observes the live mobile top bar + tab bar so the content frame is sized to their REAL heights
+   *  (see {@link measureBars}) instead of hardcoded px — robust across safe-area, font scale, camera-pod
+   *  on/off, and rotation. Null where ResizeObserver is unavailable (SSR); the CSS calc is the fallback. */
+  private readonly barRO =
+    typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => this.measureBars()) : null;
   readonly palette = inject(CommandPaletteService);
   readonly theme = inject(ThemeService);
   readonly platform = inject(PlatformService);
@@ -481,6 +487,14 @@ export class App implements AfterViewInit {
       else this.pwa.clearBadge();
     });
 
+    // Re-attach the bar observer whenever the shell mode flips (the mobile top/tab bars mount + unmount).
+    // queueMicrotask defers to AFTER the @switch re-renders so the bars are in the DOM to measure.
+    effect(() => {
+      this.shellMode(); // dependency: re-run on shell change
+      queueMicrotask(() => this.reobserveBars());
+    });
+    inject(DestroyRef).onDestroy(() => this.barRO?.disconnect());
+
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),
@@ -669,11 +683,42 @@ export class App implements AfterViewInit {
    * these two assignments. Navigation commands are self-contained in the palette (it has Router).
    */
   ngAfterViewInit(): void {
+    this.reobserveBars();
     const p = this.commandPalette();
     if (!p) return;
     p.setQuickAddHandler(() => this.openQuickAdd());
     p.setLogoutHandler(() => this.logout());
     p.setSnapHandler(() => this.openSnap());
+  }
+
+  /** (Re)point the ResizeObserver at the currently-mounted mobile top bar + tab bar, then take a reading.
+   *  Called on first render + on every shell-mode change (the bars are conditional). */
+  private reobserveBars(): void {
+    if (!this.barRO || typeof document === 'undefined') return;
+    this.barRO.disconnect();
+    const root = this.host.nativeElement;
+    const topbar = root.querySelector('app-mobile-topbar');
+    const tabbar = root.querySelector('app-bottom-tab-bar');
+    if (topbar) this.barRO.observe(topbar);
+    if (tabbar) this.barRO.observe(tabbar);
+    this.measureBars();
+  }
+
+  /**
+   * Publish the REAL rendered heights of the mobile top bar + tab bar as --mobile-bar-h / --mobile-tabbar-h
+   * on the content frame, so it fills exactly the viewport gap between them on ANY device — no hardcoded
+   * px. The >20px guard skips a bar that's momentarily display:none (the tab bar hides while a sheet is
+   * open), keeping the last good size so the frame doesn't jump. The CSS calc remains the pre-JS fallback.
+   */
+  private measureBars(): void {
+    if (typeof document === 'undefined') return;
+    const root = this.host.nativeElement;
+    const frame = root.querySelector('main.content--mobile') as HTMLElement | null;
+    if (!frame) return;
+    const th = (root.querySelector('app-mobile-topbar') as HTMLElement | null)?.offsetHeight ?? 0;
+    const bh = (root.querySelector('app-bottom-tab-bar') as HTMLElement | null)?.offsetHeight ?? 0;
+    if (th > 20) frame.style.setProperty('--mobile-bar-h', `${th}px`);
+    if (bh > 20) frame.style.setProperty('--mobile-tabbar-h', `${bh}px`);
   }
 
   /**
