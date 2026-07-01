@@ -231,6 +231,39 @@ export class OptimisticTracker {
     }
   }
 
+  /**
+   * Edit a logged night of sleep. The backend has no sleep PATCH (edit = delete + re-add, mirroring the
+   * desktop add-sleep-dialog replaceId path), so this removes the old row and adds the new values as ONE
+   * optimistic operation: the old row is dropped + the new provisional inserted locally FIRST (recovery
+   * roll-up ticks instantly), then the real DELETE is awaited (immediate — no deferred-undo window, so we
+   * never briefly double-count server-side) and the ADD reconciled. On any failure we restore the original
+   * row and offer a Retry. Distinct from {@link deleteSleep}, whose Undo-deferred delete would clash with a
+   * follow-on add.
+   */
+  async replaceSleep(oldId: number, body: AddSleepRequest): Promise<void> {
+    const original = this.day()?.sleep.find(s => s.id === oldId);
+    const tempId = this.tempSeq--;
+    const provisional: SleepEntryDto = {
+      id: tempId, hours: body.hours, quality: body.quality ?? 3,
+      bedTime: body.bedTime, wakeTime: body.wakeTime, note: body.note,
+      createdUtc: new Date().toISOString(),
+    };
+    this.patch(d => this.recomputeSleep({
+      ...d, sleep: [...d.sleep.filter(s => s.id !== oldId), provisional],
+    }));
+    try {
+      await firstValueFrom(this.api.deleteSleep(oldId));
+      const real = await firstValueFrom(this.api.addSleep(body));
+      this.patch(d => this.recomputeSleep({ ...d, sleep: d.sleep.map(s => (s.id === tempId ? real : s)) }));
+    } catch {
+      this.rollback(d => {
+        const without = d.sleep.filter(s => s.id !== tempId);
+        const restored = original ? [...without, original].sort((a, b) => a.id - b.id) : without;
+        return this.recomputeSleep({ ...d, sleep: restored });
+      }, 'Couldn’t save sleep', () => this.replaceSleep(oldId, body));
+    }
+  }
+
   async deleteSleep(id: number): Promise<void> {
     const removed = this.day()?.sleep.find(s => s.id === id);
     if (!removed) return;

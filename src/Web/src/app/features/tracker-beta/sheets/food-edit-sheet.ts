@@ -2,9 +2,12 @@ import {
   ChangeDetectionStrategy, Component, computed, effect, inject, model, signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 
+import { Api } from '../../../core/api';
+import { AuthService } from '../../../core/auth';
 import {
-  FoodEntryDto, Meal, UpdateFoodRequest,
+  FoodEntryDto, Meal, PERM, UpdateFoodRequest,
 } from '../../../core/models';
 import { OptimisticTracker } from '../state/optimistic-tracker';
 import { BottomSheet } from '../ui/bottom-sheet';
@@ -117,6 +120,14 @@ function safeNum(n: number | null | undefined): number {
             </span>
           </div>
         } @else {
+          @if (showAi()) {
+            <button type="button" class="fe-ai" (click)="reEstimate()"
+                    [disabled]="aiBusy() || !desc().trim() || tracker.readOnly()"
+                    aria-label="Re-estimate this food's macros with AI">
+              @if (aiBusy()) { <span class="fe-spin fe-spin--ai" aria-hidden="true"></span> Estimating… }
+              @else { ✨ Re-estimate macros }
+            </button>
+          }
           <div class="fe-macros" role="group" aria-label="Macros">
             <div class="fe-macro">
               <label class="fe-label" for="fe-cal">Calories</label>
@@ -288,11 +299,26 @@ function safeNum(n: number | null | undefined): number {
     .fe-cta:disabled { opacity: .45; cursor: default; }
     .fe-cta:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 
+    /* AI re-estimate affordance (manual rows). */
+    .fe-ai {
+      align-self: flex-start; min-height: 44px; padding: 0 14px;
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--ink);
+      background: transparent; border: 1px solid var(--glass-edge); border-radius: var(--r-pill);
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent; cursor: pointer;
+      transition: transform 120ms var(--ease-out);
+    }
+    .fe-ai:active:not(:disabled) { transform: translateY(1px) scale(.98); }
+    .fe-ai:disabled { opacity: .5; cursor: default; }
+    .fe-ai:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
     .fe-spin {
       width: 16px; height: 16px; border-radius: 50%;
       border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
       animation: fe-spin 700ms linear infinite;
     }
+    /* On the transparent AI button the spinner needs ink-toned strokes, not white. */
+    .fe-spin--ai { border-color: var(--hairline); border-top-color: var(--ink); }
     @keyframes fe-spin { to { transform: rotate(360deg); } }
 
     .fe-sr {
@@ -308,6 +334,13 @@ function safeNum(n: number | null | undefined): number {
 })
 export class FoodEditSheet {
   protected readonly tracker = inject(OptimisticTracker);
+  private readonly api = inject(Api);
+  private readonly auth = inject(AuthService);
+
+  /** AI re-estimate is gated exactly like desktop: trackerAi permission (and hidden in read-only views). */
+  protected readonly showAi = signal(this.auth.hasPermission(PERM.trackerAi));
+  /** True while an AI macro re-estimate is in flight (latches the button). */
+  protected readonly aiBusy = signal(false);
 
   readonly open = model<boolean>(false);
   /** The logged food entry to edit (null when the sheet is closed / nothing selected). */
@@ -428,6 +461,53 @@ export class FoodEditSheet {
   }
 
   /**
+   * Re-estimate a MANUAL row's macros from its (possibly edited) description via AI — the mobile twin of the
+   * desktop repullMacros. Uses the existing Api.parseMeal (always-200 floor); takes the first parsed item,
+   * replaces the quantity + macro fields with the fresh estimate, and resets the per-serving baseline so a
+   * later quantity change rescales from the new figures. Leaves the description as the user typed it.
+   * Gated on trackerAi (hidden otherwise) + own tracker. Priced rows never reach here (button hidden).
+   */
+  protected async reEstimate(): Promise<void> {
+    if (!this.showAi() || this.aiBusy() || this.isPriced() || this.tracker.readOnly()) return;
+    const text = this.desc().trim();
+    if (text.length === 0) {
+      this.announce.set('Type what the food is first, then re-estimate.');
+      return;
+    }
+    this.aiBusy.set(true);
+    this.announce.set('Re-estimating macros with AI…');
+    try {
+      const res = await firstValueFrom(this.api.parseMeal({ text }));
+      const item = res.items?.[0];
+      if (!item) {
+        this.announce.set('AI couldn’t estimate that — enter it manually.');
+        return;
+      }
+      const qty = item.quantity > 0 ? item.quantity : 1;
+      const total = {
+        calories: Math.max(0, Math.round(safeNum(item.calories))),
+        proteinG: round1(Math.max(0, safeNum(item.proteinG))),
+        carbG: round1(Math.max(0, safeNum(item.carbG))),
+        fatG: round1(Math.max(0, safeNum(item.fatG))),
+      };
+      this.quantity.set(qty);
+      this.calories.set(total.calories);
+      this.protein.set(total.proteinG);
+      this.carb.set(total.carbG);
+      this.fat.set(total.fatG);
+      this.perUnit = {
+        calories: total.calories / qty, proteinG: total.proteinG / qty,
+        carbG: total.carbG / qty, fatG: total.fatG / qty,
+      };
+      this.announce.set(`AI estimated ${total.calories} calories for ${text}.`);
+    } catch {
+      this.announce.set('AI estimate unavailable — enter it manually.');
+    } finally {
+      this.aiBusy.set(false);
+    }
+  }
+
+  /**
    * Persist the edit through OptimisticTracker (instant ring tick + reconcile/rollback). Priced rows send
    * only { quantity, meal }; manual rows send the raw description + macro totals + quantity. The optimistic
    * local shape mirrors the desktop editor: priced => the live preview; manual => the typed totals.
@@ -490,6 +570,7 @@ export class FoodEditSheet {
   protected onClosed(): void {
     this.entry.set(null);
     this.busy.set(false);
+    this.aiBusy.set(false);
     this.announce.set('');
   }
 }

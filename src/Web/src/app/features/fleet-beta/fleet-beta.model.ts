@@ -88,6 +88,35 @@ export function uptimeLabel(sec: number | null): string {
   return `${m}m`;
 }
 
+/** Which management mutation a fleet action sheet drives (mirrors the live FleetActionDialog). */
+export type FleetAction = 'reassign' | 'delete' | 'revoke';
+
+/** One combine/transfer target option in a reassign picker (a bucket other than the source). */
+export interface FleetActionTarget {
+  /** Machine dimension: the raw machine name. Empty for user targets. */
+  rawValue: string;
+  /** Friendly label shown in the picker. */
+  label: string;
+  /** User dimension: the target AppUser id (null = local/orphan bucket). */
+  userId?: number | null;
+}
+
+/**
+ * Input contract for the mobile FleetActionSheet — the bottom-sheet equivalent of the desktop
+ * FleetActionDialog. For MACHINE `rawValue` is the raw machine name (already mapped from the "local"
+ * display row to ""); for USER the client holds no email so `userId` carries the AppUser id (null for
+ * the local/orphan bucket). `others` are the reassign picker's options (each with a `userId` for users).
+ */
+export interface FleetActionRequest {
+  action: FleetAction;
+  dimension: 'machine' | 'user';
+  rawValue: string;
+  userId?: number | null;
+  label: string;
+  records: number;
+  others: FleetActionTarget[];
+}
+
 /** Compact-format a USD amount as "$1.2k" / "$1.2M" / "$12.34". Token/record counts use the CompactPipe. */
 export function compactUsd(value: number): string {
   const abs = Math.abs(value);

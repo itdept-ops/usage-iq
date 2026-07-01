@@ -4,6 +4,7 @@ import {
 import { MatIconModule } from '@angular/material/icon';
 
 import { OptimisticTracker } from '../state/optimistic-tracker';
+import { SleepEntryDto } from '../../../core/models';
 import { SwipeRow } from '../ui/swipe-row';
 
 /**
@@ -76,13 +77,16 @@ import { SwipeRow } from '../ui/swipe-row';
             <app-swipe-row [disabled]="readOnly()"
                            [label]="rowLabel(s)"
                            (delete)="opt.deleteSleep(s.id)">
-              <div class="tb-sleep__row">
+              <button type="button" class="tb-sleep__row tb-sleep__row-btn"
+                      [disabled]="readOnly()"
+                      (click)="editEntry.emit(s)"
+                      [attr.aria-label]="'Edit sleep, ' + s.hours + ' hours, ' + qualityLabel(s.quality) + ' quality'">
                 <span class="tb-sleep__row-name">{{ qualityLabel(s.quality) }}</span>
                 <span class="tb-sleep__leader" aria-hidden="true"></span>
                 <span class="tb-sleep__row-amt">
                   {{ s.hours }}<span class="tb-sleep__row-unit"> h</span>
                 </span>
-              </div>
+              </button>
             </app-swipe-row>
           </li>
         }
@@ -208,6 +212,21 @@ import { SwipeRow } from '../ui/swipe-row';
       padding: 0 12px;
     }
 
+    .tb-sleep__row-btn {
+      width: 100%;
+      background: transparent;
+      border: 0;
+      text-align: left;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      font: inherit;
+      color: inherit;
+    }
+    .tb-sleep__row-btn:disabled { cursor: default; }
+    .tb-sleep__row-btn:active:not(:disabled) { background: var(--bg-sink); }
+    .tb-sleep__row-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: var(--r-tile); }
+
     .tb-sleep__row-name {
       flex: 0 1 auto;
       font-size: 15px;
@@ -246,6 +265,8 @@ export class SleepCard {
 
   /** Emitted when the user taps + to log a night of sleep — the page opens the SleepSheet. */
   readonly log = output<void>();
+  /** Emitted when a logged night row is tapped — the page opens the SleepSheet seeded to edit it. */
+  readonly editEntry = output<SleepEntryDto>();
 
   protected readonly readOnly = this.opt.readOnly;
 

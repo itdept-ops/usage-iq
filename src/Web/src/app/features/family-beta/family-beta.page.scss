@@ -180,6 +180,8 @@
   border-top: 1px solid var(--hairline);
   box-shadow: var(--lift-3);
 }
+// Without the assistant perm the Ask pill is hidden — push the lone quick-add to the trailing edge.
+.actions--noai { justify-content: flex-end; }
 // The kit FAB is the dominant Ask pill — stretch it across the bar.
 .actions__ask { flex: 1 1 auto; }
 .actions__ask ::ng-deep .bs-fab { width: 100%; min-height: 54px; }
@@ -237,6 +239,45 @@
 .sheet__answer { margin: 4px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink); }
 .sheet__answer--load { color: var(--ink-dim); }
 .sheet__answer--err { color: var(--accent-b); }
+
+// Proposed AI action cards — tappable rows under the answer, each performs one existing write on tap.
+.acts { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.acts__btn {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  min-height: 56px; padding: 8px 12px; border-radius: var(--r-card);
+  background: var(--bg-rise); border: 1px solid var(--hairline); box-shadow: var(--lift-1);
+  color: var(--ink); font: inherit; cursor: pointer;
+  transition: transform 120ms var(--ease-spring), box-shadow 120ms var(--ease-out), background 120ms var(--ease-out);
+}
+@media (hover: hover) {
+  .acts__btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent-a) 8%, var(--bg-rise));
+    box-shadow: var(--lift-2);
+  }
+}
+.acts__btn:active:not(:disabled) { transform: scale(.98); }
+.acts__btn:disabled { cursor: default; }
+.acts__ic {
+  flex: 0 0 auto; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-a) 22%, transparent), color-mix(in srgb, var(--accent-b) 22%, transparent));
+}
+.acts__ic mat-icon { font-size: 20px; width: 20px; height: 20px; color: color-mix(in srgb, var(--accent-a) 80%, var(--ink)); }
+.acts__body { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.acts__title { font-size: 14px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+.acts__verb { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+.acts__note { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+.acts__end { flex: 0 0 auto; display: grid; place-items: center; color: var(--ink-faint); }
+.acts__end mat-icon { font-size: 22px; width: 22px; height: 22px; }
+.acts__spin { animation: acts-spin 900ms linear infinite; }
+.acts__row.is-done .acts__end { color: var(--signal); }
+.acts__row.is-done .acts__note { color: var(--signal); }
+.acts__row.is-err .acts__end,
+.acts__row.is-err .acts__note { color: var(--accent-b); }
+@keyframes acts-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .acts__spin { animation: none; } }
+
+// Header tool cluster (household gear + family-finder), inline at the header's trailing edge.
+.hh__tools { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; }
 
 // Own visible focus ring (tracks the page accent via --focus).
 :host ::ng-deep :focus-visible {

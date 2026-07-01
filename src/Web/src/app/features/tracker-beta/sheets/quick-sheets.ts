@@ -8,7 +8,7 @@ import { Api } from '../../../core/api';
 import { AuthService } from '../../../core/auth';
 import {
   AddCoffeeRequest, AddExerciseRequest, AddSleepRequest, AddSupplementRequest, CustomExerciseDto,
-  ExerciseLibraryDto, PERM, SupplementKind,
+  ExerciseLibraryDto, PERM, SleepEntryDto, SupplementKind,
 } from '../../../core/models';
 import { OptimisticTracker } from '../state/optimistic-tracker';
 import { BottomSheet } from '../ui/bottom-sheet';
@@ -327,9 +327,9 @@ const SLEEP_QUALITIES: readonly SleepQuality[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, BottomSheet],
   template: `
-    <app-bottom-sheet [(open)]="open" detent="half" label="Log sleep">
+    <app-bottom-sheet [(open)]="open" detent="half" [label]="editing() ? 'Edit sleep' : 'Log sleep'" (closed)="onClosed()">
       <div class="qs-head" style="--accent-edge: var(--sleep-b);">
-        <h2 class="qs-title">Sleep</h2>
+        <h2 class="qs-title">{{ editing() ? 'Edit sleep' : 'Sleep' }}</h2>
         <span class="qs-sub">{{ tracker.date() }}</span>
       </div>
 
@@ -371,7 +371,7 @@ const SLEEP_QUALITIES: readonly SleepQuality[] = [
 
         <div class="qs-actions">
           <button type="button" class="qs-cta" (click)="add()" [disabled]="busy() || tracker.readOnly()">
-            @if (busy()) { <span class="qs-spin" aria-hidden="true"></span> } @else { Log sleep }
+            @if (busy()) { <span class="qs-spin" aria-hidden="true"></span> } @else { {{ editing() ? 'Save sleep' : 'Log sleep' }} }
           </button>
         </div>
         <span class="qs-sr" role="status" aria-live="polite">{{ announce() }}</span>
@@ -384,6 +384,12 @@ export class SleepSheet {
   protected readonly tracker = inject(OptimisticTracker);
 
   readonly open = model<boolean>(false);
+  /**
+   * When set (tapping a logged night in the Sleep card), the sheet opens in EDIT mode — seeded from this
+   * entry. The backend has no sleep PATCH, so a save deletes this row then re-adds the edited values
+   * (mirrors the desktop add-sleep-dialog's replaceId edit). Null (default) = fresh log.
+   */
+  readonly entry = model<SleepEntryDto | null>(null);
 
   protected readonly qualities = SLEEP_QUALITIES;
   protected readonly hours = signal(8);
@@ -393,16 +399,24 @@ export class SleepSheet {
   protected readonly busy = signal(false);
   protected readonly announce = signal('');
 
+  /** True while editing an existing night (drives the title + Save/Log copy). */
+  protected readonly editing = computed(() => this.entry() != null);
+
+  private wasOpen = false;
+
   constructor() {
-    // Reset to a sensible default each time the sheet opens.
+    // Seed on the open transition only: from the entry when editing, else sensible defaults.
     effect(() => {
-      if (this.open()) {
-        this.hours.set(8);
-        this.quality.set(3);
-        this.bedTime.set('');
-        this.wakeTime.set('');
+      const isOpen = this.open();
+      if (isOpen && !this.wasOpen) {
+        const e = this.entry();
+        this.hours.set(e?.hours ?? 8);
+        this.quality.set(e?.quality ?? 3);
+        this.bedTime.set(e?.bedTime ?? '');
+        this.wakeTime.set(e?.wakeTime ?? '');
         this.announce.set('');
       }
+      this.wasOpen = isOpen;
     });
   }
 
@@ -414,6 +428,7 @@ export class SleepSheet {
     if (this.busy() || this.tracker.readOnly()) return;
     const bed = this.bedTime().trim();
     const wake = this.wakeTime().trim();
+    const edit = this.entry();
     const body: AddSleepRequest = {
       date: this.tracker.date(),
       hours: this.hours(),
@@ -422,14 +437,22 @@ export class SleepSheet {
       wakeTime: wake || undefined,
     };
     this.busy.set(true);
-    this.announce.set('Logging sleep…');
+    this.announce.set(edit ? 'Saving sleep…' : 'Logging sleep…');
     try {
-      await this.tracker.addSleep(body);
-      this.announce.set(`Logged ${body.hours} hours of sleep.`);
+      // Edit = delete-then-add (no server PATCH), matching the desktop replaceId path. replaceSleep does
+      // both atomically (immediate delete, no deferred-undo window) so we never double-count server-side.
+      if (edit) await this.tracker.replaceSleep(edit.id, body);
+      else await this.tracker.addSleep(body);
+      this.announce.set(edit ? `Updated to ${body.hours} hours of sleep.` : `Logged ${body.hours} hours of sleep.`);
       this.open.set(false);
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** Clear the edit seed when the sheet closes so the next open starts fresh unless re-seeded. */
+  protected onClosed(): void {
+    this.entry.set(null);
   }
 }
 

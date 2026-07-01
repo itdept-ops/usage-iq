@@ -146,6 +146,7 @@
   font-size: 10px; font-weight: 700; color: var(--ink-on-accent, #fff);
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
 }
+.pm-invitee__check { width: 16px; height: 16px; font-size: 16px; line-height: 16px; margin-left: 2px; }
 
 // ---- skeleton ----
 .pm-skel { display: flex; flex-direction: column; gap: 12px; padding: 4px 2px; }
@@ -230,20 +231,31 @@
     &:focus-visible { outline: 2px solid var(--focus, var(--accent-a)); outline-offset: 2px; }
   }
 
-  &__members { display: flex; align-items: center; gap: 4px; margin-top: 12px; }
-  &__mcount { margin-left: 6px; font-size: .76rem; font-weight: 600; color: var(--ink-dim); }
+  &__members { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  &__mcount { margin-left: 2px; font-size: .76rem; font-weight: 600; color: var(--ink-dim); }
 
   &__actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
   &__expand { margin-left: auto; }
 }
 
-.pm-mchip {
-  width: 26px; height: 26px; border-radius: 50%;
-  display: inline-grid; place-items: center; margin-left: -6px;
-  font-size: 10px; font-weight: 700; color: var(--ink-on-accent, #fff);
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  box-shadow: 0 0 0 2px var(--glass, var(--glass-1));
-  &:first-child { margin-left: 0; }
+// member chips now carry the full display name alongside the initials avatar
+.pm-member {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 30px; padding: 3px 11px 3px 3px; border-radius: var(--r-pill);
+  background: var(--bg-rise, var(--glass-2));
+  border: 1px solid var(--hairline, var(--hair));
+  max-width: 100%;
+
+  &__avatar {
+    flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%;
+    display: inline-grid; place-items: center;
+    font-size: 10px; font-weight: 700; color: var(--ink-on-accent, #fff);
+    background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  }
+  &__name {
+    min-width: 0; font-size: .78rem; font-weight: 650; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
 }
 
 .pm-btn {

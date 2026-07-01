@@ -10,18 +10,24 @@ import { firstValueFrom } from 'rxjs';
 
 import { TrackerStore, toLocalDate } from '../../core/tracker-store';
 import { Api } from '../../core/api';
-import { CopyFoodRequest, FoodEntryDto, Meal } from '../../core/models';
+import { AuthService } from '../../core/auth';
+import { CopyFoodRequest, FoodEntryDto, Meal, MoveDayResult, PERM, SleepEntryDto } from '../../core/models';
 import { UnitService } from '../../core/unit.service';
+
+import { FormsModule } from '@angular/forms';
 
 import { OptimisticTracker } from './state/optimistic-tracker';
 import { HeroRing, HeroFace } from './hero/hero-ring';
 import { QuickRail, QuickTile } from './ui/quick-rail';
+import { BaselineGate } from './ui/baseline-gate';
+import { BottomSheet } from './ui/bottom-sheet';
 import { FuelCard } from './cards/fuel-card';
 import { WaterCard } from './cards/water-card';
 import { MoveCard } from './cards/move-card';
 import { CoffeeCard } from './cards/coffee-card';
 import { SleepCard } from './cards/sleep-card';
 import { WeightCard } from './cards/weight-card';
+import { AiCard } from './cards/ai-card';
 import { LogMenuSheet, LogTarget } from './sheets/log-menu-sheet';
 import { FoodSheet } from './sheets/food-sheet';
 import { FoodEditSheet } from './sheets/food-edit-sheet';
@@ -30,6 +36,9 @@ import { WatchSheet } from './sheets/watch-sheet';
 import { CoffeeSheet, ExerciseSheet, SleepSheet, SupplementSheet } from './sheets/quick-sheets';
 import { LeftoversSheet, LeftoversLogged } from './sheets/leftovers-sheet';
 import { CopyFoodSheet, CopyFoodDone } from './sheets/copy-food-sheet';
+import { MoveDaySheet } from './sheets/move-day-sheet';
+import { SharedSheet } from './sheets/shared-sheet';
+import { WhatToEatSheet } from './sheets/what-to-eat-sheet';
 import { currentStreak, dayHasAnyLog } from './util/streak';
 
 /**
@@ -64,11 +73,11 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
   // both paths land on the same component-tree instance.
   providers: [OptimisticTracker],
   imports: [
-    MatIconModule,
-    HeroRing, QuickRail,
-    FuelCard, WaterCard, MoveCard, CoffeeCard, SleepCard, WeightCard,
+    MatIconModule, FormsModule, BottomSheet,
+    HeroRing, QuickRail, BaselineGate,
+    FuelCard, WaterCard, MoveCard, CoffeeCard, SleepCard, WeightCard, AiCard,
     LogMenuSheet, FoodSheet, FoodEditSheet, WeightSheet, WatchSheet, CoffeeSheet, ExerciseSheet, SleepSheet, SupplementSheet,
-    LeftoversSheet, CopyFoodSheet,
+    LeftoversSheet, CopyFoodSheet, MoveDaySheet, SharedSheet, WhatToEatSheet,
   ],
   template: `
     <!-- ─────────────────── DAY STRIP (fixed top glass) ─────────────────── -->
@@ -86,11 +95,23 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
           <mat-icon aria-hidden="true">chevron_right</mat-icon>
         </button>
       </div>
-      <button type="button" class="tb-avatar"
-              [attr.aria-label]="'Viewing ' + ownerName() + ' — open the full tracker for settings, profile, and switching users'"
-              (click)="router.navigate(['/tracker'])">
-        <span class="tb-avatar-initial" aria-hidden="true">{{ initial() }}</span>
-      </button>
+      <div class="tb-strip-actions">
+        <!-- Jump to an arbitrary date (parity with the desktop date picker). A visually-hidden native date
+             input drives it so we get the OS picker for free; the calendar button is the visible affordance. -->
+        <label class="tb-daybtn tb-datepick" [attr.aria-label]="'Pick a date, currently ' + store.date()">
+          <mat-icon aria-hidden="true">calendar_today</mat-icon>
+          <input class="tb-datepick-input" type="date" [max]="todayIso()"
+                 [ngModel]="store.date()" (ngModelChange)="pickDate($event)" />
+        </label>
+        <button type="button" class="tb-daybtn" aria-label="More tracker actions" (click)="actionsOpen.set(true)">
+          <mat-icon aria-hidden="true">more_horiz</mat-icon>
+        </button>
+        <button type="button" class="tb-avatar"
+                [attr.aria-label]="'Viewing ' + ownerName() + ' — switch whose tracker you\\'re viewing'"
+                (click)="sharedOpen.set(true)">
+          <span class="tb-avatar-initial" aria-hidden="true">{{ initial() }}</span>
+        </button>
+      </div>
     </header>
 
     <!-- ─────────────────── SCROLL REGION ─────────────────── -->
@@ -108,6 +129,10 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
         @for (i of [1,2,3,4,5]; track i) {
           <div class="tb-card tb-skeleton tb-card-skeleton" aria-hidden="true"></div>
         }
+      } @else if (needsBaseline()) {
+        <!-- BLOCKING baseline gate (own tracker, missing weight/height/DOB/sex) — replaces the dashboard
+             until saved, mirroring the desktop needsBaseline onboarding. -->
+        <app-baseline-gate (done)="onBaselineDone()" />
       } @else {
         <!-- HERO -->
         <section class="tb-hero">
@@ -126,10 +151,16 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
         <app-tb-water-card />
         <app-move-card (addExercise)="exerciseOpen.set(true)" (editWatch)="watchOpen.set(true)" />
         <app-tracker-beta-coffee-card />
-        <app-tracker-beta-sleep-card (log)="sleepOpen.set(true)" />
+        <app-tracker-beta-sleep-card (log)="openSleep()" (editEntry)="openEditSleep($event)" />
         <div class="tb-defer">
           <app-weight-card #weightCard (weigh)="weightOpen.set(true)" />
         </div>
+        <!-- AI COACH (trackerAi + own writable tracker only) -->
+        @if (aiEnabled()) {
+          <div class="tb-defer">
+            <app-tracker-beta-ai-card (whatToEat)="whatToEatOpen.set(true)" />
+          </div>
+        }
       }
     </main>
 
@@ -157,7 +188,7 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
     <app-food-edit-sheet [(open)]="foodEditOpen" [(entry)]="editingFood" />
     <app-coffee-sheet [(open)]="coffeeOpen" />
     <app-exercise-sheet [(open)]="exerciseOpen" />
-    <app-sleep-sheet [(open)]="sleepOpen" />
+    <app-sleep-sheet [(open)]="sleepOpen" [(entry)]="editingSleep" />
     <app-supplement-sheet [(open)]="supplementOpen" />
     <app-weight-sheet [(open)]="weightOpen" (logged)="onWeighed()" />
     <app-watch-sheet [(open)]="watchOpen" (logged)="onWatchSaved()" />
@@ -165,10 +196,62 @@ import { currentStreak, dayHasAnyLog } from './util/streak';
     <app-copy-food-sheet [(open)]="copyFoodOpen" [(entryIds)]="copyEntryIds"
                          [(sourceMeal)]="copySourceMeal" [(label)]="copyLabel"
                          (copied)="onFoodCopied($event)" />
+    <app-move-day-sheet [(open)]="moveDayOpen" (moved)="onDayMoved($event)" />
+    <app-shared-sheet [(open)]="sharedOpen" />
+    <app-what-to-eat-sheet [(open)]="whatToEatOpen" />
+
+    <!-- Actions overflow (Profile & Goals, Move day) — the desktop day-level actions on mobile. -->
+    <app-bottom-sheet [(open)]="actionsOpen" detent="peek" label="Tracker actions">
+      <div class="tb-actions-sheet">
+        <button type="button" class="tb-action-row" (click)="goToProfile()">
+          <mat-icon aria-hidden="true">tune</mat-icon>
+          <span>Profile &amp; goals</span>
+          <mat-icon class="tb-action-chev" aria-hidden="true">chevron_right</mat-icon>
+        </button>
+        @if (!readOnly()) {
+          <button type="button" class="tb-action-row" (click)="openMoveDay()">
+            <mat-icon aria-hidden="true">event_repeat</mat-icon>
+            <span>Move this day…</span>
+            <mat-icon class="tb-action-chev" aria-hidden="true">chevron_right</mat-icon>
+          </button>
+        }
+        <button type="button" class="tb-action-row" (click)="openSharedFromActions()">
+          <mat-icon aria-hidden="true">group</mat-icon>
+          <span>View someone's tracker</span>
+          <mat-icon class="tb-action-chev" aria-hidden="true">chevron_right</mat-icon>
+        </button>
+      </div>
+    </app-bottom-sheet>
   `,
   styles: [`
     /* DAY STRIP internals */
     .tb-day-nav { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .tb-strip-actions { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+
+    /* Date-picker button: the visible calendar glyph over a full-cover invisible native date input. */
+    .tb-datepick { position: relative; overflow: hidden; }
+    .tb-datepick-input {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      opacity: 0; border: 0; padding: 0; margin: 0; cursor: pointer;
+      -webkit-appearance: none; appearance: none;
+    }
+    .tb-datepick:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-pill); }
+
+    /* Actions overflow sheet rows. */
+    .tb-actions-sheet { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 8px; }
+    .tb-action-row {
+      width: 100%; min-height: 52px; padding: 0 12px;
+      display: flex; align-items: center; gap: 12px;
+      font-family: var(--font-ui); font-size: 15px; font-weight: 600; color: var(--ink);
+      background: var(--bg-sink); border: 1px solid var(--hairline); border-radius: var(--r-tile);
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent; cursor: pointer;
+      transition: background 160ms var(--ease-out);
+    }
+    .tb-action-row span { flex: 1 1 auto; text-align: left; }
+    .tb-action-row mat-icon { width: 22px; height: 22px; font-size: 22px; color: var(--ink-dim); flex: 0 0 auto; }
+    .tb-action-chev { color: var(--ink-faint) !important; }
+    .tb-action-row:active { background: var(--bg-rise); }
+    .tb-action-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     .tb-daybtn {
       width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
       border: none; background: transparent; color: var(--ink); cursor: pointer;
@@ -238,12 +321,30 @@ export class TrackerBetaPage {
   private readonly activatedRoute = inject(ActivatedRoute);
   protected readonly units = inject(UnitService);
   private readonly api = inject(Api);
+  private readonly auth = inject(AuthService);
   private readonly snack = inject(MatSnackBar);
 
   // ── read surface (off the shared day() signal) ──
   protected readonly day = this.opt.day;
   protected readonly loading = this.opt.loading;
   protected readonly readOnly = this.opt.readOnly;
+
+  /**
+   * BLOCKING baseline gate (own tracker only): true when weight/height/DOB/sex are unset — mirrors the
+   * desktop needsBaseline. Never true in a read-only view (another user's metrics aren't exposed).
+   */
+  protected readonly needsBaseline = computed(() => {
+    const d = this.day();
+    if (!d || d.readOnly) return false;
+    const p = d.profile;
+    if (!p) return false;
+    return p.weightKg == null || p.heightCm == null || !p.dateOfBirth || p.sex === 'Unspecified';
+  });
+
+  /** AI affordances gate (mirrors desktop aiEnabled): trackerAi held AND own, writable tracker. */
+  protected readonly aiEnabled = computed(
+    () => this.auth.hasPermission(PERM.trackerAi) && !this.readOnly(),
+  );
 
   // ── hero face (two-way with the hero-ring) ──
   protected readonly heroFace = signal<HeroFace>('rings');
@@ -257,6 +358,8 @@ export class TrackerBetaPage {
   protected readonly coffeeOpen = signal(false);
   protected readonly exerciseOpen = signal(false);
   protected readonly sleepOpen = signal(false);
+  /** The logged sleep entry being edited (two-way into the sleep sheet; null = fresh log). */
+  protected readonly editingSleep = signal<SleepEntryDto | null>(null);
   protected readonly supplementOpen = signal(false);
   protected readonly weightOpen = signal(false);
   protected readonly watchOpen = signal(false);
@@ -266,6 +369,11 @@ export class TrackerBetaPage {
   protected readonly copyEntryIds = signal<number[]>([]);
   protected readonly copySourceMeal = signal<Meal>('breakfast');
   protected readonly copyLabel = signal<string>('');
+  // Ported desktop capabilities: move-day, shared-user picker, what-to-eat, day-actions overflow.
+  protected readonly moveDayOpen = signal(false);
+  protected readonly sharedOpen = signal(false);
+  protected readonly whatToEatOpen = signal(false);
+  protected readonly actionsOpen = signal(false);
 
   private readonly scrollEl = viewChild<ElementRef<HTMLElement>>('scroll');
   private readonly weightCard = viewChild<WeightCard>('weightCard');
@@ -275,6 +383,9 @@ export class TrackerBetaPage {
 
   // ── day-strip derived state ──
   protected readonly isToday = computed(() => this.store.date() === toLocalDate(new Date()));
+
+  /** Today as a local yyyy-MM-dd — caps the date picker so you can't jump to a future day. */
+  protected readonly todayIso = computed(() => toLocalDate(new Date()));
 
   protected readonly dateHeading = computed(() => {
     const iso = this.store.date();
@@ -360,6 +471,61 @@ export class TrackerBetaPage {
     this.withTransition(() => this.store.goToday());
   }
 
+  /** Jump to an arbitrary date picked from the native date input (parity with the desktop date picker). */
+  protected pickDate(iso: string): void {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso) || iso === this.store.date()) return;
+    this.withTransition(() => this.store.setDate(iso));
+  }
+
+  // ── ported day-level actions ──
+
+  /** Open the full Profile & Goals editor (the mobile /tracker/profile twin). Closes the actions sheet. */
+  protected goToProfile(): void {
+    this.actionsOpen.set(false);
+    void this.router.navigate(['/tracker/profile']);
+  }
+
+  /** Open the Move-day sheet (own tracker only). Closes the actions sheet first. */
+  protected openMoveDay(): void {
+    if (this.readOnly()) return;
+    this.actionsOpen.set(false);
+    this.moveDayOpen.set(true);
+  }
+
+  /** Open the shared-user picker from the actions sheet. */
+  protected openSharedFromActions(): void {
+    this.actionsOpen.set(false);
+    this.sharedOpen.set(true);
+  }
+
+  /**
+   * A day-move settled (the sheet POSTed /tracker/day/move). Toast the per-domain counts and reload if the
+   * SOURCE or TARGET day is on screen (the source lost its entries; the target gained them). Mirrors the
+   * desktop moveDayMessage.
+   */
+  protected onDayMoved(res: MoveDayResult): void {
+    const m = res.moved;
+    const bits: string[] = [];
+    if (m.food) bits.push(`${m.food} food${m.food === 1 ? '' : 's'}`);
+    if (m.exercise) bits.push(`${m.exercise} workout${m.exercise === 1 ? '' : 's'}`);
+    if (m.hydration) bits.push(`${m.hydration} drink${m.hydration === 1 ? '' : 's'}`);
+    if (m.weight) bits.push('your weight');
+    if (m.activity) bits.push('your activity');
+    const to = this.copyDayLabel(res.toDate);
+    const msg = bits.length === 0
+      ? `Nothing to move to ${to}`
+      : `Moved ${bits.join(', ')} to ${to}`;
+    this.snack.open(msg, 'OK', { duration: 4000, politeness: 'polite' });
+    // The move re-dated entries OFF the viewed day (source) and possibly ONTO it — reload either way.
+    void this.store.load();
+    void this.weightCard()?.refresh();
+  }
+
+  /** Baseline gate completed — the gate already reloaded the day + profile; nothing more to do here. */
+  protected onBaselineDone(): void {
+    /* needsBaseline() recomputes off the reloaded day and clears; the dashboard renders. */
+  }
+
   /**
    * Run a day change, optionally inside a View-Transitions slide. The mutate is ASYNC (it fetches the
    * new day), so we RETURN its promise into startViewTransition — otherwise the transition captured the
@@ -398,7 +564,7 @@ export class TrackerBetaPage {
         break;
       case 'sleep':
         // Sleep needs hours/quality — there's no sensible one-tap default, so open the sheet.
-        this.sleepOpen.set(true);
+        this.openSleep();
         break;
       case 'weigh':
         this.weightOpen.set(true);
@@ -415,7 +581,7 @@ export class TrackerBetaPage {
     switch (key) {
       case 'water': this.openWater(); break;
       case 'coffee': this.coffeeOpen.set(true); break;
-      case 'sleep': this.sleepOpen.set(true); break;
+      case 'sleep': this.openSleep(); break;
       case 'weigh': this.weightOpen.set(true); break;
       case 'meal': this.openFood('breakfast'); break;
     }
@@ -452,6 +618,23 @@ export class TrackerBetaPage {
    */
   protected openFood(_meal: Meal): void {
     this.foodOpen.set(true);
+  }
+
+  /** Open the sleep sheet for a FRESH log (clears any prior edit seed so it starts blank). */
+  protected openSleep(): void {
+    if (this.readOnly()) return;
+    this.editingSleep.set(null);
+    this.sleepOpen.set(true);
+  }
+
+  /**
+   * Open the sleep sheet seeded to EDIT a tapped logged night (owner-only). The sheet saves by
+   * delete-then-add (the backend has no sleep PATCH), mirroring the desktop replaceId edit path.
+   */
+  protected openEditSleep(s: SleepEntryDto): void {
+    if (this.readOnly()) return;
+    this.editingSleep.set(s);
+    this.sleepOpen.set(true);
   }
 
   /**

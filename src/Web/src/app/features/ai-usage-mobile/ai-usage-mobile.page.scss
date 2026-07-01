@@ -157,9 +157,64 @@
 // OUTCOME FILTER + SECTION HEADER
 // ============================================================================
 
-.au-seg-wrap { display: block; }
-.au-seg { display: block; }
+.au-seg-wrap { display: flex; align-items: center; gap: 8px; }
+.au-seg { display: block; flex: 1 1 auto; min-width: 0; }
 .au-sechead { display: block; margin-top: 2px; }
+
+// "More filters" trigger — a square pill beside the outcome segments; carries a count badge when active
+.au-filter-btn {
+  position: relative; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 44px; min-width: 46px; padding: 0 12px;
+  background: var(--bg-rise);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-pill, var(--r-pill));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
+  color: var(--ink); cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out), border-color 120ms var(--ease-out);
+
+  mat-icon { font-size: 20px; width: 20px; height: 20px; }
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-raised, var(--lift-2)); }
+  &:active { transform: scale(.97); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  &.is-active {
+    border-color: color-mix(in oklab, var(--accent-a) 55%, transparent);
+    color: var(--accent-a);
+    background: color-mix(in oklab, var(--accent-a) 10%, var(--bg-rise));
+  }
+}
+
+.au-filter-btn__count {
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: var(--tech-text-on-accent, var(--ink-on-accent, #07120f));
+  font-size: 11px; font-weight: 800; line-height: 1;
+}
+
+// Active-filter chips row (tap a chip to drop that filter)
+.au-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.au-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 10px 6px 9px;
+  background: color-mix(in oklab, var(--accent-a) 10%, var(--bg-rise));
+  border: 1px solid color-mix(in oklab, var(--accent-a) 32%, transparent);
+  border-radius: var(--tech-r-pill, var(--r-pill));
+  color: var(--ink); font-family: var(--font-ui); font-size: 12.5px; font-weight: 700;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  max-width: 100%;
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out);
+
+  mat-icon { flex: 0 0 auto; font-size: 15px; width: 15px; height: 15px; color: var(--accent-a); }
+  .au-chip__x { color: var(--ink-dim); font-size: 16px; width: 16px; height: 16px; }
+  &:hover { transform: translateY(-1px); box-shadow: var(--tech-shadow-panel, var(--lift-1)); }
+  &:active { transform: scale(.96); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+}
 
 // ============================================================================
 // PER-CALL LIST
@@ -261,6 +316,16 @@
 }
 
 .au-row__sub-ic { font-size: 14px; width: 14px; height: 14px; }
+
+// error/reason hint on failed rows (never response content — just the short status hint)
+.au-row__hint {
+  display: inline-flex; align-items: center; gap: 4px; min-width: 0;
+  font-family: var(--font-ui); font-size: 11.5px; font-weight: 600;
+  color: var(--tech-error, #f87171);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.au-row.oc-warn .au-row__hint { color: var(--warn, #fbbf24); }
+.au-row__hint-ic { flex: 0 0 auto; font-size: 13px; width: 13px; height: 13px; }
 
 .au-row__go { flex: 0 0 auto; color: var(--ink-faint, #8b98a5); }
 
@@ -414,6 +479,25 @@
   text-align: center;
 }
 
+// failed-call hint banner in the detail sheet
+.ad__hint {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 13px;
+  border-radius: var(--tech-radius, var(--r-tile));
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600; line-height: 1.4;
+  color: var(--tech-error, #f87171);
+  background: color-mix(in oklab, var(--tech-error, #f87171) 12%, var(--bg-rise));
+  border: 1px solid color-mix(in oklab, var(--tech-error, #f87171) 28%, transparent);
+
+  mat-icon { flex: 0 0 auto; font-size: 18px; width: 18px; height: 18px; }
+
+  &.oc-warn {
+    color: var(--warn, #fbbf24);
+    background: color-mix(in oklab, var(--warn, #fbbf24) 12%, var(--bg-rise));
+    border-color: color-mix(in oklab, var(--warn, #fbbf24) 28%, transparent);
+  }
+}
+
 // key/value detail rows
 .ad__rows {
   margin: 0; display: flex; flex-direction: column; gap: 0;
@@ -439,4 +523,98 @@
     font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--ink);
     word-break: break-word;
   }
+}
+
+// ============================================================================
+// FILTER SHEET BODY (user / feature / date range + Apply)
+// ============================================================================
+
+.af { display: flex; flex-direction: column; gap: 18px; padding-top: 4px; padding-bottom: 8px; }
+
+.af__head { display: flex; flex-direction: column; gap: 3px; }
+
+.af__title {
+  margin: 0;
+  font-family: var(--tech-font-display, var(--font-display, var(--font-ui))); font-weight: 800; font-size: 20px; color: var(--ink);
+}
+
+.af__sub {
+  margin: 0; font-family: var(--font-ui); font-size: 12.5px; line-height: 1.4; color: var(--ink-dim);
+}
+
+.af__group { display: flex; flex-direction: column; gap: 9px; }
+
+.af__label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-ui); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--ink-dim);
+
+  mat-icon { font-size: 16px; width: 16px; height: 16px; color: var(--accent-a); }
+}
+
+.af__none {
+  margin: 0; font-family: var(--font-ui); font-size: 13px; color: var(--ink-faint, #8b98a5);
+}
+
+.af__dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.af__date { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+.af__date-l {
+  font-family: var(--font-ui); font-size: 12px; font-weight: 600; color: var(--ink-dim);
+}
+
+.af__date-i {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 12px;
+  background: var(--bg-rise);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-control, var(--r-tile));
+  color: var(--ink); font-family: var(--font-ui); font-size: 14px;
+  -webkit-appearance: none; appearance: none;
+
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--accent-a); }
+  &::-webkit-calendar-picker-indicator { filter: var(--date-picker-filter, none); opacity: .7; cursor: pointer; }
+}
+
+.af__actions {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 2px;
+  position: sticky; bottom: 0;
+  padding-top: 4px;
+}
+
+.af__clear {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 12px 16px;
+  background: var(--bg-rise);
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-control, var(--r-pill));
+  color: var(--ink); font-family: var(--font-ui); font-size: 14px; font-weight: 700;
+  cursor: pointer; touch-action: manipulation;
+  transition: transform 120ms var(--ease-out), opacity 120ms var(--ease-out);
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  &:active:not(:disabled) { transform: scale(.97); }
+  &:disabled { opacity: .4; cursor: default; }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+}
+
+.af__apply {
+  flex: 1 1 auto;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: var(--tech-text-on-accent, var(--ink-on-accent, #07120f));
+  border: none; border-radius: var(--tech-r-control, var(--r-pill));
+  font-family: var(--font-ui); font-size: 15px; font-weight: 800;
+  cursor: pointer; touch-action: manipulation;
+  box-shadow: var(--tech-shadow-panel, var(--lift-1));
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out);
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--tech-text-on-accent, var(--ink-on-accent, #07120f)); }
+  &:hover { box-shadow: var(--tech-shadow-raised, var(--lift-2)); transform: translateY(-1px); }
+  &:active { transform: scale(.98); box-shadow: var(--press); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 }

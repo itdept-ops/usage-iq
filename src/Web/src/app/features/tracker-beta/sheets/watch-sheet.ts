@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 
 import { OptimisticTracker } from '../state/optimistic-tracker';
 import { UnitService } from '../../../core/unit.service';
-import { WatchActivityDto } from '../../../core/models';
+import { ActivityCalorieMode, WatchActivityDto } from '../../../core/models';
 import { BottomSheet } from '../ui/bottom-sheet';
 
 /*
@@ -68,6 +68,26 @@ import { BottomSheet } from '../ui/bottom-sheet';
                  [ngModel]="activeCalories()" (ngModelChange)="activeCalories.set($event)" />
         </div>
 
+        <!-- How the watch active-calories combine with logged workouts (mirrors desktop setCalorieMode). -->
+        <div>
+          <span class="wt-label" id="wt-mode-lbl">Active calories</span>
+          <div class="wt-seg" role="group" aria-labelledby="wt-mode-lbl">
+            <button type="button" class="wt-seg-btn" [class.on]="calorieMode() === 'add'"
+                    [attr.aria-pressed]="calorieMode() === 'add'" (click)="calorieMode.set('add')">
+              Add to workouts
+            </button>
+            <button type="button" class="wt-seg-btn" [class.on]="calorieMode() === 'override'"
+                    [attr.aria-pressed]="calorieMode() === 'override'" (click)="calorieMode.set('override')">
+              Replace workouts
+            </button>
+          </div>
+          <p class="wt-note">
+            {{ calorieMode() === 'override'
+                ? 'Watch active calories replace your logged workouts in the burn total.'
+                : 'Watch active calories add on top of your logged workouts.' }}
+          </p>
+        </div>
+
         <div class="wt-actions">
           <button type="button" class="wt-cta" (click)="save()" [disabled]="busy() || tracker.readOnly()">
             @if (busy()) { <span class="wt-spin" aria-hidden="true"></span> } @else { Save watch stats }
@@ -116,6 +136,24 @@ import { BottomSheet } from '../ui/bottom-sheet';
     .wt-input:focus-visible {
       outline: 2px solid var(--focus); outline-offset: 2px; border-color: var(--focus);
     }
+
+    /* Add/Override segmented toggle. */
+    .wt-seg {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+      padding: 4px; border-radius: var(--r-pill);
+      background: var(--bg-sink); border: 1px solid var(--hairline); box-shadow: var(--press);
+    }
+    .wt-seg-btn {
+      min-height: 44px; padding: 0 10px;
+      font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--ink-dim);
+      background: transparent; border: 0; border-radius: var(--r-pill);
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent; cursor: pointer;
+      transition: color 160ms var(--ease-out), background 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+    }
+    .wt-seg-btn.on {
+      color: var(--ink); background: var(--bg-rise); box-shadow: var(--lift-1);
+    }
+    .wt-seg-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
     .wt-actions { display: flex; gap: 10px; padding-top: 4px; }
     .wt-cta {
@@ -176,6 +214,8 @@ export class WatchSheet {
   /** Distance in the DISPLAY unit (km / mi); converted to/from metres on seed + save. */
   protected readonly distance = signal<number | null>(null);
   protected readonly activeCalories = signal<number | null>(null);
+  /** How watch active-calories combine with logged workouts ('add' | 'override'); seeded from the day's row. */
+  protected readonly calorieMode = signal<ActivityCalorieMode>('add');
 
   protected readonly busy = signal(false);
   protected readonly announce = signal('');
@@ -208,6 +248,7 @@ export class WatchSheet {
         ? Math.round(this.units.distanceToDisplay(meters / 1000) * 100) / 100
         : null,
     );
+    this.calorieMode.set(a?.calorieMode ?? 'add');
     this.announce.set('');
   }
 
@@ -224,7 +265,6 @@ export class WatchSheet {
     const distanceMeters = dist != null && Number.isFinite(dist) && dist > 0
       ? Math.round(this.units.distanceToCanonical(dist) * 1000)
       : null;
-    const prev = this.tracker.day()?.activity ?? null;
     this.busy.set(true);
     this.announce.set('Saving watch stats…');
     try {
@@ -233,8 +273,8 @@ export class WatchSheet {
         steps: this.intOf(this.steps(), 200000),
         distanceMeters,
         activeCalories: this.intOf(this.activeCalories(), 20000),
-        // Preserve the existing combine mode; default to "add" for a brand-new row.
-        calorieMode: prev?.calorieMode ?? 'add',
+        // Use the user's chosen combine mode (seeded from the existing row on open).
+        calorieMode: this.calorieMode(),
       });
       this.announce.set('Watch stats saved.');
       this.logged.emit(saved);
@@ -249,7 +289,6 @@ export class WatchSheet {
   /** Clear the day's watch stats (send every field null; keeps the existing combine mode). */
   protected async clear(): Promise<void> {
     if (this.busy() || this.tracker.readOnly()) return;
-    const prev = this.tracker.day()?.activity ?? null;
     this.busy.set(true);
     this.announce.set('Clearing watch stats…');
     try {
@@ -258,7 +297,7 @@ export class WatchSheet {
         steps: null,
         distanceMeters: null,
         activeCalories: null,
-        calorieMode: prev?.calorieMode ?? 'add',
+        calorieMode: this.calorieMode(),
       });
       this.announce.set('Watch stats cleared.');
       this.logged.emit(saved);

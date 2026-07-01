@@ -2,13 +2,17 @@ import {
   ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, computed, inject, signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { catchError, firstValueFrom, of } from 'rxjs';
 
 import { Api } from '../../core/api';
-import { FamilyAssistantResult, FamilyBriefing, FamilyToday } from '../../core/models';
+import { AuthService } from '../../core/auth';
+import {
+  FamilyAssistantAction, FamilyAssistantResult, FamilyBriefing, FamilyList, FamilyToday, Household,
+  HouseholdMember, PERM,
+} from '../../core/models';
 
 import { OptimisticFamily } from './state/optimistic-family';
 import {
@@ -23,6 +27,18 @@ import { HouseholdCard } from './cards/household-card';
 import { RoomsDrawer } from './drawer/rooms-drawer';
 import { WeatherCard } from './cards/weather-card';
 import { LeaderboardCard } from './cards/leaderboard-card';
+
+/** The execution status of a single proposed action card. */
+type FbActionStatus = 'idle' | 'running' | 'done' | 'error';
+
+/** One AI-proposed action plus its live tap state. Card identity is the stable `id` (track key). */
+interface FbActionCard {
+  id: number;
+  action: FamilyAssistantAction;
+  status: FbActionStatus;
+  /** A short success/error line shown under the title once tapped. */
+  note: string;
+}
 
 /**
  * Family "Hearth" — a NEW, beta-only mobile-first glance surface for the household, REBUILT on the shared
@@ -85,9 +101,14 @@ import { LeaderboardCard } from './cards/leaderboard-card';
               @if (dateLabel(); as dl) { <span class="hh__date">{{ dl }}</span> }
               <h1 class="hh__greet">{{ greeting() || 'Hi there' }}</h1>
             </div>
-            <a class="hh__finder" routerLink="/family/locations" aria-label="Where's everyone">
-              <mat-icon aria-hidden="true">person_pin_circle</mat-icon>
-            </a>
+            <div class="hh__tools">
+              <a class="hh__finder" routerLink="/family/household" aria-label="Household settings">
+                <mat-icon aria-hidden="true">settings</mat-icon>
+              </a>
+              <a class="hh__finder" routerLink="/family/locations" aria-label="Where's everyone">
+                <mat-icon aria-hidden="true">person_pin_circle</mat-icon>
+              </a>
+            </div>
           </div>
           <div class="hh__quick">
             <a class="hh__chip" routerLink="/family/calendar"><mat-icon aria-hidden="true">event</mat-icon> Calendar</a>
@@ -114,9 +135,13 @@ import { LeaderboardCard } from './cards/leaderboard-card';
       </div>
     </app-bs-pull-refresh>
 
-    <!-- Fixed bottom action bar: a prominent gradient Ask pill + a secondary quick-add. -->
-    <nav class="actions" aria-label="Quick actions">
-      <app-bs-fab class="actions__ask" icon="auto_awesome" label="Ask" [extended]="true" (action)="openAsk()" />
+    <!-- Fixed bottom action bar: a prominent gradient Ask pill + a secondary quick-add. The Ask pill is
+         gated on family.ai.assistant — without it every ask 403s (a dead end), so we hide it (mirrors the
+         desktop family-home, which hides the whole assistant box for those users). -->
+    <nav class="actions" [class.actions--noai]="!canUseFamilyAssistant()" aria-label="Quick actions">
+      @if (canUseFamilyAssistant()) {
+        <app-bs-fab class="actions__ask" icon="auto_awesome" label="Ask" [extended]="true" (action)="openAsk()" />
+      }
       <button type="button" class="actions__add" (click)="openQuickAdd()" aria-label="Quick add">
         <mat-icon aria-hidden="true">add</mat-icon>
       </button>
@@ -135,10 +160,39 @@ import { LeaderboardCard } from './cards/leaderboard-card';
             <mat-icon aria-hidden="true">arrow_upward</mat-icon>
           </button>
         </form>
-        <p class="sheet__hint">The assistant only answers — nothing is changed until you act on it in a room.</p>
+        <p class="sheet__hint">The assistant answers — nothing changes until you tap an action below.</p>
         @if (asking()) { <p class="sheet__answer sheet__answer--load">Thinking…</p> }
-        @else if (askAnswer(); as a) { <p class="sheet__answer" aria-live="polite">{{ a }}</p> }
         @else if (askError(); as e) { <p class="sheet__answer sheet__answer--err" aria-live="polite">{{ e }}</p> }
+        @else if (askAnswer(); as a) {
+          <p class="sheet__answer" aria-live="polite">{{ a }}</p>
+
+          <!-- Proposed ACTION cards — each a tappable row that performs the write via the EXISTING endpoint
+               (never the assistant). Nothing runs until the user taps. Per-row status + inline note/error. -->
+          @if (askActions().length) {
+            <ul class="acts" aria-label="Suggested actions">
+              @for (c of askActions(); track c.id) {
+                <li class="acts__row" [class.is-done]="c.status === 'done'" [class.is-err]="c.status === 'error'">
+                  <button type="button" class="acts__btn"
+                          [disabled]="c.status === 'running' || c.status === 'done'"
+                          (click)="runAction(c)">
+                    <span class="acts__ic" aria-hidden="true"><mat-icon>{{ iconFor(c.action.type) }}</mat-icon></span>
+                    <span class="acts__body">
+                      <span class="acts__title">{{ c.action.title }}</span>
+                      @if (c.note) { <span class="acts__note">{{ c.note }}</span> }
+                      @else { <span class="acts__verb">{{ buttonLabel(c.action.type) }}</span> }
+                    </span>
+                    <span class="acts__end" aria-hidden="true">
+                      @if (c.status === 'running') { <mat-icon class="acts__spin">progress_activity</mat-icon> }
+                      @else if (c.status === 'done') { <mat-icon>check_circle</mat-icon> }
+                      @else if (c.status === 'error') { <mat-icon>refresh</mat-icon> }
+                      @else { <mat-icon>chevron_right</mat-icon> }
+                    </span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        }
       </div>
     </app-bs-sheet>
 
@@ -165,8 +219,24 @@ import { LeaderboardCard } from './cards/leaderboard-card';
 })
 export class FamilyBetaPage implements OnDestroy {
   private readonly api = inject(Api);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly optimistic = inject(OptimisticFamily);
   private readonly toasts = inject(ToastController);
   private readonly destroyRef = inject(DestroyRef);
+
+  /**
+   * The Ask FAB/sheet is gated on the permission the assistant endpoint requires — without
+   * family.ai.assistant every ask 403s, a try-it-and-it-breaks dead end. Hide the FAB for those users
+   * (mirrors the desktop family-home, which hides the whole assistant box). Re-runs on permission changes.
+   */
+  readonly canUseFamilyAssistant = computed(() => {
+    this.auth.permissions();
+    return this.auth.hasPermission(PERM.familyAiAssistant);
+  });
+
+  /** The household (lazy, best-effort) — used only to resolve a chore assignee NAME to a member userId. */
+  private readonly household = signal<Household | null>(null);
 
   // ── shared best-effort sources (the page owns these; cards take them as inputs) ──
   private readonly _today = signal<FamilyToday | null>(null);
@@ -196,6 +266,9 @@ export class FamilyBetaPage implements OnDestroy {
   readonly adding = signal(false);
   readonly askAnswer = signal<string | null>(null);
   readonly askError = signal<string | null>(null);
+  /** The proposed action cards for the latest ask (each independently tappable). */
+  readonly askActions = signal<FbActionCard[]>([]);
+  private nextActionId = 1;
 
   /** True while a pull-to-refresh is in flight — drives the kit pull-refresh spinner. */
   readonly refreshing = signal(false);
@@ -258,7 +331,14 @@ export class FamilyBetaPage implements OnDestroy {
   openAsk(): void {
     this.askAnswer.set(null);
     this.askError.set(null);
+    this.askActions.set([]);
     this.askOpen.set(true);
+    // Warm the household lazily so a chore action can resolve an assignee NAME → member id (best-effort).
+    if (!this.household()) {
+      this.api.getHousehold()
+        .pipe(catchError(() => of<Household | null>(null)), takeUntilDestroyed(this.destroyRef))
+        .subscribe(h => { if (h) this.household.set(h); });
+    }
   }
 
   async ask(ev: Event): Promise<void> {
@@ -268,14 +348,200 @@ export class FamilyBetaPage implements OnDestroy {
     this.asking.set(true);
     this.askAnswer.set(null);
     this.askError.set(null);
+    this.askActions.set([]);
     try {
       const res: FamilyAssistantResult = await firstValueFrom(this.api.familyAssistant(q));
       this.askAnswer.set(res.answer ?? 'No answer.');
+      // Materialise the proposed actions as tappable cards. Nothing writes until the user taps one.
+      this.askActions.set((res.actions ?? []).map(action => ({
+        id: this.nextActionId++, action, status: 'idle' as FbActionStatus, note: '',
+      })));
     } catch {
       this.askError.set('The assistant is unavailable right now — try a room from the drawer.');
     } finally {
       this.asking.set(false);
     }
+  }
+
+  // ── Ask action cards: each maps to an EXISTING family write endpoint (the assistant wrote nothing). ──
+
+  /** Execute one proposed action card. Only runs on the user's tap; per-card status + inline note/error. */
+  async runAction(card: FbActionCard): Promise<void> {
+    if (card.status === 'running' || card.status === 'done') return;
+    this.patchAction(card.id, { status: 'running', note: '' });
+    try {
+      const note = await this.executeAction(card.action);
+      this.patchAction(card.id, { status: 'done', note });
+      if (note) this.toasts.show(note, { tone: 'success' });
+      // A list/reminder write changes today's counts — re-pull the snapshot so the cards reflect it.
+      const t = card.action.type;
+      if (t === 'list_add' || t === 'reminder') this.loadToday();
+    } catch (e) {
+      this.patchAction(card.id, {
+        status: 'error',
+        note: this.actionError(e, "Couldn't do that just now — tap to retry."),
+      });
+    }
+  }
+
+  private async executeAction(action: FamilyAssistantAction): Promise<string> {
+    switch (action.type) {
+      case 'list_add': return this.execListAdd(action.params.listName, action.params.items);
+      case 'reminder': return this.execReminder(action.params.text, action.params.whenLocal);
+      case 'timer': return this.execTimer(action.params.label, action.params.durationSeconds);
+      case 'calendar_event': return this.execCalendarEvent(action.params);
+      case 'chore': return this.execChore(
+        action.params.title, action.params.points, action.params.recurrence, action.params.assigneeName);
+      case 'meal': return this.execMeal(
+        action.params.title, action.params.ingredients, action.params.mealDateLocal);
+    }
+  }
+
+  /** list_add: find the list by name (create a shopping/todo list if missing), then add items via the store. */
+  private async execListAdd(listName: string, items: string[]): Promise<string> {
+    const name = (listName || '').trim();
+    const toAdd = (items ?? []).map(i => i.trim()).filter(Boolean);
+    if (!name || toAdd.length === 0) throw new Error('Nothing to add.');
+
+    const lists = await firstValueFrom(this.api.familyLists());
+    let list: FamilyList | undefined = lists.find(l => l.name.trim().toLowerCase() === name.toLowerCase());
+    if (!list) {
+      const kind = /shop|grocer|market|store/i.test(name) ? 'shopping' : 'todo';
+      list = await firstValueFrom(this.api.createFamilyList(name, kind));
+    }
+    const target = list;
+    for (const text of toAdd) {
+      // Reuse the shared optimistic store (no local list snapshot to bump here → no-op patch/rollback).
+      const res = await this.optimistic.addListItem(target.id, text, () => {}, () => {});
+      if (!res) throw new Error("Couldn't add item.");
+    }
+    const n = toAdd.length;
+    return `Added ${n} ${n === 1 ? 'item' : 'items'} to ${target.name}.`;
+  }
+
+  /** reminder: createFamilyReminder. An empty whenLocal defaults to one hour from now (still useful). */
+  private async execReminder(text: string, whenLocal: string): Promise<string> {
+    const t = (text || '').trim();
+    if (!t) throw new Error('No reminder text.');
+    const due = this.localToUtcIso(whenLocal) ?? new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    await firstValueFrom(this.api.createFamilyReminder({ text: t, dueUtc: due, recurrence: 'none' }));
+    return 'Reminder set.';
+  }
+
+  /** timer: createFamilyTimer (durationSeconds clamped 5..86400). */
+  private async execTimer(label: string, durationSeconds: number): Promise<string> {
+    const seconds = Math.max(5, Math.min(86400, Math.round(durationSeconds || 0)));
+    await firstValueFrom(
+      this.api.createFamilyTimer({ label: (label || 'Timer').trim(), durationSeconds: seconds }));
+    return 'Timer started.';
+  }
+
+  /**
+   * calendar_event: calendar writes go to the user's real Google Calendar, so we never create silently.
+   * On mobile there's no editor dialog here — navigate to the family calendar with the proposal prefilled
+   * as query params (the desktop opens a prefilled editor; this is the mobile substitute) and close the sheet.
+   */
+  private async execCalendarEvent(p: {
+    title: string; startLocal: string; endLocal: string; allDay: boolean; location: string; notes: string;
+  }): Promise<string> {
+    const queryParams: Record<string, string> = { seedTitle: p.title };
+    if (p.startLocal) queryParams['seedStart'] = p.startLocal;
+    if (p.endLocal) queryParams['seedEnd'] = p.endLocal;
+    if (p.allDay) queryParams['seedAllDay'] = '1';
+    if (p.location) queryParams['seedLocation'] = p.location;
+    if (p.notes) queryParams['seedNotes'] = p.notes;
+    this.askOpen.set(false);
+    await this.router.navigate(['/family/calendar'], { queryParams });
+    return 'Opening your calendar…';
+  }
+
+  /** chore: createFamilyChore. Resolve the assignee NAME to a member; unknown/blank → unassigned. */
+  private async execChore(
+    title: string, points: number, recurrence: 'none' | 'daily' | 'weekly', assigneeName: string,
+  ): Promise<string> {
+    const t = (title || '').trim();
+    if (!t) throw new Error('No chore title.');
+    const assignedToUserId = this.resolveMemberId(assigneeName);
+    await firstValueFrom(this.api.createFamilyChore({
+      title: t, points: Math.max(0, Math.round(points || 0)),
+      recurrence: recurrence || 'none', assignedToUserId,
+    }));
+    const who = assignedToUserId != null ? this.memberName(assignedToUserId) : null;
+    return who ? `Chore added for ${who}.` : 'Chore added.';
+  }
+
+  /** meal: createFamilyMeal. A bare local date (or today) + the dinner slot (the assistant picks no slot). */
+  private async execMeal(title: string, ingredients: string, mealDateLocal: string): Promise<string> {
+    const t = (title || '').trim();
+    if (!t) throw new Error('No meal title.');
+    const localDate =
+      (mealDateLocal && mealDateLocal.length >= 8 ? mealDateLocal.slice(0, 10) : '') || this.localDay();
+    await firstValueFrom(this.api.createFamilyMeal({
+      localDate, slot: 'dinner', title: t, ingredients: (ingredients || '').trim() || undefined,
+    }));
+    return 'Added to the meal plan.';
+  }
+
+  // ── Action helpers ──
+
+  /** Resolve a display name to a household member's userId (case-insensitive); null when blank/unknown. */
+  private resolveMemberId(name: string): number | null {
+    const n = (name || '').trim().toLowerCase();
+    if (!n) return null;
+    const members: HouseholdMember[] = this.household()?.members ?? [];
+    const exact = members.find(m => m.name.trim().toLowerCase() === n);
+    if (exact) return exact.userId;
+    const partial = members.find(m => m.name.trim().toLowerCase().split(/\s+/)[0] === n);
+    return partial?.userId ?? null;
+  }
+
+  private memberName(userId: number): string | null {
+    return this.household()?.members.find(m => m.userId === userId)?.name ?? null;
+  }
+
+  /** Convert an offset-less LOCAL ISO string ("2026-06-23T15:00:00" or "2026-06-23") to a UTC ISO instant, or null. */
+  private localToUtcIso(local: string): string | null {
+    const s = (local || '').trim();
+    if (!s) return null;
+    const d = new Date(s.length <= 10 ? `${s}T00:00:00` : s);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+
+  /** A friendly icon per action type (the confirm-row glyph). */
+  iconFor(type: FamilyAssistantAction['type']): string {
+    switch (type) {
+      case 'list_add': return 'add_shopping_cart';
+      case 'reminder': return 'notifications_active';
+      case 'timer': return 'timer';
+      case 'calendar_event': return 'event';
+      case 'chore': return 'cleaning_services';
+      case 'meal': return 'restaurant';
+    }
+  }
+
+  /** The verb each tap performs, per action type. */
+  buttonLabel(type: FamilyAssistantAction['type']): string {
+    switch (type) {
+      case 'list_add': return 'Add to list';
+      case 'reminder': return 'Set reminder';
+      case 'timer': return 'Start timer';
+      case 'calendar_event': return 'Add to calendar';
+      case 'chore': return 'Add chore';
+      case 'meal': return 'Add meal';
+    }
+  }
+
+  /** Patch one action card by id, re-emitting the array so the OnPush template re-renders. */
+  private patchAction(id: number, patch: Partial<FbActionCard>): void {
+    this.askActions.update(list => list.map(c => (c.id === id ? { ...c, ...patch } : c)));
+  }
+
+  /** Best-effort friendly message from an HttpErrorResponse, else a fallback. */
+  private actionError(e: unknown, fallback: string): string {
+    const err = e as { status?: number; error?: { message?: string; detail?: string } };
+    if (err?.status === 403) return "That isn't available on your account.";
+    if (err?.status === 503) return "The assistant isn't available right now.";
+    return err?.error?.detail ?? err?.error?.message ?? (e instanceof Error ? e.message : fallback) ?? fallback;
   }
 
   // ── Quick-add sheet ──

@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, computed, input,
+  ChangeDetectionStrategy, Component, computed, input, output,
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -10,6 +10,8 @@ import { compactUsd, isLocalName } from '../fleet-beta.model';
 /** A leaderboard row: the user + its rank, share of total spend, and the relative-bar width. */
 interface LbRow {
   key: string;
+  /** The full source user — passed through on tap so the page can open a detail/manage sheet. */
+  user: FleetUser;
   name: string;
   isLocal: boolean;
   costUsd: number;
@@ -38,24 +40,29 @@ interface LbRow {
       <ol class="lb">
         @for (r of rows(); track r.key; let i = $index) {
           <li class="lb__row" [style.--i]="i">
-            <span class="lb__rank" aria-hidden="true">{{ r.rank }}</span>
-            <span class="lb__body">
-              <span class="lb__top">
-                <span class="lb__name" [title]="r.name">
-                  <mat-icon class="lb__kind" aria-hidden="true">{{ r.isLocal ? 'home' : 'person' }}</mat-icon>
-                  {{ r.isLocal ? 'local (file sync)' : r.name }}
+            <button type="button" class="lb__tap" (click)="select.emit(r.user)"
+                    [attr.aria-label]="r.name + ', ' + costLabel(r.costUsd) + ' spend. Tap for details.'">
+              <span class="lb__rank" aria-hidden="true">{{ r.rank }}</span>
+              <span class="lb__body">
+                <span class="lb__top">
+                  <span class="lb__name" [title]="r.name">
+                    <mat-icon class="lb__kind" aria-hidden="true">{{ r.isLocal ? 'home' : 'person' }}</mat-icon>
+                    {{ r.isLocal ? 'local (file sync)' : r.name }}
+                  </span>
+                  <span class="lb__cost">{{ costLabel(r.costUsd) }}</span>
                 </span>
-                <span class="lb__cost">{{ costLabel(r.costUsd) }}</span>
-              </span>
-              <span class="lb__bar" aria-hidden="true"><i [style.width.%]="r.pct"></i></span>
-              <span class="lb__foot">
-                <span class="lb__share">{{ sharePct(r.share) }}% of spend</span>
-                <span class="lb__nums">
-                  <span class="lb__num">{{ r.tokens | compact }} tok</span>
-                  <span class="lb__num">{{ r.machines }} {{ r.machines === 1 ? 'machine' : 'machines' }}</span>
+                <span class="lb__bar" aria-hidden="true"><i [style.width.%]="r.pct"></i></span>
+                <span class="lb__foot">
+                  <span class="lb__share">{{ sharePct(r.share) }}% of spend</span>
+                  <span class="lb__nums">
+                    <span class="lb__num">{{ r.records | compact }} rec</span>
+                    <span class="lb__num">{{ r.tokens | compact }} tok</span>
+                    <span class="lb__num">{{ r.machines }} {{ r.machines === 1 ? 'machine' : 'machines' }}</span>
+                  </span>
                 </span>
               </span>
-            </span>
+              <mat-icon class="lb__chev" aria-hidden="true">chevron_right</mat-icon>
+            </button>
           </li>
         }
       </ol>
@@ -72,6 +79,8 @@ interface LbRow {
 export class FleetUserLeaderboard {
   /** The users to rank (the page passes them pre-fetched; this orders + bars them). */
   readonly users = input.required<FleetUser[]>();
+  /** Fired when a row is tapped — the page opens the user detail sheet with the full FleetUser. */
+  readonly select = output<FleetUser>();
 
   /** Stable, non-email key for a user row (the userId when present, else the bucket name). */
   private userKey(u: FleetUser): string {
@@ -84,6 +93,7 @@ export class FleetUserLeaderboard {
     const max = sorted.reduce((m, u) => Math.max(m, u.costUsd), 0) || 1;
     return sorted.map((u, i) => ({
       key: this.userKey(u),
+      user: u,
       name: u.name,
       isLocal: isLocalName(u.name),
       costUsd: u.costUsd,

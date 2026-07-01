@@ -5,8 +5,6 @@
 .lb { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
 
 .lb__row {
-  display: flex; align-items: stretch; gap: 12px;
-  padding-block: 14px;
   // Hairline divider between rows (not after the last row).
   border-bottom: 1px solid var(--hairline);
   // Spring-stagger entrance per row.
@@ -14,6 +12,22 @@
   animation-delay: calc(var(--i, 0) * 45ms);
 }
 .lb__row:last-child { border-bottom: none; }
+
+// The whole row is a button — tap opens the user detail/manage sheet.
+.lb__tap {
+  display: flex; align-items: stretch; gap: 12px; width: 100%;
+  padding: 14px 4px; border: none; background: transparent;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+  border-radius: var(--r-tile);
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: background 140ms var(--ease-out), transform 120ms var(--ease-spring);
+}
+@media (hover: hover) {
+  .lb__tap:hover { background: color-mix(in srgb, var(--accent-a) 6%, transparent); }
+}
+.lb__tap:active { transform: scale(.99); }
+.lb__tap:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.lb__chev { flex: 0 0 auto; align-self: center; color: var(--ink-faint); font-size: 20px; width: 20px; height: 20px; }
 @keyframes lb-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }

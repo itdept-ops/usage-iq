@@ -379,6 +379,12 @@ interface ExportTarget {
                             <input class="rm-input" type="text" [ngModel]="ed.gpa" (ngModelChange)="setEducation(i, 'gpa', $event)" [name]="'ed-g-' + i" autocomplete="off" />
                           </label>
                         </div>
+                        <label class="rm-field"><span class="rm-field__label">Location</span>
+                          <input class="rm-input" type="text" [ngModel]="ed.location" (ngModelChange)="setEducation(i, 'location', $event)" [name]="'ed-loc-' + i" autocomplete="off" placeholder="City, State" />
+                        </label>
+                        <label class="rm-field"><span class="rm-field__label">Details</span>
+                          <textarea class="rm-input rm-area" rows="2" [ngModel]="ed.details" (ngModelChange)="setEducation(i, 'details', $event)" [name]="'ed-det-' + i" placeholder="Honors, coursework, activities…"></textarea>
+                        </label>
                       </div>
                     }
                     <button type="button" class="rm-add" (click)="addEducation()">
@@ -565,6 +571,124 @@ interface ExportTarget {
 
             <div class="rm-savebar-spacer" aria-hidden="true"></div>
 
+          } @else if (tab() === 'preview') {
+            <!-- ── LIVE PREVIEW (mirrors the desktop pv__* layout off draft()) ── -->
+            @if (previewHasContent()) {
+              <div class="rm-pv-wrap">
+                <div class="pv" [class.pv--designed]="!!headshotUrl()">
+                  <header class="pv__head">
+                    @if (headshotUrl(); as url) {
+                      <img class="pv__photo" [src]="url" alt="" width="76" height="76" loading="lazy" />
+                    }
+                    <div class="pv__id">
+                      <h2 class="pv__name">{{ draft().contact.fullName || 'Your Name' }}</h2>
+                      @if (draft().contact.headline) { <p class="pv__headline">{{ draft().contact.headline }}</p> }
+                      <p class="pv__contact">
+                        @if (draft().contact.email) { <span>{{ draft().contact.email }}</span> }
+                        @if (draft().contact.phone) { <span>{{ draft().contact.phone }}</span> }
+                        @if (draft().contact.location) { <span>{{ draft().contact.location }}</span> }
+                      </p>
+                      @if (draft().contact.links.length) {
+                        <p class="pv__links">
+                          @for (lnk of draft().contact.links; track $index) {
+                            @if (lnk.url || lnk.label) { <span>{{ lnk.label || lnk.url }}</span> }
+                          }
+                        </p>
+                      }
+                    </div>
+                  </header>
+
+                  @if (draft().summary) {
+                    <section class="pv__sec">
+                      <h3 class="pv__sec-h">Summary</h3>
+                      <p class="pv__text">{{ draft().summary }}</p>
+                    </section>
+                  }
+
+                  @if (draft().experience.length) {
+                    <section class="pv__sec">
+                      <h3 class="pv__sec-h">Experience</h3>
+                      @for (exp of draft().experience; track $index) {
+                        <div class="pv__entry">
+                          <div class="pv__entry-head">
+                            <span class="pv__entry-title">{{ exp.title || 'Role' }}@if (exp.company) {<span class="pv__at"> · {{ exp.company }}</span>}</span>
+                            <span class="pv__entry-date">{{ dateRange(exp.startDate, exp.endDate, exp.current) }}</span>
+                          </div>
+                          @if (exp.location) { <p class="pv__entry-sub">{{ exp.location }}</p> }
+                          @if (exp.bullets.length) {
+                            <ul class="pv__bullets">
+                              @for (b of exp.bullets; track $index) { @if (b.trim()) { <li>{{ b }}</li> } }
+                            </ul>
+                          }
+                        </div>
+                      }
+                    </section>
+                  }
+
+                  @if (draft().education.length) {
+                    <section class="pv__sec">
+                      <h3 class="pv__sec-h">Education</h3>
+                      @for (edu of draft().education; track $index) {
+                        <div class="pv__entry">
+                          <div class="pv__entry-head">
+                            <span class="pv__entry-title">{{ edu.degree || edu.school || 'Education' }}@if (edu.field) {<span class="pv__at"> · {{ edu.field }}</span>}</span>
+                            <span class="pv__entry-date">{{ dateRange(edu.startDate, edu.endDate, false) }}</span>
+                          </div>
+                          @if (edu.school && edu.degree) { <p class="pv__entry-sub">{{ edu.school }}</p> }
+                          @if (edu.location) { <p class="pv__entry-sub">{{ edu.location }}</p> }
+                          @if (edu.details) { <p class="pv__entry-sub">{{ edu.details }}</p> }
+                        </div>
+                      }
+                    </section>
+                  }
+
+                  @if (draft().skills.length) {
+                    <section class="pv__sec">
+                      <h3 class="pv__sec-h">Skills</h3>
+                      <div class="pv__skills">
+                        @for (s of draft().skills; track $index) { <span class="pv__skill">{{ s }}</span> }
+                      </div>
+                    </section>
+                  }
+
+                  @if (draft().projects.length) {
+                    <section class="pv__sec">
+                      <h3 class="pv__sec-h">Projects</h3>
+                      @for (proj of draft().projects; track $index) {
+                        <div class="pv__entry">
+                          <span class="pv__entry-title">{{ proj.name || 'Project' }}</span>
+                          @if (proj.description) { <p class="pv__entry-sub">{{ proj.description }}</p> }
+                          @if (proj.bullets.length) {
+                            <ul class="pv__bullets">
+                              @for (b of proj.bullets; track $index) { @if (b.trim()) { <li>{{ b }}</li> } }
+                            </ul>
+                          }
+                        </div>
+                      }
+                    </section>
+                  }
+
+                  @if (draft().certifications.length) {
+                    <section class="pv__sec">
+                      <h3 class="pv__sec-h">Certifications</h3>
+                      @for (cert of draft().certifications; track $index) {
+                        <p class="pv__cert">
+                          {{ cert.name }}@if (cert.issuer) {<span class="pv__at"> · {{ cert.issuer }}</span>}@if (cert.date) {<span class="pv__entry-date"> {{ cert.date }}</span>}
+                        </p>
+                      }
+                    </section>
+                  }
+                </div>
+              </div>
+            } @else {
+              <div class="rm-empty">
+                <span class="rm-empty__orb"><mat-icon aria-hidden="true">visibility</mat-icon></span>
+                <h2 class="rm-empty__title">Nothing to preview yet</h2>
+                <p class="rm-empty__body">Fill in a section in the Editor and it appears here, formatted like your export.</p>
+              </div>
+            }
+            <div class="rm-savebar-spacer" aria-hidden="true"></div>
+
           } @else {
             <!-- ── APPLICATIONS ── -->
             @if (applications().length) {
@@ -593,6 +717,15 @@ interface ExportTarget {
 
                         <span class="rm-mini-title">Cover letter</span>
                         <textarea class="rm-input rm-area" rows="6" [ngModel]="app.coverLetter" (ngModelChange)="setAppCoverLetter($event)" [name]="'a-cl-' + app.id" placeholder="Dear hiring manager…"></textarea>
+
+                        <details class="rm-jd">
+                          <summary class="rm-jd__summary">
+                            <mat-icon aria-hidden="true">description</mat-icon>
+                            <span>Pinned job description</span>
+                            <mat-icon class="rm-jd__chev" aria-hidden="true">expand_more</mat-icon>
+                          </summary>
+                          <p class="rm-jd__text">{{ app.jobDescription || 'No job description saved.' }}</p>
+                        </details>
 
                         <div class="rm-app__ai">
                           <button type="button" class="rm-ai" [disabled]="isAppBusy(app.id)" (click)="reTailor()">
@@ -718,7 +851,14 @@ interface ExportTarget {
       <div class="rm-chat">
         <div class="rm-form__head">
           <h3 class="rm-form__title"><mat-icon class="rm-chat__spark" aria-hidden="true">auto_awesome</mat-icon> Assistant</h3>
-          <button type="button" class="rm-form__close" (click)="chatOpen.set(false)" aria-label="Close"><mat-icon aria-hidden="true">close</mat-icon></button>
+          <span class="rm-chat__head-tools">
+            @if (chatLog().length) {
+              <button type="button" class="rm-chat__clear" (click)="clearChat()" [disabled]="chatBusy()">
+                <mat-icon aria-hidden="true">delete_sweep</mat-icon> Clear
+              </button>
+            }
+            <button type="button" class="rm-form__close" (click)="chatOpen.set(false)" aria-label="Close"><mat-icon aria-hidden="true">close</mat-icon></button>
+          </span>
         </div>
 
         <div class="rm-chat__log">
@@ -726,6 +866,11 @@ interface ExportTarget {
             <div class="rm-chat__hint">
               <mat-icon aria-hidden="true">tips_and_updates</mat-icon>
               <p>Ask me to interview you, fill gaps, or sharpen a section. I can see your resume as context.</p>
+              <div class="rm-chat__chips">
+                @for (s of chatSuggestions; track $index) {
+                  <button type="button" class="rm-chat__chip" [disabled]="chatBusy()" (click)="useChatSuggestion(s)">{{ s }}</button>
+                }
+              </div>
             </div>
           }
           @for (m of chatLog(); track $index) {
@@ -793,8 +938,8 @@ export class ResumeMobilePage {
 
   readonly hasMaster = computed(() => this.master() !== null);
 
-  /** Editor | Applications. */
-  readonly tab = signal<'editor' | 'apps'>('editor');
+  /** Editor | Preview | Applications. */
+  readonly tab = signal<'editor' | 'preview' | 'apps'>('editor');
   /** Which accordion section is open (single-open). */
   readonly open = signal<SectionKey | null>('contact');
   /** Which application is expanded. */
@@ -821,8 +966,17 @@ export class ResumeMobilePage {
 
   readonly tabSegments = computed<Segment[]>(() => [
     { key: 'editor', label: 'Editor' },
+    { key: 'preview', label: 'Preview' },
     { key: 'apps', label: `Applications${this.applications().length ? ' · ' + this.applications().length : ''}` },
   ]);
+
+  /** Starter prompts shown when the assistant conversation is empty (mirrors the desktop AI panel). */
+  readonly chatSuggestions = [
+    'Interview me to build my resume from scratch',
+    'How can I make my summary stronger?',
+    'What is missing from my experience section?',
+    'Suggest skills for my target role',
+  ];
 
   /** The current application being edited (the one expanded), or null. */
   readonly openApp = computed(() => this.applications().find((a) => a.id === this.openAppId()) ?? null);
@@ -891,7 +1045,9 @@ export class ResumeMobilePage {
 
   // ─────────────── NAV ───────────────
 
-  setTab(key: string): void { this.tab.set(key === 'apps' ? 'apps' : 'editor'); }
+  setTab(key: string): void {
+    this.tab.set(key === 'apps' ? 'apps' : key === 'preview' ? 'preview' : 'editor');
+  }
   toggleSection(key: SectionKey): void { this.open.update((cur) => (cur === key ? null : key)); }
   toggleApp(id: number): void { this.openAppId.update((cur) => (cur === id ? null : id)); }
 
@@ -1329,6 +1485,20 @@ export class ResumeMobilePage {
 
   openChat(): void { this.chatOpen.set(true); }
 
+  /** Send one of the empty-state starter prompts. */
+  useChatSuggestion(text: string): void {
+    if (this.chatBusy()) return;
+    this.chatInput.set(text);
+    void this.sendChat();
+  }
+
+  /** Wipe the assistant conversation back to the empty state. */
+  clearChat(): void {
+    if (this.chatBusy()) return;
+    this.chatLog.set([]);
+    this.chatInput.set('');
+  }
+
   async sendChat(): Promise<void> {
     const text = this.chatInput().trim();
     if (!text || this.chatBusy()) return;
@@ -1360,4 +1530,21 @@ export class ResumeMobilePage {
   countLabel(n: number, singular: string, plural = singular + 's'): string {
     return n ? `${n} ${n === 1 ? singular : plural}` : `No ${plural} yet`;
   }
+
+  /** A flat, human label for a date range ("Jun 2021 – Present"); mirrors the live preview. */
+  dateRange(start: string, end: string, current: boolean): string {
+    const e = current ? 'Present' : end;
+    if (start && e) return `${start} – ${e}`;
+    return start || e || '';
+  }
+
+  /** True when the draft has any renderable content (drives the preview empty state). */
+  readonly previewHasContent = computed(() => {
+    const d = this.draft();
+    return !!(
+      d.contact.fullName.trim() || d.contact.headline.trim() || d.summary.trim() ||
+      d.experience.length || d.education.length || d.skills.length ||
+      d.projects.length || d.certifications.length
+    );
+  });
 }

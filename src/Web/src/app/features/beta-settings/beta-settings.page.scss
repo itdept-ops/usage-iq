@@ -252,6 +252,112 @@
 }
 .foot a { color: color-mix(in srgb, var(--accent-b) 70%, var(--ink)); font-weight: 600; }
 
+// ============================================================================
+// ADMIN SECTIONS — ingestion / sources / discord config + routing / last-sync.
+// ============================================================================
+
+// Native-styled labeled field (matches the pricing-mobile field convention, reskinned to Strata).
+.fld { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.fld:first-child { margin-top: 0; }
+.fld__label {
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-dim);
+}
+.fld__input {
+  width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px 12px;
+  border-radius: var(--r-tile); border: 1px solid var(--hairline);
+  background: var(--bg-sink); color: var(--ink);
+  font-family: var(--font-ui); font-size: 15px; -webkit-appearance: none; appearance: none;
+  transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
+}
+.fld__input:focus-visible {
+  outline: none; border-color: color-mix(in srgb, var(--accent-b) 60%, var(--hairline));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-b) 18%, transparent);
+}
+.fld__input:disabled { opacity: .55; }
+select.fld__input {
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-dim) 50%),
+                    linear-gradient(135deg, var(--ink-dim) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 34px;
+}
+.fld__hint { font-size: 12px; color: var(--ink-faint); line-height: 1.4; }
+.fld-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fld-2col .fld { margin-top: 12px; }
+
+// A list card nested inside a padded card (toggle rows) — flush to its container edges.
+.flush-list {
+  margin: 12px -16px 0; border-radius: 0; box-shadow: none; background: transparent; background-image: none;
+  border-left: none; border-right: none;
+  border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+  padding: 0;
+}
+
+// Action button row.
+.act-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.act-row--wrap { margin-top: 14px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 0 16px; border-radius: var(--r-pill);
+  font-family: var(--font-ui); font-size: 14px; font-weight: 700; letter-spacing: -.01em;
+  cursor: pointer; border: 1px solid transparent; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent; transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn--primary {
+  color: var(--tech-text-on-accent, #fff);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-b) 32%, transparent);
+}
+.btn--ghost {
+  color: var(--ink); background: var(--bg-sink); border-color: var(--hairline);
+}
+.btn--danger {
+  color: color-mix(in srgb, var(--danger, #ef5f6b) 90%, var(--ink)); background: transparent;
+  border-color: color-mix(in srgb, var(--danger, #ef5f6b) 40%, var(--hairline));
+}
+
+// ── sync status pill (inside the ingestion card) ──
+.sync-pill {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px;
+  padding: 5px 11px; border-radius: var(--r-pill);
+  background: var(--bg-sink); border: 1px solid var(--hairline);
+  font-size: 12px; font-weight: 600; color: var(--ink-dim);
+}
+.sync-pill__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex: 0 0 auto; }
+.sync-pill[data-state='ok'] .sync-pill__dot { background: var(--signal, #4fd18b); }
+.sync-pill[data-state='running'] .sync-pill__dot { background: var(--accent-b); animation: sp-pulse 1.2s ease-in-out infinite; }
+.sync-pill[data-state='error'] .sync-pill__dot { background: var(--danger, #ef5f6b); }
+.sync-pill__sep { color: var(--ink-faint); }
+@keyframes sp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .sync-pill[data-state='running'] .sync-pill__dot { animation: none; } }
+
+// ── source card ──
+.src { margin-top: 0; }
+.src--off { opacity: .7; }
+
+// ── routing table rows ──
+.route { padding: 0 0 10px; }
+.route + .route { border-top: 1px solid var(--hairline); }
+.route--off { opacity: .7; }
+.route--saving { opacity: .5; }
+.route__mention { margin: 0 14px 4px; }
+.route__mention .fld__input { min-height: 40px; font-size: 13px; }
+
+// ── last-sync result key/value rows ──
+.result { display: flex; flex-direction: column; gap: 0; }
+.result--warn { border-color: color-mix(in srgb, var(--danger, #ef5f6b) 34%, var(--hairline)); }
+.kv {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 9px 0; font-size: 13.5px; color: var(--ink-dim);
+}
+.kv + .kv { border-top: 1px solid var(--hairline); }
+.kv b { color: var(--ink); font-weight: 700; }
+.kv--sub { padding-left: 14px; font-size: 12.5px; }
+.kv--sub span { color: var(--ink-faint); }
+.kv--accent { color: color-mix(in srgb, var(--accent-b) 80%, var(--ink)) !important; }
+.kv--warn span, .kv--warn b { color: color-mix(in srgb, var(--danger, #ef5f6b) 88%, var(--ink)); }
+
 // Own visible focus ring (tracks the page accent via --focus).
 :host ::ng-deep :focus-visible {
   outline: 2px solid var(--focus);

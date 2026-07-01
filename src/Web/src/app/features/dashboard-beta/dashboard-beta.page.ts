@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDialog } from '@angular/material/dialog';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -8,16 +10,17 @@ import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
   CacheEfficiency, GroupBy, IngestionSource, MachineStat, ModelStat, PagedResult,
-  ProjectDto, SummaryResponse, UsageFilter, UsageRecord, PERM,
+  ProjectDto, SavedView, SummaryResponse, UsageFilter, UsageRecord, PERM,
 } from '../../core/models';
-import { BetaPullRefresh, BetaToaster, ToastController } from '../beta-ui';
+import { ShareDialog } from '../share/share-dialog';
+import { BetaBottomSheet, BetaPullRefresh, BetaToaster, ToastController } from '../beta-ui';
 
 import { PulseHeroCard } from './hero/hero-card';
 import { PulseInsightCard } from './cards/insight-card';
 import { PulseTrendCard } from './cards/trend-card';
 import { PulseBreakdownCard, BreakdownDim, BreakdownSlice } from './cards/breakdown-card';
 import { PulseEfficiencyCard } from './cards/efficiency-card';
-import { PulseRecentFeed } from './cards/recent-feed';
+import { PulseRecentFeed, type RecordSort } from './cards/recent-feed';
 import { PulseFilterSheet } from './sheets/filter-sheet';
 import { PulseTickerMobile } from '../pulse-ticker/pulse-ticker-mobile';
 
@@ -48,7 +51,7 @@ const PAGE_SIZE = 25;
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ToastController],
   imports: [
-    MatIconModule, RouterLink, BetaPullRefresh, BetaToaster,
+    MatIconModule, RouterLink, FormsModule, BetaPullRefresh, BetaToaster, BetaBottomSheet,
     PulseHeroCard, PulseInsightCard, PulseTrendCard, PulseBreakdownCard, PulseEfficiencyCard, PulseRecentFeed, PulseFilterSheet,
     PulseTickerMobile,
   ],
@@ -64,10 +67,23 @@ const PAGE_SIZE = 25;
               <span class="hh__eyebrow">Usage</span>
               <h1 class="hh__title">Spend Pulse</h1>
             </div>
-            <button type="button" class="hh__filter" (click)="openFilter()" aria-label="Filters">
-              <mat-icon aria-hidden="true">tune</mat-icon>
-              @if (activeFilterCount()) { <span class="hh__filter-badge">{{ activeFilterCount() }}</span> }
-            </button>
+            <div class="hh__actions">
+              @if (canSync()) {
+                <button type="button" class="hh__act" (click)="sync()" [disabled]="syncing()" aria-label="Sync usage from disk">
+                  <mat-icon aria-hidden="true" [class.hh__act-spin]="syncing()">{{ syncing() ? 'progress_activity' : 'sync' }}</mat-icon>
+                </button>
+              }
+              <button type="button" class="hh__act" (click)="exportCsv()" [disabled]="exporting()" aria-label="Export records CSV">
+                <mat-icon aria-hidden="true">{{ exporting() ? 'progress_activity' : 'download' }}</mat-icon>
+              </button>
+              <button type="button" class="hh__act" (click)="openShare()" aria-label="Share this view">
+                <mat-icon aria-hidden="true">ios_share</mat-icon>
+              </button>
+              <button type="button" class="hh__filter" (click)="openFilter()" aria-label="Filters">
+                <mat-icon aria-hidden="true">tune</mat-icon>
+                @if (activeFilterCount()) { <span class="hh__filter-badge">{{ activeFilterCount() }}</span> }
+              </button>
+            </div>
           </div>
 
           <div class="hh__pills" role="radiogroup" aria-label="Date range">
@@ -130,6 +146,8 @@ const PAGE_SIZE = 25;
         <div class="rise pb-card pb-defer" [style.--i]="4">
           <app-pulse-recent
             [page]="records()" [loading]="loading()" [loadingMore]="loadingMore()"
+            [sort]="recordSort()"
+            (sortChange)="setRecordSort($event)"
             (more)="loadMore()" (widen)="setDatePreset('all')" />
         </div>
       </div>
@@ -138,8 +156,28 @@ const PAGE_SIZE = 25;
     <app-pulse-filter-sheet #sheet
       [(open)]="filterOpen"
       [projects]="projects()" [models]="modelStats()" [sources]="sources()" [machines]="machines()"
-      [filter]="filter()" [groupBy]="groupBy()"
-      (applied)="onApplyFilters($event)" />
+      [filter]="filter()" [groupBy]="groupBy()" [savedViews]="savedViews()"
+      (applied)="onApplyFilters($event)"
+      (applyView)="applyView($event)"
+      (deleteView)="deleteView($event)"
+      (renameView)="renameView($event)"
+      (saveCurrent)="promptSaveView($event)" />
+
+    <!-- Name-a-view sheet: prompts for a name, then upserts the pending draft filter. -->
+    <app-bs-sheet [(open)]="nameSheetOpen" detent="peek" label="Name this view">
+      <div class="nv">
+        <h2 class="nv__title">Save view</h2>
+        <p class="nv__sub">Save the current filters as a named view.</p>
+        <input class="nv__input" type="text" [ngModel]="nameDraft()"
+               (ngModelChange)="nameDraft.set($event)" (keydown.enter)="confirmSaveView()"
+               placeholder="e.g. Last 30 days — Claude" aria-label="View name" />
+        <div class="nv__row">
+          <button type="button" class="nv__cancel" (click)="nameSheetOpen.set(false)">Cancel</button>
+          <button type="button" class="nv__save" [disabled]="!nameDraft().trim() || savingView()"
+                  (click)="confirmSaveView()">{{ savingView() ? 'Saving…' : 'Save view' }}</button>
+        </div>
+      </div>
+    </app-bs-sheet>
 
     <app-bs-toaster />
   `,
@@ -151,10 +189,29 @@ export class DashboardBetaPage {
   private route = inject(ActivatedRoute);
   private toast = inject(ToastController);
   private auth = inject(AuthService);
+  private dialog = inject(MatDialog);
   private readonly sheet = viewChild.required(PulseFilterSheet);
 
   /** Show the "Your Day" teaser only when the caller can reach the tracker.self-gated /today surface. */
   readonly canSeeRecap = computed(() => this.auth.hasPermission(PERM.trackerSelf));
+
+  /** Gate the Sync action exactly like the live dashboard (sync.run). */
+  readonly canSync = computed(() => this.auth.hasPermission(PERM.syncRun));
+
+  // ---- header action state ----
+  readonly syncing = signal(false);
+  readonly exporting = signal(false);
+
+  // ---- saved views (per-user) ----
+  readonly savedViews = signal<SavedView[]>([]);
+  readonly savingView = signal(false);
+  /** Name-a-view sheet + its pending draft filter (the filter to upsert once a name is entered). */
+  readonly nameSheetOpen = signal(false);
+  readonly nameDraft = signal('');
+  private pendingViewFilter: UsageFilter | null = null;
+
+  // ---- records sort (date/model/input/output/cost), applied to the recent feed ----
+  readonly recordSort = signal<RecordSort>('timestamp');
 
   // ---- filter + view state (shapes copied from the live dashboard for parity) ----
   readonly filter = signal<UsageFilter>({ from: null, to: null, projectIds: [], models: [], sources: [], machine: [], includeSidechain: true });
@@ -390,6 +447,12 @@ export class DashboardBetaPage {
     this.api.models().subscribe({ next: m => this.modelStats.set(m), error: () => { /* non-critical */ } });
     this.api.sources().subscribe({ next: s => this.sources.set(s), error: () => { /* non-critical */ } });
     this.api.machines().subscribe({ next: m => this.machines.set(m), error: () => { /* non-critical */ } });
+    this.loadSavedViews();
+  }
+
+  /** Per-user saved views for the filter sheet (non-critical). */
+  private loadSavedViews(): void {
+    this.api.savedViews().subscribe({ next: v => this.savedViews.set(v), error: () => { /* non-critical */ } });
   }
 
   private reloadAll(): void {
@@ -397,7 +460,7 @@ export class DashboardBetaPage {
     const prior = this.priorFilter();
     forkJoin({
       summary: this.api.summary(this.filter(), this.groupBy()),
-      records: this.api.records(this.filter(), 1, PAGE_SIZE, 'timestamp', true),
+      records: this.api.records(this.filter(), 1, PAGE_SIZE, this.recordSort(), true),
       cacheEff: this.api.cacheEfficiency(this.filter()).pipe(catchError(() => of<CacheEfficiency | null>(null))),
       // Prior-period summary for the delta — best-effort (null when no prior window or it errors).
       prev: prior ? this.api.summary(prior, this.groupBy()).pipe(catchError(() => of<SummaryResponse | null>(null))) : of<SummaryResponse | null>(null),
@@ -414,7 +477,7 @@ export class DashboardBetaPage {
       error: () => {
         this.loading.set(false);
         this.api.summary(this.filter(), this.groupBy()).subscribe({ next: s => this.summary.set(s), error: () => {} });
-        this.api.records(this.filter(), 1, PAGE_SIZE, 'timestamp', true).subscribe({ next: rec => this.records.set(rec), error: () => {} });
+        this.api.records(this.filter(), 1, PAGE_SIZE, this.recordSort(), true).subscribe({ next: rec => this.records.set(rec), error: () => {} });
         this.cacheEff.set(null);
         this.prevSummary.set(null);
       },
@@ -442,7 +505,7 @@ export class DashboardBetaPage {
     const prior = this.priorFilter();
     forkJoin({
       summary: this.api.summary(this.filter(), this.groupBy()).pipe(catchError(() => of<SummaryResponse | null>(null))),
-      records: this.api.records(this.filter(), 1, PAGE_SIZE, 'timestamp', true).pipe(catchError(() => of<PagedResult<UsageRecord> | null>(null))),
+      records: this.api.records(this.filter(), 1, PAGE_SIZE, this.recordSort(), true).pipe(catchError(() => of<PagedResult<UsageRecord> | null>(null))),
       cacheEff: this.api.cacheEfficiency(this.filter()).pipe(catchError(() => of<CacheEfficiency | null>(null))),
       breakdown: this.api.summary(this.filter(), this.breakdownDim()).pipe(catchError(() => of<SummaryResponse | null>(null))),
       prev: prior ? this.api.summary(prior, this.groupBy()).pipe(catchError(() => of<SummaryResponse | null>(null))) : of<SummaryResponse | null>(null),
@@ -464,6 +527,150 @@ export class DashboardBetaPage {
     });
   }
 
+  // ---- records sort (date/model/input/output/cost) — refetch page 1 with the new sort ----
+  setRecordSort(sort: RecordSort): void {
+    if (this.recordSort() === sort) return;
+    this.recordSort.set(sort);
+    this.page.set(1);
+    this.api.records(this.filter(), 1, PAGE_SIZE, this.recordSort(), true).subscribe({
+      next: r => this.records.set(r),
+      error: () => this.toast.show('Could not sort records', { tone: 'warn' }),
+    });
+  }
+
+  // ---- Sync (gated by sync.run, exactly like the live dashboard) ----
+  sync(): void {
+    if (!this.canSync() || this.syncing()) return;
+    this.syncing.set(true);
+    this.api.sync().subscribe({
+      next: r => {
+        this.syncing.set(false);
+        if (r.error) { this.toast.show(`Sync error: ${r.error}`, { tone: 'warn' }); return; }
+        this.toast.show(`Synced +${r.newRecords.toLocaleString()} rows`, { tone: 'success', durationMs: 2600 });
+        this.loadOptions();
+        this.reloadAll();
+        this.reloadBreakdown();
+      },
+      error: () => { this.syncing.set(false); this.toast.show('Sync failed', { tone: 'warn' }); },
+    });
+  }
+
+  // ---- Export CSV (server-rendered records.csv for the current filter → blob download) ----
+  exportCsv(): void {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    this.api.recordsCsv(this.filter()).subscribe({
+      next: blob => {
+        this.exporting.set(false);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `usage-iq-records-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => { this.exporting.set(false); this.toast.show('Export failed', { tone: 'warn' }); },
+    });
+  }
+
+  // ---- Share (reuse the proven desktop ShareDialog: public, token-based, time-limited links) ----
+  openShare(): void {
+    this.dialog.open(ShareDialog, {
+      data: { filter: this.filter(), groupBy: this.groupBy() },
+      width: '560px',
+      maxWidth: '94vw',
+      maxHeight: '90dvh',
+      autoFocus: false,
+      panelClass: 'uiq-dialog',
+    });
+  }
+
+  // ---- Saved views (upsert-by-name / apply / rename / delete via the SAME Api the desktop uses) ----
+  private viewPayload(name: string, f: UsageFilter) {
+    return {
+      name,
+      from: f.from,
+      to: f.to,
+      projectId: f.projectIds,
+      model: f.models,
+      source: f.sources,
+      includeSidechain: f.includeSidechain,
+      groupBy: this.groupBy(),
+    };
+  }
+
+  /** From the filter sheet's "Save view" — remember the draft filter, then open the name sheet. */
+  promptSaveView(f: UsageFilter): void {
+    this.pendingViewFilter = f;
+    this.nameDraft.set('');
+    this.filterOpen.set(false);
+    this.nameSheetOpen.set(true);
+  }
+
+  confirmSaveView(): void {
+    const name = this.nameDraft().trim();
+    const f = this.pendingViewFilter ?? this.filter();
+    if (!name || this.savingView()) return;
+    this.savingView.set(true);
+    this.api.saveView(this.viewPayload(name, f)).subscribe({
+      next: v => {
+        this.savingView.set(false);
+        this.nameSheetOpen.set(false);
+        // Upsert-by-name: drop any existing same-name/id, append, keep sorted.
+        this.savedViews.update(list => {
+          const rest = list.filter(x => x.id !== v.id && x.name.toLowerCase() !== v.name.toLowerCase());
+          return [...rest, v].sort((a, b) => a.name.localeCompare(b.name));
+        });
+        this.toast.show(`Saved “${v.name}”`, { tone: 'success', durationMs: 2200 });
+      },
+      error: () => { this.savingView.set(false); this.toast.show('Could not save view', { tone: 'warn' }); },
+    });
+  }
+
+  /** Apply a saved view's filter + groupBy through the normal reload path. */
+  applyView(v: SavedView): void {
+    this.filter.set({
+      from: v.from,
+      to: v.to,
+      projectIds: [...v.projectId],
+      models: [...v.model],
+      sources: [...v.source],
+      machine: [],
+      includeSidechain: v.includeSidechain,
+    });
+    this.groupBy.set((v.groupBy || 'day') as GroupBy);
+    this.activePreset.set(v.from || v.to ? '' : 'all');
+    this.filterOpen.set(false);
+    this.applyAndReload();
+    this.toast.show(`Applied “${v.name}”`, { tone: 'success', durationMs: 1800 });
+  }
+
+  /** Rename a saved view — reuses its stored filter payload, only the name changes. */
+  renameView(e: { view: SavedView; name: string }): void {
+    const v = e.view;
+    this.api.updateView(v.id, {
+      name: e.name,
+      from: v.from,
+      to: v.to,
+      projectId: v.projectId,
+      model: v.model,
+      source: v.source,
+      includeSidechain: v.includeSidechain,
+      groupBy: v.groupBy,
+    }).subscribe({
+      next: updated => this.savedViews.update(list =>
+        list.map(x => (x.id === updated.id ? updated : x)).sort((a, b) => a.name.localeCompare(b.name))),
+      error: () => this.toast.show('Rename failed', { tone: 'warn' }),
+    });
+  }
+
+  deleteView(v: SavedView): void {
+    this.api.deleteView(v.id).subscribe({
+      next: () => this.savedViews.update(list => list.filter(x => x.id !== v.id)),
+      error: () => this.toast.show('Could not delete view', { tone: 'warn' }),
+    });
+  }
+
   // ---- infinite scroll: append the next records page ----
   loadMore(): void {
     const cur = this.records();
@@ -471,7 +678,7 @@ export class DashboardBetaPage {
     if (cur.page >= Math.ceil(cur.total / cur.pageSize)) return;
     const next = cur.page + 1;
     this.loadingMore.set(true);
-    this.api.records(this.filter(), next, PAGE_SIZE, 'timestamp', true).subscribe({
+    this.api.records(this.filter(), next, PAGE_SIZE, this.recordSort(), true).subscribe({
       next: r => {
         this.records.set({ ...r, items: [...cur.items, ...r.items] });
         this.page.set(next);

@@ -634,6 +634,108 @@
 }
 
 // ============================================================================
+// LIVE PREVIEW (pv__* — formatted, paper-like render of draft())
+// ============================================================================
+
+.rm-pv-wrap { padding: 2px; }
+.pv {
+  padding: 18px 16px 20px; border-radius: var(--r-card, 14px);
+  background: color-mix(in srgb, var(--bg-base) 60%, #fff 40%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--lift-1);
+  color: var(--ink);
+  font-size: 13px; line-height: 1.5;
+}
+:root[data-theme='dark'] .pv,
+.pv { background: color-mix(in srgb, var(--glass) 96%, transparent); }
+.pv__head { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--glass-edge); }
+.pv__photo { flex: 0 0 auto; width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid var(--glass-edge); }
+.pv__id { min-width: 0; }
+.pv__name { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+.pv__headline { margin: 2px 0 0; font-size: 13px; font-weight: 600; color: var(--accent-a); }
+.pv__contact, .pv__links {
+  margin: 5px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px;
+  font-size: 12px; font-weight: 500; color: var(--ink-dim);
+}
+.pv__links { color: var(--accent-b); }
+.pv__sec { margin-top: 14px; }
+.pv__sec-h {
+  margin: 0 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent-a); border-bottom: 1px solid color-mix(in srgb, var(--accent-a) 30%, var(--glass-edge)); padding-bottom: 3px;
+}
+.pv__text { margin: 0; font-size: 13px; font-weight: 500; color: var(--ink); }
+.pv__entry { margin-top: 9px; &:first-of-type { margin-top: 0; } }
+.pv__entry-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.pv__entry-title { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.pv__at { font-weight: 500; color: var(--ink-dim); }
+.pv__entry-date { flex: 0 0 auto; font-size: 11.5px; font-weight: 600; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.pv__entry-sub { margin: 2px 0 0; font-size: 12px; font-weight: 500; color: var(--ink-dim); }
+.pv__bullets { margin: 5px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.pv__bullets li { font-size: 12.5px; font-weight: 500; color: var(--ink); }
+.pv__skills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pv__skill {
+  padding: 3px 10px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 600;
+  background: color-mix(in srgb, var(--accent-a) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-a) 24%, var(--glass-edge)); color: var(--accent-a);
+}
+.pv__cert { margin: 4px 0 0; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+
+// ============================================================================
+// PINNED JOB DESCRIPTION (collapsible inside an application body)
+// ============================================================================
+
+.rm-jd {
+  border: 1px solid var(--glass-edge); border-radius: var(--tech-r-control, 12px);
+  background: color-mix(in srgb, var(--glass) 60%, transparent); overflow: hidden;
+}
+.rm-jd__summary {
+  display: flex; align-items: center; gap: 8px; padding: 11px 13px; cursor: pointer;
+  list-style: none; font-size: 13px; font-weight: 700; color: var(--tech-text, var(--ink));
+  -webkit-tap-highlight-color: transparent;
+  &::-webkit-details-marker { display: none; }
+  mat-icon:first-child { color: var(--accent-a); width: 18px; height: 18px; font-size: 18px; line-height: 18px; }
+  span { flex: 1 1 auto; }
+}
+.rm-jd__chev { color: var(--ink-faint); width: 20px; height: 20px; font-size: 20px; line-height: 20px; transition: transform 200ms var(--ease-out); }
+.rm-jd[open] .rm-jd__chev { transform: rotate(180deg); }
+.rm-jd__text {
+  margin: 0; padding: 0 13px 13px; font-size: 12.5px; font-weight: 500; line-height: 1.5;
+  color: var(--ink-dim); white-space: pre-wrap; word-break: break-word;
+}
+
+// ============================================================================
+// ASSISTANT — starter chips + clear-conversation button
+// ============================================================================
+
+.rm-chat__head-tools { display: inline-flex; align-items: center; gap: 6px; }
+.rm-chat__clear {
+  display: inline-flex; align-items: center; gap: 5px; padding: 8px 12px;
+  border: 1px solid var(--glass-edge); border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--glass) 70%, transparent); color: var(--tech-text-secondary, var(--ink-dim));
+  font-family: var(--font-ui); font-size: 12.5px; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 120ms var(--ease-out), color 120ms var(--ease-out);
+  mat-icon { width: 17px; height: 17px; font-size: 17px; line-height: 17px; }
+  &:hover:not(:disabled) { background: color-mix(in srgb, var(--glass) 92%, transparent); color: var(--ink); }
+  &:active { transform: scale(.96); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  &:disabled { opacity: .5; pointer-events: none; }
+}
+.rm-chat__chips { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 4px; }
+.rm-chat__chip {
+  width: 100%; text-align: left; padding: 11px 14px;
+  border: 1px solid var(--glass-edge); border-radius: var(--tech-r-control, 12px);
+  background: var(--glass); color: var(--ink);
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600; line-height: 1.35; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 120ms var(--ease-out), border-color 120ms var(--ease-out), transform 120ms var(--ease-out);
+  &:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-a) 8%, var(--glass)); border-color: color-mix(in srgb, var(--accent-a) 34%, var(--glass-edge)); }
+  &:active { transform: scale(.98); }
+  &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  &:disabled { opacity: .5; pointer-events: none; }
+}
+
+// ============================================================================
 // SPINNERS
 // ============================================================================
 

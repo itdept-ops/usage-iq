@@ -8,7 +8,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import {
-  CreateHabitRequest, HabitCadence, HabitDto, HabitLeaderboardRowDto, PERM, UpdateHabitRequest,
+  CreateHabitRequest, HabitCadence, HabitCoachDto, HabitDayDto, HabitDto,
+  HabitLeaderboardRowDto, PERM, UpdateHabitRequest,
 } from '../../core/models';
 import {
   BetaPullRefresh, BetaSegmentedControl, BetaBottomSheet, BetaSkeleton, BetaFab,
@@ -40,6 +41,9 @@ function emptyDraft(): HabitDraft {
     partialCredit: false, autoSource: 'None', color: '#10b981',
   };
 }
+
+/** One cell of the per-habit mini streak calendar (mirrors the desktop grid). */
+interface HabitCalCell { iso: string; dayNum: number; inMonth: boolean; isToday: boolean; complete: boolean; skip: boolean; }
 
 /**
  * Habits — the mobile-first twin of the live `/habits` page (the generalised successor to /challenge),
@@ -100,6 +104,18 @@ function emptyDraft(): HabitDraft {
             (retry)="reload()" />
 
         } @else {
+          <!-- AI COACH CARD (gated tracker.ai; server floors to a deterministic recap) -->
+          @if (canCoach() && coach(); as c) {
+            <div class="hm-coach hm-reveal">
+              <span class="hm-coach__ic" aria-hidden="true"><mat-icon>auto_awesome</mat-icon></span>
+              <div class="hm-coach__body">
+                <span class="hm-coach__h">Your coach</span>
+                <p class="hm-coach__note">{{ c.narrative }}</p>
+                @for (ins of c.insights; track ins) { <p class="hm-coach__insight">{{ ins }}</p> }
+              </div>
+            </div>
+          }
+
           <div class="hm-seg-wrap">
             <app-bs-segmented class="hm-seg" [segments]="tabs" [value]="tab()" label="Habits view" (change)="setTab($event)" />
           </div>
@@ -127,7 +143,14 @@ function emptyDraft(): HabitDraft {
 
                     @if (isMeasurable(h)) {
                       <div class="hm-hcard__bar" aria-hidden="true"><span class="hm-hcard__bar-fill" [style.width.%]="progressPct(h)"></span></div>
-                      <span class="hm-hcard__measured">{{ measurableLabel(h) }}</span>
+                      <div class="hm-hcard__meas-row">
+                        <span class="hm-hcard__measured">{{ measurableLabel(h) }}</span>
+                        @if (isManual(h)) {
+                          <input class="hm-hcard__valinput" type="number" min="0" inputmode="decimal"
+                                 [ngModel]="h.today.value" (ngModelChange)="setTodayValue(h, $event)"
+                                 [attr.aria-label]="'Set value for ' + h.title" />
+                        }
+                      </div>
                     }
 
                     <div class="hm-hcard__actions">
@@ -138,6 +161,16 @@ function emptyDraft(): HabitDraft {
                       </button>
                       <button type="button" class="hm-hcard__skip" [class.is-on]="h.today.skip" (click)="toggleSkip(h)">
                         {{ h.today.skip ? 'Skipped' : 'Skip' }}
+                      </button>
+                    </div>
+
+                    <div class="hm-hcard__chips">
+                      <button type="button" class="hm-hcard__chip" (click)="openCalendar(h)" aria-label="Streak calendar">
+                        <mat-icon aria-hidden="true">calendar_month</mat-icon> Calendar
+                      </button>
+                      <button type="button" class="hm-hcard__chip" [class.is-paused]="h.status === 'Paused'" (click)="pauseHabit(h)">
+                        <mat-icon aria-hidden="true">{{ h.status === 'Paused' ? 'play_arrow' : 'pause' }}</mat-icon>
+                        {{ h.status === 'Paused' ? 'Resume' : 'Pause' }}
                       </button>
                     </div>
                   </article>
@@ -236,6 +269,12 @@ function emptyDraft(): HabitDraft {
             <label class="hs__field"><span class="hs__label">Target</span><input class="hs__input" type="number" min="0.01" [ngModel]="draft().targetValue" (ngModelChange)="patchDraft({ targetValue: $event })" name="htarget" /></label>
             <label class="hs__field"><span class="hs__label">Unit</span><input class="hs__input" [ngModel]="draft().unit" (ngModelChange)="patchDraft({ unit: $event })" name="hunit" maxlength="32" placeholder="min / ml" /></label>
           </div>
+          @if (draft().autoSource === 'None') {
+            <button type="button" class="hs__toggle" [class.is-on]="draft().partialCredit" (click)="patchDraft({ partialCredit: !draft().partialCredit })">
+              <mat-icon aria-hidden="true">{{ draft().partialCredit ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+              <span class="hs__toggle-txt">Give partial credit toward the target</span>
+            </button>
+          }
         }
 
         <span class="hs__sub">Colour</span>
@@ -255,6 +294,40 @@ function emptyDraft(): HabitDraft {
       </div>
     </app-bs-sheet>
 
+    <!-- PER-HABIT STREAK CALENDAR SHEET -->
+    <app-bs-sheet [(open)]="calOpen" detent="half" label="Streak calendar">
+      @if (calHabit(); as ch) {
+        <div class="hcal" [style.--hc-accent]="ch.color || '#10b981'">
+          <div class="hs__head">
+            <h3 class="hs__title">{{ ch.title }}</h3>
+            <button type="button" class="hs__close" (click)="calOpen.set(false)" aria-label="Close"><mat-icon aria-hidden="true">close</mat-icon></button>
+          </div>
+          <div class="hcal__bar">
+            <button type="button" class="hcal__nav" (click)="prevCalMonth()" aria-label="Previous month"><mat-icon aria-hidden="true">chevron_left</mat-icon></button>
+            <span class="hcal__month">{{ calMonthLabel() }}</span>
+            <button type="button" class="hcal__nav" (click)="nextCalMonth()" aria-label="Next month"><mat-icon aria-hidden="true">chevron_right</mat-icon></button>
+          </div>
+          <div class="hcal__dow" aria-hidden="true">
+            @for (d of weekdayLabels; track $index) { <span>{{ d }}</span> }
+          </div>
+          @if (calLoading()) {
+            <app-bs-skeleton height="200px" radius="var(--r-tile)" />
+          } @else {
+            <div class="hcal__grid">
+              @for (c of calCells(); track c.iso) {
+                <span class="hcal__day" [class.is-out]="!c.inMonth" [class.is-today]="c.isToday"
+                      [class.is-done]="c.complete" [class.is-skip]="c.skip">{{ c.dayNum }}</span>
+              }
+            </div>
+          }
+          <div class="hcal__legend" aria-hidden="true">
+            <span><i class="is-done"></i> Complete</span>
+            <span><i class="is-skip"></i> Skipped</span>
+          </div>
+        </div>
+      }
+    </app-bs-sheet>
+
     <app-bs-toaster />
   `,
   styleUrl: './habits-mobile.page.scss',
@@ -272,6 +345,12 @@ export class HabitsMobilePage {
 
   readonly habits = signal<HabitDto[]>([]);
   readonly leaderboard = signal<HabitLeaderboardRowDto[]>([]);
+  readonly coach = signal<HabitCoachDto | null>(null);
+
+  readonly canCoach = computed(() => {
+    this.auth.permissions();
+    return this.auth.hasPermission(PERM.trackerAi);
+  });
 
   readonly tabs: Segment[] = [
     { key: 'habits', label: 'Habits' },
@@ -302,6 +381,33 @@ export class HabitsMobilePage {
   readonly bestStreak = computed(() => this.habits().reduce((m, h) => Math.max(m, h.currentStreak), 0));
   readonly doneToday = computed(() => this.habits().filter((h) => h.today.complete).length);
 
+  // ---- per-habit streak calendar ----
+  readonly calOpen = signal(false);
+  readonly calHabit = signal<HabitDto | null>(null);
+  readonly calMonth = signal<Date>(this.firstOfMonth(new Date()));
+  readonly calDays = signal<Map<string, HabitDayDto>>(new Map());
+  readonly calLoading = signal(false);
+
+  readonly calCells = computed<HabitCalCell[]>(() => {
+    const first = this.calMonth();
+    const month = first.getMonth();
+    const gridStart = this.sundayOf(first);
+    const days = this.calDays();
+    const out: HabitCalCell[] = [];
+    for (let i = 0; i < 42; i++) {
+      const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+      const iso = this.toLocalDate(date);
+      const d = days.get(iso);
+      out.push({
+        iso, dayNum: date.getDate(), inMonth: date.getMonth() === month,
+        isToday: iso === this.today, complete: d?.complete ?? false, skip: d?.skip ?? false,
+      });
+    }
+    return out;
+  });
+  readonly calMonthLabel = computed(() =>
+    this.calMonth().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }));
+
   constructor() {
     void this.reload();
   }
@@ -325,11 +431,19 @@ export class HabitsMobilePage {
         if (!this.errored()) this.toast.show('Habits refreshed', { tone: 'success', durationMs: 1600 });
       }
     }
-    if (!this.errored()) void this.loadLeaderboard();
+    if (!this.errored()) {
+      void this.loadLeaderboard();
+      if (this.canCoach() && this.habits().length) void this.loadCoach();
+      else this.coach.set(null);
+    }
   }
 
   private async loadLeaderboard(): Promise<void> {
     try { this.leaderboard.set(await firstValueFrom(this.api.habitsLeaderboard())); } catch { /* best-effort */ }
+  }
+
+  private async loadCoach(): Promise<void> {
+    try { this.coach.set(await firstValueFrom(this.api.habitsCoach())); } catch { this.coach.set(null); }
   }
 
   // ---- today check / skip ----
@@ -346,13 +460,76 @@ export class HabitsMobilePage {
     await this.commitDay(h, { date: this.today, skip: !h.today.skip });
   }
 
+  /** Commit a measurable manual value from the inline input. */
+  async setTodayValue(h: HabitDto, raw: number | null): Promise<void> {
+    const value = raw == null || isNaN(raw) ? 0 : Math.max(0, raw);
+    await this.commitDay(h, { date: this.today, value });
+  }
+
+  /** Pause / resume a habit (status drives it: Active=0 / Paused=1). */
+  async pauseHabit(h: HabitDto): Promise<void> {
+    const next = h.status === 'Paused' ? 0 : 1;
+    try {
+      await firstValueFrom(this.api.updateHabit(h.id, { status: next }));
+      this.habits.set(await firstValueFrom(this.api.habits()));
+      void this.loadLeaderboard();
+    } catch (e) {
+      this.toast.show(this.messageOf(e, 'Could not update that habit.'), { tone: 'warn' });
+    }
+  }
+
   private async commitDay(h: HabitDto, body: { date: string; value?: number; done?: boolean; skip?: boolean }): Promise<void> {
     try {
       await firstValueFrom(this.api.upsertHabitDay(h.id, body));
       this.habits.set(await firstValueFrom(this.api.habits()));
       void this.loadLeaderboard();
+      if (this.calHabit()?.id === h.id) void this.loadCalendar(this.calHabit()!);
     } catch {
       this.toast.show("Couldn't save — try again.", { tone: 'warn' });
+    }
+  }
+
+  // ---- per-habit streak calendar ----
+
+  openCalendar(h: HabitDto): void {
+    this.calHabit.set(h);
+    this.calMonth.set(this.firstOfMonth(new Date()));
+    this.calOpen.set(true);
+    void this.loadCalendar(h);
+  }
+
+  prevCalMonth(): void {
+    const s = this.calMonth();
+    this.calMonth.set(new Date(s.getFullYear(), s.getMonth() - 1, 1));
+    if (this.calHabit()) void this.loadCalendar(this.calHabit()!);
+  }
+  nextCalMonth(): void {
+    const s = this.calMonth();
+    this.calMonth.set(new Date(s.getFullYear(), s.getMonth() + 1, 1));
+    if (this.calHabit()) void this.loadCalendar(this.calHabit()!);
+  }
+
+  private async loadCalendar(h: HabitDto): Promise<void> {
+    this.calLoading.set(true);
+    const gridStart = this.sundayOf(this.calMonth());
+    const map = new Map<string, HabitDayDto>();
+    try {
+      const promises: Promise<HabitDayDto>[] = [];
+      const isos: string[] = [];
+      for (let i = 0; i < 42; i++) {
+        const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+        const iso = this.toLocalDate(date);
+        if (iso > this.today) continue; // no future days
+        isos.push(iso);
+        promises.push(firstValueFrom(this.api.habitDay(h.id, iso)));
+      }
+      const results = await Promise.all(promises);
+      results.forEach((d, idx) => map.set(isos[idx], d));
+      this.calDays.set(map);
+    } catch {
+      this.calDays.set(new Map());
+    } finally {
+      this.calLoading.set(false);
     }
   }
 
@@ -438,6 +615,7 @@ export class HabitsMobilePage {
     }
   }
   isMeasurable(h: HabitDto): boolean { return h.targetValue != null; }
+  isManual(h: HabitDto): boolean { return h.autoSource === 'None'; }
   progressPct(h: HabitDto): number { return Math.round(Math.min(1, Math.max(0, h.today.progress)) * 100); }
   measurableLabel(h: HabitDto): string {
     if (h.targetValue == null) return '';
@@ -470,6 +648,8 @@ export class HabitsMobilePage {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
   private todayIso(): string { return this.toLocalDate(new Date()); }
+  private sundayOf(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay()); }
+  private firstOfMonth(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), 1); }
   private messageOf(e: unknown, fallback: string): string {
     const msg = (e as { error?: { message?: string } })?.error?.message;
     return typeof msg === 'string' && msg ? msg : fallback;

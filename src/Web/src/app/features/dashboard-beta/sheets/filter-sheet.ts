@@ -1,9 +1,10 @@
 import {
   ChangeDetectionStrategy, Component, computed, input, model, output, signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 
 import {
-  GroupBy, IngestionSource, MachineStat, ModelStat, ProjectDto, UsageFilter,
+  GroupBy, IngestionSource, MachineStat, ModelStat, ProjectDto, SavedView, UsageFilter,
 } from '../../../core/models';
 import { BetaBottomSheet, BetaSegmentedControl, type Segment } from '../../beta-ui';
 
@@ -20,7 +21,7 @@ import { BetaBottomSheet, BetaSegmentedControl, type Segment } from '../../beta-
   selector: 'app-pulse-filter-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BetaBottomSheet, BetaSegmentedControl],
+  imports: [BetaBottomSheet, BetaSegmentedControl, FormsModule],
   template: `
     <app-bs-sheet [(open)]="open" detent="full" label="Filter usage" (closed)="onClosed()">
       <div class="fs">
@@ -28,6 +29,55 @@ import { BetaBottomSheet, BetaSegmentedControl, type Segment } from '../../beta-
           <h2 class="fs__title">Filters</h2>
           <button type="button" class="fs__reset" (click)="reset()">Reset</button>
         </header>
+
+        <!-- Saved views: apply / rename / delete a named filter set. Save-current lives in the apply bar. -->
+        @if (savedViews().length) {
+          <section class="fs__group">
+            <h3 class="fs__label" id="fs-lbl-views">Saved views</h3>
+            <ul class="fs__views" role="group" aria-labelledby="fs-lbl-views">
+              @for (v of savedViews(); track v.id) {
+                <li class="view">
+                  @if (renamingId() === v.id) {
+                    <input class="view__rename" type="text" [ngModel]="renameDraft()"
+                           (ngModelChange)="renameDraft.set($event)"
+                           (keydown.enter)="commitRename(v)" (keydown.escape)="cancelRename()"
+                           aria-label="View name" />
+                    <button type="button" class="view__act view__act--ok" (click)="commitRename(v)"
+                            aria-label="Save name">Save</button>
+                    <button type="button" class="view__act" (click)="cancelRename()"
+                            aria-label="Cancel rename">Cancel</button>
+                  } @else {
+                    <button type="button" class="view__apply" (click)="applyView.emit(v)">{{ v.name }}</button>
+                    <button type="button" class="view__act" (click)="startRename(v)"
+                            aria-label="Rename view">Rename</button>
+                    <button type="button" class="view__act view__act--del" (click)="deleteView.emit(v)"
+                            aria-label="Delete view">Delete</button>
+                  }
+                </li>
+              }
+            </ul>
+          </section>
+        }
+
+        <!-- Custom range: from/to date inputs. Setting either clears the preset chip on apply. -->
+        <section class="fs__group">
+          <h3 class="fs__label">Custom range</h3>
+          <div class="fs__dates">
+            <label class="date">
+              <span class="date__cap">From</span>
+              <input class="date__in" type="date" [ngModel]="draft().from ?? ''"
+                     (ngModelChange)="setFrom($event)" aria-label="From date" />
+            </label>
+            <label class="date">
+              <span class="date__cap">To</span>
+              <input class="date__in" type="date" [ngModel]="draft().to ?? ''"
+                     (ngModelChange)="setTo($event)" aria-label="To date" />
+            </label>
+          </div>
+          @if (draft().from || draft().to) {
+            <button type="button" class="fs__reset fs__reset--inline" (click)="clearRange()">Clear range</button>
+          }
+        </section>
 
         @if (projects().length) {
           <section class="fs__group">
@@ -103,6 +153,8 @@ import { BetaBottomSheet, BetaSegmentedControl, type Segment } from '../../beta-
 
       <div class="fs__apply">
         <button type="button" class="fs__cancel" (click)="cancel()">Cancel</button>
+        <button type="button" class="fs__save" (click)="saveCurrent.emit(draft())"
+                aria-label="Save current filters as a view">Save view</button>
         <button type="button" class="fs__commit" (click)="apply()">
           Apply{{ activeCount() ? ' · ' + activeCount() : '' }}
         </button>
@@ -180,6 +232,47 @@ import { BetaBottomSheet, BetaSegmentedControl, type Segment } from '../../beta-
       background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--ink-on-accent); border: 0;
       box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--accent-a) 70%, transparent);
     }
+    .fs__save { flex: 0 0 auto; padding: 0 14px; background: var(--bg-rise); color: var(--ink); }
+
+    .fs__reset--inline { align-self: flex-start; padding: 0; min-height: 36px; }
+
+    /* Saved views list */
+    .fs__views { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .view { display: flex; align-items: center; gap: 8px; }
+    .view__apply {
+      flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 14px; border-radius: var(--r-tile);
+      background: var(--bg-rise); border: 1px solid var(--hairline); color: var(--ink);
+      font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .view__apply:active { background: color-mix(in srgb, var(--accent-a) 12%, var(--bg-rise)); }
+    .view__rename {
+      flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: var(--r-tile);
+      background: var(--bg-base); border: 1px solid color-mix(in srgb, var(--accent-a) 45%, var(--hairline));
+      color: var(--ink); font: inherit; font-size: 14px;
+    }
+    .view__act {
+      flex: 0 0 auto; min-height: 44px; padding: 0 12px; border-radius: var(--r-pill);
+      background: none; border: 1px solid var(--hairline); color: var(--ink-dim);
+      font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .view__act--del:active { color: var(--tech-danger, #f5556d); }
+    .view__act--ok {
+      background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--ink-on-accent); border: 0;
+    }
+
+    /* Custom range date inputs */
+    .fs__dates { display: flex; gap: 10px; }
+    .date { flex: 1 1 0; display: flex; flex-direction: column; gap: 6px; }
+    .date__cap {
+      font-size: 12px; font-weight: 700; letter-spacing: .03em; color: var(--ink-dim);
+    }
+    .date__in {
+      min-height: 44px; padding: 0 12px; border-radius: var(--r-tile);
+      background: var(--bg-rise); border: 1px solid var(--hairline); color: var(--ink);
+      font: inherit; font-size: 14px; width: 100%;
+    }
+    .date__in:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   `],
 })
 export class PulseFilterSheet {
@@ -196,8 +289,23 @@ export class PulseFilterSheet {
   readonly filter = input.required<UsageFilter>();
   readonly groupBy = input.required<GroupBy>();
 
+  /** Per-user saved views (owned + fetched by the page; the sheet only renders + emits intents). */
+  readonly savedViews = input<SavedView[]>([]);
+
   /** Emitted on Apply with the committed draft (page re-fetches). */
   readonly applied = output<{ filter: UsageFilter; groupBy: GroupBy }>();
+
+  /** Saved-view intents — the page owns the Api calls (saveView/updateView/deleteView). */
+  readonly applyView = output<SavedView>();
+  readonly deleteView = output<SavedView>();
+  /** Save the CURRENT draft filter as a named view; the page prompts for a name + upserts. */
+  readonly saveCurrent = output<UsageFilter>();
+  /** Rename an existing view: {view, name}. The page PUTs the same payload with only the name changed. */
+  readonly renameView = output<{ view: SavedView; name: string }>();
+
+  /** Inline rename state for the views list. */
+  readonly renamingId = signal<number | null>(null);
+  readonly renameDraft = signal('');
 
   protected readonly groupSegs: Segment[] = [
     { key: 'day', label: 'Day' },
@@ -234,6 +342,20 @@ export class PulseFilterSheet {
   toggleSource(s: string): void { this.draftFilter.update(f => ({ ...f, sources: toggle(f.sources, s) })); }
   toggleMachine(mc: string): void { this.draftFilter.update(f => ({ ...f, machine: toggle(f.machine, mc) })); }
   toggleSidechain(): void { this.draftFilter.update(f => ({ ...f, includeSidechain: !f.includeSidechain })); }
+
+  // ---- custom date range (empty string ⇒ null) ----
+  setFrom(v: string): void { this.draftFilter.update(f => ({ ...f, from: v || null })); }
+  setTo(v: string): void { this.draftFilter.update(f => ({ ...f, to: v || null })); }
+  clearRange(): void { this.draftFilter.update(f => ({ ...f, from: null, to: null })); }
+
+  // ---- inline rename of a saved view ----
+  startRename(v: SavedView): void { this.renamingId.set(v.id); this.renameDraft.set(v.name); }
+  cancelRename(): void { this.renamingId.set(null); }
+  commitRename(v: SavedView): void {
+    const name = this.renameDraft().trim();
+    this.renamingId.set(null);
+    if (name && name !== v.name) this.renameView.emit({ view: v, name });
+  }
 
   reset(): void { this.draftFilter.set(this.blankFilter()); this.draftGroupBy.set('day'); }
 

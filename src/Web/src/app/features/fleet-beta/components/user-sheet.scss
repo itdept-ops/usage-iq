@@ -1,0 +1,72 @@
+// BETA FLEET · UserSheet — detail content inside the kit BottomSheet. Inherits the Strata cascade
+// off the host page; the sheet primitive owns the panel/glass/scrim chrome.
+
+:host { display: contents; }
+
+.us { display: flex; flex-direction: column; gap: 18px; padding: 6px 2px 8px; }
+
+// ---- hero ----
+.us__hero { display: flex; align-items: center; gap: 14px; }
+.us__ico {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 54px; height: 54px; border-radius: var(--r-tile);
+  background: color-mix(in srgb, var(--accent-a) 12%, transparent);
+  border: 1px solid var(--glass-edge); color: var(--accent-a);
+}
+.us__ico mat-icon { font-size: 28px; width: 28px; height: 28px; }
+.us__id { min-width: 0; }
+.us__name {
+  margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 24px;
+  letter-spacing: -.02em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.us__state {
+  margin: 2px 0 0; display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--ink-dim);
+}
+.us__sep { color: var(--ink-faint); }
+
+// ---- tiles ----
+.us__tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+// ---- sections ----
+.us__sec { display: flex; flex-direction: column; gap: 10px; }
+.us__sec-h {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim);
+}
+
+// chips — tinted accent bg + accent border
+.us__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.us__chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--accent-a) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-a) 30%, transparent);
+  font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.us__chip mat-icon { font-size: 16px; width: 16px; height: 16px; color: var(--accent-a); }
+.us__none { font-size: 13px; color: var(--ink-faint); }
+
+// management actions
+.us__actions { display: flex; flex-direction: column; gap: 8px; }
+.us__action {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 12px 14px; border-radius: var(--r-tile);
+  background: var(--bg-rise); border: 1px solid var(--hairline);
+  color: var(--ink); font: inherit; font-weight: 700; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--ease-spring), border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+}
+.us__action mat-icon { flex: 0 0 auto; font-size: 20px; width: 20px; height: 20px; color: var(--accent-a); }
+.us__action-t { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+@media (hover: hover) {
+  .us__action:hover { border-color: color-mix(in srgb, var(--accent-a) 40%, transparent); background: color-mix(in srgb, var(--accent-a) 6%, var(--bg-rise)); }
+}
+.us__action:active { transform: scale(.985); }
+.us__action:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.us__action.is-danger { color: var(--warn); }
+.us__action.is-danger mat-icon { color: var(--warn); }
+@media (hover: hover) {
+  .us__action.is-danger:hover { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 8%, var(--bg-rise)); }
+}

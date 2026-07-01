@@ -75,7 +75,26 @@
 }
 
 .hh__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.hh__text { min-width: 0; }
+.hh__text { min-width: 0; flex: 1 1 auto; }
+
+// Header action cluster: Sync / Export / Share + the filter button.
+.hh__actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.hh__act {
+  flex: 0 0 auto; display: inline-grid; place-items: center; width: 44px; height: 44px;
+  border-radius: var(--r-tile); border: 1px solid var(--hairline);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+  color: var(--ink); cursor: pointer;
+  transition: transform 120ms var(--ease-spring), color 120ms var(--ease-out);
+}
+.hh__act:active { transform: scale(.92); }
+.hh__act:disabled { opacity: .55; cursor: progress; }
+.hh__act:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hh__act mat-icon { font-size: 22px; width: 22px; height: 22px; }
+.hh__act-spin { animation: hh-spin 900ms linear infinite; }
+@keyframes hh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .hh__act-spin { animation: none; } }
 .hh__eyebrow {
   display: block; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   color: var(--ink-dim); margin-bottom: 4px;
@@ -199,6 +218,30 @@
   &__title { font-size: 15px; font-weight: 700; color: var(--ink); }
   &__go { flex: none; color: var(--accent-a); font-size: 22px; width: 22px; height: 22px; }
 }
+
+// ───────── Name-a-view sheet ─────────
+.nv { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 calc(8px + var(--safe-bottom)); }
+.nv__title { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
+.nv__sub { margin: 0; font-size: 13px; color: var(--ink-dim); }
+.nv__input {
+  min-height: 48px; padding: 0 14px; border-radius: var(--r-tile);
+  background: var(--bg-rise); border: 1px solid var(--hairline); color: var(--ink);
+  font: inherit; font-size: 15px; width: 100%;
+}
+.nv__input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.nv__row { display: flex; gap: 10px; margin-top: 4px; }
+.nv__cancel, .nv__save {
+  flex: 1 1 auto; min-height: 50px; border-radius: var(--r-pill); font: inherit;
+  font-size: 15px; font-weight: 700; cursor: pointer; border: 1px solid var(--hairline);
+  transition: transform 120ms var(--ease-spring);
+}
+.nv__cancel:active, .nv__save:active { transform: scale(.98); }
+.nv__cancel { flex: 0 0 38%; background: var(--bg-rise); color: var(--ink-dim); }
+.nv__save {
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: var(--ink-on-accent); border: 0;
+  box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--accent-a) 70%, transparent);
+}
+.nv__save:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
 
 // No 390px overflow: everything is fluid by construction.
 :host, .pb-scroll { max-width: 100vw; }

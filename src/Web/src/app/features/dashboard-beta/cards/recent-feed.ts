@@ -4,7 +4,10 @@ import { MatIconModule } from '@angular/material/icon';
 
 import { PagedResult, UsageRecord } from '../../../core/models';
 import { CompactPipe } from '../../../shared/format';
-import { BetaSectionHeader, BetaSkeleton } from '../../beta-ui';
+import { BetaSectionHeader, BetaSkeleton, BetaSegmentedControl, type Segment } from '../../beta-ui';
+
+/** Server sort keys accepted by Api.records (date/model/input/output/cost). */
+export type RecordSort = 'timestamp' | 'model' | 'input' | 'output' | 'cost';
 
 /**
  * The RECENT feed — a vertical two-line list of {@link UsageRecord}s for the current filter, rebuilt
@@ -16,10 +19,15 @@ import { BetaSectionHeader, BetaSkeleton } from '../../beta-ui';
   selector: 'app-pulse-recent',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, CompactPipe, MatIconModule, BetaSectionHeader, BetaSkeleton],
+  imports: [DatePipe, CompactPipe, MatIconModule, BetaSectionHeader, BetaSkeleton, BetaSegmentedControl],
   template: `
     <div class="rf">
       <app-bs-section-header title="Recent" [subtitle]="countLabel()" icon="receipt_long" />
+
+      <div class="rf__sort-scroll">
+        <app-bs-segmented class="rf__sort" [segments]="sortSegs" [value]="sort()"
+                          label="Sort records" (change)="sortChange.emit($any($event))" />
+      </div>
 
       @if (loading() && !items().length) {
         <div class="rf__skeleton">
@@ -69,6 +77,14 @@ import { BetaSectionHeader, BetaSkeleton } from '../../beta-ui';
   styles: [`
     :host { display: block; }
     .rf { display: flex; flex-direction: column; gap: 12px; }
+
+    /* 5 sort options overflow 390px — scroll the segmented control horizontally, momentum + hidden bar. */
+    .rf__sort-scroll {
+      overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain; scrollbar-width: none; margin-inline: -2px; padding: 2px;
+    }
+    .rf__sort-scroll::-webkit-scrollbar { display: none; }
+    .rf__sort-scroll app-bs-segmented { min-width: max-content; }
 
     .rf__skeleton { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; }
     .rf__sk-row { display: flex; flex-direction: column; gap: 7px; }
@@ -139,6 +155,19 @@ export class PulseRecentFeed {
   readonly page = input<PagedResult<UsageRecord> | null>(null);
   readonly loading = input<boolean>(false);
   readonly loadingMore = input<boolean>(false);
+  /** Active server sort key (owned by the page; the feed just reflects + emits changes). */
+  readonly sort = input<RecordSort>('timestamp');
+
+  /** Emitted when the user picks a different sort; the page refetches page 1 with it. */
+  readonly sortChange = output<RecordSort>();
+
+  protected readonly sortSegs: Segment[] = [
+    { key: 'timestamp', label: 'Date' },
+    { key: 'cost', label: 'Cost' },
+    { key: 'model', label: 'Model' },
+    { key: 'input', label: 'Input' },
+    { key: 'output', label: 'Output' },
+  ];
 
   /** Emitted to ask the page for the next page (it appends + re-renders). */
   readonly more = output<void>();

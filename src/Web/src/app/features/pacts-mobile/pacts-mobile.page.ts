@@ -93,6 +93,7 @@ const KINDS: readonly { key: PactKind; label: string; icon: string; unit: string
                             [attr.aria-pressed]="isInvited(c.userId)" (click)="toggleInvitee(c.userId)">
                       <span class="pm-invitee__avatar" aria-hidden="true">{{ initials(c.name) }}</span>
                       {{ c.name }}
+                      @if (isInvited(c.userId)) { <mat-icon class="pm-invitee__check" aria-hidden="true">check</mat-icon> }
                     </button>
                   }
                 </div>
@@ -137,6 +138,11 @@ const KINDS: readonly { key: PactKind; label: string; icon: string; unit: string
             <span class="pm-state__orb"><mat-icon aria-hidden="true">handshake</mat-icon></span>
             <h2 class="pm-state__title">No pacts yet</h2>
             <p class="pm-state__body">Start one to keep yourself — and your circle — honest.</p>
+            @if (!showCreate()) {
+              <button type="button" class="pm-state__cta" (click)="toggleCreate()">
+                <mat-icon aria-hidden="true">add</mat-icon> New pact
+              </button>
+            }
           </div>
 
         } @else {
@@ -148,7 +154,7 @@ const KINDS: readonly { key: PactKind; label: string; icon: string; unit: string
                   <div class="pm-card__id">
                     <h3 class="pm-card__title">{{ p.title }}</h3>
                     <p class="pm-card__meta">
-                      {{ p.targetIntValue }} {{ unitFor(p.kind) }} · {{ p.periodDays }}d
+                      {{ labelFor(p.kind) }} · {{ p.targetIntValue }} {{ unitFor(p.kind) }} · {{ p.periodDays }}d
                       @if (!p.archived && daysLeft(p) > 0) { · {{ daysLeft(p) }}d left }
                       @if (p.archived) { · archived }
                     </p>
@@ -162,7 +168,10 @@ const KINDS: readonly { key: PactKind; label: string; icon: string; unit: string
 
                 <div class="pm-card__members">
                   @for (m of activeMembers(p); track m.userId) {
-                    <span class="pm-mchip" aria-hidden="true">{{ initials(m.name) }}</span>
+                    <span class="pm-member">
+                      <span class="pm-member__avatar" aria-hidden="true">{{ initials(m.name) }}</span>
+                      <span class="pm-member__name">{{ m.name }}</span>
+                    </span>
                   }
                   <span class="pm-card__mcount">{{ activeMembers(p).length }} in</span>
                 </div>
@@ -274,6 +283,7 @@ export class PactsMobilePage {
   }
 
   iconFor(kind: string): string { return this.kinds.find((k) => k.key === kind)?.icon ?? 'flag'; }
+  labelFor(kind: string): string { return this.kinds.find((k) => k.key === kind)?.label ?? 'Activity'; }
   unitFor(kind: string): string { return this.kinds.find((k) => k.key === kind)?.unit ?? 'logs'; }
 
   activeMembers(p: PactDto): { userId: number; name: string }[] {
@@ -306,11 +316,19 @@ export class PactsMobilePage {
       .subscribe((p) => {
         if (p) {
           this.pacts.update((cur) => [p, ...cur]);
-          this.draftTitle.set(''); this.draftInvitees.set(new Set());
+          this.resetDraft();
           this.showCreate.set(false);
         }
         this.creating.set(false);
       });
+  }
+
+  private resetDraft(): void {
+    this.draftTitle.set('');
+    this.draftKind = 'workout.logged';
+    this.draftTarget = 5;
+    this.draftPeriod = 7;
+    this.draftInvitees.set(new Set());
   }
 
   toggleExpand(p: PactDto): void {

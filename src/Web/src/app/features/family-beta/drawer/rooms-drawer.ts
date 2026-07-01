@@ -34,6 +34,10 @@ const ROOMS: Room[] = [
   { key: 'locations', label: "Where's everyone", icon: 'person_pin_circle', route: '/family/locations' },
   { key: 'allowance', label: 'Allowance', icon: 'savings', route: '/family/allowance', perm: PERM.allowanceManage },
   { key: 'finance', label: 'Finance', icon: 'account_balance_wallet', route: '/family/finance', perm: PERM.familyFinance },
+  // Household management + family settings — the desktop family-home reaches these via a header "Household"
+  // doorway (and Settings from inside Household). No extra client perm: both pages gate/authorize server-side.
+  { key: 'household', label: 'Household', icon: 'diversity_3', route: '/family/household' },
+  { key: 'settings', label: 'Family settings', icon: 'settings', route: '/family/settings' },
 ];
 
 /**

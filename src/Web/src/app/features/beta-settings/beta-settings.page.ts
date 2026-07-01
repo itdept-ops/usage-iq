@@ -1,17 +1,23 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { DecimalPipe } from '@angular/common';
+import { timer, switchMap, catchError, of } from 'rxjs';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
 import { ThemeService, ThemeMode } from '../../core/theme';
 import { UnitService, UnitSystem } from '../../core/unit.service';
 import {
-  ALL_DISCORD_CATEGORIES, DISCORD_CATEGORY_META, DisplayNameMode, LocationSettings, MyDiscord,
-  MyDiscordCategories, NotificationPreferenceDto, PERM, ProfilePrefs,
+  ALL_DISCORD_CATEGORIES, DISCORD_CATEGORY_META, DiscordRoute, DisplayNameMode, IngestionSource,
+  LocationSettings, MyDiscord, MyDiscordCategories, NotificationPreferenceDto, NotificationSettings,
+  NotificationUpdate, PERM, ProfilePrefs, Settings as SettingsModel, SyncResult, SyncStatus,
 } from '../../core/models';
+import { timeAgo, humanizeInterval } from '../../shared/format';
 
 import {
-  BetaPullRefresh, BetaSectionHeader, BetaSegmentedControl,
+  BetaEmptyState, BetaPullRefresh, BetaSectionHeader, BetaSegmentedControl,
   BetaSkeleton, BetaToaster, ToastController, Segment,
 } from '../beta-ui';
 import { BetaToggleRow } from './beta-toggle-row';
@@ -41,8 +47,8 @@ import { HomeOption, HOME_OPTIONS } from '../../core/home-options';
   providers: [ToastController],
   styleUrl: './beta-settings.page.scss',
   imports: [
-    RouterLink,
-    BetaPullRefresh, BetaSectionHeader, BetaSegmentedControl,
+    RouterLink, DecimalPipe,
+    BetaEmptyState, BetaPullRefresh, BetaSectionHeader, BetaSegmentedControl,
     BetaSkeleton, BetaToaster, BetaToggleRow,
   ],
   template: `
@@ -238,6 +244,221 @@ import { HomeOption, HOME_OPTIONS } from '../../core/home-options';
           </section>
         }
 
+        <!-- ═════════════════ ADMIN — INGESTION (timezone + auto-sync + run-now) ═════════════════ -->
+        @if (isAdmin()) {
+          @if (settings(); as m) {
+            <section class="rise" [style.--i]="7">
+              <app-bs-section-header title="Ingestion" subtitle="Timezone, auto-sync cadence & manual sync" icon="sync" />
+              <div class="card card--pad">
+                <div class="sync-pill" [attr.data-state]="syncState()" aria-live="polite">
+                  <span class="sync-pill__dot"></span>
+                  <span class="sync-pill__txt">Synced {{ lastSyncedLabel() }}</span>
+                  @if (autoSyncLabel()) { <span class="sync-pill__sep">·</span><span class="sync-pill__txt">{{ autoSyncLabel() }}</span> }
+                </div>
+
+                <label class="fld">
+                  <span class="fld__label">Display timezone (IANA)</span>
+                  <select class="fld__input" [value]="m.displayTimeZone"
+                          (change)="patchSettings('displayTimeZone', $any($event.target).value)"
+                          aria-label="Display timezone">
+                    @for (z of zones(); track z) { <option [value]="z">{{ z }}</option> }
+                  </select>
+                  <span class="fld__hint">Controls how events are bucketed into days & months.</span>
+                </label>
+
+                <label class="fld">
+                  <span class="fld__label">Auto-sync interval (seconds)</span>
+                  <input class="fld__input mono-num" type="number" inputmode="numeric" min="30" step="30"
+                         [value]="m.autoSyncIntervalSeconds" [disabled]="!m.autoSyncEnabled"
+                         (input)="patchSettings('autoSyncIntervalSeconds', +$any($event.target).value)"
+                         aria-label="Auto-sync interval in seconds" />
+                  <span class="fld__hint">Background re-sync cadence (minimum 30s).</span>
+                </label>
+
+                <div class="card card--list flush-list">
+                  <app-beta-toggle-row title="Background auto-sync" subtitle="Re-scan logs on a timer"
+                                       icon="autorenew" [checked]="m.autoSyncEnabled"
+                                       (toggle)="patchSettings('autoSyncEnabled', $event)" />
+                </div>
+
+                <div class="act-row">
+                  @if (auth.hasPermission(PERM.settingsManage)) {
+                    <button type="button" class="btn btn--primary" [disabled]="savingSettings()" (click)="saveSettings()">
+                      {{ savingSettings() ? 'Saving…' : 'Save settings' }}
+                    </button>
+                  }
+                  @if (auth.hasPermission(PERM.syncRun)) {
+                    <button type="button" class="btn btn--ghost" [disabled]="syncing()" (click)="runSync()">
+                      {{ syncing() ? 'Syncing…' : 'Run sync now' }}
+                    </button>
+                  }
+                </div>
+              </div>
+            </section>
+
+            <!-- ── SOURCES (per-source enable + editable root path) ── -->
+            <section class="rise" [style.--i]="8">
+              <app-bs-section-header title="Sources" [subtitle]="sources().length + ' configured'" icon="folder" />
+              @for (s of sources(); track s.id) {
+                <div class="card card--pad src" [class.src--off]="!s.enabled">
+                  <div class="card card--list flush-list">
+                    <app-beta-toggle-row [title]="s.name"
+                                         [subtitle]="s.kind + ' · ' + (s.records | number) + ' rows'"
+                                         icon="storage" [checked]="s.enabled"
+                                         (toggle)="setSourceEnabled(s, $event)" />
+                  </div>
+                  <label class="fld">
+                    <span class="fld__label">Root path</span>
+                    <input class="fld__input mono-num" type="text" autocomplete="off"
+                           [value]="s.rootPath" (input)="s.rootPath = $any($event.target).value"
+                           [attr.aria-label]="'Root path for ' + s.name" />
+                  </label>
+                  @if (auth.hasPermission(PERM.settingsManage)) {
+                    <div class="act-row">
+                      <button type="button" class="btn btn--ghost" [disabled]="savingSourceId() === s.id"
+                              (click)="saveSource(s)">
+                        {{ savingSourceId() === s.id ? 'Saving…' : 'Save source' }}
+                      </button>
+                    </div>
+                  }
+                </div>
+              } @empty {
+                <app-bs-empty icon="folder_open" title="No sources configured yet" compact
+                              body="Ingestion paths appear here once the backend is configured." />
+              }
+            </section>
+          }
+
+          <!-- ── ADMIN DISCORD SYSTEM CONFIG (notificationsView/Manage) ── -->
+          @if (canViewNotif()) {
+            @if (notif(); as n) {
+              <section class="rise" [style.--i]="9">
+                <app-bs-section-header title="Discord notifications" subtitle="System digests & spend alerts" icon="notifications_active" />
+                <div class="card card--list flush-list">
+                  <app-beta-toggle-row title="Enabled" subtitle="Post system alerts to the channel"
+                                       icon="power_settings_new" [checked]="n.enabled" [disabled]="!canManageNotif()"
+                                       (toggle)="patchNotif('enabled', $event)" />
+                </div>
+                <div class="card card--pad">
+                  <label class="fld">
+                    <span class="fld__label">Discord webhook URL</span>
+                    <input class="fld__input mono-num" type="password" autocomplete="off"
+                           placeholder="https://discord.com/api/webhooks/…"
+                           [value]="webhookInput()" (input)="webhookInput.set($any($event.target).value)"
+                           [disabled]="!canManageNotif()" aria-label="Discord webhook URL" />
+                    <span class="fld__hint">{{ n.webhookConfigured ? 'Configured (' + n.webhookMasked + ') — paste a new URL to replace.' : 'Paste your channel webhook URL.' }}</span>
+                  </label>
+
+                  <div class="fld-2col">
+                    <label class="fld">
+                      <span class="fld__label">Digest hour (local)</span>
+                      <input class="fld__input mono-num" type="number" inputmode="numeric" min="0" max="23"
+                             [value]="n.digestHourLocal" (input)="patchNotif('digestHourLocal', +$any($event.target).value)"
+                             [disabled]="!canManageNotif()" aria-label="Digest hour local" />
+                    </label>
+                    <label class="fld">
+                      <span class="fld__label">Weekly day</span>
+                      <select class="fld__input" [value]="n.weeklyDay"
+                              (change)="patchNotif('weeklyDay', +$any($event.target).value)"
+                              [disabled]="!canManageNotif()" aria-label="Weekly digest day">
+                        @for (d of weekdays; track $index) { <option [value]="$index">{{ d }}</option> }
+                      </select>
+                    </label>
+                  </div>
+
+                  <div class="fld-2col">
+                    <label class="fld">
+                      <span class="fld__label">Spend alert ($ / day)</span>
+                      <input class="fld__input mono-num" type="number" inputmode="decimal" min="0" step="10"
+                             [value]="n.thresholdUsd" (input)="patchNotif('thresholdUsd', +$any($event.target).value)"
+                             [disabled]="!canManageNotif()" aria-label="Spend alert threshold" />
+                    </label>
+                    <label class="fld">
+                      <span class="fld__label">Global mention</span>
+                      <input class="fld__input mono-num" type="text" maxlength="64" placeholder="@here or <@&roleId>"
+                             [value]="n.mentionOnAlert ?? ''" (input)="patchNotif('mentionOnAlert', $any($event.target).value)"
+                             [disabled]="!canManageNotif()" aria-label="Global mention" />
+                    </label>
+                  </div>
+
+                  @if (canManageNotif()) {
+                    <div class="act-row act-row--wrap">
+                      <button type="button" class="btn btn--primary" [disabled]="savingNotif()" (click)="saveNotif()">
+                        {{ savingNotif() ? 'Saving…' : 'Save' }}
+                      </button>
+                      <button type="button" class="btn btn--ghost" [disabled]="testingNotif() || !n.webhookConfigured" (click)="testNotif()">
+                        {{ testingNotif() ? 'Sending…' : 'Send test' }}
+                      </button>
+                      <button type="button" class="btn btn--ghost" [disabled]="sendingSnapshot() || !n.webhookConfigured" (click)="sendSnapshot()">
+                        {{ sendingSnapshot() ? 'Sending…' : 'Send usage now' }}
+                      </button>
+                      @if (n.webhookConfigured) {
+                        <button type="button" class="btn btn--danger" [disabled]="savingNotif()" (click)="removeWebhook()">Remove</button>
+                      }
+                    </div>
+                  }
+                </div>
+
+                <!-- ── Event routing table ── -->
+                <p class="grp-cap">Event routing</p>
+                @if (routesLoading()) {
+                  <div class="card card--list skel-list" aria-hidden="true">
+                    <app-bs-skeleton height="56px" radius="0" />
+                    <app-bs-skeleton height="56px" radius="0" />
+                  </div>
+                } @else if (routesError()) {
+                  <app-bs-empty icon="cloud_off" title="Couldn’t load the routing table" compact
+                                body="Check your connection and try again."
+                                ctaLabel="Retry" ctaIcon="refresh" (action)="loadRoutes()" />
+                } @else {
+                  <div class="card card--list">
+                    @for (r of routes(); track r.eventKey) {
+                      <div class="route" [class.route--off]="!r.enabled" [class.route--saving]="savingRouteKey() === r.eventKey">
+                        <app-beta-toggle-row [title]="r.label" [subtitle]="r.eventKey"
+                                             [checked]="r.enabled" [busy]="savingRouteKey() === r.eventKey"
+                                             [disabled]="!canManageNotif()"
+                                             (toggle)="toggleRoute(r, $event)" />
+                        <label class="fld route__mention">
+                          <input class="fld__input mono-num" type="text" maxlength="64" placeholder="Mention (optional)"
+                                 [value]="r.mention ?? ''"
+                                 (blur)="saveRouteMention(r, $any($event.target).value)"
+                                 [disabled]="!canManageNotif() || savingRouteKey() === r.eventKey"
+                                 [attr.aria-label]="'Mention for ' + r.label" />
+                        </label>
+                      </div>
+                    } @empty {
+                      <app-bs-empty icon="alt_route" title="No routes configured" compact
+                                    body="Event routes control which Discord notifications forward." />
+                    }
+                  </div>
+                }
+              </section>
+            }
+          }
+
+          <!-- ── LAST SYNC RESULT (after a manual sync) ── -->
+          @if (lastSync(); as r) {
+            <section class="rise" [style.--i]="10">
+              <app-bs-section-header title="Last sync"
+                                     [subtitle]="(r.unpricedModels.length || r.sourceWarnings.length || r.warning) ? 'Completed with notes' : 'Completed'"
+                                     icon="task_alt" />
+              <div class="card card--pad result" [class.result--warn]="r.unpricedModels.length || r.sourceWarnings.length || r.warning">
+                <div class="kv"><span>Files parsed / scanned</span><b class="mono-num">{{ r.filesParsed | number }} / {{ r.filesScanned | number }}</b></div>
+                <div class="kv"><span>New rows</span><b class="mono-num kv--accent">{{ r.newRecords | number }}</b></div>
+                @for (pair of lastSyncBySource(); track pair[0]) {
+                  <div class="kv kv--sub"><span>↳ {{ pair[0] }}</span><b class="mono-num kv--accent">+{{ pair[1] | number }}</b></div>
+                }
+                <div class="kv"><span>Duration</span><b class="mono-num">{{ (r.durationMs / 1000).toFixed(1) }}s</b></div>
+                @if (r.unpricedModels.length) {
+                  <div class="kv kv--warn"><span>Unpriced models</span><b class="mono-num">{{ r.unpricedModels.join(', ') }}</b></div>
+                }
+                @for (w of r.sourceWarnings; track w) { <div class="kv kv--warn"><span>Source</span><b>{{ w }}</b></div> }
+                @if (r.warning) { <div class="kv kv--warn"><span>Warning</span><b>{{ r.warning }}</b></div> }
+              </div>
+            </section>
+          }
+        }
+
         <p class="foot">Quick toggles — changes save automatically. The full editors live on the
           <a routerLink="/preferences">Settings hub</a>.</p>
         <div class="scroll__foot" aria-hidden="true"></div>
@@ -250,13 +471,84 @@ import { HomeOption, HOME_OPTIONS } from '../../core/home-options';
 })
 export class BetaSettingsPage {
   private api = inject(Api);
-  private auth = inject(AuthService);
   private toasts = inject(ToastController);
   readonly theme = inject(ThemeService);
   readonly units = inject(UnitService);
 
+  readonly auth = inject(AuthService);
+  readonly PERM = PERM;
+
   readonly canChat = computed(() => this.auth.hasPermission(PERM.chatRead));
   readonly canLocation = computed(() => this.auth.hasPermission(PERM.locationSelf));
+
+  // ── ADMIN (ingestion / sources / system Discord) — perm-gated exactly like desktop ──
+  /** Any admin ingestion capability the desktop exposes (mirrors the desktop's gates). */
+  readonly isAdmin = computed(() =>
+    this.auth.hasPermission(PERM.settingsManage) ||
+    this.auth.hasPermission(PERM.syncRun) ||
+    this.auth.hasPermission(PERM.notificationsView) ||
+    this.auth.hasPermission(PERM.notificationsManage),
+  );
+  readonly canViewNotif = computed(() =>
+    this.auth.hasPermission(PERM.notificationsView) || this.auth.hasPermission(PERM.notificationsManage),
+  );
+  readonly canManageNotif = computed(() => this.auth.hasPermission(PERM.notificationsManage));
+
+  readonly settings = signal<SettingsModel | null>(null);
+  readonly sources = signal<IngestionSource[]>([]);
+  readonly savingSettings = signal(false);
+  readonly savingSourceId = signal<number | null>(null);
+  readonly syncing = signal(false);
+  readonly lastSync = signal<SyncResult | null>(null);
+  readonly status = signal<SyncStatus | null>(null);
+  private readonly now = signal(Date.now());
+
+  readonly notif = signal<NotificationSettings | null>(null);
+  readonly webhookInput = signal('');
+  readonly savingNotif = signal(false);
+  readonly testingNotif = signal(false);
+  readonly sendingSnapshot = signal(false);
+  readonly weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  readonly routes = signal<DiscordRoute[]>([]);
+  readonly routesLoading = signal(false);
+  readonly routesError = signal(false);
+  readonly savingRouteKey = signal<string | null>(null);
+
+  readonly lastSyncBySource = computed(() => Object.entries(this.lastSync()?.newRecordsBySource ?? {}));
+
+  readonly lastSyncedLabel = computed(() => {
+    const s = this.status();
+    const n = this.now();
+    if (!s) return '—';
+    if (s.isRunning) return 'syncing now…';
+    return s.lastSyncUtc
+      ? `${timeAgo(s.lastSyncUtc, n)} · +${s.lastNewRecords.toLocaleString()} rows`
+      : 'never';
+  });
+  readonly autoSyncLabel = computed(() => {
+    const s = this.status();
+    if (!s) return '';
+    return s.autoSyncEnabled ? `Auto-sync every ${humanizeInterval(s.intervalSeconds)}` : 'Auto-sync off';
+  });
+  readonly syncState = computed(() => {
+    const s = this.status();
+    if (!s) return 'idle';
+    if (s.isRunning) return 'running';
+    if (s.lastError) return 'error';
+    return s.lastSyncUtc ? 'ok' : 'idle';
+  });
+
+  private readonly commonZones = [
+    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix',
+    'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu', 'UTC',
+    'Europe/London', 'Europe/Berlin', 'Europe/Madrid', 'Asia/Kolkata',
+    'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney',
+  ];
+  readonly zones = computed(() => {
+    const cur = this.settings()?.displayTimeZone;
+    return cur && !this.commonZones.includes(cur) ? [cur, ...this.commonZones] : this.commonZones;
+  });
 
   readonly prefs = signal<NotificationPreferenceDto | null>(null);
   readonly discord = signal<MyDiscord | null>(null);
@@ -349,6 +641,36 @@ export class BetaSettingsPage {
     }
     // Ensure the unit signal reflects the persisted preference when this page is the entry point.
     void this.units.load();
+
+    // ── ADMIN ingestion sections (perm-gated exactly like desktop) ──
+    if (this.isAdmin()) {
+      this.loadAdmin();
+      // Poll sync status every 15s (also fed by the API's background auto-sync); "now" keeps the label fresh.
+      timer(0, 15000)
+        .pipe(
+          switchMap(() => this.api.syncStatus().pipe(catchError(() => of(null)))),
+          takeUntilDestroyed(),
+        )
+        .subscribe(s => { this.now.set(Date.now()); if (s) this.status.set(s); });
+    }
+  }
+
+  private loadAdmin(): void {
+    this.api.settings().subscribe({ next: s => this.settings.set(s), error: () => {} });
+    this.api.sources().subscribe({ next: s => this.sources.set(s), error: () => {} });
+    if (this.canViewNotif()) {
+      this.api.notifications().subscribe({ next: n => this.notif.set(n), error: () => {} });
+      this.loadRoutes();
+    }
+  }
+
+  loadRoutes(): void {
+    this.routesLoading.set(true);
+    this.routesError.set(false);
+    this.api.discordRoutes().subscribe({
+      next: r => { this.routes.set([...r].sort((a, b) => a.sortOrder - b.sortOrder)); this.routesLoading.set(false); },
+      error: () => { this.routesLoading.set(false); this.routesError.set(true); },
+    });
   }
 
   private loadProfile(): void {
@@ -380,6 +702,7 @@ export class BetaSettingsPage {
       if (this.canLocation()) {
         this.api.locationSettings().subscribe({ next: l => this.location.set(l), error: () => {} });
       }
+      if (this.isAdmin()) this.loadAdmin();
       await Promise.allSettled([this.units.load()]);
       await new Promise(r => setTimeout(r, 350));
     } finally {
@@ -469,6 +792,119 @@ export class BetaSettingsPage {
     this.api.setHomeRoute(route).subscribe({
       next: res => this.auth.applyHomeRoute(res.homeRoute),
       error: () => { this.auth.applyHomeRoute(prev); this.fail('your home page'); },
+    });
+  }
+
+  // ══════════════════ ADMIN — INGESTION SETTINGS ══════════════════
+  patchSettings<K extends keyof SettingsModel>(key: K, value: SettingsModel[K]): void {
+    this.settings.update(m => (m ? { ...m, [key]: value } : m));
+  }
+
+  saveSettings(): void {
+    const m = this.settings();
+    if (!m) return;
+    this.savingSettings.set(true);
+    this.api.saveSettings(m).subscribe({
+      next: () => { this.savingSettings.set(false); this.toasts.show('Settings saved (local dates re-bucketed if timezone changed).', { tone: 'success' }); },
+      error: () => { this.savingSettings.set(false); this.toasts.show('Save failed (check the timezone is a valid IANA id).', { tone: 'warn' }); },
+    });
+  }
+
+  runSync(): void {
+    this.syncing.set(true);
+    this.api.sync().subscribe({
+      next: r => {
+        this.syncing.set(false);
+        this.lastSync.set(r);
+        this.now.set(Date.now());
+        this.api.sources().subscribe({ next: s => this.sources.set(s), error: () => {} });
+        this.api.syncStatus().subscribe({ next: st => this.status.set(st), error: () => {} });
+        this.toasts.show(
+          r.error ? `Sync error: ${r.error}` : `Synced +${r.newRecords.toLocaleString()} rows`,
+          { tone: r.error ? 'warn' : 'success' },
+        );
+      },
+      error: () => { this.syncing.set(false); this.toasts.show('Sync failed.', { tone: 'warn' }); },
+    });
+  }
+
+  // ══════════════════ ADMIN — SOURCES ══════════════════
+  setSourceEnabled(s: IngestionSource, enabled: boolean): void {
+    this.sources.update(list => list.map(x => (x.id === s.id ? { ...x, enabled } : x)));
+  }
+
+  saveSource(s: IngestionSource): void {
+    this.savingSourceId.set(s.id);
+    this.api.updateSource(s.id, s).subscribe({
+      next: () => { this.savingSourceId.set(null); this.toasts.show(`Saved source “${s.name}”.`, { tone: 'success' }); },
+      error: () => { this.savingSourceId.set(null); this.toasts.show('Save failed.', { tone: 'warn' }); },
+    });
+  }
+
+  // ══════════════════ ADMIN — DISCORD SYSTEM CONFIG ══════════════════
+  patchNotif<K extends keyof NotificationSettings>(key: K, value: NotificationSettings[K]): void {
+    this.notif.update(n => (n ? { ...n, [key]: value } : n));
+  }
+
+  private notifBody(over: Partial<NotificationUpdate> = {}): NotificationUpdate {
+    const n = this.notif()!;
+    return {
+      enabled: n.enabled, digestHourLocal: n.digestHourLocal, weeklyDay: n.weeklyDay,
+      thresholdUsd: n.thresholdUsd, mentionOnAlert: n.mentionOnAlert, ...over,
+    };
+  }
+
+  saveNotif(): void {
+    if (!this.notif()) return;
+    this.savingNotif.set(true);
+    const url = this.webhookInput().trim();
+    this.api.saveNotifications(this.notifBody(url ? { discordWebhookUrl: url } : {})).subscribe({
+      next: n => { this.notif.set(n); this.webhookInput.set(''); this.savingNotif.set(false); this.toasts.show('Notification settings saved.', { tone: 'success' }); },
+      error: (e: HttpErrorResponse) => { this.savingNotif.set(false); this.toasts.show(e.error?.message ?? 'Save failed.', { tone: 'warn' }); },
+    });
+  }
+
+  removeWebhook(): void {
+    if (!this.notif()) return;
+    this.savingNotif.set(true);
+    this.api.saveNotifications(this.notifBody({ discordWebhookUrl: '' })).subscribe({
+      next: n => { this.notif.set(n); this.savingNotif.set(false); this.toasts.show('Webhook removed.', { tone: 'success' }); },
+      error: () => { this.savingNotif.set(false); this.toasts.show('Could not remove webhook.', { tone: 'warn' }); },
+    });
+  }
+
+  testNotif(): void {
+    this.testingNotif.set(true);
+    this.api.testNotification().subscribe({
+      next: r => { this.testingNotif.set(false); this.toasts.show(r.message, { tone: 'success' }); },
+      error: (e: HttpErrorResponse) => { this.testingNotif.set(false); this.toasts.show(e.error?.message ?? 'Test failed.', { tone: 'warn' }); },
+    });
+  }
+
+  sendSnapshot(): void {
+    this.sendingSnapshot.set(true);
+    this.api.sendUsageSnapshot().subscribe({
+      next: r => { this.sendingSnapshot.set(false); this.toasts.show(r.message, { tone: 'success' }); },
+      error: (e: HttpErrorResponse) => { this.sendingSnapshot.set(false); this.toasts.show(e.error?.message ?? 'Could not send snapshot.', { tone: 'warn' }); },
+    });
+  }
+
+  // ══════════════════ ADMIN — DISCORD EVENT ROUTING ══════════════════
+  toggleRoute(route: DiscordRoute, enabled: boolean): void {
+    this.saveRoute(route, { enabled, mention: route.mention });
+  }
+
+  saveRouteMention(route: DiscordRoute, mention: string): void {
+    const trimmed = mention.trim();
+    if ((trimmed || null) === (route.mention || null)) return; // no change
+    this.saveRoute(route, { enabled: route.enabled, mention: trimmed || null });
+  }
+
+  private saveRoute(route: DiscordRoute, body: { enabled: boolean; mention: string | null }): void {
+    this.savingRouteKey.set(route.eventKey);
+    this.api.updateDiscordRoute(route.eventKey, body).subscribe({
+      next: saved => { this.routes.update(list => list.map(r => (r.eventKey === saved.eventKey ? saved : r))); this.savingRouteKey.set(null); },
+      error: (e: HttpErrorResponse) => { this.savingRouteKey.set(null); this.loadRoutes(); this.toasts.show(e.error?.message ?? 'Could not update route.', { tone: 'warn' }); },
     });
   }
 

@@ -158,6 +158,42 @@
   box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-a) 35%, transparent);
 }
 
+// Custom From/To range editor (revealed by the "Custom" pill).
+.hh__range {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+  padding: 12px; border-radius: var(--r-card);
+  background: var(--bg-sink); border: 1px solid var(--hairline);
+  animation: hh-range-in .32s var(--ease-spring-up, var(--ease-out)) both;
+}
+@keyframes hh-range-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .hh__range { animation: none; } }
+.hh__date { flex: 1 1 130px; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.hh__date-l {
+  font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim);
+}
+.hh__date input {
+  width: 100%; min-height: 42px; padding: 0 12px; border-radius: var(--r-tile);
+  background: var(--bg-rise); border: 1px solid var(--hairline);
+  color: var(--ink); font: inherit; font-size: 14px; font-weight: 600;
+}
+.hh__date input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: color-mix(in srgb, var(--accent-a) 45%, transparent); }
+.hh__range-btns { display: flex; gap: 8px; flex: 1 1 100%; }
+.hh__rbtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  flex: 1 1 auto; min-height: 42px; padding: 0 14px; border-radius: var(--r-pill);
+  background: var(--bg-rise); border: 1px solid var(--hairline);
+  color: var(--ink); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--ease-spring);
+}
+.hh__rbtn mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.hh__rbtn:active { transform: scale(.97); }
+.hh__rbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hh__rbtn--go {
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  border-color: transparent; color: var(--tech-text-on-accent, var(--ink-on-accent, #04222a));
+}
+
 // ============================================================================
 // BOARDS — segmented control + section header + lists.
 // ============================================================================

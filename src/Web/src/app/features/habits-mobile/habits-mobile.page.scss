@@ -307,6 +307,102 @@
 }
 
 // ============================================================================
+// AI COACH CARD
+// ============================================================================
+
+// FiMobile coach card — gradient-accent leading tile + narrative + insight bullets.
+.hm-coach {
+  display: flex; align-items: flex-start; gap: 12px; padding: 16px;
+  border-radius: var(--tech-radius, var(--r-card));
+  background: var(--glass);
+  border: 1px solid var(--tech-border, var(--hairline));
+  box-shadow: var(--tech-shadow-panel, var(--lift-1)), inset 0 1px 0 var(--glass-edge, rgba(255,255,255,.10));
+  border-left: 3px solid var(--accent-a);
+}
+.hm-coach__ic {
+  flex: none; width: 40px; height: 40px;
+  border-radius: var(--tech-r-control, var(--r-tile));
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  mat-icon { color: var(--tech-text-on-accent, #fff); font-size: 22px; width: 22px; height: 22px; }
+}
+.hm-coach__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.hm-coach__h { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-a); }
+.hm-coach__note { margin: 0; font-size: .9rem; line-height: 1.4; color: var(--ink); }
+.hm-coach__insight {
+  margin: 0; font-size: .82rem; line-height: 1.35; color: var(--tech-text-secondary, var(--ink-dim));
+  padding-left: 14px; position: relative;
+  &::before { content: '•'; position: absolute; left: 2px; color: var(--accent-a); }
+}
+
+// ============================================================================
+// HABIT CARD — inline value input + secondary chips
+// ============================================================================
+
+.hm-hcard__meas-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.hm-hcard__valinput {
+  flex: none; width: 92px; box-sizing: border-box; padding: 8px 10px; text-align: right;
+  border: 1px solid var(--hairline); border-radius: var(--tech-r-control, var(--r-tile));
+  background: var(--bg-base); color: var(--ink); font: inherit; font-size: .9rem; font-weight: 700;
+  &:focus-visible { outline: none; border-color: var(--accent-a); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-a) 22%, transparent); }
+}
+
+.hm-hcard__chips { display: flex; gap: 8px; }
+// FiMobile secondary chip actions on the card (calendar / pause-resume) — tinted, quiet
+.hm-hcard__chip {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px;
+  border: 1px solid var(--tech-border, var(--hairline));
+  border-radius: var(--tech-r-control, var(--r-pill));
+  background: var(--bg-base); color: var(--tech-text-secondary, var(--ink-dim)); font-size: .82rem; font-weight: 700; cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s var(--ease-out, ease);
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  &.is-paused { color: var(--accent-a); border-color: color-mix(in srgb, var(--accent-a) 40%, transparent); }
+  &:active { transform: scale(.97); }
+  &:focus-visible { outline: 2px solid var(--focus, var(--accent-a)); outline-offset: 2px; }
+}
+
+// ============================================================================
+// STREAK CALENDAR SHEET
+// ============================================================================
+
+.hcal { display: flex; flex-direction: column; gap: 12px; padding-bottom: 20px; }
+.hcal__bar { display: flex; align-items: center; justify-content: space-between; }
+.hcal__month { font-size: 1rem; font-weight: 800; color: var(--ink); }
+.hcal__nav {
+  display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+  border: none; border-radius: 50%; background: var(--bg-rise); color: var(--ink); cursor: pointer;
+  mat-icon { font-size: 22px; width: 22px; height: 22px; }
+  &:active { transform: scale(.94); }
+  &:focus-visible { outline: 2px solid var(--focus, var(--accent-a)); outline-offset: 2px; }
+}
+.hcal__dow {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  span { text-align: center; font-size: .7rem; font-weight: 700; color: var(--ink-faint); }
+}
+.hcal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.hcal__day {
+  aspect-ratio: 1; display: grid; place-items: center;
+  border-radius: var(--tech-r-control, var(--r-tile));
+  font-size: .82rem; font-weight: 700; color: var(--ink);
+  background: var(--bg-base); border: 1px solid transparent;
+  &.is-out { color: var(--ink-faint); opacity: .5; }
+  &.is-today { border-color: var(--accent-a); }
+  &.is-done {
+    color: var(--tech-text-on-accent, #fff);
+    background: linear-gradient(135deg, var(--hc-accent, var(--accent-a)), var(--accent-b));
+  }
+  &.is-skip { background: color-mix(in srgb, var(--warn) 22%, var(--bg-base)); color: var(--ink); }
+}
+.hcal__legend {
+  display: flex; gap: 16px; font-size: .76rem; color: var(--ink-dim);
+  span { display: inline-flex; align-items: center; gap: 6px; }
+  i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+  i.is-done { background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); }
+  i.is-skip { background: color-mix(in srgb, var(--warn) 40%, var(--bg-base)); }
+}
+
+// ============================================================================
 // STAGGERED REVEAL
 // ============================================================================
 

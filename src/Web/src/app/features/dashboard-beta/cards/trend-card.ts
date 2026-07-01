@@ -24,8 +24,10 @@ type Metric = 'cost' | 'tokens';
       <app-bs-section-header title="Trend" [subtitle]="subLabel()" icon="show_chart" />
 
       <div class="trend__segs">
-        <app-bs-segmented class="trend__seg" [segments]="groupSegs" [value]="groupBy()"
-                          label="Group by" (change)="onGroup($event)" />
+        <div class="trend__group-scroll">
+          <app-bs-segmented class="trend__seg" [segments]="groupSegs" [value]="groupBy()"
+                            label="Group by" (change)="onGroup($event)" />
+        </div>
         <app-bs-segmented class="trend__seg" [segments]="metricSegs" [value]="metric()"
                           label="Metric" (change)="metric.set($any($event))" />
       </div>
@@ -86,6 +88,13 @@ type Metric = 'cost' | 'tokens';
     .trend__segs { display: flex; flex-direction: column; gap: 8px; }
     /* NOTE: never set a display value on app-bs-segmented — it clobbers the kit host inline-flex
        (equal specificity) and collapses the control. It is already width:100% as a flex item. */
+    /* 6 group options overflow 390px — let the group control scroll horizontally, momentum + hidden bar. */
+    .trend__group-scroll {
+      overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain; scrollbar-width: none; margin-inline: -2px; padding: 2px;
+    }
+    .trend__group-scroll::-webkit-scrollbar { display: none; }
+    .trend__group-scroll app-bs-segmented { min-width: max-content; }
 
     .trend__skeleton { padding-top: 4px; }
 
@@ -148,6 +157,10 @@ export class PulseTrendCard {
   protected readonly groupSegs: Segment[] = [
     { key: 'day', label: 'Day' },
     { key: 'month', label: 'Month' },
+    { key: 'project', label: 'Project' },
+    { key: 'model', label: 'Model' },
+    { key: 'source', label: 'Source' },
+    { key: 'session', label: 'Session' },
   ];
   protected readonly metricSegs: Segment[] = [
     { key: 'cost', label: 'Cost' },
@@ -161,8 +174,12 @@ export class PulseTrendCard {
   protected readonly lineId = `trend-line-${Math.random().toString(36).slice(2, 8)}`;
   protected readonly fillId = `trend-fill-${Math.random().toString(36).slice(2, 8)}`;
 
-  protected readonly subLabel = computed(() =>
-    this.metric() === 'cost' ? 'Cost (USD)' : 'Total tokens');
+  protected readonly subLabel = computed(() => {
+    const metric = this.metric() === 'cost' ? 'Cost (USD)' : 'Total tokens';
+    const g = this.groupBy();
+    const isTime = g === 'day' || g === 'month';
+    return isTime ? metric : `${metric} · by ${g}`;
+  });
 
   protected onGroup(g: string): void {
     if (this.groupBy() !== g) this.groupByChange.emit(g as GroupBy);
@@ -214,16 +231,22 @@ export class PulseTrendCard {
       line, area,
       grid,
       peakX: peak.x, peakY: peak.y,
-      peakKey: keys[peakIdx],
+      peakKey: axisLabel(keys[peakIdx]),
       peakLabel: isCost
         ? vals[peakIdx].toLocaleString(undefined, { maximumFractionDigits: 2 })
         : shortNum(vals[peakIdx]),
-      firstKey: keys[0],
-      midKey: keys.length > 2 ? keys[Math.floor((keys.length - 1) / 2)] : '',
-      lastKey: keys[keys.length - 1],
+      firstKey: axisLabel(keys[0]),
+      midKey: keys.length > 2 ? axisLabel(keys[Math.floor((keys.length - 1) / 2)]) : '',
+      lastKey: axisLabel(keys[keys.length - 1]),
       len,
     };
   });
+}
+
+/** Truncate long categorical keys (project paths, model ids, session ids) for the axis. */
+function axisLabel(key: string): string {
+  if (!key) return '';
+  return key.length > 16 ? key.slice(0, 8) + '…' + key.slice(-5) : key;
 }
 
 /** B/M/K compact formatter (copied from the live dashboard's shortNum). */

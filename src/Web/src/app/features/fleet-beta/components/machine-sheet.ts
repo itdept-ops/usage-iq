@@ -8,7 +8,7 @@ import { FleetMachine } from '../../../core/models';
 import { CompactPipe, timeAgo } from '../../../shared/format';
 import { BetaBottomSheet, BetaStatTile } from '../../beta-ui';
 import {
-  agentIcon, agentLabel, compactUsd, geoSourceLabel, hasCoords, isLocalName, isOnline,
+  agentIcon, agentLabel, compactUsd, FleetAction, geoSourceLabel, hasCoords, isLocalName, isOnline,
   locationLabel, mapUrl, ramLabel, systemLabel, uptimeLabel,
 } from '../fleet-beta.model';
 
@@ -63,7 +63,7 @@ interface DetailRow { icon: string; label: string; value: string; mono?: boolean
           </div>
 
           <!-- Identity & network: agent + the IPs, each one-tap copyable. -->
-          @if (agentLbl() || m.localIp || m.publicIp) {
+          @if (agentLbl() || m.localIp || m.publicIp || m.lanIps) {
             <section class="ms__sec">
               <span class="ms__sec-h">Identity &amp; network</span>
               <div class="ms__net">
@@ -84,6 +84,13 @@ interface DetailRow { icon: string; label: string; value: string; mono?: boolean
                   <button type="button" class="ms__net-row is-copy" (click)="copy(m.publicIp!, 'Public IP')">
                     <span class="ms__net-l"><mat-icon aria-hidden="true">public</mat-icon> Public IP</span>
                     <span class="ms__net-v mono">{{ m.publicIp }}</span>
+                    <mat-icon class="ms__net-c" aria-hidden="true">content_copy</mat-icon>
+                  </button>
+                }
+                @if (m.lanIps) {
+                  <button type="button" class="ms__net-row is-copy" (click)="copy(m.lanIps!, 'LAN IPs')">
+                    <span class="ms__net-l"><mat-icon aria-hidden="true">router</mat-icon> LAN IPs</span>
+                    <span class="ms__net-v mono">{{ m.lanIps }}</span>
                     <mat-icon class="ms__net-c" aria-hidden="true">content_copy</mat-icon>
                   </button>
                 }
@@ -138,6 +145,23 @@ interface DetailRow { icon: string; label: string; value: string; mono?: boolean
             </section>
           }
 
+          <!-- Management (reporter.manage) — combine/move + delete this machine. -->
+          @if (canManage()) {
+            <section class="ms__sec">
+              <span class="ms__sec-h">Manage</span>
+              <div class="ms__actions">
+                <button type="button" class="ms__action" (click)="manage.emit('reassign')">
+                  <mat-icon aria-hidden="true">merge_type</mat-icon>
+                  <span class="ms__action-t">Combine / move…</span>
+                </button>
+                <button type="button" class="ms__action is-danger" (click)="manage.emit('delete')">
+                  <mat-icon aria-hidden="true">delete_forever</mat-icon>
+                  <span class="ms__action-t">Delete…</span>
+                </button>
+              </div>
+            </section>
+          }
+
           <!-- Forward CTA: stand up another reporter. -->
           <a class="ms__cta" routerLink="/reporter" (click)="open.set(false)">
             <span class="ms__cta-ic" aria-hidden="true"><mat-icon>add_link</mat-icon></span>
@@ -160,8 +184,12 @@ export class FleetMachineSheet {
   readonly machine = input<FleetMachine | null>(null);
   /** The fleet's TOTAL spend — drives the "of fleet" share-% tile. */
   readonly totalCost = input<number>(0);
+  /** reporter.manage — reveals the combine/move + delete management actions. */
+  readonly canManage = input<boolean>(false);
   /** Emitted after a copy attempt so the page can toast (label = what was copied). */
   readonly copied = output<{ label: string; ok: boolean }>();
+  /** Fired when a management action is chosen — the page opens the confirm sheet for this machine. */
+  readonly manage = output<FleetAction>();
 
   protected readonly online = computed(() => isOnline(this.machine()?.lastSeenUtc ?? null));
   protected readonly isLocal = computed(() => {
@@ -216,8 +244,17 @@ export class FleetMachineSheet {
     // Local/Public IP + agent now live in the copyable "Identity & network" section above.
     push('computer', 'OS', [m.os, m.arch].filter((p) => !!p).join(' · '));
     push('account_circle', 'OS user', m.osUser, true);
+    push('workspaces', 'Domain', m.domain ?? null);
     push('developer_board', 'CPU', m.cpuModel ?? null);
-    if (!m.cpuModel) push('memory', 'CPU cores', m.cpuCount != null ? String(m.cpuCount) : null, true);
+    // Physical / logical core counts ("8C / 16T") when reported; else the coarse cpuCount.
+    if (m.physicalCores || m.logicalCores) {
+      const parts: string[] = [];
+      if (m.physicalCores) parts.push(`${m.physicalCores}C`);
+      if (m.logicalCores) parts.push(`${m.logicalCores}T`);
+      push('memory', 'Cores', parts.join(' / '), true);
+    } else if (!m.cpuModel) {
+      push('memory', 'CPU cores', m.cpuCount != null ? String(m.cpuCount) : null, true);
+    }
     push('sd_card', 'RAM', ramLabel(m.ramTotalMB) || null, true);
     push('videogame_asset', 'GPU', m.gpuModel ?? null);
     push('precision_manufacturing', 'System', systemLabel(m) || null);

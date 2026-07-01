@@ -1,12 +1,13 @@
 import {
-  ChangeDetectionStrategy, Component, computed, inject, signal,
+  ChangeDetectionStrategy, Component, computed, inject, signal, viewChild,
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { Api } from '../../core/api';
-import { Fleet, FleetMachine, FleetUser, UsageFilter } from '../../core/models';
+import { AuthService } from '../../core/auth';
+import { Fleet, FleetMachine, FleetUser, PERM, UsageFilter } from '../../core/models';
 import { CompactPipe } from '../../shared/format';
 import {
   BetaPullRefresh, BetaSectionHeader, BetaSegmentedControl, BetaSkeleton,
@@ -16,7 +17,11 @@ import {
 import { FleetMachineCard } from './components/machine-card';
 import { FleetUserLeaderboard } from './components/user-leaderboard';
 import { FleetMachineSheet } from './components/machine-sheet';
-import { compactUsd, isOnline } from './fleet-beta.model';
+import { FleetUserSheet } from './components/user-sheet';
+import { FleetActionSheet, FleetActionResult } from './components/action-sheet';
+import {
+  compactUsd, FleetAction, FleetActionRequest, FleetActionTarget, isLocalName, isOnline,
+} from './fleet-beta.model';
 
 /** The empty filter the fleet rollup starts from (date-range-only, like the live /fleet page). */
 const EMPTY_FILTER: UsageFilter = {
@@ -52,7 +57,7 @@ const EMPTY_FILTER: UsageFilter = {
   imports: [
     MatIconModule, RouterLink, CompactPipe,
     BetaPullRefresh, BetaSegmentedControl, BetaSectionHeader, BetaSkeleton, BetaToaster,
-    FleetMachineCard, FleetUserLeaderboard, FleetMachineSheet,
+    FleetMachineCard, FleetUserLeaderboard, FleetMachineSheet, FleetUserSheet, FleetActionSheet,
   ],
   template: `
     <app-bs-pull-refresh class="fb-ptr" [busy]="refreshing()" (refresh)="refreshAll()">
@@ -74,11 +79,16 @@ const EMPTY_FILTER: UsageFilter = {
             }
           </div>
 
-          <!-- Glance: machines + total spend + total tokens. -->
+          <!-- Glance: machines + users + total spend + total tokens + records. -->
           <div class="hh__glance">
             <div class="hh__stat">
               <span class="hh__stat-n">{{ totals().machineCount | compact }}</span>
               <span class="hh__stat-l">{{ totals().machineCount === 1 ? 'machine' : 'machines' }}</span>
+            </div>
+            <span class="hh__div" aria-hidden="true"></span>
+            <div class="hh__stat">
+              <span class="hh__stat-n">{{ totals().userCount | compact }}</span>
+              <span class="hh__stat-l">{{ totals().userCount === 1 ? 'user' : 'users' }}</span>
             </div>
             <span class="hh__div" aria-hidden="true"></span>
             <div class="hh__stat">
@@ -90,9 +100,14 @@ const EMPTY_FILTER: UsageFilter = {
               <span class="hh__stat-n">{{ totals().tokens | compact }}</span>
               <span class="hh__stat-l">tokens</span>
             </div>
+            <span class="hh__div" aria-hidden="true"></span>
+            <div class="hh__stat">
+              <span class="hh__stat-n">{{ totals().records | compact }}</span>
+              <span class="hh__stat-l">records</span>
+            </div>
           </div>
 
-          <!-- Range pills. -->
+          <!-- Range pills (+ a Custom toggle that reveals From/To date inputs). -->
           <div class="hh__pills" role="radiogroup" aria-label="Date range">
             @for (p of presets; track p.key) {
               <button type="button" class="pill" role="radio"
@@ -100,7 +115,36 @@ const EMPTY_FILTER: UsageFilter = {
                       [attr.aria-checked]="activePreset() === p.key"
                       (click)="setDatePreset(p.key)">{{ p.label }}</button>
             }
+            <button type="button" class="pill" role="radio"
+                    [class.pill--on]="activePreset() === 'custom'"
+                    [attr.aria-checked]="activePreset() === 'custom'"
+                    [attr.aria-expanded]="customOpen()"
+                    (click)="toggleCustom()">Custom</button>
           </div>
+
+          <!-- Custom From/To range with Apply / Reset. -->
+          @if (customOpen()) {
+            <div class="hh__range">
+              <label class="hh__date">
+                <span class="hh__date-l">From</span>
+                <input type="date" [value]="filter().from ?? ''"
+                       (input)="patch('from', $any($event.target).value || null)" aria-label="From date" />
+              </label>
+              <label class="hh__date">
+                <span class="hh__date-l">To</span>
+                <input type="date" [value]="filter().to ?? ''"
+                       (input)="patch('to', $any($event.target).value || null)" aria-label="To date" />
+              </label>
+              <div class="hh__range-btns">
+                <button type="button" class="hh__rbtn" (click)="resetRange()">
+                  <mat-icon aria-hidden="true">clear</mat-icon> Reset
+                </button>
+                <button type="button" class="hh__rbtn hh__rbtn--go" (click)="applyRange()">
+                  <mat-icon aria-hidden="true">filter_list</mat-icon> Apply
+                </button>
+              </div>
+            </div>
+          }
         </header>
 
         <!-- Machines / Users toggle. -->
@@ -182,15 +226,23 @@ const EMPTY_FILTER: UsageFilter = {
             title="Top users" [subtitle]="userSubtitle()" />
 
           <div class="fb-lb-card">
-            <app-fleet-user-leaderboard [users]="users()" />
+            <app-fleet-user-leaderboard [users]="users()" (select)="openUser($event)" />
           </div>
         }
       </div>
     </app-bs-pull-refresh>
 
-    <!-- Tap-through machine detail. -->
+    <!-- Tap-through machine detail (+ management when reporter.manage). -->
     <app-fleet-machine-sheet [(open)]="sheetOpen" [machine]="activeMachine()"
-      [totalCost]="totals().cost" (copied)="onCopied($event)" />
+      [totalCost]="totals().cost" [canManage]="canManage()"
+      (copied)="onCopied($event)" (manage)="onMachineManage($event)" />
+
+    <!-- Tap-through user detail (+ management when reporter.manage). -->
+    <app-fleet-user-sheet [(open)]="userSheetOpen" [user]="activeUser()"
+      [canManage]="canManage()" (manage)="onUserManage($event)" />
+
+    <!-- Shared confirm sheet for combine/move + delete + revoke. -->
+    <app-fleet-action-sheet [(open)]="actionOpen" [request]="actionRequest()" (done)="onActionDone($event)" />
 
     <app-bs-toaster />
   `,
@@ -199,10 +251,16 @@ const EMPTY_FILTER: UsageFilter = {
 export class FleetBetaPage {
   private readonly api = inject(Api);
   private readonly toast = inject(ToastController);
+  private readonly auth = inject(AuthService);
+
+  /** Row-level management (combine/move, delete, revoke). The board is read-only without it. */
+  readonly canManage = computed(() => this.auth.hasPermission(PERM.reporterManage));
 
   // ---- range filter (date-only — the fleet is a coarse roll-up, mirroring the live page) ----
   readonly filter = signal<UsageFilter>({ ...EMPTY_FILTER });
   readonly activePreset = signal<string>('all');
+  /** Whether the custom From/To range editor is expanded. */
+  readonly customOpen = signal(false);
   readonly presets = [
     { key: '7d', label: '7d' }, { key: '30d', label: '30d' }, { key: '90d', label: '90d' },
     { key: 'mtd', label: 'Month' }, { key: 'all', label: 'All' },
@@ -231,9 +289,16 @@ export class FleetBetaPage {
   readonly error = signal(false);
   readonly refreshing = signal(false);
 
-  // ---- detail sheet ----
+  // ---- detail sheets ----
   readonly sheetOpen = signal(false);
   readonly activeMachine = signal<FleetMachine | null>(null);
+  readonly userSheetOpen = signal(false);
+  readonly activeUser = signal<FleetUser | null>(null);
+
+  // ---- management confirm sheet ----
+  readonly actionOpen = signal(false);
+  readonly actionRequest = signal<FleetActionRequest | null>(null);
+  private readonly actionSheet = viewChild(FleetActionSheet);
 
   /** Cost-desc machines (the server may sort; we enforce a stable view). The canonical fleet set —
    *  totals/maxCost/onlineCount read this; the displayed list is {@link visibleMachines}. */
@@ -261,6 +326,7 @@ export class FleetBetaPage {
     return {
       machineCount: m.length,
       userCount: this.users().length,
+      records: m.reduce((a, x) => a + x.records, 0),
       tokens: m.reduce((a, x) => a + x.tokens, 0),
       cost: m.reduce((a, x) => a + x.costUsd, 0),
     };
@@ -308,7 +374,34 @@ export class FleetBetaPage {
     }
     const to = kind === 'all' ? null : fmt(today);
     this.activePreset.set(kind);
+    this.customOpen.set(false);
     this.filter.update(f => ({ ...f, from, to }));
+    this.reload(true);
+  }
+
+  // ---- custom From/To range ----
+  patch<K extends keyof UsageFilter>(key: K, value: UsageFilter[K]): void {
+    this.filter.update(f => ({ ...f, [key]: value }));
+  }
+
+  /** Toggle the custom range editor; marking the preset "custom" so no pill reads as active. */
+  toggleCustom(): void {
+    const open = !this.customOpen();
+    this.customOpen.set(open);
+    if (open) this.activePreset.set('custom');
+  }
+
+  /** Apply the typed From/To range (no preset selected). */
+  applyRange(): void {
+    this.activePreset.set('custom');
+    this.reload(true);
+  }
+
+  /** Clear the typed range back to all-time and collapse the editor. */
+  resetRange(): void {
+    this.filter.update(f => ({ ...f, from: null, to: null }));
+    this.activePreset.set('all');
+    this.customOpen.set(false);
     this.reload(true);
   }
 
@@ -336,10 +429,15 @@ export class FleetBetaPage {
     }
   }
 
-  // ---- detail sheet ----
+  // ---- detail sheets ----
   openMachine(m: FleetMachine): void {
     this.activeMachine.set(m);
     this.sheetOpen.set(true);
+  }
+
+  openUser(u: FleetUser): void {
+    this.activeUser.set(u);
+    this.userSheetOpen.set(true);
   }
 
   /** The sheet copied a value to the clipboard — confirm with a toast (ok = success, else warn). */
@@ -348,5 +446,78 @@ export class FleetBetaPage {
       ev.ok ? `${ev.label} copied` : `Couldn’t copy — long-press to select`,
       { tone: ev.ok ? 'success' : 'warn', durationMs: 1600 },
     );
+  }
+
+  // ---- management (reporter.manage) ----
+  private readonly userKey = (u: FleetUser): string => (u.userId != null ? 'u' + u.userId : 'n:' + u.name);
+  private rawValue(name: string): string { return isLocalName(name) ? '' : name; }
+  private friendly(name: string): string { return isLocalName(name) ? 'local (file sync)' : name; }
+
+  /** OTHER machine buckets — the machine reassign picker's targets (raw names). */
+  private otherMachineTargets(self: string): FleetActionTarget[] {
+    return this.machines()
+      .map(m => m.name)
+      .filter(name => name !== self)
+      .map(name => ({ rawValue: this.rawValue(name), label: this.friendly(name) }));
+  }
+
+  /** OTHER user buckets — the user reassign picker's targets (keyed by userId; no email). */
+  private otherUserTargets(self: FleetUser): FleetActionTarget[] {
+    return this.users()
+      .filter(u => this.userKey(u) !== this.userKey(self))
+      .map(u => ({ rawValue: '', label: this.friendly(u.name), userId: u.userId ?? null }));
+  }
+
+  /** A machine management action was chosen in the machine sheet — open the confirm sheet. */
+  onMachineManage(action: FleetAction): void {
+    if (!this.canManage()) return;
+    const m = this.activeMachine();
+    if (!m) return;
+    this.openAction({
+      action,
+      dimension: 'machine',
+      rawValue: this.rawValue(m.name),
+      label: this.friendly(m.name),
+      records: m.records,
+      others: action === 'reassign' ? this.otherMachineTargets(m.name) : [],
+    });
+  }
+
+  /** A user management action was chosen in the user sheet — open the confirm sheet. */
+  onUserManage(action: FleetAction): void {
+    if (!this.canManage()) return;
+    const u = this.activeUser();
+    if (!u) return;
+    this.openAction({
+      action,
+      dimension: 'user',
+      rawValue: '',
+      userId: u.userId ?? null,
+      label: this.friendly(u.name),
+      records: u.records,
+      others: action === 'reassign' ? this.otherUserTargets(u) : [],
+    });
+  }
+
+  /** Stage the request, reset the confirm sheet's picker, then open it (over the detail sheet). */
+  private openAction(req: FleetActionRequest): void {
+    this.actionRequest.set(req);
+    this.actionSheet()?.reset();
+    this.actionOpen.set(true);
+  }
+
+  /** A mutation succeeded — close the detail sheets, refresh the fleet, and toast the count. */
+  onActionDone(res: FleetActionResult): void {
+    const label = this.actionRequest()?.label ?? '';
+    this.sheetOpen.set(false);
+    this.userSheetOpen.set(false);
+    const n = res.count;
+    const msg = res.action === 'reassign'
+      ? `Moved ${n.toLocaleString()} record${n === 1 ? '' : 's'} from “${label}”.`
+      : res.action === 'delete'
+        ? `Deleted ${n.toLocaleString()} record${n === 1 ? '' : 's'} from “${label}”.`
+        : `Revoked ${n.toLocaleString()} key${n === 1 ? '' : 's'} for “${label}”.`;
+    this.toast.show(msg, { tone: 'success', durationMs: 3200 });
+    this.reload(false);
   }
 }

@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy, Component, computed, inject, signal,
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -13,6 +14,12 @@ import {
 } from '../beta-ui';
 
 const PAGE_SIZE = 100;
+
+/** A {value,label} option for the user/feature filter selects, derived from the window summary. */
+interface FilterOption {
+  value: string;
+  label: string;
+}
 
 /**
  * AI Usage log — the MOBILE twin of the live /ai-usage page, rebuilt on the shared beta-ui "Strata" kit
@@ -41,7 +48,7 @@ const PAGE_SIZE = 100;
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ToastController],
   imports: [
-    DecimalPipe, MatIconModule,
+    DecimalPipe, FormsModule, MatIconModule,
     BetaPullRefresh, BetaSegmentedControl, BetaBottomSheet, BetaStatTile, BetaSkeleton,
     BetaSectionHeader, BetaToaster,
   ],
@@ -130,12 +137,42 @@ const PAGE_SIZE = 100;
             }
           }
 
-          <!-- ─── OUTCOME FILTER ─── -->
+          <!-- ─── OUTCOME FILTER + MORE-FILTERS TRIGGER ─── -->
           <div class="au-seg-wrap">
             <app-bs-segmented class="au-seg"
               [segments]="outcomeSegments" [value]="outcome()" label="Filter by outcome"
               (change)="setOutcome($event)" />
+            <button type="button" class="au-filter-btn" [class.is-active]="extraFilterCount() > 0"
+                    (click)="openFilters()" aria-label="More filters">
+              <mat-icon aria-hidden="true">tune</mat-icon>
+              @if (extraFilterCount() > 0) {
+                <span class="au-filter-btn__count mono-num">{{ extraFilterCount() }}</span>
+              }
+            </button>
           </div>
+
+          @if (extraFilterCount() > 0) {
+            <div class="au-chips" aria-label="Active filters">
+              @if (userLabel(); as ul) {
+                <button type="button" class="au-chip" (click)="clearUser()">
+                  <mat-icon aria-hidden="true">person</mat-icon>{{ ul }}
+                  <mat-icon class="au-chip__x" aria-hidden="true">close</mat-icon>
+                </button>
+              }
+              @if (feature()) {
+                <button type="button" class="au-chip" (click)="clearFeature()">
+                  <mat-icon aria-hidden="true">bolt</mat-icon>{{ feature() }}
+                  <mat-icon class="au-chip__x" aria-hidden="true">close</mat-icon>
+                </button>
+              }
+              @if (dateLabel(); as dl) {
+                <button type="button" class="au-chip" (click)="clearDates()">
+                  <mat-icon aria-hidden="true">event</mat-icon>{{ dl }}
+                  <mat-icon class="au-chip__x" aria-hidden="true">close</mat-icon>
+                </button>
+              }
+            </div>
+          }
 
           <app-bs-section-header class="au-sechead"
             title="Calls" [subtitle]="listSub()" icon="receipt_long" />
@@ -169,6 +206,11 @@ const PAGE_SIZE = 100;
                       }
                       {{ fmtTime(r.whenUtc) }}
                     </span>
+                    @if (r.errorHint && outcomeTone(r.outcome) !== 'ok') {
+                      <span class="au-row__hint">
+                        <mat-icon class="au-row__hint-ic" aria-hidden="true">warning_amber</mat-icon>{{ r.errorHint }}
+                      </span>
+                    }
                   </span>
                   <mat-icon class="au-row__go" aria-hidden="true">chevron_right</mat-icon>
                 </button>
@@ -233,6 +275,13 @@ const PAGE_SIZE = 100;
             <div class="ad__macro"><span class="ad__macro-n mono-num">{{ fmtCost(r.estimatedCostUsd) }}</span><span class="ad__macro-l">est. cost</span></div>
           </div>
 
+          @if (r.errorHint && outcomeTone(r.outcome) !== 'ok') {
+            <div class="ad__hint" [class]="'oc-' + outcomeTone(r.outcome)">
+              <mat-icon aria-hidden="true">{{ outcomeIcon(r.outcome) }}</mat-icon>
+              <span>{{ r.errorHint }}</span>
+            </div>
+          }
+
           <dl class="ad__rows">
             <div class="ad__kv"><dt>User</dt><dd>{{ r.userName || 'Background tick' }}</dd></div>
             <div class="ad__kv"><dt>Model</dt><dd class="mono-num">{{ r.model }}</dd></div>
@@ -243,6 +292,65 @@ const PAGE_SIZE = 100;
           </dl>
         </div>
       }
+    </app-bs-sheet>
+
+    <!-- ─────────────── FILTER BOTTOM SHEET ─────────────── -->
+    <app-bs-sheet [(open)]="filtersOpen" detent="full" label="Filter AI usage">
+      <div class="af">
+        <div class="af__head">
+          <h3 class="af__title">Filters</h3>
+          <p class="af__sub">Scope the call log by user, feature and date. Applies on the newest page.</p>
+        </div>
+
+        <!-- USER -->
+        <div class="af__group">
+          <span class="af__label"><mat-icon aria-hidden="true">person</mat-icon> User</span>
+          @if (userSegments().length > 1) {
+            <app-bs-segmented [segments]="userSegments()" [value]="draftUser()"
+              label="Filter by user" (change)="draftUser.set($event)" />
+          } @else {
+            <p class="af__none">No users in this window.</p>
+          }
+        </div>
+
+        <!-- FEATURE -->
+        <div class="af__group">
+          <span class="af__label"><mat-icon aria-hidden="true">bolt</mat-icon> Feature</span>
+          @if (featureSegments().length > 1) {
+            <app-bs-segmented [segments]="featureSegments()" [value]="draftFeature()"
+              label="Filter by feature" (change)="draftFeature.set($event)" />
+          } @else {
+            <p class="af__none">No features in this window.</p>
+          }
+        </div>
+
+        <!-- DATE RANGE -->
+        <div class="af__group">
+          <span class="af__label"><mat-icon aria-hidden="true">event</mat-icon> Date range</span>
+          <div class="af__dates">
+            <label class="af__date">
+              <span class="af__date-l">From</span>
+              <input type="date" class="af__date-i" [ngModel]="draftFrom()"
+                (ngModelChange)="draftFrom.set($event)" [max]="draftTo() || null" />
+            </label>
+            <label class="af__date">
+              <span class="af__date-l">To</span>
+              <input type="date" class="af__date-i" [ngModel]="draftTo()"
+                (ngModelChange)="draftTo.set($event)" [min]="draftFrom() || null" />
+            </label>
+          </div>
+        </div>
+
+        <div class="af__actions">
+          <button type="button" class="af__clear" (click)="clearDraftFilters()"
+                  [disabled]="!draftDirty()">
+            <mat-icon aria-hidden="true">filter_alt_off</mat-icon> Clear
+          </button>
+          <button type="button" class="af__apply" (click)="applyFilters()">
+            <mat-icon aria-hidden="true">check</mat-icon> Apply
+          </button>
+        </div>
+      </div>
     </app-bs-sheet>
 
     <app-bs-toaster />
@@ -272,9 +380,26 @@ export class AiUsageMobilePage {
   /** Outcome filter ('' = all) — scopes the feed AND the server query so paging stays consistent. */
   readonly outcome = signal('');
 
+  // ---- Extra server filters (mirror the live page; sent to getAiUsage) ----
+  /** AppUser id as a string ('' = all users). */
+  readonly user = signal('');
+  /** Feature label ('' = all features). */
+  readonly feature = signal('');
+  /** yyyy-MM-dd lower bound, inclusive ('' = none). */
+  readonly from = signal('');
+  /** yyyy-MM-dd upper bound, inclusive ('' = none). */
+  readonly to = signal('');
+
   /** Detail sheet state + the row it's showing. */
   readonly detailOpen = signal(false);
   readonly selected = signal<AiUsageRow | null>(null);
+
+  // ---- Filter sheet (edited via drafts; committed only on Apply) ----
+  readonly filtersOpen = signal(false);
+  readonly draftUser = signal('');
+  readonly draftFeature = signal('');
+  readonly draftFrom = signal('');
+  readonly draftTo = signal('');
 
   /** Keyset cursor stack: the `before` id used to fetch each page (index 0 = newest, no cursor). */
   private cursors: (number | null)[] = [null];
@@ -287,8 +412,60 @@ export class AiUsageMobilePage {
     { key: 'ok', label: 'OK' },
     { key: 'unavailable', label: 'N/A' },
     { key: 'rate-limited', label: 'Limited' },
+    { key: 'parse-failed', label: 'Parse' },
     { key: 'error', label: 'Errors' },
   ];
+
+  /** Top users from the window summary, as filter options (userId -> display name). Background
+   *  ticks carry no id and are dropped (they can't be filtered by user). */
+  readonly userOptions = computed<FilterOption[]>(() =>
+    (this.summary()?.topUsers ?? [])
+      .filter((u) => u.userId != null)
+      .map((u) => ({ value: String(u.userId), label: u.key })),
+  );
+
+  /** Top features from the window summary, as filter options. */
+  readonly featureOptions = computed<FilterOption[]>(() =>
+    (this.summary()?.topFeatures ?? []).map((f) => ({ value: f.key, label: f.key })),
+  );
+
+  /** User options as segmented-control segments, with a leading "All" (labels truncated for the pill). */
+  readonly userSegments = computed<Segment[]>(() => [
+    { key: '', label: 'All' },
+    ...this.userOptions().map((o) => ({ key: o.value, label: o.label })),
+  ]);
+
+  /** Feature options as segmented-control segments, with a leading "All". */
+  readonly featureSegments = computed<Segment[]>(() => [
+    { key: '', label: 'All' },
+    ...this.featureOptions().map((o) => ({ key: o.value, label: o.label })),
+  ]);
+
+  /** Count of the EXTRA (non-outcome) filters currently applied — drives the trigger badge. */
+  readonly extraFilterCount = computed(() =>
+    (this.user() ? 1 : 0) + (this.feature() ? 1 : 0) + (this.from() || this.to() ? 1 : 0),
+  );
+
+  /** Display name for the active user filter (from the options, falling back to the raw id). */
+  readonly userLabel = computed(() => {
+    if (!this.user()) return '';
+    return this.userOptions().find((o) => o.value === this.user())?.label ?? `User ${this.user()}`;
+  });
+
+  /** Human label for the active date range (e.g. "Jun 1 – Jun 30", "from Jun 1", "to Jun 30"). */
+  readonly dateLabel = computed(() => {
+    const f = this.from();
+    const t = this.to();
+    if (f && t) return `${this.fmtDay(f)} – ${this.fmtDay(t)}`;
+    if (f) return `from ${this.fmtDay(f)}`;
+    if (t) return `to ${this.fmtDay(t)}`;
+    return '';
+  });
+
+  /** True when the filter-sheet drafts differ from "no extra filters" (enables Clear). */
+  readonly draftDirty = computed(() =>
+    !!(this.draftUser() || this.draftFeature() || this.draftFrom() || this.draftTo()),
+  );
 
   /** Count of non-ok outcomes in the window (drives the Failures tile + its red accent). */
   readonly failures = computed(() => {
@@ -341,11 +518,19 @@ export class AiUsageMobilePage {
     }
   }
 
-  /** Fetch the current page (cursor at `page`) with the active filter; throws on failure. */
+  /** Fetch the current page (cursor at `page`) with the active filters; throws on failure. */
   private async fetch(): Promise<void> {
     const before = this.cursors[this.page()];
     const r = await firstValueFrom(
-      this.api.getAiUsage({ before, limit: PAGE_SIZE, outcome: this.outcome() }),
+      this.api.getAiUsage({
+        before,
+        limit: PAGE_SIZE,
+        outcome: this.outcome(),
+        user: this.user() ? Number(this.user()) : null,
+        feature: this.feature(),
+        from: this.from() ? new Date(this.from() + 'T00:00:00').toISOString() : undefined,
+        to: this.to() ? new Date(this.to() + 'T23:59:59').toISOString() : undefined,
+      }),
     );
     this.rows.set(r.rows ?? []);
     this.summary.set(r.summary ?? null);
@@ -373,6 +558,50 @@ export class AiUsageMobilePage {
     this.page.set(0);
     void this.repage();
   }
+
+  // ─────────────── EXTRA FILTERS (user / feature / date range) ───────────────
+
+  /** Open the filter sheet, seeding the drafts from the currently-applied filters. */
+  openFilters(): void {
+    this.draftUser.set(this.user());
+    this.draftFeature.set(this.feature());
+    this.draftFrom.set(this.from());
+    this.draftTo.set(this.to());
+    this.filtersOpen.set(true);
+  }
+
+  /** Commit the drafts, reset the keyset cursors (filter-specific) and repage from newest. */
+  applyFilters(): void {
+    this.user.set(this.draftUser());
+    this.feature.set(this.draftFeature());
+    this.from.set(this.draftFrom());
+    this.to.set(this.draftTo());
+    this.filtersOpen.set(false);
+    this.cursors = [null];
+    this.page.set(0);
+    void this.repage();
+  }
+
+  /** Reset the sheet drafts (does NOT apply until Apply is tapped). */
+  clearDraftFilters(): void {
+    this.draftUser.set('');
+    this.draftFeature.set('');
+    this.draftFrom.set('');
+    this.draftTo.set('');
+  }
+
+  /** Remove one applied filter from a chip and repage immediately. */
+  private applyOne(mutate: () => void): void {
+    if (this.paging()) return;
+    mutate();
+    this.cursors = [null];
+    this.page.set(0);
+    void this.repage();
+  }
+
+  clearUser(): void { this.applyOne(() => this.user.set('')); }
+  clearFeature(): void { this.applyOne(() => this.feature.set('')); }
+  clearDates(): void { this.applyOne(() => { this.from.set(''); this.to.set(''); }); }
 
   nextPage(): void {
     if (!this.hasMore() || !this.rows().length || this.paging()) return;
@@ -466,6 +695,13 @@ export class AiUsageMobilePage {
   fmtMs(ms: number): string {
     if (ms < 1000) return `${Math.round(ms)} ms`;
     return `${(ms / 1000).toFixed(2)} s`;
+  }
+
+  /** A short month/day label for a yyyy-MM-dd filter value (used in the date chip). */
+  fmtDay(ymd: string): string {
+    const d = new Date(ymd + 'T00:00:00');
+    if (isNaN(d.getTime())) return ymd;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
   /** A short, locale-aware timestamp for the list/detail (the ISO is also shown raw in detail). */
