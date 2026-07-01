@@ -751,7 +751,11 @@ html {
 body {
   margin: 0;
   height: 100%;
-  min-height: 100%;
+  /* Fill the TRUE dynamic viewport (incl. the safe-area zone under the notch/home indicator, exposed by
+     viewport-fit=cover). Plain `height:100%` can resolve short of that in the installed iOS PWA, leaving
+     the html void bg peeking as a thin strip along the bottom edge (the "gap" above the home indicator).
+     100dvh backfills the whole screen with the app canvas so the app reads truly edge-to-edge. */
+  min-height: 100dvh;
   overflow-x: hidden;
 
   font-family: var(--tech-font-ui);
