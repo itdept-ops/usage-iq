@@ -3,12 +3,14 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { AuthSession, MeResponse, ProfilePrefs } from './models';
 import { HOME_OPTIONS, HOME_PERMS } from './home-options';
+import { OfflineQueue } from './offline-queue';
 
 const STORAGE_KEY = 'usage_iq_session';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private http = inject(HttpClient);
+  private offlineQueue = inject(OfflineQueue);
   private readonly _session = signal<AuthSession | null>(this.restore());
 
   readonly session = this._session.asReadonly();
@@ -164,6 +166,10 @@ export class AuthService {
       fetch('/api/presence/offline', { method: 'POST', credentials: 'include', keepalive: true }).catch(() => { /* ignore */ });
     } catch { /* ignore */ }
     this._session.set(null);
+    // Empty the offline write queue so a subsequent DIFFERENT user on this (possibly shared) device
+    // never inherits — and unknowingly replays as themselves — the previous user's queued writes.
+    // OfflineQueue has no dependency on AuthService, so injecting it here creates no circular DI.
+    try { void this.offlineQueue.clear(); } catch { /* ignore */ }
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
     try { (window as unknown as { google?: any }).google?.accounts?.id?.disableAutoSelect?.(); } catch { /* ignore */ }
   }

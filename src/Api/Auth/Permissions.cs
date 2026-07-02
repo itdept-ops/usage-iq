@@ -363,10 +363,11 @@ public static class Permissions
     /// account — matching how <see cref="AiUsageView"/> is treated. Likewise excludes <see cref="UsersEmailReveal"/>:
     /// unmasking other users' real emails is restricted PII access, so it is a deliberate grant, never inherited.
     /// Likewise excludes the deployment-GLOBAL config-write gates <see cref="SettingsManage"/>,
-    /// <see cref="SourcesManage"/>, <see cref="ReporterManage"/> and <see cref="NotificationsManage"/>: these
-    /// rewrite instance-wide state (timezone/auto-sync, ingestion sources, ingest keys for the whole fleet, and
-    /// the shared Discord webhook), so they must be granted deliberately per user, never inherited by every
-    /// new account.
+    /// <see cref="SourcesManage"/>, <see cref="ReporterManage"/>, <see cref="NotificationsManage"/>,
+    /// <see cref="PricingManage"/> and <see cref="SharesManage"/>: these rewrite instance-wide state
+    /// (timezone/auto-sync, ingestion sources, ingest keys for the whole fleet, the shared Discord webhook,
+    /// model pricing + recomputed costs, and share links), so they must be granted deliberately per user,
+    /// never inherited by every new account.
     /// Finally excludes ALL AI keys (<see cref="AiKeys"/>) and ALL Location keys (<see cref="LocationKeys"/>):
     /// AI capabilities spend tokens and the Location feature reveals where a user is, so both must be
     /// granted deliberately per user — every new account starts with AI off and location off.
@@ -380,5 +381,6 @@ public static class Permissions
         && key != RecipesUse && key != GroceryUse && key != MealsUse && key != ResumeUse
         && key != UsersView && key != ActivityView && key != UsersEmailReveal
         && key != SettingsManage && key != SourcesManage && key != ReporterManage && key != NotificationsManage
+        && key != PricingManage && key != SharesManage
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }

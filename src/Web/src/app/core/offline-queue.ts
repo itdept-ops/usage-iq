@@ -13,6 +13,13 @@ export interface QueuedRequest {
   body: unknown;
   headers: Record<string, string>;
   enqueuedAt: number;
+  /**
+   * Owner of this queued write (the signed-in user's id/email at enqueue time), used so a flush on a
+   * SHARED device only replays rows belonging to the CURRENT user — a different user's queued writes
+   * would otherwise replay authenticated as whoever is now signed in (the auth cookie rides along
+   * automatically). Undefined on legacy rows / when no session metadata was available at enqueue.
+   */
+  owner?: string;
 }
 
 /** Snapshot the interceptor passes to {@link OfflineQueue.enqueue} (everything except the auto id/timestamp). */
@@ -41,6 +48,25 @@ function sessionActive(): boolean {
     return !!s?.expiresAtUtc && new Date(s.expiresAtUtc).getTime() > Date.now();
   } catch {
     return false;
+  }
+}
+
+/**
+ * A stable identity key for the currently-signed-in user, read from the SAME persisted session blob
+ * (userId preferred, email as a fallback), or null if none can be derived. Used to stamp queued rows
+ * on enqueue and to gate replay on flush so one user's offline writes never replay as another's on a
+ * shared device. Not a security boundary (the server still authorizes every replay by the cookie) —
+ * it's a correctness guard against cross-user attribution.
+ */
+function currentUserKey(): string | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as { userId?: string | null; email?: string | null };
+    const key = s?.userId ?? s?.email ?? null;
+    return key ? String(key) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -92,12 +118,14 @@ export class OfflineQueue {
   async enqueue(req: QueuedRequestInput): Promise<void> {
     const db = await this.db();
     if (!db) return;
+    const owner = currentUserKey();
     const record: Omit<QueuedRequest, 'id'> = {
       method: req.method,
       url: req.url,
       body: req.body,
       headers: req.headers ?? {},
       enqueuedAt: Date.now(),
+      ...(owner ? { owner } : {}),
     };
     try {
       await this.tx(db, 'readwrite', store => store.add(record as QueuedRequest));
@@ -129,6 +157,20 @@ export class OfflineQueue {
   }
 
   /**
+   * Empty the ENTIRE queue (all pending rows) and reset the size signal to 0. Called on logout so a
+   * subsequent different user on the same shared device never inherits the previous user's queued
+   * offline writes. Fully guarded — a missing IndexedDB simply leaves the (empty) size at 0.
+   */
+  async clear(): Promise<void> {
+    const db = await this.db();
+    if (!db) { this.size.set(0); return; }
+    try {
+      await this.tx(db, 'readwrite', store => store.clear());
+    } catch { /* ignore */ }
+    await this.refreshSize();
+  }
+
+  /**
    * Replay every queued request with the CURRENT auth + credentials. A definitive response
    * (2xx OR 4xx — the server reached a verdict) removes the entry; a true network error keeps it
    * for the next wake. Re-entrancy-guarded so overlapping wakes don't double-replay.
@@ -145,7 +187,23 @@ export class OfflineQueue {
       // Leave everything queued for a later wake once re-authenticated.
       if (!sessionActive()) return;
 
-      for (const item of pending) {
+      // Shared-device guard: on a signed-in session, drop any row STAMPED for a DIFFERENT user before
+      // replaying — its write would otherwise apply as the current user (the auth cookie rides along).
+      // Legacy/unstamped rows (owner undefined) are still replayed, preserving prior behaviour.
+      const me = currentUserKey();
+      if (me) {
+        for (const item of pending) {
+          if (item.owner && item.owner !== me) {
+            await this.remove(item.id);
+          }
+        }
+      }
+
+      const toReplay = me
+        ? pending.filter(item => !item.owner || item.owner === me)
+        : pending;
+
+      for (const item of toReplay) {
         try {
           const headers: Record<string, string> = { ...(item.headers ?? {}) };
           // Auth rides the HttpOnly cookie (credentials:'include' below), not a header; strip any stale

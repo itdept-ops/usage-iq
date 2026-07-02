@@ -980,6 +980,7 @@ export class UsersMobilePage {
     // Admin oversight reads + deployment-global config-writes: never inheritable by open sign-up.
     PERM.usersView, PERM.activityView, PERM.aiUsageView,
     PERM.settingsManage, PERM.sourcesManage, PERM.reporterManage, PERM.notificationsManage,
+    PERM.pricingManage, PERM.sharesManage,
     PERM.trackerAi, PERM.familyAi, PERM.familyAiAssistant, PERM.financeAi, PERM.chatAi, PERM.aiVision,
   ]);
 

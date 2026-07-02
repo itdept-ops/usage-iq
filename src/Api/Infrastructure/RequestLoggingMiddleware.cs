@@ -56,6 +56,13 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next, RequestLogQue
         "/api/location", "/api/family/locations", "/api/cycle", "/api/family/cycle",
         "/api/meds", "/api/vitals", "/api/health",
         "/api/family/finance", "/api/bills", "/api/tracker",
+        // Free-text journals + household organizers (notes/lists/meals/reminders/timers/polls/quick-add),
+        // habit logs, and the AI/agent surfaces (prompts + generated content) — all carry special-category
+        // free-text / PII that LogRedaction can't scrub from bodies, so drop the bodies at capture time.
+        "/api/journal", "/api/family/notes", "/api/family/lists", "/api/family/meals",
+        "/api/family/reminders", "/api/family/timers", "/api/family/polls", "/api/family/quick-add",
+        "/api/family/assistant", "/api/habits", "/api/ai", "/api/push", "/api/agents",
+        "/api/inbox", "/api/recipes", "/api/grocery",
     };
 
     public async Task Invoke(HttpContext ctx)

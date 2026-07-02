@@ -470,23 +470,37 @@ export class ChatRealtime {
     // Capture a generation token so only the LATEST refresh reconciles: two overlapping refreshChannels()
     // calls (start()/onreconnected()/deep-link) otherwise let the slower response win.
     const seq = ++this.channelsRefreshSeq;
+    // Snapshot the ids we knew BEFORE the GET. Any channel that appears after this (a hub ChannelAdded
+    // racing in mid-flight) is NOT in this set, so we can tell it apart from a stale channel the server
+    // has dropped — the former must survive the reconcile, the latter must be pruned.
+    const knownBefore = new Set(this._channels().map(ch => ch.id));
     // Guard the array off the async response: a null/undefined body must not make _channels non-iterable
     // (the always-mounted shell chrome — bell/presence — derives off these signals on every page).
     const list = (await firstValueFrom(this.api.chatChannels())) ?? [];
     // A newer refresh started while this GET was in flight — drop this stale snapshot entirely.
     if (seq !== this.channelsRefreshSeq) return list;
-    // MERGE by id rather than hard-replacing: a hub ChannelAdded (which appends a brand-new channel and
-    // seeds its unread) that raced in during the in-flight GET would be clobbered by a plain .set(list)
-    // predating it. Upsert the server snapshot over the current list, keeping any channel the snapshot
-    // doesn't yet know about (e.g. one just added over the hub) so it doesn't vanish from the sidebar.
+    const serverIds = new Set(list.map(ch => ch.id));
+    // Reconcile so the result reflects the server's AUTHORITATIVE set: a deleted/left/archived channel
+    // absent from the snapshot is dropped (previously it lingered forever). We still keep any channel a
+    // concurrent hub ChannelAdded appended DURING the in-flight GET (not in knownBefore) so it doesn't
+    // vanish before the next refresh sees it. For channels the server still returns we take its row (its
+    // fresh unreadCount/lastMessage), for a surviving hub-added channel we keep the client's row as-is.
     this._channels.update(current => {
       const byId = new Map<number, ChatChannelDto>();
-      for (const ch of current) byId.set(ch.id, ch);
+      for (const ch of current) {
+        if (serverIds.has(ch.id) || !knownBefore.has(ch.id)) byId.set(ch.id, ch);
+      }
       for (const ch of list) byId.set(ch.id, ch);
       return [...byId.values()];
     });
     this._unread.update(map => {
       const next = { ...map };
+      // Prune unread for channels the server no longer returns (unless a concurrent hub ChannelAdded seeded
+      // it mid-flight) so a dropped DM stops inflating totalUnreadMessages; refresh the survivors' counts.
+      for (const key of Object.keys(next)) {
+        const id = Number(key);
+        if (!serverIds.has(id) && knownBefore.has(id)) delete next[id];
+      }
       for (const ch of list) next[ch.id] = ch.unreadCount;
       return next;
     });

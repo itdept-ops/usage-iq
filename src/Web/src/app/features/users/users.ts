@@ -377,6 +377,8 @@ export class Users {
     PERM.sourcesManage,
     PERM.reporterManage,
     PERM.notificationsManage,
+    PERM.pricingManage,
+    PERM.sharesManage,
     PERM.trackerAi,
     PERM.familyAi,
     PERM.familyAiAssistant,

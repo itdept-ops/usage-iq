@@ -101,15 +101,51 @@ public sealed class HealthSyncMapper(UsageDbContext db)
 
                 if (changedSteps || changedHr)
                 {
+                    var skipRace = false;
                     if (!hadRow) db.DailyActivities.Add(row);
-                    await db.SaveChangesAsync(ct);
+                    try
+                    {
+                        await db.SaveChangesAsync(ct);
+                    }
+                    catch (DbUpdateException ex) when (!hadRow && IsUniqueViolation(ex))
+                    {
+                        // RACE: a concurrent sync inserted the (UserEmail, LocalDate) DailyActivity row first.
+                        // Drop our losing insert, re-read the committed row and re-apply our mapped values to
+                        // it as an in-place update (never a duplicate). Skip if the winner is a Manual row.
+                        db.ChangeTracker.Clear();
+                        var winner = await db.DailyActivities
+                            .FirstOrDefaultAsync(x => x.UserEmail == email && x.LocalDate == date, ct);
+                        if (winner is null || winner.Source == SourceKind.Manual)
+                        {
+                            if (changedSteps) steps = steps.Add(new SignalResult(0, 0, 1));
+                            if (changedHr) hr = hr.Add(new SignalResult(0, 0, 1));
+                            skipRace = true;
+                        }
+                        else
+                        {
+                            winner.Source = SourceKind.Watch;
+                            winner.UpdatedUtc = DateTime.UtcNow;
+                            if (changedSteps)
+                            {
+                                winner.Steps = a.Steps;
+                                winner.DistanceMeters = a.DistanceMeters;
+                                winner.ActiveCalories = a.ActiveCalories;
+                            }
+                            if (changedHr) winner.RestingHeartRate = a.RestingHeartRate;
+                            await db.SaveChangesAsync(ct);
+                            row = winner;
+                        }
+                    }
 
-                    if (changedSteps)
-                        steps = steps.Add(await RecordDayKeyedAsync(
-                            email, provider, date, HealthSignalKind.Steps, dayRef, row.Id, ct));
-                    if (changedHr)
-                        hr = hr.Add(await RecordDayKeyedAsync(
-                            email, provider, date, HealthSignalKind.HeartRate, dayRef, row.Id, ct));
+                    if (!skipRace)
+                    {
+                        if (changedSteps)
+                            steps = steps.Add(await RecordDayKeyedAsync(
+                                email, provider, date, HealthSignalKind.Steps, dayRef, row.Id, ct));
+                        if (changedHr)
+                            hr = hr.Add(await RecordDayKeyedAsync(
+                                email, provider, date, HealthSignalKind.HeartRate, dayRef, row.Id, ct));
+                    }
                 }
             }
         }

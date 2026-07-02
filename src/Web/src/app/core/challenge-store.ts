@@ -48,6 +48,13 @@ export class ChallengeStore {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
+  /**
+   * Monotonic request counter for {@link load}. Each load captures the current value before its await;
+   * only the latest-issued load may mutate the visible signals, so a slow response for a superseded
+   * view-user can never overwrite a freshly-loaded challenge (latest-wins).
+   */
+  private loadSeq = 0;
+
   /** True while viewing someone else's challenge (no edit controls). */
   readonly readOnly = computed(() => this.challenge()?.readOnly ?? this.viewUser() !== null);
 
@@ -68,17 +75,25 @@ export class ChallengeStore {
 
   /** Load (or reload) the active challenge for the current view target. */
   async load(): Promise<void> {
+    const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
     try {
       const c = await firstValueFrom(this.api.challenge(this.viewUser() ?? undefined));
+      // Latest-wins: a newer load has superseded this one; discard its result so it can't
+      // overwrite the freshly-requested view-user (another person's challenge/PII).
+      if (seq !== this.loadSeq) return;
       this.challenge.set(c);
     } catch (e: unknown) {
+      if (seq !== this.loadSeq) return;
       this.error.set(this.messageOf(e));
       this.challenge.set(null);
     } finally {
-      this.loaded.set(true);
-      this.loading.set(false);
+      // Only the latest load flips loaded / clears the spinner; a stale load resolving first must not.
+      if (seq === this.loadSeq) {
+        this.loaded.set(true);
+        this.loading.set(false);
+      }
     }
   }
 

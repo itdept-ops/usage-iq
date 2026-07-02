@@ -69,6 +69,16 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
             throw new HubException("You are not a member of that channel.");
         if (channel.ArchivedUtc is not null) throw new HubException("This channel is archived.");
 
+        // The mutual-contact gate is durable, not just enforced at first-DM creation: removing the
+        // contact edge must cut off the existing DM too. Mirror the REST send endpoint — re-check it
+        // on every Direct send. Chat admins (chat.contacts.manage) bypass, as there.
+        if (channel.Kind == ChannelKind.Direct && !await HasContactsManageAsync(scope, email))
+        {
+            var other = channel.Members.FirstOrDefault(m => m.UserEmail != email)?.UserEmail;
+            if (other is null || !await ContactGraph.IsContactAsync(db, email, other, Context.ConnectionAborted))
+                throw new HubException("You can only message your contacts. Ask an admin to add them to your circle.");
+        }
+
         var text = (body ?? "").Trim();
         if (text.Length == 0) throw new HubException("Message body is required.");
         if (text.Length > 4000) text = text[..4000];
@@ -181,6 +191,9 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
 
     private Task<bool> HasSendAsync(AsyncServiceScope scope, string email) =>
         HasPermissionAsync(scope, email, TokenSv, Permissions.ChatSend);
+
+    private Task<bool> HasContactsManageAsync(AsyncServiceScope scope, string email) =>
+        HasPermissionAsync(scope, email, TokenSv, Permissions.ChatContactsManage);
 
     /// <summary>
     /// Re-validates the caller for the LIFETIME of the hub connection — not just at handshake — mirroring
