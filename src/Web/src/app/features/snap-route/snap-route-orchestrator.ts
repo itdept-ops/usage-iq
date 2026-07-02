@@ -372,6 +372,10 @@ export class SnapRouteOrchestrator {
     const ai = await this.aiImage();
     if (!(await ai.confirmPhotoNotice())) return; // user declined the one-time Gemini notice
 
+    // Re-triggering Snap while a receipt review is open would drop `draftBillId` in resetState() WITHOUT
+    // deleting the outstanding server-side draft — leaving a stray empty 'Snap receipt' bill. Clean it up
+    // first so a new capture never orphans a prior uncommitted draft.
+    await this.cleanupDraftBill();
     this.resetState();
     if (this.platform.isMobile()) {
       // Mobile: open the OS photo chooser (no `capture` attr → offers BOTH "Take Photo" and "Photo Library"),

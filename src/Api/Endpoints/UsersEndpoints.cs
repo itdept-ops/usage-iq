@@ -202,6 +202,28 @@ public static class UsersEndpoints
                     return Results.BadRequest(new { message = "You can't delete the last administrator." });
 
                 var removedEmail = user.Email;
+                var removedId = user.Id;
+
+                // Un-ghost the deleted person across the family domain: many columns reference an AppUser
+                // by bare int with no FK, so a hard delete would otherwise leave the household rendering the
+                // deleted user as a chore actor, poll voter, or share recipient. Null the NULLABLE chore actor
+                // columns (preserves the chore + its history) and DELETE the person's poll votes / shares
+                // (which also pin them in unique (OptionId,UserId)/(ItemType,ItemId,SharedWithUserId) keys).
+                // Non-nullable history/ledger references (CreatedByUserId, ChoreCompletion.ByUserId,
+                // CreditEntry.ChildUserId, Finance*.CreatedByUserId) are deliberately left intact — nulling is
+                // impossible and deleting would corrupt the ledger/audit trail; those want real FKs (SetNull)
+                // added in a migration. These run in the same serializable transaction as the delete below.
+                await db.FamilyChores.Where(c => c.AssignedToUserId == removedId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.AssignedToUserId, (int?)null), ct);
+                await db.FamilyChores.Where(c => c.DoneByUserId == removedId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.DoneByUserId, (int?)null), ct);
+                await db.FamilyChores.Where(c => c.ClaimedByUserId == removedId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.ClaimedByUserId, (int?)null), ct);
+                await db.FamilyChores.Where(c => c.ApprovedByUserId == removedId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.ApprovedByUserId, (int?)null), ct);
+                await db.FamilyPlanPollVotes.Where(v => v.UserId == removedId).ExecuteDeleteAsync(ct);
+                await db.FamilyShares.Where(f => f.SharedWithUserId == removedId).ExecuteDeleteAsync(ct);
+
                 db.Users.Remove(user);
                 await db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);

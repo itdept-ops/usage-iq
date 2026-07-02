@@ -453,45 +453,57 @@ public static class HardChallengeEndpoints
 
             var now = DateTime.UtcNow;
 
-            foreach (var dt in toRemove)
+            // Apply the validated removals + additions onto the currently-tracked day rows. Factored out so the
+            // concurrency retry below can re-apply the SAME mutations onto freshly-reloaded rows.
+            async Task ApplyCheatDaysAsync()
             {
-                var r = await db.HardChallengeDays
-                    .FirstOrDefaultAsync(x => x.UserEmail == caller.Email && x.LocalDate == dt, ct);
-                if (r is null) continue;
-                r.IsCheatDay = false;
-                r.UpdatedUtc = now;
-            }
-
-            foreach (var dt in toAdd)
-            {
-                var r = await db.HardChallengeDays
-                    .FirstOrDefaultAsync(x => x.UserEmail == caller.Email && x.LocalDate == dt, ct);
-                if (r is null)
+                foreach (var dt in toRemove)
                 {
-                    r = new HardChallengeDay
-                    {
-                        ChallengeId = challenge.Id,
-                        UserEmail = caller.Email,
-                        LocalDate = dt,
-                        IsCheatDay = true,
-                        CreatedUtc = now,
-                        UpdatedUtc = now,
-                    };
-                    db.HardChallengeDays.Add(r);
-                }
-                else
-                {
-                    r.IsCheatDay = true;
+                    var r = await db.HardChallengeDays
+                        .FirstOrDefaultAsync(x => x.UserEmail == caller.Email && x.LocalDate == dt, ct);
+                    if (r is null) continue;
+                    r.IsCheatDay = false;
                     r.UpdatedUtc = now;
                 }
+
+                foreach (var dt in toAdd)
+                {
+                    var r = await db.HardChallengeDays
+                        .FirstOrDefaultAsync(x => x.UserEmail == caller.Email && x.LocalDate == dt, ct);
+                    if (r is null)
+                    {
+                        r = new HardChallengeDay
+                        {
+                            ChallengeId = challenge.Id,
+                            UserEmail = caller.Email,
+                            LocalDate = dt,
+                            IsCheatDay = true,
+                            CreatedUtc = now,
+                            UpdatedUtc = now,
+                        };
+                        db.HardChallengeDays.Add(r);
+                    }
+                    else
+                    {
+                        r.IsCheatDay = true;
+                        r.UpdatedUtc = now;
+                    }
+                }
             }
+
+            await ApplyCheatDaysAsync();
             try
             {
                 await db.SaveChangesAsync(ct);
             }
             catch (DbUpdateException ex) when (TrackerVisibility.IsUniqueViolation(ex))
             {
+                // A concurrent same-day insert of one of these cheat dates raced our Add. Drop our stale tracked
+                // state, then re-read the affected rows and re-apply the SAME validated mutations so the caller's
+                // edit is actually persisted (mirrors the PUT /day upsert retry) — never a 200 with it discarded.
                 db.ChangeTracker.Clear();
+                await ApplyCheatDaysAsync();
+                await db.SaveChangesAsync(ct);
             }
 
             var refreshed = await db.HardChallenges.FirstAsync(c => c.Id == challenge.Id, ct);

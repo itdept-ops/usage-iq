@@ -16,13 +16,12 @@ import { DayCell } from '../meals-beta.model';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="ds-rail" role="tablist" aria-label="Days of the week">
+    <div class="ds-rail" role="group" aria-label="Days of the week">
       @for (c of cells(); track c.localDate; let i = $index) {
         <button type="button" class="ds-chip"
-                role="tab"
                 [class.is-sel]="c.localDate === selected()"
                 [class.is-today]="c.isToday"
-                [attr.aria-selected]="c.localDate === selected()"
+                [attr.aria-pressed]="c.localDate === selected()"
                 [attr.aria-label]="c.weekdayLong + ' ' + c.dateLabel + ', ' + c.meals.length + ' meals'"
                 [style.--i]="i"
                 (click)="pick.emit(c.localDate)">

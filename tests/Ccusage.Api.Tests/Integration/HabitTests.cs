@@ -223,7 +223,28 @@ public class HabitTests(WebAppFactory factory)
         var id = created.GetProperty("id").GetInt32();
         await owner.PutAsJsonAsync($"/api/habits/{id}/day", new { date = Today, done = true });
 
-        await Task.Delay(200);
+        // A bare sleep can't distinguish 'never emits' from 'emits slowly' under CI load — a late erroneous
+        // emit would pass green. Anchor on a SHARING sibling that reliably DOES emit: once that observable
+        // event lands, the fire-and-forget path has drained, so the non-sharing actor's absence is real proof.
+        var (sharerEmail, sharer) = await ProvisionUser("tracker.self");
+        await SetShareActivity(sharerEmail, true);
+        var sharerHabit = await Json(await sharer.PostAsJsonAsync("/api/habits/",
+            new { title = "Loud habit", cadence = (int)HabitCadence.Daily, startDate = Today }));
+        await sharer.PutAsJsonAsync($"/api/habits/{sharerHabit.GetProperty("id").GetInt32()}/day",
+            new { date = Today, done = true });
+
+        var sharerEmitted = false;
+        for (var i = 0; i < 20 && !sharerEmitted; i++)
+        {
+            using var pollScope = factory.Services.CreateScope();
+            var pollDb = pollScope.ServiceProvider.GetRequiredService<UsageDbContext>();
+            sharerEmitted = await pollDb.ActivityEvents.AsNoTracking()
+                .AnyAsync(e => e.ActorEmail == sharerEmail.ToLowerInvariant()
+                               && e.Kind == ActivityEmitter.Kinds.HabitDayComplete);
+            if (!sharerEmitted) await Task.Delay(50);
+        }
+        sharerEmitted.Should().BeTrue("the sharing sibling's emit anchors that the fire-and-forget path has drained");
+
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
         (await db.ActivityEvents.AsNoTracking()

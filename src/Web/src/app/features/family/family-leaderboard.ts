@@ -33,10 +33,10 @@ const METRICS: readonly { key: LeaderboardMetric; label: string; icon: string; u
     <section class="lb" aria-label="Family leaderboard">
       <div class="lb__head">
         <h2 class="lb__title"><mat-icon aria-hidden="true">leaderboard</mat-icon> Leaderboard</h2>
-        <div class="lb__switch" role="tablist" aria-label="Metric">
+        <div class="lb__switch" role="group" aria-label="Metric">
           @for (m of metrics; track m.key) {
-            <button type="button" class="lb__tab" role="tab" [class.is-on]="metric() === m.key"
-                    [attr.aria-selected]="metric() === m.key" (click)="setMetric(m.key)">
+            <button type="button" class="lb__tab" [class.is-on]="metric() === m.key"
+                    [attr.aria-pressed]="metric() === m.key" (click)="setMetric(m.key)">
               <mat-icon aria-hidden="true">{{ m.icon }}</mat-icon>
               <span class="lb__tab-label">{{ m.label }}</span>
             </button>

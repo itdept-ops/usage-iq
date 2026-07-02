@@ -10,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
+import { HOME_OPTIONS, HomeOption } from '../../core/home-options';
 import {
   AccessPolicy, AuditEntry, ChatContactDto, LoginEvent, ManagedUser, PermissionItem, PermissionPreset,
   PERM, PERM_GROUP_ORDER,
@@ -29,12 +30,6 @@ interface PermGroup {
 
 /** How the list is filtered by capability axis. `perm` narrows to holders of a specific permission key. */
 type CapFilter = 'all' | 'ai' | 'enabled' | 'disabled' | 'perm';
-
-/** A landing-page option for the "Lands on" picker (route + label), offered only when reachable. */
-interface HomeOption {
-  route: string;
-  label: string;
-}
 
 /** Lazy-loaded login-history state for one user's detail. */
 interface LoginHistory {
@@ -984,37 +979,6 @@ export class UsersMobilePage {
     PERM.trackerAi, PERM.familyAi, PERM.familyAiAssistant, PERM.financeAi, PERM.chatAi, PERM.aiVision,
   ]);
 
-  /** route -> permission key(s) granting access (ANY one) — mirrors the live page's homePerms. */
-  private static readonly homePerms: Readonly<Record<string, readonly string[]>> = {
-    '/': [PERM.dashboardView],
-    '/calendar': [PERM.calendarView],
-    '/pricing': [PERM.pricingView],
-    '/reporter': [PERM.reporterView, PERM.reporterManage, PERM.reporterSelf],
-    '/fleet': [PERM.fleetView, PERM.reporterManage],
-    '/tracker': [PERM.trackerSelf],
-    '/family': [PERM.familyUse],
-    '/chat': [PERM.chatRead],
-    '/locations': [PERM.locationSelf],
-    '/users': [PERM.usersView],
-    '/activity': [PERM.activityView],
-    '/settings': [PERM.settingsView],
-  };
-
-  private static readonly homeOptionDefs: readonly HomeOption[] = [
-    { route: '/', label: 'Dashboard' },
-    { route: '/calendar', label: 'Calendar' },
-    { route: '/pricing', label: 'Pricing' },
-    { route: '/reporter', label: 'Reporter' },
-    { route: '/fleet', label: 'Fleet' },
-    { route: '/tracker', label: 'Tracker' },
-    { route: '/family', label: 'Family' },
-    { route: '/chat', label: 'Chat' },
-    { route: '/locations', label: 'My locations' },
-    { route: '/users', label: 'Users' },
-    { route: '/activity', label: 'Activity' },
-    { route: '/settings', label: 'Settings' },
-  ];
-
   // ─────────────── derived: catalog groups ───────────────
 
   readonly groups = computed<PermGroup[]>(() => {
@@ -1169,10 +1133,10 @@ export class UsersMobilePage {
     const u = this.selected();
     if (!u) return [];
     const held = new Set(u.permissions);
-    return UsersMobilePage.homeOptionDefs.filter((o) => {
-      const req = UsersMobilePage.homePerms[o.route];
-      return req && req.some((k) => held.has(k));
-    });
+    // Drive the admin "Lands on" picker from the ONE shared home list (core/home-options.ts) — the same
+    // source of truth the self-service picker + canAccessHome + the backend HomeRoutes.cs trace to — so it
+    // can never drift. Offer each option only when the TARGET user holds one of its granting perms.
+    return HOME_OPTIONS.filter((o) => o.perms.some((k) => held.has(k)));
   });
 
   readonly loginState = computed(() => {

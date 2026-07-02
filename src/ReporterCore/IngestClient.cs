@@ -36,11 +36,17 @@ public sealed class IngestClient : IDisposable
     {
         _machine = machine;
         _machineInfo = machineInfo;
+        var baseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+        // The X-Ingest-Key is a bearer secret, and each batch also carries precise GPS, MachineGuid,
+        // LAN IPs, OS user and machine model. Over plain http to a non-local host that all travels in
+        // cleartext and can be MITM'd. Refuse to send it rather than leak it (mirrors QuickAddClient).
+        if (baseAddress.Scheme == "http" && !baseAddress.IsLoopback)
+            throw new FatalReporterException("Server URL is http:// to a non-local host — refusing to send your key and telemetry in cleartext. Use https in Settings.");
         // AllowAutoRedirect = false so the X-Ingest-Key credential is never re-sent to a redirect
         // target on a different host: .NET strips Authorization on cross-origin redirects but not
         // custom headers, so an auto-followed 3xx (or a cleartext-http MITM) would otherwise leak it.
         var handler = new HttpClientHandler { AllowAutoRedirect = false };
-        _http = new HttpClient(handler) { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(100) };
+        _http = new HttpClient(handler) { BaseAddress = baseAddress, Timeout = TimeSpan.FromSeconds(100) };
         _http.DefaultRequestHeaders.Add("X-Ingest-Key", key);
         _http.DefaultRequestHeaders.UserAgent.ParseAdd(Version);
     }

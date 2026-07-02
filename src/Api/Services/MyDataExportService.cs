@@ -33,7 +33,9 @@ namespace Ccusage.Api.Services;
 /// </list>
 ///
 /// <para>Streamed via <see cref="ZipArchive"/> directly over the response body (mirrors
-/// <see cref="UsageQueries.WriteRecordsCsvAsync"/>), so nothing is buffered to a temp file.</para>
+/// <see cref="UsageQueries.WriteRecordsCsvAsync"/>), so nothing is buffered to a temp file OR to memory —
+/// each entry (including the caller's whole lifetime <c>usage_records.csv</c>, which on this token-usage
+/// product can be millions of rows) is written straight to the response as it is read.</para>
 /// </summary>
 public sealed class MyDataExportService(UsageDbContext db)
 {
@@ -44,11 +46,14 @@ public sealed class MyDataExportService(UsageDbContext db)
     /// Writes the caller's full personal export as a ZIP to <paramref name="output"/>. Every entry is scoped
     /// to <paramref name="caller"/>'s own data. <paramref name="output"/> (the response body) is left open.
     ///
-    /// <para>The ZIP is assembled into a pooled <see cref="MemoryStream"/> first, then copied to the body with
-    /// a single async copy. <see cref="ZipArchive.Dispose"/> writes the central directory with SYNCHRONOUS
-    /// stream writes, which Kestrel forbids on the response body (AllowSynchronousIO is off) — building into
-    /// memory keeps every write to the response itself async. A personal export is small (one person's rows),
-    /// so the transient buffer is bounded.</para>
+    /// <para>The ZIP is streamed straight to the response — NOTHING is buffered in memory. This matters on this
+    /// token-usage product: the largest entry (<c>usage_records.csv</c>) is the caller's ENTIRE lifetime
+    /// UsageRecords, which for a heavy user or the owner account can be millions of rows / hundreds of MB;
+    /// buffering the whole compressed archive would be a per-export LOH allocation that a few concurrent
+    /// exports could use to exhaust the API heap. <see cref="ZipArchive.Dispose"/> writes the central directory
+    /// with SYNCHRONOUS stream writes, which Kestrel forbids on the response body (AllowSynchronousIO is off);
+    /// <see cref="SyncToAsyncStream"/> wraps <paramref name="output"/> so those synchronous writes are forwarded
+    /// as async writes, letting us stream without a buffer.</para>
     /// </summary>
     public async Task WriteExportAsync(
         CurrentUserAccessor.CurrentUser caller, Stream output, CancellationToken ct)
@@ -56,16 +61,15 @@ public sealed class MyDataExportService(UsageDbContext db)
         var email = caller.Email; // already lower-cased by the accessor
         var nowUtc = DateTime.UtcNow;
 
-        using var buffer = new MemoryStream();
-        await BuildZipAsync(buffer, caller, email, nowUtc, ct);
-        buffer.Position = 0;
-        await buffer.CopyToAsync(output, ct);
+        await using var wrapped = new SyncToAsyncStream(output);
+        await BuildZipAsync(wrapped, caller, email, nowUtc, ct);
     }
 
     private async Task BuildZipAsync(
         Stream target, CurrentUserAccessor.CurrentUser caller, string email, DateTime nowUtc, CancellationToken ct)
     {
-        // leaveOpen: true so the MemoryStream survives Dispose; Dispose writes the central directory.
+        // leaveOpen: true so disposing the zip (which writes the central directory) does not dispose the
+        // response-body wrapper — the wrapper is disposed by the caller and leaves the response body open.
         using var zip = new ZipArchive(target, ZipArchiveMode.Create, leaveOpen: true);
 
         // ---- manifest.json (no email — the caller's DisplayName only) ----
@@ -353,6 +357,43 @@ public sealed class MyDataExportService(UsageDbContext db)
             .Select(x => Row(x.name, T(x.CreatedUtc)));
 
         await WriteCsvRowsAsync(zip, "contacts.csv", "contact,added_utc", lines, ct);
+    }
+
+    // ---------------------------------------------------------------- response-body stream wrapper
+
+    /// <summary>
+    /// Forwards a stream's SYNCHRONOUS writes to the wrapped stream's ASYNC writes. Lets us stream the ZIP
+    /// directly to the Kestrel response body (which has AllowSynchronousIO off) without buffering the whole
+    /// archive in memory: the only synchronous writes ZipArchive makes are the small central directory during
+    /// <see cref="ZipArchive.Dispose"/>, and those are bridged here. The wrapped stream is left OPEN on dispose
+    /// (the response body is owned by the caller). Blocks the calling thread on the central-directory flush,
+    /// which is a bounded, one-off cost per export.
+    /// </summary>
+    private sealed class SyncToAsyncStream(Stream inner) : Stream
+    {
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) =>
+            inner.WriteAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
+
+        public override void Write(ReadOnlySpan<byte> buffer) =>
+            inner.WriteAsync(buffer.ToArray().AsMemory()).AsTask().GetAwaiter().GetResult();
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default) =>
+            inner.WriteAsync(buffer, ct);
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct) =>
+            inner.WriteAsync(buffer.AsMemory(offset, count), ct).AsTask();
+
+        public override void Flush() => inner.FlushAsync().GetAwaiter().GetResult();
+        public override Task FlushAsync(CancellationToken ct) => inner.FlushAsync(ct);
     }
 
     // ---------------------------------------------------------------- writers

@@ -269,20 +269,28 @@ public static class HabitEndpoints
             var selfRow = await db.Users.AsNoTracking().Where(u => u.Email == caller.Email)
                 .Select(u => new { u.Id, u.Email, u.Name, u.DisplayNameMode, u.Nickname, u.Picture }).FirstAsync(ct);
 
+            // Batch ALL users' stats in a constant handful of queries (one Habits/HabitDays/auto-source read each,
+            // filtered by UserEmail IN (...)) rather than a per-user fan-out that would issue ~2-5 sequential
+            // queries for each of up to MaxLeaderboardPeople+1 people.
+            var emails = new List<string> { selfRow.Email };
+            emails.AddRange(others.Select(u => u.Email));
+            var statsByEmail = await ComputeUsersStatsAsync(db, emails, today, ct);
+            var zero = new UserStats(0, 0, 0);
+
             var rows = new List<LeaderboardRowDto>();
-            async Task AddRowAsync(int uid, string email, string? name, string? picture, bool isSelf)
+            void AddRow(int uid, string email, string? name, string? picture, bool isSelf)
             {
-                var stats = await ComputeUserStatsAsync(db, email, today, ct);
+                var stats = statsByEmail.TryGetValue(email, out var s) ? s : zero;
                 if (stats.ActiveHabits == 0 && !isSelf) return; // omit a contact with no habits
                 rows.Add(new LeaderboardRowDto(
                     uid, string.IsNullOrEmpty(name) ? DisplayName.Unknown : name!, picture,
                     stats.BestStreak, stats.TotalCompletions, stats.ActiveHabits, isSelf));
             }
 
-            await AddRowAsync(selfRow.Id, selfRow.Email,
+            AddRow(selfRow.Id, selfRow.Email,
                 DisplayName.Format(selfRow.Name, selfRow.DisplayNameMode, selfRow.Nickname), selfRow.Picture, isSelf: true);
             foreach (var u in others)
-                await AddRowAsync(u.Id, u.Email, u.Name, u.Picture, isSelf: false);
+                AddRow(u.Id, u.Email, u.Name, u.Picture, isSelf: false);
 
             var ranked = rows
                 .OrderByDescending(r => r.BestStreak)
@@ -307,12 +315,12 @@ public static class HabitEndpoints
                 return Results.Ok(new CoachDto(
                     "Create a habit to get your coaching recap.", Array.Empty<string>(), true));
 
-            var facts = new List<(string Title, int Streak, int Completed, string Cadence)>();
-            foreach (var h in habits)
-            {
-                var (streak, completed) = await ComputeHabitStreakAsync(db, caller.Email, h, today, ct);
-                facts.Add((h.Title, streak, completed, h.Cadence.ToString()));
-            }
+            // Score every habit from the batched primitives (one days query + one auto-input load), not a
+            // per-habit ComputeFullAsync fan-out.
+            var perHabit = await ComputeHabitStatsAsync(db, caller.Email, habits, today, ct);
+            var facts = habits
+                .Select(h => (h.Title, perHabit[h.Id].Streak, perHabit[h.Id].Completed, h.Cadence.ToString()))
+                .ToList();
             var plain = PlainCoach(facts);
 
             if (!caller.Permissions.Contains(Permissions.TrackerAi) || !gemini.IsConfigured)
@@ -419,26 +427,76 @@ public static class HabitEndpoints
         return (streak.CurrentStreak, streak.LongestStreak, completed, todayInput, todayRow);
     }
 
-    private static async Task<(int Streak, int Completed)> ComputeHabitStreakAsync(
-        UsageDbContext db, string email, Habit habit, DateOnly today, CancellationToken ct)
-    {
-        var r = await ComputeFullAsync(db, habit, today, ct);
-        return (r.Streak, r.Completed);
-    }
-
     private readonly record struct UserStats(int BestStreak, int TotalCompletions, int ActiveHabits);
 
-    private static async Task<UserStats> ComputeUserStatsAsync(
-        UsageDbContext db, string email, DateOnly today, CancellationToken ct)
+    /// <summary>
+    /// Batch every leaderboard user's <see cref="UserStats"/> in a CONSTANT handful of queries — keyed by email —
+    /// instead of the per-user fan-out that issued ~2-5 sequential queries for each of up to
+    /// <see cref="MaxLeaderboardPeople"/>+1 people. Reads ONE Habits query (UserEmail IN (...)), ONE HabitDays
+    /// query for all of those habits' ids in the window, and ONE query per auto-source table (UserEmail IN (...)),
+    /// then groups everything in memory and scores each habit via the same <see cref="ScoreHabit"/> primitive.
+    /// Emails with no active habits are simply absent from the result.
+    /// </summary>
+    private static async Task<Dictionary<string, UserStats>> ComputeUsersStatsAsync(
+        UsageDbContext db, IReadOnlyCollection<string> emails, DateOnly today, CancellationToken ct)
     {
-        var habits = await db.Habits.AsNoTracking()
-            .Where(h => h.UserEmail == email && h.Status == HabitStatus.Active)
-            .ToListAsync(ct);
-        if (habits.Count == 0) return new UserStats(0, 0, 0);
+        var result = new Dictionary<string, UserStats>();
+        var distinctEmails = emails.Distinct().ToList();
+        if (distinctEmails.Count == 0) return result;
 
-        // Batch the per-habit reads to a constant handful of queries: all habits' days in ONE HabitId IN (...)
-        // query + the user's auto-source tracker data loaded once, then score each habit purely in memory. This
-        // replaces the O(habits x 1..3) fan-out ComputeHabitStreakAsync would incur per user.
+        var windowStart = today.AddDays(-(CalendarDays - 1));
+
+        // ONE Habits read for all users.
+        var habits = await db.Habits.AsNoTracking()
+            .Where(h => distinctEmails.Contains(h.UserEmail) && h.Status == HabitStatus.Active)
+            .ToListAsync(ct);
+        if (habits.Count == 0) return result;
+        var habitsByEmail = habits.GroupBy(h => h.UserEmail).ToDictionary(g => g.Key, g => g.ToList());
+        var habitIds = habits.Select(h => h.Id).ToList();
+
+        // ONE HabitDays read for all of those habits.
+        var days = await db.HabitDays.AsNoTracking()
+            .Where(x => habitIds.Contains(x.HabitId) && x.LocalDate >= windowStart && x.LocalDate <= today)
+            .ToListAsync(ct);
+        var daysByHabit = days.GroupBy(d => d.HabitId)
+            .ToDictionary(g => g.Key, g => g.ToDictionary(d => d.LocalDate));
+
+        // ONE read per auto-source table across all users, projected to a per-email cache.
+        var autoByEmail = await LoadUsersAutoInputsAsync(db, distinctEmails, habits, windowStart, today, ct);
+
+        var emptyCache = new UserAutoInputs(
+            new Dictionary<DateOnly, int>(), new Dictionary<DateOnly, List<int>>(), new Dictionary<DateOnly, int>());
+        var emptyDays = new Dictionary<DateOnly, HabitDay>();
+        foreach (var (email, userHabits) in habitsByEmail)
+        {
+            var cache = autoByEmail.TryGetValue(email, out var c) ? c : emptyCache;
+            int best = 0, total = 0;
+            foreach (var h in userHabits)
+            {
+                var rowByDate = daysByHabit.TryGetValue(h.Id, out var m) ? m : emptyDays;
+                var (streak, completed) = ScoreHabit(h, rowByDate, cache, today);
+                best = Math.Max(best, streak);
+                total += completed;
+            }
+            result[email] = new UserStats(best, total, userHabits.Count);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Score a batch of one user's active habits to their per-habit (streak, completed) — keyed by HabitId — using
+    /// a CONSTANT handful of queries regardless of habit count: all habits' days in ONE HabitId IN (...) window
+    /// query + the user's auto-source tracker data loaded ONCE, then score each habit purely in memory via
+    /// <see cref="ScoreHabit"/>. This is the batched counterpart to the per-habit <see cref="ComputeFullAsync"/>
+    /// fan-out, used by /coach (the cross-user leaderboard batches the same way via
+    /// <see cref="ComputeUsersStatsAsync"/>).
+    /// </summary>
+    private static async Task<Dictionary<int, (int Streak, int Completed)>> ComputeHabitStatsAsync(
+        UsageDbContext db, string email, IReadOnlyCollection<Habit> habits, DateOnly today, CancellationToken ct)
+    {
+        var result = new Dictionary<int, (int Streak, int Completed)>(habits.Count);
+        if (habits.Count == 0) return result;
+
         var windowStart = today.AddDays(-(CalendarDays - 1));
         var habitIds = habits.Select(h => h.Id).ToList();
         var days = await db.HabitDays.AsNoTracking()
@@ -449,16 +507,13 @@ public static class HabitEndpoints
 
         var cache = await LoadUserAutoInputsAsync(db, email, habits, windowStart, today, ct);
 
-        int best = 0, total = 0;
         var empty = new Dictionary<DateOnly, HabitDay>();
         foreach (var h in habits)
         {
             var rowByDate = daysByHabit.TryGetValue(h.Id, out var m) ? m : empty;
-            var (streak, completed) = ScoreHabit(h, rowByDate, cache, today);
-            best = Math.Max(best, streak);
-            total += completed;
+            result[h.Id] = ScoreHabit(h, rowByDate, cache, today);
         }
-        return new UserStats(best, total, habits.Count);
+        return result;
     }
 
     // =====================================================================================
@@ -567,6 +622,62 @@ public static class HabitEndpoints
             foreach (var a in act) calories[a.LocalDate] = a.ActiveCalories!.Value;
         }
         return new UserAutoInputs(hydration, workouts, calories);
+    }
+
+    /// <summary>
+    /// The cross-user counterpart of <see cref="LoadUserAutoInputsAsync"/>: batch-load MANY users' auto-source
+    /// tracker data for the window keyed by email, in at most one query per needed source (UserEmail IN (...)).
+    /// Only the sources some habit in the batch actually uses are queried. Users with no rows are absent.
+    /// </summary>
+    private static async Task<Dictionary<string, UserAutoInputs>> LoadUsersAutoInputsAsync(
+        UsageDbContext db, IReadOnlyCollection<string> emails, IReadOnlyCollection<Habit> habits,
+        DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        var needWater = habits.Any(h => h.AutoSource == HardTaskAutoSource.Water);
+        var needWorkout = habits.Any(h => h.AutoSource == HardTaskAutoSource.Workout);
+
+        var hydration = new Dictionary<string, Dictionary<DateOnly, int>>();
+        var workouts = new Dictionary<string, Dictionary<DateOnly, List<int>>>();
+        var calories = new Dictionary<string, Dictionary<DateOnly, int>>();
+
+        if (needWater)
+        {
+            var rows = await db.HydrationEntries.AsNoTracking()
+                .Where(h => emails.Contains(h.UserEmail) && h.LocalDate >= from && h.LocalDate <= to)
+                .GroupBy(h => new { h.UserEmail, h.LocalDate })
+                .Select(grp => new { grp.Key.UserEmail, grp.Key.LocalDate, Ml = grp.Sum(h => h.AmountMl) })
+                .ToListAsync(ct);
+            foreach (var r in rows)
+                (hydration.TryGetValue(r.UserEmail, out var m) ? m : hydration[r.UserEmail] = new())[r.LocalDate] = r.Ml;
+        }
+        if (needWorkout)
+        {
+            var ex = await db.ExerciseEntries.AsNoTracking()
+                .Where(x => emails.Contains(x.UserEmail) && x.LocalDate >= from && x.LocalDate <= to && x.DurationMin != null)
+                .Select(x => new { x.UserEmail, x.LocalDate, Dur = x.DurationMin!.Value })
+                .ToListAsync(ct);
+            foreach (var grp in ex.GroupBy(x => new { x.UserEmail, x.LocalDate }))
+                (workouts.TryGetValue(grp.Key.UserEmail, out var m) ? m : workouts[grp.Key.UserEmail] = new())[grp.Key.LocalDate]
+                    = grp.Select(x => x.Dur).ToList();
+
+            var act = await db.DailyActivities.AsNoTracking()
+                .Where(a => emails.Contains(a.UserEmail) && a.LocalDate >= from && a.LocalDate <= to && a.ActiveCalories != null)
+                .Select(a => new { a.UserEmail, a.LocalDate, a.ActiveCalories })
+                .ToListAsync(ct);
+            foreach (var a in act)
+                (calories.TryGetValue(a.UserEmail, out var m) ? m : calories[a.UserEmail] = new())[a.LocalDate]
+                    = a.ActiveCalories!.Value;
+        }
+
+        var result = new Dictionary<string, UserAutoInputs>();
+        foreach (var email in emails.Distinct())
+        {
+            var h = hydration.TryGetValue(email, out var hm) ? hm : new Dictionary<DateOnly, int>();
+            var w = workouts.TryGetValue(email, out var wm) ? wm : new Dictionary<DateOnly, List<int>>();
+            var c = calories.TryGetValue(email, out var cm) ? cm : new Dictionary<DateOnly, int>();
+            result[email] = new UserAutoInputs(h, w, c);
+        }
+        return result;
     }
 
     /// <summary>The per-day <see cref="HardChallengeScoring.HardDayInput"/> for a specific habit's day, projected

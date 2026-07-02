@@ -36,6 +36,7 @@ import {
 
 import { Api } from '../../core/api';
 import { AuthService } from '../../core/auth';
+import { HOME_OPTIONS, HOME_PERMS, HomeOption } from '../../core/home-options';
 import {
   AccessPolicy,
   AuditEntry,
@@ -147,12 +148,6 @@ interface PermGroup {
 
 /** How the list is filtered by capability: a single permission key, the "has AI" axis, or none. */
 type CapFilter = 'all' | 'ai' | 'enabled' | 'disabled' | 'perm';
-
-/** A landing-page option for the "Lands on" picker (route + label), shown only when the user can reach it. */
-interface HomeOption {
-  route: string;
-  label: string;
-}
 
 /** The delta of a staged grant-set vs an applied role: keys added on top of, and removed from, the role. */
 interface RoleDelta {
@@ -276,42 +271,6 @@ export class Users {
 
   /** Collapsed-state of each detail group accordion (keyed by group name). AI panel is separate. */
   readonly collapsedGroups = signal<Set<string>>(new Set());
-
-  /**
-   * route -> the permission key(s) that grant access; the caller needs ANY one. Mirrors auth.ts's
-   * homePerms (and the backend HomeRoutes.Map) EXACTLY so the "Lands on" picker only offers pages the
-   * TARGET user can actually reach (intersect their grant set with this map).
-   */
-  private static readonly homePerms: Readonly<Record<string, readonly string[]>> = {
-    '/': [PERM.dashboardView],
-    '/calendar': [PERM.calendarView],
-    '/pricing': [PERM.pricingView],
-    '/reporter': [PERM.reporterView, PERM.reporterManage, PERM.reporterSelf],
-    '/fleet': [PERM.fleetView, PERM.reporterManage],
-    '/tracker': [PERM.trackerSelf],
-    '/family': [PERM.familyUse],
-    '/chat': [PERM.chatRead],
-    '/locations': [PERM.locationSelf],
-    '/users': [PERM.usersView],
-    '/activity': [PERM.activityView],
-    '/settings': [PERM.settingsView],
-  };
-
-  /** Landing-page options in nav order (route + label) — mirrors app.ts's homeOptionDefs. */
-  private static readonly homeOptionDefs: readonly HomeOption[] = [
-    { route: '/', label: 'Dashboard' },
-    { route: '/calendar', label: 'Calendar' },
-    { route: '/pricing', label: 'Pricing' },
-    { route: '/reporter', label: 'Reporter' },
-    { route: '/fleet', label: 'Fleet' },
-    { route: '/tracker', label: 'Tracker' },
-    { route: '/family', label: 'Family' },
-    { route: '/chat', label: 'Chat' },
-    { route: '/locations', label: 'My locations' },
-    { route: '/users', label: 'Users' },
-    { route: '/activity', label: 'Activity' },
-    { route: '/settings', label: 'Settings' },
-  ];
 
   /**
    * Permission catalog grouped by the server-provided group, in PERM_GROUP_ORDER. Any group the order
@@ -478,8 +437,8 @@ export class Users {
     const u = this.selected();
     if (!u) return [];
     const held = new Set(u.permissions);
-    return Users.homeOptionDefs.filter((o) => {
-      const req = Users.homePerms[o.route];
+    return HOME_OPTIONS.filter((o) => {
+      const req = HOME_PERMS[o.route];
       return req && req.some((k) => held.has(k));
     });
   });

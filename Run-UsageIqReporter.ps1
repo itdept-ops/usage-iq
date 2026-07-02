@@ -55,6 +55,21 @@ if ([string]::IsNullOrWhiteSpace($Key)) {
     if ((Read-Host "Save it to '$keyFile' so you don't get asked again? (y/N)") -match '^(y|yes)$') {
         New-Item -ItemType Directory -Force -Path $keyDir | Out-Null
         Set-Content -Path $keyFile -Value $Key -NoNewline -Encoding ascii
+        # Lock the secret down to the current user only, matching the C# writer
+        # (ReporterConfig.RestrictToOwnerWindows): break inheritance and drop any inherited grants,
+        # leaving a single explicit current-user FullControl rule so local admins / other
+        # profile-scoped processes can't read the persisted bearer secret. Best-effort.
+        try {
+            $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+            $acl = Get-Acl $keyFile
+            $acl.SetAccessRuleProtection($true, $false)   # protected, don't preserve inherited rules
+            foreach ($rule in @($acl.Access)) { [void]$acl.RemoveAccessRule($rule) }
+            $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+                $sid, 'FullControl', 'Allow')))
+            Set-Acl -Path $keyFile -AclObject $acl
+        } catch {
+            Write-Host "WARNING: couldn't restrict '$keyFile' to your account only ($($_.Exception.Message))." -ForegroundColor Yellow
+        }
         Write-Host "Saved to $keyFile. Treat it as a password - keep it private." -ForegroundColor Yellow
     }
 }

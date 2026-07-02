@@ -75,11 +75,14 @@ public static class Permissions
     /// Never default — granted deliberately per user, since it gates private household data.</summary>
     public const string GroceryUse = "grocery.use";
 
-    /// <summary>Page-gate for the standalone Meal Planner tool (<c>/api/family/meals</c> + the AI planner
-    /// <c>/api/ai/plan-meals</c>): the household weekly meal plan, its grocery + macro interconnect, and the
-    /// macro-aware "plan my day/week" AI. Household-scoped private data — solo users auto-get a household,
-    /// like the Grocery tool. Never default — granted deliberately per user, since it gates private household
-    /// data. The AI planner ALSO requires <see cref="TrackerAi"/> (the token-spending gate, checked there).</summary>
+    /// <summary>Page-gate for the standalone Meal Planner tool — the SPA <c>/meal-planner</c> route (see the
+    /// page registry) — and the in-handler permission gate for the macro-aware AI planner
+    /// <c>/api/ai/plan-meals</c>. NOTE: the underlying family meal DATA API (<c>/api/family/meals</c> CRUD and
+    /// its grocery + macro interconnect) is gated by <see cref="FamilyUse"/> (household membership), NOT by this
+    /// permission — a family member with family.use can use the shared household meal plan even without the
+    /// Meal Planner page in their own nav. Household-scoped private data — solo users auto-get a household, like
+    /// the Grocery tool. Never default — granted deliberately per user. The AI planner ALSO requires
+    /// <see cref="TrackerAi"/> (the token-spending gate, checked there).</summary>
     public const string MealsUse = "meals.use";
 
     /// <summary>Page-gate for the Resume Builder tool (<c>/api/resume</c>): build, parse, tailor, and

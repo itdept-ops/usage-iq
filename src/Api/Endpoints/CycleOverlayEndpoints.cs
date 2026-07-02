@@ -74,6 +74,21 @@ public static class CycleOverlayEndpoints
                 .Select(p => p.UserId)
                 .ToListAsync(ct);
 
+            // cycle.track is a LIVE precondition for being an overlay SUBJECT, not just for the caller (line
+            // below). OverlayToFamily is a persisted opt-in that can only be set while gated by cycle.track,
+            // but revoking that permission must also revoke the household-wide disclosure it enabled. So drop
+            // any opted-in member who no longer holds cycle.track — mirroring the caller check on their own
+            // inclusion. Effective permissions come from the same UserPermissions rows CurrentUserAccessor reads.
+            if (optedInOthers.Count > 0)
+            {
+                var stillTracking = await db.UserPermissions.AsNoTracking()
+                    .Where(up => up.Permission == Permissions.CycleTrack && optedInOthers.Contains(up.UserId))
+                    .Select(up => up.UserId)
+                    .ToListAsync(ct);
+                var trackingSet = new HashSet<int>(stillTracking);
+                optedInOthers = optedInOthers.Where(id => trackingSet.Contains(id)).ToList();
+            }
+
             var subjectIds = new HashSet<int>(optedInOthers);
             // The caller's own predictions require cycle.track. A child caller was already returned empty
             // above, so a non-child caller with the permission always sees their OWN overlay — even a solo

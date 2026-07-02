@@ -26,7 +26,7 @@ import { ThemeService, COLOR_SCHEMES, type ThemeMode } from '../../../core/theme
       <div class="tp__block">
         <span class="tp__label">Appearance</span>
         <div class="tp__seg" role="radiogroup" aria-label="Theme mode">
-          @for (m of modes; track m.value) {
+          @for (m of modes; track m.value; let i = $index) {
             <button
               type="button"
               class="tp__seg-opt"
@@ -34,8 +34,10 @@ import { ThemeService, COLOR_SCHEMES, type ThemeMode } from '../../../core/theme
               [class.tp__seg-opt--on]="theme.mode() === m.value"
               [attr.aria-checked]="theme.mode() === m.value"
               [attr.aria-label]="m.label + ' mode'"
+              [attr.tabindex]="theme.mode() === m.value ? 0 : -1"
               [matTooltip]="m.label"
               (click)="theme.setMode(m.value)"
+              (keydown)="onModeKeydown($event, i)"
             >
               <mat-icon aria-hidden="true">{{ m.icon }}</mat-icon>
               <span class="tp__seg-text">{{ m.label }}</span>
@@ -47,7 +49,7 @@ import { ThemeService, COLOR_SCHEMES, type ThemeMode } from '../../../core/theme
       <div class="tp__block">
         <span class="tp__label">Color</span>
         <div class="tp__swatches" role="radiogroup" aria-label="Color scheme">
-          @for (s of schemes; track s.value) {
+          @for (s of schemes; track s.value; let i = $index) {
             <button
               type="button"
               class="tp__swatch"
@@ -56,8 +58,10 @@ import { ThemeService, COLOR_SCHEMES, type ThemeMode } from '../../../core/theme
               [class.tp__swatch--on]="theme.scheme() === s.value"
               [attr.aria-checked]="theme.scheme() === s.value"
               [attr.aria-label]="s.label"
+              [attr.tabindex]="theme.scheme() === s.value ? 0 : -1"
               [matTooltip]="s.label"
               (click)="theme.setScheme(s.value)"
+              (keydown)="onSchemeKeydown($event, i)"
             >
               @if (theme.scheme() === s.value) {
                 <mat-icon class="tp__swatch-check" aria-hidden="true">check</mat-icon>
@@ -203,4 +207,49 @@ export class ThemePicker {
   ];
 
   protected readonly schemes = COLOR_SCHEMES;
+
+  /** Roving-tabindex arrow-key navigation for the theme-mode radiogroup. */
+  protected onModeKeydown(e: KeyboardEvent, i: number): void {
+    const next = this.rovingIndex(e, i, this.modes.length);
+    if (next < 0) return;
+    e.preventDefault();
+    this.theme.setMode(this.modes[next].value);
+    this.focusRadio(e.currentTarget as HTMLElement, next);
+  }
+
+  /** Roving-tabindex arrow-key navigation for the color-scheme radiogroup. */
+  protected onSchemeKeydown(e: KeyboardEvent, i: number): void {
+    const next = this.rovingIndex(e, i, this.schemes.length);
+    if (next < 0) return;
+    e.preventDefault();
+    this.theme.setScheme(this.schemes[next].value);
+    this.focusRadio(e.currentTarget as HTMLElement, next);
+  }
+
+  /**
+   * Maps an arrow/Home/End keypress to the target radio index (wraparound), or -1 for keys
+   * this widget doesn't handle. Mirrors the beta-ui segmented control's arrow-key contract.
+   */
+  private rovingIndex(e: KeyboardEvent, i: number, count: number): number {
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        return (i + 1) % count;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        return (i - 1 + count) % count;
+      case 'Home':
+        return 0;
+      case 'End':
+        return count - 1;
+      default:
+        return -1;
+    }
+  }
+
+  /** Moves DOM focus to the sibling radio at `index` within the same radiogroup. */
+  private focusRadio(current: HTMLElement, index: number): void {
+    const radios = current.parentElement?.querySelectorAll<HTMLElement>('[role="radio"]');
+    radios?.[index]?.focus();
+  }
 }

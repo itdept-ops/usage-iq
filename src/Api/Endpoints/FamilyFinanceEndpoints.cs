@@ -642,7 +642,10 @@ public static class FamilyFinanceEndpoints
                 Kind = KindString(row.Kind),
                 AccountKey = Clamp(key, 420),
                 AccountName = Clamp(string.IsNullOrWhiteSpace(row.AccountName) ? "Unnamed account" : row.AccountName, 200),
-                Institution = string.IsNullOrWhiteSpace(row.Institution) ? null : Clamp(row.Institution, 200),
+                // Store "" (not null) for a blank institution so the persisted value matches the (HouseholdId,
+                // Name, Institution) dedup key/unique index — Postgres treats every NULL as distinct, which would
+                // let concurrent imports each insert a duplicate no-institution account. See CommitStagedAsync.
+                Institution = string.IsNullOrWhiteSpace(row.Institution) ? "" : Clamp(row.Institution, 200),
                 AccountTypeRaw = Clamp(row.AccountTypeRaw, 120),
                 Category = cat.Category is null ? null : Clamp(cat.Category, 120),
                 SuggestedCategory = null,
@@ -714,7 +717,10 @@ public static class FamilyFinanceEndpoints
                 {
                     HouseholdId = householdId,
                     Name = Clamp(string.IsNullOrWhiteSpace(s.AccountName) ? "Unnamed account" : s.AccountName, 200),
-                    Institution = string.IsNullOrWhiteSpace(s.Institution) ? null : Clamp(s.Institution, 200),
+                    // Persist "" (not null) for a blank institution so this row matches the (HouseholdId, Name,
+                    // Institution) unique index and the byKey dedup — a null would read as distinct in Postgres,
+                    // so two concurrent commits could each insert a duplicate no-institution account.
+                    Institution = string.IsNullOrWhiteSpace(s.Institution) ? "" : Clamp(s.Institution, 200),
                     Owner = "unassigned",
                     Kind = RocketMoneyCsv.AccountKind(s.AccountTypeRaw),
                     CreatedUtc = now,

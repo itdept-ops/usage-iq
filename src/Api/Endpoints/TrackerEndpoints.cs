@@ -665,7 +665,7 @@ public static class TrackerEndpoints
             // re-apply it to a freshly-reloaded profile (a failed SaveChanges rolls back the in-place edit).
             void ApplyProfileEdits(TrackerProfile p)
             {
-                p.Goal = Enum.TryParse<TrackerGoal>(req.Goal, ignoreCase: true, out var g) ? g : TrackerGoal.Maintain;
+                p.Goal = ParseEnumOrDefault(req.Goal, TrackerGoal.Maintain);
                 p.WeightKg = Positive(req.WeightKg);
                 p.DailyCalorieGoal = Positive(req.DailyCalorieGoal);
                 p.ProteinGoalG = Positive(req.ProteinGoalG);
@@ -674,10 +674,10 @@ public static class TrackerEndpoints
                 p.ShareWithContacts = req.ShareWithContacts;
                 p.DateOfBirth = TryParseDate(req.DateOfBirth, out var dob) ? dob : null;
                 p.HeightCm = Positive(req.HeightCm);
-                p.Sex = Enum.TryParse<BiologicalSex>(req.Sex, ignoreCase: true, out var sex) ? sex : BiologicalSex.Unspecified;
-                p.ActivityLevel = Enum.TryParse<ActivityLevel>(req.ActivityLevel, ignoreCase: true, out var act) ? act : ActivityLevel.Sedentary;
+                p.Sex = ParseEnumOrDefault(req.Sex, BiologicalSex.Unspecified);
+                p.ActivityLevel = ParseEnumOrDefault(req.ActivityLevel, ActivityLevel.Sedentary);
                 p.GoalWeightKg = Positive(req.GoalWeightKg);
-                p.UnitSystem = Enum.TryParse<UnitSystem>(req.UnitSystem, ignoreCase: true, out var unit) ? unit : UnitSystem.Metric;
+                p.UnitSystem = ParseEnumOrDefault(req.UnitSystem, UnitSystem.Metric);
                 p.HydrationGoalMl = Positive(req.HydrationGoalMl);
                 p.CoffeeGoalCups = Positive(req.CoffeeGoalCups);
                 p.StepGoal = Positive(req.StepGoal);
@@ -688,14 +688,14 @@ public static class TrackerEndpoints
                 p.NeckCm = Positive(req.NeckCm);
                 p.WaistCm = Positive(req.WaistCm);
                 p.HipCm = Positive(req.HipCm);
-                p.DietPattern = Enum.TryParse<DietPattern>(req.DietPattern, ignoreCase: true, out var diet) ? diet : DietPattern.Balanced;
+                p.DietPattern = ParseEnumOrDefault(req.DietPattern, DietPattern.Balanced);
                 p.Restrictions = Trunc(string.IsNullOrWhiteSpace(req.Restrictions) ? null : req.Restrictions.Trim(), 500);
-                p.TrainingType = Enum.TryParse<TrainingType>(req.TrainingType, ignoreCase: true, out var tt) ? tt : TrainingType.None;
-                p.ProteinBasis = Enum.TryParse<ProteinBasis>(req.ProteinBasis, ignoreCase: true, out var pb) ? pb : ProteinBasis.PerBodyweight;
-                p.LifeStage = Enum.TryParse<LifeStage>(req.LifeStage, ignoreCase: true, out var ls) ? ls : LifeStage.None;
+                p.TrainingType = ParseEnumOrDefault(req.TrainingType, TrainingType.None);
+                p.ProteinBasis = ParseEnumOrDefault(req.ProteinBasis, ProteinBasis.PerBodyweight);
+                p.LifeStage = ParseEnumOrDefault(req.LifeStage, LifeStage.None);
                 p.Trimester = req.Trimester is { } tr && tr >= 1 && tr <= 3 ? tr : null;
                 p.MealsPerDay = req.MealsPerDay is { } mpd && mpd >= 1 && mpd <= 12 ? mpd : null;
-                p.EatingWindow = Enum.TryParse<EatingWindow>(req.EatingWindow, ignoreCase: true, out var ew) ? ew : EatingWindow.None;
+                p.EatingWindow = ParseEnumOrDefault(req.EatingWindow, EatingWindow.None);
                 p.GoalBasisWeightKg = Positive(req.GoalBasisWeightKg);
                 p.BaselineReviewedUtc = TryParseUtc(req.BaselineReviewedUtc, out var reviewed) ? reviewed : null;
                 p.UpdatedUtc = DateTime.UtcNow;
@@ -2482,6 +2482,14 @@ public static class TrackerEndpoints
     private static bool TryParseMeal(string? value, out MealType meal) =>
         Enum.TryParse((value ?? "").Trim(), ignoreCase: true, out meal)
         && Enum.IsDefined(meal);
+
+    /// <summary>Parse a profile enum by (case-insensitive) member name, falling to <paramref name="fallback"/>
+    /// unless BOTH TryParse succeeds AND the value is a DEFINED member — so an out-of-range numeric string
+    /// (e.g. "999") is treated as unparseable rather than persisting an undefined enum value.</summary>
+    private static TEnum ParseEnumOrDefault<TEnum>(string? value, TEnum fallback) where TEnum : struct, Enum =>
+        Enum.TryParse<TEnum>((value ?? "").Trim(), ignoreCase: true, out var parsed) && Enum.IsDefined(parsed)
+            ? parsed
+            : fallback;
 
     private static IResult UsdaUnconfigured() => Results.Problem(
         title: "USDA FoodData Central is not configured.",

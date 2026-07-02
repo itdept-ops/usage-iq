@@ -149,7 +149,19 @@ public sealed class NotificationBackgroundService(
     private static readonly HashSet<string> SignupActions =
         new(StringComparer.Ordinal) { "user.autoprovisioned", "user.created" };
 
-    private static async Task ForwardSecurityAsync(
+    // Poison-entry / dead-webhook drain guard. SendSecurityAsync only returns a bool, so a permanent
+    // failure (a 400 Discord rejects for THIS entry's content, or a 404 from a server-side-deleted but
+    // still-valid-format webhook) looks identical to a transient one (5xx/429/network). Retrying-from-here
+    // is right for transient blips, but with no cap a permanent failure stalls the ENTIRE security+signup
+    // forward stream forever on the same id. We keep an in-memory count of consecutive failed attempts on
+    // the same audit id (this service is a singleton hosted service, so the field survives across ticks):
+    // after the cap we log and advance past the poison entry so the stream drains, reserving the first
+    // (MaxForwardAttempts-1) failures for genuine transient retry-from-here.
+    private const int MaxForwardAttempts = 5;
+    private long _stuckAuditId;
+    private int _stuckAttempts;
+
+    private async Task ForwardSecurityAsync(
         UsageDbContext db, DiscordNotifier notifier, NotificationSetting s, string url,
         bool securityOn, bool signupOn, string? securityMention, string? signupMention, CancellationToken ct)
     {
@@ -170,7 +182,26 @@ public sealed class NotificationBackgroundService(
                 var baseMention = (signupOn && isSignup && !securityOn) ? signupMention : securityMention;
                 var mention = e.Action.StartsWith("auth.", StringComparison.Ordinal) ? null : baseMention;
                 if (!await notifier.SendSecurityAsync(url, e.Action, e.ActorEmail, e.TargetEmail, e.Detail, mention, ct))
-                    break; // stop on failure; retry from here next tick
+                {
+                    // Count consecutive failures on THIS id. Until the cap, break and retry from here next
+                    // tick (correct for transient outages). At the cap, treat it as permanent: log and fall
+                    // through to advance past the poison entry so later entries can be forwarded.
+                    _stuckAttempts = e.Id == _stuckAuditId ? _stuckAttempts + 1 : 1;
+                    _stuckAuditId = e.Id;
+                    if (_stuckAttempts < MaxForwardAttempts)
+                        break; // transient: stop on failure; retry from here next tick
+
+                    logger.LogWarning(
+                        "Skipping audit entry {Id} ({Action}) after {Attempts} failed Discord forward attempts; "
+                        + "advancing past it to drain the security/signup stream.", e.Id, e.Action, _stuckAttempts);
+                    // fall through to advance the high-water mark past this poison entry
+                }
+                else if (e.Id == _stuckAuditId)
+                {
+                    // Recovered on this id — clear the stuck-counter so a later blip gets a full retry budget.
+                    _stuckAuditId = 0;
+                    _stuckAttempts = 0;
+                }
             }
             // Advance the high-water mark even for entries this tick chose to skip (e.g. signup-only mode
             // skipping a non-signup entry) so a skipped entry isn't reconsidered forever.

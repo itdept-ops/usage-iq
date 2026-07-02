@@ -276,7 +276,8 @@
                     [matTooltip]="p.description" (click)="applyRole(p.key)">{{ p.label }}</button>
           }
           <span class="role-seg role-seg--custom" [class.on]="!draftRole()"
-                role="radio" [attr.aria-checked]="!draftRole()">Custom</span>
+                role="status" [attr.aria-label]="!draftRole() ? 'Custom (no preset role applied)' : null"
+                [attr.aria-hidden]="!draftRole() ? null : true">Custom</span>
         </div>
 
         <!-- Delta vs the applied role (named, visible, reversible) -->

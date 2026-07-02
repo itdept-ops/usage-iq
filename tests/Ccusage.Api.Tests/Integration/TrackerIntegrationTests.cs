@@ -69,6 +69,23 @@ public class TrackerIntegrationTests(WebAppFactory factory)
 
     private const string Today = "2026-06-17";
 
+    /// <summary>"Today" in the app's display timezone — the SAME clock the tracker's stats use for age
+    /// (TrackerEndpoints computes age against <c>DateOnly.FromDateTime(ConvertTimeFromUtc(UtcNow, displayTz))</c>,
+    /// NOT against the requested <c>date</c>). Mirroring it here keeps age-derived assertions clock-independent
+    /// instead of hard-wiring a single calendar year that silently breaks at the next New Year.</summary>
+    private async Task<DateOnly> DisplayTzTodayAsync()
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
+        var id = (await db.AppConfigs.AsNoTracking().FirstOrDefaultAsync())?.DisplayTimeZone;
+        var tz = TimeZoneInfo.Utc;
+        if (!string.IsNullOrWhiteSpace(id))
+        {
+            try { tz = TimeZoneInfo.FindSystemTimeZoneById(id); } catch { tz = TimeZoneInfo.Utc; }
+        }
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+    }
+
     // ---- Permission gating ----
 
     [Fact]
@@ -807,11 +824,18 @@ public class TrackerIntegrationTests(WebAppFactory factory)
             goal = "Maintain",
             weightKg = 80.0,
             heightCm = 180.0,
-            dateOfBirth = "1990-01-01", // birthday in January → age stable regardless of "today"
+            dateOfBirth = "1990-01-01", // birthday in January → age == today.Year - 1990 on every day of any year
             sex = "Male",
             activityLevel = "Sedentary",
             shareWithContacts = false,
         });
+
+        // Age is computed against the display-tz "today" (NOT the requested date), so derive the expected
+        // age/BMR/TDEE from that same clock — hard-coding age=36 would silently break at the 2027 New Year.
+        // DOB is 1990-01-01 (January), so age == today.Year - 1990 for every day of the year.
+        var expectedAge = (await DisplayTzTodayAsync()).Year - 1990;
+        var expectedBmr = (int)Math.Round(10 * 80.0 + 6.25 * 180.0 - 5 * expectedAge + 5); // Mifflin-St Jeor, Male
+        var expectedTdee = (int)Math.Round(expectedBmr * 1.2); // Sedentary
 
         var day = await Json(await user.GetAsync($"/api/tracker/day?date={Today}"));
         var stats = day.GetProperty("stats");
@@ -819,11 +843,10 @@ public class TrackerIntegrationTests(WebAppFactory factory)
         // BMI = 80 / 1.8^2 = 24.7, Normal.
         stats.GetProperty("bmi").GetDouble().Should().Be(24.7);
         stats.GetProperty("bmiCategory").GetString().Should().Be("Normal");
-        // Male BMR = 10*80 + 6.25*180 - 5*36 + 5 = 1750; Sedentary TDEE = 1750*1.2 = 2100.
-        stats.GetProperty("bmr").GetInt32().Should().Be(1750);
-        stats.GetProperty("tdee").GetInt32().Should().Be(2100);
-        stats.GetProperty("suggestedCalorieGoal").GetInt32().Should().Be(2100); // Maintain
-        stats.GetProperty("age").GetInt32().Should().Be(36);
+        stats.GetProperty("bmr").GetInt32().Should().Be(expectedBmr);
+        stats.GetProperty("tdee").GetInt32().Should().Be(expectedTdee);
+        stats.GetProperty("suggestedCalorieGoal").GetInt32().Should().Be(expectedTdee); // Maintain
+        stats.GetProperty("age").GetInt32().Should().Be(expectedAge);
     }
 
     [Fact]

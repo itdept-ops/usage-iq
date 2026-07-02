@@ -51,6 +51,13 @@ export class ChatRealtime {
   private readonly typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
   /** How long a remote typing flag survives without a refresh before we auto-clear it. */
   private static readonly TYPING_SAFETY_MS = 6000;
+  /**
+   * Upper bound on the retained live-notification list. refreshInbox() caps the load at 50; the live
+   * ReceiveNotification path must cap too, or a long-lived session (this hub stays connected the whole
+   * time the user is signed in) grows _notifications without bound. The dropdown only shows recent items
+   * plus a "view all" affordance, so trimming the tail loses nothing the bell renders.
+   */
+  private static readonly MAX_NOTIFICATIONS = 100;
 
   // ---- connection state ----
   private readonly _connection = signal<ChatConnectionState>('disconnected');
@@ -210,17 +217,21 @@ export class ChatRealtime {
     try {
       await connection.start();
       this._connection.set('connected');
-      await this.refreshChannels();
     } catch {
       this._connection.set('disconnected');
+      // Actually close the half-open socket before dropping the reference, so it can't linger and keep
+      // firing handlers against a connection the store now treats as gone.
+      try { await connection.stop(); } catch { /* ignore */ }
       this.connection = null;
       return;
     }
 
-    // Initial inbox + preferences load. These populate the dropdown/badge/prefs but must NOT surface
-    // toasts — they never touch _liveNotification (only ReceiveNotification does). They run OUTSIDE
-    // the connection try/catch above and each swallows its own error, so a transient REST failure can
-    // never tear down a healthy hub connection. Preferences additionally fall back to DEFAULT_PREFERENCES.
+    // Initial channel + inbox + preferences load. These populate the list/dropdown/badge/prefs but must
+    // NOT surface toasts — they never touch _liveNotification (only ReceiveNotification does). They run
+    // OUTSIDE the connection try/catch above and each swallows its own error, so a transient REST failure
+    // can never tear down a healthy hub connection (nor let the next start() build a duplicate). A failed
+    // channel fetch simply resyncs on the next reconnect/refresh. Preferences fall back to DEFAULT_PREFERENCES.
+    void this.refreshChannels().catch(() => { /* keep the live hub; channel list resyncs on reconnect */ });
     void this.refreshInbox().catch(() => { /* keep the live hub; badge/list stay as-is */ });
     void this.loadPreferences().catch(() => { /* keep DEFAULT_PREFERENCES */ });
   }
@@ -328,7 +339,8 @@ export class ChatRealtime {
   }
 
   private onReceiveNotification(n: NotificationDto): void {
-    this._notifications.update(list => [n, ...list.filter(x => x.id !== n.id)]);
+    this._notifications.update(list =>
+      [n, ...list.filter(x => x.id !== n.id)].slice(0, ChatRealtime.MAX_NOTIFICATIONS));
     // Publish to the LIVE surface so the bell can toast / browser-notify. This is the ONLY place
     // _liveNotification is set — the initial load and reconnect re-fetch go through refreshInbox(),
     // which never touches it, so backlog/history is never replayed as toasts.

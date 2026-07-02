@@ -7,10 +7,9 @@
 //
 // These are the single source of truth for metric<->imperial math. The injectable
 // {@link UnitService} (core/unit.service.ts) wraps these with the user's unitSystem
-// signal so callers don't pass an `imperial` boolean around. NOTE: the older tracker
-// helpers (features/tracker/units.ts) are INDEPENDENT — they keep their own factor
-// table (e.g. their own LB_PER_KG=2.20462) and do NOT re-export from here, so the two
-// factor tables can drift. Keep them in sync by hand if you change a factor.
+// signal so callers don't pass an `imperial` boolean around. The tracker helpers
+// (features/tracker/units.ts) RE-EXPORT these primitives rather than keeping their own
+// factor table, so there is only one place to edit a factor — no hand-syncing needed.
 //
 // Exact conversion factors (per the unit-system spec):
 //   lb   = kg * 2.2046226

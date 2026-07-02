@@ -30,6 +30,7 @@
           <button type="button" class="theme-seg__opt" role="radio"
                   [class.theme-seg__opt--on]="units.unitSystem() === u.value"
                   [attr.aria-checked]="units.unitSystem() === u.value"
+                  [attr.tabindex]="units.unitSystem() === u.value ? 0 : -1"
                   (click)="setUnits(u.value)">
             <mat-icon class="theme-seg__icon" aria-hidden="true">{{ u.icon }}</mat-icon>
             <span class="theme-seg__label">{{ u.label }}</span>

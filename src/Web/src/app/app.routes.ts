@@ -1,7 +1,5 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth.guard';
-import { permissionGuard } from './core/permission.guard';
-import { PERM } from './core/models';
 import { PAGE_REGISTRY, toRoutes } from './core/page-registry';
 
 /**
@@ -23,30 +21,31 @@ const PUBLIC_ROUTES: Routes = [
 ];
 
 /**
- * The Beta/mobile-preview tree (`/tracker-beta` + `/beta/*`) — these are the explicit "mobile preview on any
- * device" URLs and the source of the mobile twins. They carry NO `canMatch` (they resolve on any device) and
- * are gated by `platform.mobile` inside each lazy children file. The more-specific `beta/x` entries precede the
- * `beta` hub (Angular is first-match). Once a canonical page renders the same component per-device (Wave 1+),
- * these can become redirects to the canonical path.
+ * The Beta/mobile-preview tree (`/tracker-beta` + `/beta/*`) — the legacy "mobile preview on any device" URLs
+ * that were the original source of the mobile twins. Every one of these components has since graduated to a
+ * first-class registry page that renders it per-device (the `mobile` twin in {@link PAGE_REGISTRY}), so these
+ * paths are now REDIRECT-ONLY to their canonical page — collapsing the former dual-mount. This keeps the
+ * bottom-tab nav-highlight, the back-stack, and shared/bookmarked links on the single canonical path, and
+ * removes the hand-sync burden of re-declaring the `platform.mobile` gate here (the canonical mobile twin
+ * carries its own `canMatch`+gate). The redirect targets mirror `HOME_ALIASES` in `nav-model.ts`. The
+ * more-specific `beta/x` entries precede the `beta` hub (Angular is first-match).
  */
 const BETA_ROUTES: Routes = [
-  { path: 'tracker-beta', loadChildren: () => import('./features/tracker-beta/tracker-beta.routes').then(m => m.TRACKER_BETA_ROUTES) },
-  { path: 'beta/bills', loadChildren: () => import('./features/bills-beta/bills-beta.routes').then(m => m.BILLS_BETA_ROUTES) },
-  { path: 'beta/home', loadChildren: () => import('./features/beta/beta-home.routes').then(m => m.BETA_HOME_ROUTES) },
-  { path: 'beta/dashboard', loadChildren: () => import('./features/dashboard-beta/dashboard-beta.routes').then(m => m.DASHBOARD_BETA_ROUTES) },
-  { path: 'beta/family', loadChildren: () => import('./features/family-beta/family-beta.routes').then(m => m.FAMILY_BETA_ROUTES) },
-  // Wrapped graduated to a first-class registry page (/wrapped, desktop + mobile twin); the old standalone
-  // beta route now redirects to the canonical path.
+  { path: 'tracker-beta', redirectTo: 'tracker', pathMatch: 'full' },
+  { path: 'beta/bills', redirectTo: 'bills', pathMatch: 'full' },
+  { path: 'beta/home', redirectTo: '', pathMatch: 'full' },
+  { path: 'beta/dashboard', redirectTo: '', pathMatch: 'full' },
+  { path: 'beta/family', redirectTo: 'family', pathMatch: 'full' },
   { path: 'beta/wrapped', redirectTo: 'wrapped', pathMatch: 'full' },
-  { path: 'beta/settings', loadChildren: () => import('./features/beta-settings/beta-settings.routes').then(m => m.BETA_SETTINGS_ROUTES) },
-  { path: 'beta/chat', loadChildren: () => import('./features/chat-beta/chat-beta.routes').then(m => m.CHAT_BETA_ROUTES) },
-  { path: 'beta/ask', loadChildren: () => import('./features/ask-beta/ask-beta.routes').then(m => m.ASK_BETA_ROUTES) },
-  { path: 'beta/meals', loadChildren: () => import('./features/meals-beta/meals-beta.routes').then(m => m.MEALS_BETA_ROUTES) },
-  { path: 'beta/people', loadChildren: () => import('./features/people-beta/people-beta.routes').then(m => m.PEOPLE_BETA_ROUTES) },
-  { path: 'beta/fleet', loadChildren: () => import('./features/fleet-beta/fleet-beta.routes').then(m => m.FLEET_BETA_ROUTES) },
-  { path: 'beta/trophies', loadChildren: () => import('./features/trophies-beta/trophies-beta.routes').then(m => m.TROPHIES_BETA_ROUTES) },
-  { path: 'beta/automations', loadChildren: () => import('./features/automations-beta/automations-beta.routes').then(m => m.AUTOMATIONS_BETA_ROUTES) },
-  { path: 'beta', canActivate: [permissionGuard(PERM.platformMobile)], loadComponent: () => import('./features/beta/beta-hub.page').then(m => m.BetaHubPage), title: 'Usage IQ · Beta' },
+  { path: 'beta/settings', redirectTo: 'settings', pathMatch: 'full' },
+  { path: 'beta/chat', redirectTo: 'chat', pathMatch: 'full' },
+  { path: 'beta/ask', redirectTo: 'ask', pathMatch: 'full' },
+  { path: 'beta/meals', redirectTo: 'meal-planner', pathMatch: 'full' },
+  { path: 'beta/people', redirectTo: 'people', pathMatch: 'full' },
+  { path: 'beta/fleet', redirectTo: 'fleet', pathMatch: 'full' },
+  { path: 'beta/trophies', redirectTo: 'trophies', pathMatch: 'full' },
+  { path: 'beta/automations', redirectTo: 'automations', pathMatch: 'full' },
+  { path: 'beta', redirectTo: '', pathMatch: 'full' },
 ];
 
 /** Tail routes — the PWA widget + the public share-target / share / bill views (bare, mostly unauthenticated). */

@@ -290,11 +290,23 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Issuer"]))
     configErrors.Add("Jwt:Issuer is not set.");
 if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Audience"]))
     configErrors.Add("Jwt:Audience is not set.");
-// In production the connection string MUST be explicit — never boot against the hardcoded localhost dev
-// default (line 30-31), which would only fail late at MigrateAsync and crash-loop the container.
-if (builder.Environment.IsProduction()
-    && string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Default")))
-    configErrors.Add("ConnectionStrings:Default is not set (refusing the localhost dev fallback in Production).");
+// In production the connection string MUST be explicit AND non-dev — never boot against the hardcoded
+// localhost dev default (line 30-31) or the committed dev value in appsettings.json, which would only
+// fail late at MigrateAsync and crash-loop the container (or worse, silently connect to a wrong/dev DB).
+// A blank-check alone is insufficient: appsettings.json commits a non-blank localhost/dev Default, so a
+// dropped/renamed SSM override would leave that committed value in place and pass a whitespace check.
+// Reject the dev host/credential explicitly so a missing prod override fails fast regardless.
+if (builder.Environment.IsProduction())
+{
+    var prodConn = builder.Configuration.GetConnectionString("Default");
+    if (string.IsNullOrWhiteSpace(prodConn))
+        configErrors.Add("ConnectionStrings:Default is not set (refusing the localhost dev fallback in Production).");
+    else if (prodConn.Contains("Host=localhost", StringComparison.OrdinalIgnoreCase)
+             || prodConn.Contains("Host=127.0.0.1", StringComparison.OrdinalIgnoreCase)
+             || prodConn.Contains("Password=ccusage_dev_pw", StringComparison.OrdinalIgnoreCase))
+        configErrors.Add("ConnectionStrings:Default is the committed localhost dev default in Production "
+            + "(the ConnectionStrings__Default override from SSM is missing or mis-injected).");
+}
 if (configErrors.Count > 0)
     throw new InvalidOperationException(
         "The API refuses to start with missing operationally-required configuration: "

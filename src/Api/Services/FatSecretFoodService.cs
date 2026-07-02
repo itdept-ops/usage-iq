@@ -31,6 +31,11 @@ public sealed class FatSecretFoodService(
     public const string HttpClientName = "fatsecret";
     private const string TokenCacheKey = "fatsecret:token";
 
+    // Response-size ceilings so a hostile/compromised/MITM'd upstream cannot force an unbounded
+    // allocation. A real OAuth token JSON is well under a KB; a food API JSON is small too.
+    private const int MaxTokenResponseBytes = 64 * 1024;
+    private const int MaxApiResponseBytes = 512 * 1024;
+
     private readonly FatSecretOptions _opt = options.Value;
 
     public bool IsConfigured => _opt.IsConfigured;
@@ -140,8 +145,9 @@ public sealed class FatSecretFoodService(
             return null;
         }
 
-        await using var stream = await res.Content.ReadAsStreamAsync(ct);
-        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+        var bytes = await ReadCappedAsync(res, MaxTokenResponseBytes, ct);
+        if (bytes is null) return null;
+        using var doc = JsonDocument.Parse(bytes);
         var root = doc.RootElement;
 
         if (!root.TryGetProperty("access_token", out var tokenEl) || tokenEl.ValueKind != JsonValueKind.String)
@@ -168,8 +174,28 @@ public sealed class FatSecretFoodService(
             return null;
         }
 
+        var bytes = await ReadCappedAsync(res, MaxApiResponseBytes, ct);
+        return bytes is null ? null : JsonDocument.Parse(bytes);
+    }
+
+    /// <summary>Buffer a response body into memory but abort if it exceeds <paramref name="maxBytes"/>,
+    /// so a hostile/compromised/MITM'd endpoint cannot force an arbitrarily large allocation. Returns
+    /// null if the body is over the cap (or lies about its Content-Length) or a read error occurs.</summary>
+    private static async Task<byte[]?> ReadCappedAsync(HttpResponseMessage res, int maxBytes, CancellationToken ct)
+    {
+        // If the endpoint advertises a length, reject oversized bodies before reading a single byte.
+        if (res.Content.Headers.ContentLength is long len && len > maxBytes) return null;
+
         await using var stream = await res.Content.ReadAsStreamAsync(ct);
-        return await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[8192];
+        int read;
+        while ((read = await stream.ReadAsync(chunk.AsMemory(0, chunk.Length), ct)) > 0)
+        {
+            if (buffer.Length + read > maxBytes) return null;
+            buffer.Write(chunk, 0, read);
+        }
+        return buffer.ToArray();
     }
 
     // ===================================================================================

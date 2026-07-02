@@ -383,23 +383,18 @@ public static class ChatEndpoints
     {
         var key = DirectKeyFor(a, b);
 
-        // Fast path: the DM already exists. Re-opening a moderator-archived DM revives it — clear
-        // ArchivedUtc so BuildChannelDtosForMemberAsync (which filters archived out) can see the row
-        // again, otherwise re-opening would surface zero channels and the caller would 500 on First().
+        // Fast path: the DM already exists. Do NOT auto-clear ArchivedUtc here: archiving is a
+        // chat.moderate-gated action used to shut a conversation down, and re-opening the DM only
+        // needs chat.send + a contact edge — reviving on this path would let a non-privileged user
+        // silently undo a moderator's archive. Leave it archived; BuildChannelDtosForMemberAsync
+        // filters archived rows out, so the caller's FirstOrDefault() is null and it returns 404
+        // (the archived channel stays retired until a moderator un-archives it).
         var existing = await db.ChatChannels
             .Where(c => c.DirectKey == key)
             .Select(c => new { c.Id, c.ArchivedUtc })
             .FirstOrDefaultAsync(ct);
         if (existing is not null)
-        {
-            if (existing.ArchivedUtc is not null)
-            {
-                await db.ChatChannels
-                    .Where(c => c.Id == existing.Id)
-                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.ArchivedUtc, (DateTime?)null), ct);
-            }
             return existing.Id;
-        }
 
         var now = DateTime.UtcNow;
         var channel = new ChatChannel
