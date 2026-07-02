@@ -51,6 +51,11 @@ public static class PushEndpoints
             // Cap to the column sizes so an oversized blob is rejected cleanly rather than truncated/throwing.
             if (endpoint.Length > 1024 || p256dh.Length > 256 || auth.Length > 256)
                 return Results.BadRequest(new { message = "Subscription fields are too long." });
+            // Reject at STORE time anything that isn't an https URL at a legitimate browser push host — the same
+            // allowlist WebPushSender enforces at SEND time. Storing only trusted endpoints closes off SSRF via a
+            // forged endpoint (internal/metadata hosts, bare IPs, http) instead of relying on the send-time filter.
+            if (!IsAllowedPushEndpoint(endpoint))
+                return Results.BadRequest(new { message = "endpoint is not a supported push service URL." });
 
             var ua = http.Request.Headers.UserAgent.ToString();
             if (ua.Length > 512) ua = ua[..512];
@@ -115,6 +120,35 @@ public static class PushEndpoints
                 .ExecuteDeleteAsync(ct);
             return Results.Ok(new { ok = true });
         });
+    }
+
+    // The ONLY hosts a browser push endpoint may point at — kept in lock-step with WebPushSender's send-time
+    // allowlist (fcm.googleapis.com / web.push.apple.com plus Mozilla/WNS regional-shard suffixes). Validating
+    // here at store time means a forged endpoint never even reaches the database, not just the sender.
+    private static readonly HashSet<string> AllowedPushHosts =
+        new(StringComparer.OrdinalIgnoreCase) { "fcm.googleapis.com", "web.push.apple.com" };
+
+    private static readonly string[] AllowedPushHostSuffixes =
+    {
+        ".push.services.mozilla.com",
+        ".notify.windows.com",
+        ".wns.windows.com",
+    };
+
+    /// <summary>
+    /// True only for an https URL whose host is a known browser push service. Everything else — http, a bare
+    /// IP, an internal/metadata host, or an unknown domain — is rejected so a user-supplied endpoint can never
+    /// be stored (and later POSTed to) as an SSRF target. Mirrors WebPushSender.IsAllowedPushEndpoint.
+    /// </summary>
+    private static bool IsAllowedPushEndpoint(string? endpoint)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var u)) return false;
+        if (u.Scheme != Uri.UriSchemeHttps) return false;
+        if (u.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6) return false;
+        if (AllowedPushHosts.Contains(u.Host)) return true;
+        foreach (var suffix in AllowedPushHostSuffixes)
+            if (u.Host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
     }
 }
 

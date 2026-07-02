@@ -25,6 +25,10 @@ public static class HabitEndpoints
     private const int MaxHabitsPerUser = 50;
     private const int CalendarDays = 120;
 
+    /// <summary>The viewall roster cap for <see cref="SharingUsersQuery"/> — a sane upper bound so the
+    /// leaderboard can never enumerate every enabled user (mirrors 75-Hard's cap).</summary>
+    private const int MaxLeaderboardPeople = 200;
+
     // ---- Request DTOs ----
     public sealed record CreateHabitRequest(
         string? Title, int? Cadence, int? DaysOfWeekMask, int? TimesPerPeriod, int? PeriodDays,
@@ -336,7 +340,12 @@ public static class HabitEndpoints
     private static IQueryable<AppUser> SharingUsersQuery(UsageDbContext db, CurrentUserAccessor.CurrentUser caller)
     {
         if (caller.Permissions.Contains(Permissions.TrackerViewAll))
-            return db.Users.AsNoTracking().Where(u => u.IsEnabled && u.Email != caller.Email);
+            // A contact roster is naturally bounded by the sharing graph; only the viewall path needs a cap
+            // so the leaderboard can never fan out to every enabled user (mirrors 75-Hard's SharingUsersQuery).
+            return db.Users.AsNoTracking()
+                .Where(u => u.IsEnabled && u.Email != caller.Email)
+                .OrderBy(u => u.Email)
+                .Take(MaxLeaderboardPeople);
         return ContactGraph.SharingUsers(db, caller.Email);
     }
 
@@ -425,10 +434,27 @@ public static class HabitEndpoints
         var habits = await db.Habits.AsNoTracking()
             .Where(h => h.UserEmail == email && h.Status == HabitStatus.Active)
             .ToListAsync(ct);
+        if (habits.Count == 0) return new UserStats(0, 0, 0);
+
+        // Batch the per-habit reads to a constant handful of queries: all habits' days in ONE HabitId IN (...)
+        // query + the user's auto-source tracker data loaded once, then score each habit purely in memory. This
+        // replaces the O(habits x 1..3) fan-out ComputeHabitStreakAsync would incur per user.
+        var windowStart = today.AddDays(-(CalendarDays - 1));
+        var habitIds = habits.Select(h => h.Id).ToList();
+        var days = await db.HabitDays.AsNoTracking()
+            .Where(x => habitIds.Contains(x.HabitId) && x.LocalDate >= windowStart && x.LocalDate <= today)
+            .ToListAsync(ct);
+        var daysByHabit = days.GroupBy(d => d.HabitId)
+            .ToDictionary(g => g.Key, g => g.ToDictionary(d => d.LocalDate));
+
+        var cache = await LoadUserAutoInputsAsync(db, email, habits, windowStart, today, ct);
+
         int best = 0, total = 0;
+        var empty = new Dictionary<DateOnly, HabitDay>();
         foreach (var h in habits)
         {
-            var (streak, completed) = await ComputeHabitStreakAsync(db, email, h, today, ct);
+            var rowByDate = daysByHabit.TryGetValue(h.Id, out var m) ? m : empty;
+            var (streak, completed) = ScoreHabit(h, rowByDate, cache, today);
             best = Math.Max(best, streak);
             total += completed;
         }
@@ -489,6 +515,98 @@ public static class HabitEndpoints
     {
         var map = await LoadAutoInputsAsync(db, habit, date, date, ct);
         return map.TryGetValue(date, out var i) ? i : EmptyInput;
+    }
+
+    /// <summary>
+    /// A user's raw auto-source tracker data for a window, loaded ONCE (independent of habit count). The
+    /// Water/Workout inputs depend only on <c>UserEmail</c> + the date window — not the habit — so many habits of
+    /// the same source can share a single load. Only the sources the user actually uses are queried.
+    /// </summary>
+    private readonly record struct UserAutoInputs(
+        IReadOnlyDictionary<DateOnly, int> HydrationMl,
+        IReadOnlyDictionary<DateOnly, List<int>> WorkoutDurationsMin,
+        IReadOnlyDictionary<DateOnly, int> ActiveCalories);
+
+    /// <summary>
+    /// Batch-load a user's auto-source tracker data for the window in at most one query per needed source,
+    /// replacing the per-habit fan-out in <see cref="LoadAutoInputsAsync"/> for callers scoring many habits.
+    /// </summary>
+    private static async Task<UserAutoInputs> LoadUserAutoInputsAsync(
+        UsageDbContext db, string email, IReadOnlyCollection<Habit> habits,
+        DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        var needWater = habits.Any(h => h.AutoSource == HardTaskAutoSource.Water);
+        var needWorkout = habits.Any(h => h.AutoSource == HardTaskAutoSource.Workout);
+
+        var hydration = new Dictionary<DateOnly, int>();
+        var workouts = new Dictionary<DateOnly, List<int>>();
+        var calories = new Dictionary<DateOnly, int>();
+
+        if (needWater)
+        {
+            var rows = await db.HydrationEntries.AsNoTracking()
+                .Where(h => h.UserEmail == email && h.LocalDate >= from && h.LocalDate <= to)
+                .GroupBy(h => h.LocalDate)
+                .Select(grp => new { Date = grp.Key, Ml = grp.Sum(h => h.AmountMl) })
+                .ToListAsync(ct);
+            foreach (var h in rows) hydration[h.Date] = h.Ml;
+        }
+        if (needWorkout)
+        {
+            var ex = await db.ExerciseEntries.AsNoTracking()
+                .Where(x => x.UserEmail == email && x.LocalDate >= from && x.LocalDate <= to && x.DurationMin != null)
+                .Select(x => new { x.LocalDate, Dur = x.DurationMin!.Value })
+                .ToListAsync(ct);
+            foreach (var grp in ex.GroupBy(x => x.LocalDate))
+                workouts[grp.Key] = grp.Select(x => x.Dur).ToList();
+
+            var act = await db.DailyActivities.AsNoTracking()
+                .Where(a => a.UserEmail == email && a.LocalDate >= from && a.LocalDate <= to && a.ActiveCalories != null)
+                .Select(a => new { a.LocalDate, a.ActiveCalories })
+                .ToListAsync(ct);
+            foreach (var a in act) calories[a.LocalDate] = a.ActiveCalories!.Value;
+        }
+        return new UserAutoInputs(hydration, workouts, calories);
+    }
+
+    /// <summary>The per-day <see cref="HardChallengeScoring.HardDayInput"/> for a specific habit's day, projected
+    /// PURELY (no DB) from the pre-loaded <see cref="UserAutoInputs"/>. Mirrors <see cref="LoadAutoInputsAsync"/>.</summary>
+    private static HardChallengeScoring.HardDayInput ProjectAutoInput(
+        Habit habit, UserAutoInputs cache, DateOnly date)
+    {
+        if (habit.AutoSource == HardTaskAutoSource.Water)
+            return cache.HydrationMl.TryGetValue(date, out var ml)
+                ? EmptyInput with { HydrationMl = ml } : EmptyInput;
+        if (habit.AutoSource == HardTaskAutoSource.Workout)
+        {
+            var input = EmptyInput;
+            if (cache.WorkoutDurationsMin.TryGetValue(date, out var durs))
+                input = input with { WorkoutDurationsMin = durs };
+            if (cache.ActiveCalories.TryGetValue(date, out var cal))
+                input = input with { ActiveCalories = cal };
+            return input;
+        }
+        return EmptyInput; // None (manual)
+    }
+
+    /// <summary>Score one habit's streak/completed over the window PURELY from pre-loaded day rows + auto inputs
+    /// (no DB) — the batched, in-memory counterpart of <see cref="ComputeFullAsync"/>.</summary>
+    private static (int Streak, int Completed) ScoreHabit(
+        Habit habit, IReadOnlyDictionary<DateOnly, HabitDay> rowByDate, UserAutoInputs cache, DateOnly today)
+    {
+        var windowStart = MaxDate(habit.StartDate, today.AddDays(-(CalendarDays - 1)));
+        var facts = new List<HabitScoring.DayFact>();
+        var completed = 0;
+        for (var d = windowStart; d <= today; d = d.AddDays(1))
+        {
+            rowByDate.TryGetValue(d, out var row);
+            var input = ProjectAutoInput(habit, cache, d);
+            var complete = HabitScoring.IsComplete(habit, input, row?.Value, row?.Done);
+            if (complete) completed++;
+            facts.Add(new HabitScoring.DayFact(d, complete, row?.Skip ?? false));
+        }
+        var streak = HabitScoring.CadenceStreak(habit, facts, today);
+        return (streak.CurrentStreak, completed);
     }
 
     // =====================================================================================

@@ -1,52 +1,51 @@
 import { ActivityLevel, Sex, TrackerStatsDto } from '../../core/models';
+import {
+  LB_PER_KG,
+  ML_PER_FLOZ,
+  M_PER_KM,
+  kgToLb,
+  lbToKg,
+  cmToFtIn,
+  ftInToCm,
+  mlToFloz,
+  flozToMl,
+  metersToMiles,
+  milesToMeters,
+  MI_PER_KM,
+} from '../../core/units';
 
-/** 1 kg expressed in pounds. */
-export const LB_PER_KG = 2.20462;
+// ── conversion primitives ────────────────────────────────────────────────────
+// These re-export the SINGLE canonical factor table (core/units.ts) so this module
+// and every UnitService-driven surface share one source of truth — the two tables can
+// no longer drift. Only the tracker-specific goal math (computeStats) lives locally.
 
-// ── weight: kg <-> lb ───────────────────────────────────────────────────────
+export {
+  LB_PER_KG,
+  kgToLb,
+  lbToKg,
+  cmToFtIn,
+  ftInToCm,
+  metersToMiles,
+  milesToMeters,
+};
 
-/** Kilograms → pounds. */
-export function kgToLb(kg: number): number {
-  return kg * LB_PER_KG;
-}
+/** 1 US fluid ounce expressed in millilitres (canonical: 1 / FLOZ_PER_ML). */
+export const ML_PER_OZ = ML_PER_FLOZ;
 
-/** Pounds → kilograms. */
-export function lbToKg(lb: number): number {
-  return lb / LB_PER_KG;
-}
-
-// ── height: cm <-> ft + in ────────────────────────────────────────────────────
-
-/** Centimetres → whole feet + remaining inches (inches rounded to nearest, carrying to feet at 12). */
-export function cmToFtIn(cm: number): { ft: number; in: number } {
-  const totalIn = cm / 2.54;
-  let ft = Math.floor(totalIn / 12);
-  let inches = Math.round(totalIn - ft * 12);
-  if (inches === 12) { ft += 1; inches = 0; }
-  return { ft, in: inches };
-}
-
-/** Feet + inches → centimetres. */
-export function ftInToCm(ft: number, inches: number): number {
-  return (ft * 12 + inches) * 2.54;
-}
-
-// ── hydration: ml <-> fl oz ─────────────────────────────────────────────────
-
-/** 1 US fluid ounce expressed in millilitres. */
-export const ML_PER_OZ = 29.5735;
+/** 1 mile expressed in metres (canonical: derived from MI_PER_KM). */
+export const M_PER_MI = M_PER_KM / MI_PER_KM;
 
 /** A "glass" of water in ml (~8 fl oz) — the unit the glasses subtitle counts in. */
 export const ML_PER_GLASS = 250;
 
 /** Millilitres → US fluid ounces. */
 export function mlToOz(ml: number): number {
-  return ml / ML_PER_OZ;
+  return mlToFloz(ml);
 }
 
 /** US fluid ounces → millilitres. */
 export function ozToMl(oz: number): number {
-  return oz * ML_PER_OZ;
+  return flozToMl(oz);
 }
 
 /** A whole-glass count for a volume (ml / 250), used in the "x of y glasses" subtitle. */
@@ -65,19 +64,7 @@ export function formatVolume(ml: number | null | undefined, imperial: boolean): 
 }
 
 // ── distance: m <-> mi/km ───────────────────────────────────────────────────
-
-/** 1 mile expressed in metres. */
-export const M_PER_MI = 1609.34;
-
-/** Metres → miles. */
-export function metersToMiles(m: number): number {
-  return m / M_PER_MI;
-}
-
-/** Miles → metres. */
-export function milesToMeters(mi: number): number {
-  return mi * M_PER_MI;
-}
+// metersToMiles / milesToMeters / M_PER_MI are re-exported from core/units.ts above.
 
 /**
  * Format a metric distance (metres) for display in the chosen unit system, with the unit suffix.

@@ -5,7 +5,6 @@ import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { forkJoin } from 'rxjs';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -72,15 +71,17 @@ interface ContactsState {
  * permissions) is reachable from a header action. Pull-to-refresh, skeletons + empty/error states round it.
  *
  * DATA PARITY: every row + write goes through the SAME `users.manage`-gated endpoints the live page uses —
- * {@link Api.users} (masked emails by default — this twin never reveals them), {@link Api.permissionCatalog}
- * / {@link Api.permissionPresets} for the grant matrix + role presets, {@link Api.updateUser} (the per-user
- * PUT) for grant/enabled saves, {@link Api.adminSetHomeRoute} for the landing page, {@link Api.userLogins}
- * for history, and {@link Api.getAccessPolicy} / {@link Api.updateAccessPolicy} for the policy panel. The
- * upsert body is built EXACTLY like the live editor. The server enforces all authorization + defaultability;
- * the UI mirrors the live page's nonDefaultable set so the policy picker only offers server-defaultable keys.
+ * {@link Api.users}, {@link Api.permissionCatalog} / {@link Api.permissionPresets} for the grant matrix +
+ * role presets, {@link Api.updateUser} (the per-user PUT) for grant/enabled saves, {@link Api.adminSetHomeRoute}
+ * for the landing page, {@link Api.userLogins} for history, and {@link Api.getAccessPolicy} /
+ * {@link Api.updateAccessPolicy} for the policy panel. The upsert body is built EXACTLY like the live editor.
+ * The server enforces all authorization + defaultability; the UI mirrors the live page's nonDefaultable set
+ * so the policy picker only offers server-defaultable keys.
  *
- * PRIVACY: emails are NEVER revealed here (the live page's key-gated reveal is desktop-only); other users'
- * rows show name + masked identity only, in line with the app's email-privacy rule.
+ * PRIVACY: other users' real emails are returned unmasked by the server ONLY when the caller holds the
+ * `users.email.reveal` permission (a per-admin, server-enforced gate); otherwise they come back masked (null)
+ * and the rows render name + masked identity only, in line with the app's email-privacy rule. There is no
+ * client-side reveal key.
  *
  * ISOLATION: gated by `platform.mobile` + the SAME `users.manage` the live `/users` route carries. Imports
  * only the kit + the shared Api/auth/models the live page already uses. No live page is imported or modified.
@@ -104,17 +105,6 @@ interface ContactsState {
           <p class="um-hero__kicker"><mat-icon aria-hidden="true">admin_panel_settings</mat-icon> Access control</p>
           <h1 class="um-hero__title">Users</h1>
           <p class="um-hero__sub">Manage who can sign in and exactly what each person can do.</p>
-
-          @if (auth.hasPermission(PERM.usersView)) {
-            <button type="button" class="um-reveal-toggle" [class.is-on]="emailsRevealed()"
-                    [disabled]="revealing()" [attr.aria-pressed]="emailsRevealed()"
-                    [attr.aria-label]="emailsRevealed() ? 'Hide email addresses' : 'Show email addresses (requires a key)'"
-                    (click)="toggleEmails()">
-              @if (revealing()) { <mat-icon class="um-spin" aria-hidden="true">progress_activity</mat-icon> }
-              @else { <mat-icon aria-hidden="true">{{ emailsRevealed() ? 'lock_open' : 'lock' }}</mat-icon> }
-              {{ emailsRevealed() ? 'Hide emails' : 'Show emails' }}
-            </button>
-          }
 
           @if (!loading() && !errored()) {
             <div class="um-stats">
@@ -161,7 +151,7 @@ interface ContactsState {
               <mat-icon class="um-search__ic" aria-hidden="true">search</mat-icon>
               <input class="um-search__input" type="search" inputmode="search"
                      [ngModel]="search()" (ngModelChange)="search.set($event)"
-                     [placeholder]="emailsRevealed() ? 'Search by name or email' : 'Search by name'"
+                     placeholder="Search by name or email"
                      autocomplete="off" aria-label="Search users" />
               @if (search()) {
                 <button type="button" class="um-search__clear" (click)="search.set('')" aria-label="Clear search">
@@ -239,7 +229,7 @@ interface ContactsState {
                     <span class="um-card__avatar" [class.off]="!u.isEnabled" aria-hidden="true">{{ userInitial(u) }}</span>
                     <span class="um-card__body">
                       <span class="um-card__name">{{ u.name || 'Unnamed user' }}</span>
-                      @if (emailsRevealed() && u.email) {
+                      @if (u.email) {
                         <span class="um-card__email">{{ u.email }}</span>
                       }
                       <span class="um-card__summary">{{ oneLineSummary(u) }}</span>
@@ -283,7 +273,7 @@ interface ContactsState {
                   <li class="um-audit__row">
                     <span class="um-audit__when mono-num">{{ a.whenUtc | date: 'MMM d, HH:mm' }}</span>
                     <span class="um-audit__action">{{ a.action }}</span>
-                    @if (emailsRevealed() && (a.actorEmail || a.targetEmail)) {
+                    @if (a.actorEmail || a.targetEmail) {
                       <span class="um-audit__who">
                         @if (a.actorEmail) { {{ a.actorEmail }} }
                         @if (a.actorEmail && a.targetEmail) { → }
@@ -310,7 +300,7 @@ interface ContactsState {
             <span class="ud__avatar" [class.off]="!draftEnabled()" aria-hidden="true">{{ userInitial(u) }}</span>
             <div class="ud__titles">
               <h3 class="ud__name">{{ u.name || 'Unnamed user' }}</h3>
-              @if (emailsRevealed() && u.email) { <span class="ud__email">{{ u.email }}</span> }
+              @if (u.email) { <span class="ud__email">{{ u.email }}</span> }
               <span class="ud__sub">
                 <span class="ud__role-badge">{{ draftRoleLabel() }}</span>
                 @if (u.lastLoginUtc) {
@@ -692,38 +682,6 @@ interface ContactsState {
       </div>
     </app-bs-sheet>
 
-    <!-- ─────────────── REVEAL-KEY SHEET (email reveal) ─────────────── -->
-    <app-bs-sheet [(open)]="revealOpen" detent="half" [dismissable]="!revealing()" label="Show emails">
-      <div class="up">
-        <div class="up__head">
-          <h3 class="up__title"><mat-icon aria-hidden="true">lock</mat-icon> Show emails</h3>
-          <button type="button" class="up__close" (click)="revealOpen.set(false)" aria-label="Close" [disabled]="revealing()">
-            <mat-icon aria-hidden="true">close</mat-icon>
-          </button>
-        </div>
-        <p class="up__sub">
-          Enter the reveal key to show real email addresses on this page. The key is held in memory only
-          for this session and is never saved.
-        </p>
-        <form (ngSubmit)="submitRevealKey()">
-          <label class="ud__block">
-            <span class="ud__block-title"><mat-icon aria-hidden="true">key</mat-icon> Reveal key</span>
-            <input class="um-textfield" type="password" autocomplete="off" name="revealKey"
-                   [ngModel]="revealKeyInput()" (ngModelChange)="revealKeyInput.set($event)"
-                   placeholder="Reveal key" aria-label="Email reveal key" />
-          </label>
-        </form>
-      </div>
-      <div class="ud__savebar is-dirty">
-        <span class="ud__savebar-hint">Emails stay masked until verified</span>
-        <button type="button" class="ud__savebar-btn" [disabled]="revealing() || !revealKeyInput().trim()"
-                (click)="submitRevealKey()">
-          @if (revealing()) { <mat-icon class="um-spin" aria-hidden="true">progress_activity</mat-icon> Checking… }
-          @else { <mat-icon aria-hidden="true">lock_open</mat-icon> Show emails }
-        </button>
-      </div>
-    </app-bs-sheet>
-
     <!-- ─────────────── ADD-USER SHEET ─────────────── -->
     <app-bs-sheet [(open)]="addOpen" detent="full" [dismissable]="!adding()" label="Add user">
       <div class="up">
@@ -907,7 +865,7 @@ interface ContactsState {
     <!-- ADD-USER FAB (canManage; hidden while any sheet or bulk mode is up) -->
     @if (canManage() && !loading() && !errored() && !detailOpen() && !policyOpen()
          && !addOpen() && !bulkSheetOpen() && !confirmOpen() && !permPickerOpen()
-         && !revealOpen() && !bulkMode()) {
+         && !bulkMode()) {
       <app-bs-fab icon="person_add" label="Add user" [fixed]="true" (action)="openAddUser()" />
     }
 
@@ -945,21 +903,9 @@ export class UsersMobilePage {
     { key: 'disabled', label: 'Disabled', icon: 'block' },
   ];
 
-  // ---- email reveal (key-gated; mirrors the desktop page) ----
-  // The key lives in COMPONENT MEMORY ONLY — never localStorage, never a URL. Null => emails masked.
-  private revealKey: string | null = null;
-  /** True once a key has yielded real emails — drives the toggle label/icon + the reveal-key sheet. */
-  readonly emailsRevealed = signal(false);
-  /** In-flight guard for the reveal/hide re-fetch (disables the toggle, shows a spinner). */
-  readonly revealing = signal(false);
-  /** The reveal-key entry sheet + its bound input. */
-  readonly revealOpen = signal(false);
-  readonly revealKeyInput = signal('');
-
-  /** The caller's own email (their own email is always returned real — used to detect a real reveal). */
-  private get myEmail(): string | null {
-    return this.auth.session()?.email?.toLowerCase() ?? null;
-  }
+  // ---- email visibility ----
+  // Real emails now arrive automatically when the caller holds users.email.reveal (server-side gate);
+  // otherwise other users' emails come back masked (null) and the rows render name + masked identity only.
 
   // ---- master-detail ----
   readonly detailOpen = signal(false);
@@ -1031,6 +977,9 @@ export class UsersMobilePage {
   private readonly nonDefaultable = new Set<string>([
     PERM.usersManage, PERM.chatModerate, PERM.chatContactsManage, PERM.trackerViewAll,
     PERM.familyUse, PERM.familyFinance, PERM.locationSelf, PERM.locationShare,
+    // Admin oversight reads + deployment-global config-writes: never inheritable by open sign-up.
+    PERM.usersView, PERM.activityView, PERM.aiUsageView,
+    PERM.settingsManage, PERM.sourcesManage, PERM.reporterManage, PERM.notificationsManage,
     PERM.trackerAi, PERM.familyAi, PERM.familyAiAssistant, PERM.financeAi, PERM.chatAi, PERM.aiVision,
   ]);
 
@@ -1125,11 +1074,10 @@ export class UsersMobilePage {
     const ai = this.aiKeys();
     const role = this.presets().find((p) => p.key === this.filterRole());
     const roleSet = role ? new Set(role.permissions) : null;
-    const emails = this.emailsRevealed();
     return this.users().filter((u) => {
       if (q) {
-        // Match name always; match email only when revealed (mirrors the desktop search axis).
-        const hay = emails ? `${u.name ?? ''} ${u.email ?? ''}`.toLowerCase() : (u.name ?? '').toLowerCase();
+        // Match name always; match email when the server returned it unmasked (else it's null).
+        const hay = `${u.name ?? ''} ${u.email ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       if (roleSet) {
@@ -1254,7 +1202,7 @@ export class UsersMobilePage {
     this.errored.set(false);
     try {
       const [users, perms, presets] = await Promise.all([
-        firstValueFrom(this.api.users(this.revealKey ?? undefined)), // pass the key when revealed
+        firstValueFrom(this.api.users()),
         firstValueFrom(this.api.permissionCatalog()),
         firstValueFrom(this.api.permissionPresets()),
       ]);
@@ -1293,7 +1241,7 @@ export class UsersMobilePage {
 
   private loadAudit(): void {
     if (!this.canManage()) return;
-    this.api.auditLog(this.revealKey ?? undefined).subscribe({ // pass the key when revealed
+    this.api.auditLog().subscribe({
       next: (a) => this.audit.set(a),
       error: () => { /* non-critical — the Recent-changes section just hides */ },
     });
@@ -1334,65 +1282,6 @@ export class UsersMobilePage {
     this.filterPerm.set(key);
     this.capFilter.set(key ? 'perm' : 'all');
     this.permPickerOpen.set(false);
-  }
-
-  // ─────────────── EMAIL REVEAL (key-gated) ───────────────
-
-  /** Toggle the reveal: hide immediately, or open the key-entry sheet. Mirrors the desktop page. */
-  toggleEmails(): void {
-    if (this.emailsRevealed()) { this.hideEmails(); return; }
-    this.revealKeyInput.set('');
-    this.revealOpen.set(true);
-  }
-
-  /** Submit the entered key: re-fetch users + audit WITH the key and reveal only if real emails came back. */
-  submitRevealKey(): void {
-    const key = this.revealKeyInput().trim();
-    if (!key || this.revealing()) return;
-    this.revealing.set(true);
-    forkJoin({ users: this.api.users(key), audit: this.api.auditLog(key) }).subscribe({
-      next: ({ users, audit }) => {
-        this.revealing.set(false);
-        if (this.didReveal(users, audit)) {
-          this.revealKey = key;
-          this.users.set(users ?? []);
-          this.audit.set(audit ?? []);
-          const u = this.selected();
-          if (u) {
-            const next = (users ?? []).find((x) => x.id === u.id);
-            if (next) this.seedDraft(next);
-          }
-          this.emailsRevealed.set(true);
-          this.revealOpen.set(false);
-          this.toast.show('Emails revealed', { tone: 'success', durationMs: 2000 });
-        } else {
-          this.revealKey = null;
-          this.toast.show('Incorrect key', { tone: 'warn', durationMs: 4000 });
-        }
-      },
-      error: () => {
-        this.revealing.set(false);
-        this.revealKey = null;
-        this.toast.show('Incorrect key', { tone: 'warn', durationMs: 4000 });
-      },
-    });
-  }
-
-  /** A reveal succeeded when any OTHER user's / audit entry's email came back real (mine is always real). */
-  private didReveal(users: ManagedUser[], audit: AuditEntry[]): boolean {
-    const mine = this.myEmail;
-    const isOther = (e: string | null) => !!e && e.toLowerCase() !== mine;
-    return (
-      (users ?? []).some((u) => isOther(u.email)) ||
-      (audit ?? []).some((a) => isOther(a.actorEmail) || isOther(a.targetEmail))
-    );
-  }
-
-  /** Drop the key + re-fetch masked (the plain reload path already omits the key). */
-  private hideEmails(): void {
-    this.revealKey = null;
-    this.emailsRevealed.set(false);
-    void this.reload();
   }
 
   /** Toggle the exact-role filter chip (clicking the active one clears it). */

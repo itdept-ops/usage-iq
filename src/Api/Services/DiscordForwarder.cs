@@ -66,6 +66,11 @@ public sealed class DiscordForwarder(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Low-frequency sweep to reclaim idle buckets so _buckets tracks ACTIVE senders rather than the
+        // all-time distinct recipient set (a bucket that is fully refilled and untouched has no state worth
+        // keeping). Runs off the request path; contention with TryTake is negligible at this cadence.
+        _ = PruneIdleBucketsAsync(stoppingToken);
+
         await foreach (var item in _channel.Reader.ReadAllAsync(stoppingToken))
         {
             try { await ForwardOneAsync(item, stoppingToken); }
@@ -77,6 +82,34 @@ public sealed class DiscordForwarder(
                     item.RecipientEmail, item.Kind);
             }
         }
+    }
+
+    // Sweep interval + idle TTL for bucket reclamation. A bucket is prunable once it is fully refilled AND
+    // has not been touched for BucketIdleTtl — i.e. the sender is idle and holds no rate-limit debt, so
+    // dropping it is indistinguishable from a fresh full bucket next time they send.
+    private static readonly TimeSpan PruneInterval = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan BucketIdleTtl = TimeSpan.FromMinutes(30);
+
+    private async Task PruneIdleBucketsAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(PruneInterval, stoppingToken);
+
+                var cutoff = DateTime.UtcNow - BucketIdleTtl;
+                foreach (var (email, bucket) in _buckets)
+                {
+                    // Remove only if still idle+full at removal time (TryRemove's value-compare guards a
+                    // bucket that got touched between the check and the removal).
+                    if (bucket.IsIdleAndFull(cutoff))
+                        ((ICollection<KeyValuePair<string, TokenBucket>>)_buckets)
+                            .Remove(new KeyValuePair<string, TokenBucket>(email, bucket));
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { /* shutting down */ }
     }
 
     private async Task ForwardOneAsync(DiscordForwardItem item, CancellationToken ct)
@@ -175,6 +208,20 @@ public sealed class DiscordForwarder(
                 if (_tokens < 1) return false;
                 _tokens -= 1;
                 return true;
+            }
+        }
+
+        /// <summary>
+        /// True if this bucket has fully refilled (no rate-limit debt) and has not been touched since
+        /// <paramref name="cutoff"/> — safe to evict, as re-creating it fresh yields an equivalent full bucket.
+        /// </summary>
+        public bool IsIdleAndFull(DateTime cutoff)
+        {
+            lock (_gate)
+            {
+                var now = DateTime.UtcNow;
+                var tokens = Math.Min(capacity, _tokens + (now - _last).TotalSeconds / refillSeconds);
+                return _last < cutoff && tokens >= capacity;
             }
         }
     }

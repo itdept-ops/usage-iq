@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, from, throwError } from 'rxjs';
 import { concatMap, last } from 'rxjs/operators';
@@ -245,17 +245,12 @@ export class Api {
   }
 
   /**
-   * The user-management audit log. Pass `revealKey` to send the X-Email-Reveal-Key header so the server
-   * returns real actor/target emails; omit it and other users' emails come back masked (null). The key
-   * travels only in the header — never a URL/query string — and is never persisted.
+   * The user-management audit log. Actor/target emails come back real when the caller holds the
+   * users.email.reveal permission; otherwise other users' emails are masked (null). The caller's own
+   * actor email is always real.
    */
-  auditLog(revealKey?: string): Observable<AuditEntry[]> {
-    return this.http.get<AuditEntry[]>(`${this.base}/audit`, { headers: this.revealHeader(revealKey) });
-  }
-
-  /** Build the X-Email-Reveal-Key header when a key is supplied; otherwise no extra headers (emails stay masked). */
-  private revealHeader(revealKey?: string): HttpHeaders | undefined {
-    return revealKey ? new HttpHeaders({ 'X-Email-Reveal-Key': revealKey }) : undefined;
+  auditLog(): Observable<AuditEntry[]> {
+    return this.http.get<AuditEntry[]>(`${this.base}/audit`);
   }
 
   requestLogs(opts: { method?: string; status?: string; q?: string; take?: number } = {}): Observable<RequestLogEntry[]> {
@@ -495,12 +490,11 @@ export class Api {
   }
 
   /**
-   * The managed-user list. Pass `revealKey` to send the X-Email-Reveal-Key header so the server returns
-   * real emails; omit it and other users' emails come back masked (null — the caller's own row is always
-   * real). The key travels only in the header — never a URL/query string — and is never persisted.
+   * The managed-user list. Other users' emails come back real when the caller holds the users.email.reveal
+   * permission; otherwise they are masked (null — the caller's own row is always real).
    */
-  users(revealKey?: string): Observable<ManagedUser[]> {
-    return this.http.get<ManagedUser[]>(`${this.base}/users`, { headers: this.revealHeader(revealKey) });
+  users(): Observable<ManagedUser[]> {
+    return this.http.get<ManagedUser[]>(`${this.base}/users`);
   }
 
   /** Total number of users (just the count, no row data). Gated by users.view|users.manage. */

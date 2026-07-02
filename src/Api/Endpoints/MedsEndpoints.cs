@@ -226,7 +226,21 @@ public static class MedsEndpoints
             if (med is null) return Results.NotFound();
 
             var now = DateTime.UtcNow;
-            var slot = req.Slot is { } s ? Math.Clamp(s, 0, MaxTimesPerDay - 1) : (int?)null;
+            // A slotted log must reference a dose the med actually schedules that day — reject phantom slots
+            // (e.g. slot 11 on a once-daily med, or any slot on a day the med isn't due) rather than persist
+            // an orphan adherence row that never appears in the checklist. Null slot = an unslotted log.
+            int? slot;
+            if (req.Slot is { } s)
+            {
+                var due = MedsVitalsMath.DosesDueOn(med, req.Date);
+                if (s < 0 || s >= due)
+                    return Results.BadRequest(new { message = "That dose slot isn't scheduled for this medication on that date." });
+                slot = s;
+            }
+            else
+            {
+                slot = null;
+            }
 
             // Upsert the slot's log for the day so re-tapping a dose toggles its status rather than piling up rows.
             var row = await db.MedicationLogs.FirstOrDefaultAsync(
@@ -245,7 +259,7 @@ public static class MedsEndpoints
                 db.MedicationLogs.Add(row);
             }
             row.Status = req.Status;
-            row.TakenAtUtc = req.Status == MedicationLogStatus.Taken ? (req.TakenAt ?? now) : null;
+            row.TakenAtUtc = req.Status == MedicationLogStatus.Taken ? (ToUtc(req.TakenAt) ?? now) : null;
             row.Notes = Normalize(req.Notes, MaxLogNotesLen);
             await db.SaveChangesAsync(ct);
 
@@ -387,7 +401,7 @@ public static class MedsEndpoints
                 Value2 = req.Kind == VitalKind.BloodPressure ? req.Value2 : null,
                 Unit = (req.Unit ?? "").Trim().Truncate(MaxUnitLen),
                 LocalDate = req.LocalDate,
-                MeasuredAtUtc = req.MeasuredAt,
+                MeasuredAtUtc = ToUtc(req.MeasuredAt),
                 Notes = Normalize(req.Notes, MaxLogNotesLen),
                 CreatedUtc = now,
             };
@@ -412,7 +426,7 @@ public static class MedsEndpoints
             row.Value2 = req.Kind == VitalKind.BloodPressure ? req.Value2 : null;
             row.Unit = (req.Unit ?? "").Trim().Truncate(MaxUnitLen);
             row.LocalDate = req.LocalDate;
-            row.MeasuredAtUtc = req.MeasuredAt;
+            row.MeasuredAtUtc = ToUtc(req.MeasuredAt);
             row.Notes = Normalize(req.Notes, MaxLogNotesLen);
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToVitalDto(row));
@@ -654,6 +668,17 @@ public static class MedsEndpoints
         var t = s?.Trim();
         return string.IsNullOrEmpty(t) ? null : t.Truncate(max);
     }
+
+    /// <summary>Coerce a client-supplied DateTime to UTC before it hits a timestamptz column: an offset-less
+    /// (Unspecified) value is assumed UTC, a Local value is converted. Npgsql requires <see cref="DateTimeKind.Utc"/>
+    /// for 'timestamp with time zone' and throws otherwise — mirrors the FamilyCalendar inbound normalization.</summary>
+    private static DateTime? ToUtc(DateTime? value) => value switch
+    {
+        null => null,
+        { Kind: DateTimeKind.Utc } dt => dt,
+        { Kind: DateTimeKind.Local } dt => dt.ToUniversalTime(),
+        { } dt => DateTime.SpecifyKind(dt, DateTimeKind.Utc),
+    };
 
     // ---- Projections ----
 

@@ -31,9 +31,13 @@ public sealed class IngestKeyFilter : IEndpointFilter
         var hash = Hash(provided);
         var db = http.RequestServices.GetRequiredService<UsageDbContext>();
         // Resolve the key plus its owner's email in one round-trip so the handler can attribute the
-        // rows to the owning user (server-derived). A legacy key with no linked user yields a null email.
+        // rows to the owning user (server-derived). The key must be non-revoked AND still owned by an
+        // enabled user: an offboarded owner (disabled) — or one whose account was deleted, which nulls
+        // UserId via ON DELETE SET NULL — leaves the row live but must no longer authenticate. This also
+        // rejects legacy orphan keys with no linked user: attribution to a null owner is not allowed.
         var match = await db.IngestKeys.AsNoTracking()
-            .Where(k => k.KeyHash == hash && k.RevokedUtc == null)
+            .Where(k => k.KeyHash == hash && k.RevokedUtc == null
+                && k.User != null && k.User.IsEnabled)
             .Select(k => new { k.Id, OwnerEmail = k.User != null ? k.User.Email : null })
             .FirstOrDefaultAsync(ct);
         if (match is null)

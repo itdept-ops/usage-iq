@@ -47,15 +47,7 @@ import {
 } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
 import { DialogA11yDirective } from '../../core/dialog-a11y.directive';
-
-/** The closed category set the review dropdown offers (the AI's enum + the household's ledger categories). */
-export const FINANCE_DEFAULT_CATEGORIES: readonly string[] = [
-  'Groceries', 'Dining', 'Gas', 'Shopping', 'Entertainment', 'Travel',
-  'Utilities', 'Rent', 'Mortgage', 'Insurance', 'Health', 'Fitness',
-  'Subscriptions', 'Transportation', 'Education', 'Kids', 'Pets',
-  'Personal Care', 'Home', 'Gifts', 'Charity', 'Fees', 'Taxes',
-  'Income', 'Transfer',
-];
+import { FINANCE_DEFAULT_CATEGORIES } from '../../core/finance-categories';
 
 /** The editable column-map fields the generic-CSV step collects (header-name picks + a sign toggle). */
 type ColumnMapField =

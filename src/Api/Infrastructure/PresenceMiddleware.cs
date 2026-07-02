@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using Ccusage.Api.Auth;
+using Ccusage.Api.Data.Entities;
 using Ccusage.Api.Services;
 
 namespace Ccusage.Api.Infrastructure;
@@ -21,8 +23,14 @@ public sealed class PresenceMiddleware(RequestDelegate next, PresenceTracker pre
         {
             if (ctx.User.Identity?.IsAuthenticated == true)
             {
+                // Defense-in-depth: OnTokenValidated already fails disabled accounts at the auth boundary,
+                // but if a disabled user's AppUser was stashed we must never stamp presence for them —
+                // otherwise an offboarded account keeps advertising itself as online (and its shared city).
+                var stampable = !(ctx.Items.TryGetValue(CurrentUserAccessor.LoadedUserKey, out var stashed)
+                    && stashed is AppUser user && !user.IsEnabled);
+
                 var email = ctx.User.FindFirstValue("email");
-                if (!string.IsNullOrWhiteSpace(email))
+                if (stampable && !string.IsNullOrWhiteSpace(email))
                     presence.Touch(email, ctx.User.FindFirstValue("name"), ctx.User.FindFirstValue("picture"));
             }
         }

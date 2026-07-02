@@ -78,9 +78,19 @@ if (-not (Test-Path $exe)) { Fail "Built executable not found at '$exe'." }
 if ($Url -match '^http://' -and $Url -notmatch '://(localhost|127\.0\.0\.1|\[::1\])') {
     Write-Host "WARNING: --url is http:// to a non-local host; the key travels in cleartext. Prefer https." -ForegroundColor Yellow
 }
-$reporterArgs = @("--url", $Url, "--key", $Key, "--machine", $Machine, "--batch", "$Batch", "--interval", "$Interval")
+# Hand the key to the reporter out-of-band via the env var it already reads (REPORTER_KEY),
+# so the secret never lands on the child's command line (readable by other processes/users).
+$reporterArgs = @("--url", $Url, "--machine", $Machine, "--batch", "$Batch", "--interval", "$Interval")
 if ($Once) { $reporterArgs += "--once" }
 
 Step "Starting reporter -> $Url  (machine: $Machine)$(if ($Once) { ' [one-shot]' } else { ' [watch - Ctrl+C to stop]' })"
-& $exe @reporterArgs
-exit $LASTEXITCODE
+$prevReporterKey = $env:REPORTER_KEY
+$env:REPORTER_KEY = $Key
+try {
+    & $exe @reporterArgs
+    $code = $LASTEXITCODE
+}
+finally {
+    $env:REPORTER_KEY = $prevReporterKey
+}
+exit $code

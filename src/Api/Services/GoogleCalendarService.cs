@@ -55,6 +55,14 @@ public sealed class GoogleCalendarService(
 
     private const string PrimaryCalendar = "primary";
 
+    /// <summary>Hard ceiling on the buffered OAuth token response (a real token JSON is well under a KB);
+    /// caps the allocation so a compromised/MITM'd token endpoint cannot force an unbounded read.</summary>
+    private const int MaxTokenResponseBytes = 64 * 1024;
+
+    /// <summary>Hard ceiling on a buffered Calendar API JSON response (an events page maxes at 250 slim
+    /// items); caps the allocation so a compromised/MITM'd endpoint cannot force an unbounded read.</summary>
+    private const int MaxApiResponseBytes = 8 * 1024 * 1024;
+
     /// <summary>Whether the OAuth client secret is configured. When false, calendar is "not configured".</summary>
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(config["Google:ClientId"])
@@ -456,8 +464,9 @@ public sealed class GoogleCalendarService(
                 return Status<string>(CalendarStatus.Error);
             }
 
-            await using var stream = await res.Content.ReadAsStreamAsync(ct);
-            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            var bytes = await ReadCappedAsync(res, MaxTokenResponseBytes, ct);
+            if (bytes is null) return Status<string>(CalendarStatus.Error);
+            using var doc = JsonDocument.Parse(bytes);
             var accessToken = GetStr(doc.RootElement, "access_token");
             if (string.IsNullOrEmpty(accessToken)) return Status<string>(CalendarStatus.Error);
 
@@ -498,7 +507,10 @@ public sealed class GoogleCalendarService(
                 logger.LogWarning("Google token endpoint returned {Status}.", (int)res.StatusCode);
                 return null;
             }
-            var bytes = await res.Content.ReadAsByteArrayAsync(ct);
+            // Cap the buffered token response: a legitimate OAuth token JSON is well under a KB, so
+            // reject anything larger to stop a compromised/MITM'd endpoint forcing an unbounded allocation.
+            var bytes = await ReadCappedAsync(res, MaxTokenResponseBytes, ct);
+            if (bytes is null) return null;
             return JsonDocument.Parse(bytes);
         }
         catch (Exception ex)
@@ -521,8 +533,8 @@ public sealed class GoogleCalendarService(
                 CaptureCalendarError("GET", (int)res.StatusCode, await SafeReadBodyAsync(res, ct));
                 return null;
             }
-            await using var stream = await res.Content.ReadAsStreamAsync(ct);
-            return await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            var bytes = await ReadCappedAsync(res, MaxApiResponseBytes, ct);
+            return bytes is null ? null : JsonDocument.Parse(bytes);
         }
         catch (Exception ex)
         {
@@ -548,14 +560,34 @@ public sealed class GoogleCalendarService(
                 CaptureCalendarError(method.Method, (int)res.StatusCode, await SafeReadBodyAsync(res, ct));
                 return null;
             }
-            await using var stream = await res.Content.ReadAsStreamAsync(ct);
-            return await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            var bytes = await ReadCappedAsync(res, MaxApiResponseBytes, ct);
+            return bytes is null ? null : JsonDocument.Parse(bytes);
         }
         catch (Exception ex)
         {
             logger.LogWarning("Google calendar {Method} failed: {Reason}", method.Method, ex.Message);
             return null;
         }
+    }
+
+    /// <summary>Buffer a response body into memory but abort if it exceeds <paramref name="maxBytes"/>,
+    /// so a hostile/MITM'd endpoint cannot force an arbitrarily large allocation. Returns null if the
+    /// body is over the cap or a read error occurs.</summary>
+    private static async Task<byte[]?> ReadCappedAsync(HttpResponseMessage res, int maxBytes, CancellationToken ct)
+    {
+        // If the endpoint advertises a length, reject oversized bodies before reading a single byte.
+        if (res.Content.Headers.ContentLength is long len && len > maxBytes) return null;
+
+        await using var stream = await res.Content.ReadAsStreamAsync(ct);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[8192];
+        int read;
+        while ((read = await stream.ReadAsync(chunk.AsMemory(0, chunk.Length), ct)) > 0)
+        {
+            if (buffer.Length + read > maxBytes) return null;
+            buffer.Write(chunk, 0, read);
+        }
+        return buffer.ToArray();
     }
 
     /// <summary>Read up to 4 KB of a failed Calendar API response body (secret-free — it describes the

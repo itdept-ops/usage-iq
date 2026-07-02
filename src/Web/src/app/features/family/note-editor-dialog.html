@@ -26,6 +26,7 @@
       <div class="note-ai__panel">
         <div class="note-ai__bar">
           <input class="note-ai__input" maxlength="1000" [ngModel]="aiPrompt()"
+                 aria-label="Describe what you want the AI to draft or rewrite"
                  (ngModelChange)="aiPrompt.set($event)" (keydown.enter)="runAi()" [disabled]="aiBusy()"
                  [placeholder]="aiRewrites()
                    ? 'How should I change it? e.g. make it a checklist, tighten it up'

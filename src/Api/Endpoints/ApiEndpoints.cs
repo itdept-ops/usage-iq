@@ -15,7 +15,24 @@ public static class ApiEndpoints
         // re-checked against the DB on every request (see PermissionFilter).
         var api = app.MapGroup("/api").RequireAuthorization();
 
-        api.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+        // Readiness probe: the container HEALTHCHECK and Compose service_healthy gate hit /api/health,
+        // so it must actually verify the datastore — otherwise the API is admitted into rotation the instant
+        // the process listens even when Postgres is unreachable or migrations haven't completed. Verify DB
+        // connectivity (mirrors the "ready"-tagged AddDbContextCheck) and return 503 when it's not reachable
+        // so the instance is held back until the database is genuinely ready.
+        api.MapGet("/health", async (UsageDbContext db, CancellationToken ct) =>
+        {
+            try
+            {
+                if (!await db.Database.CanConnectAsync(ct))
+                    return Results.Json(new { status = "unavailable" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+            catch
+            {
+                return Results.Json(new { status = "unavailable" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+            return Results.Ok(new { status = "ok" });
+        }).AllowAnonymous();
 
         // ---- Sync ----
         api.MapPost("/sync", async (SyncCoordinator coordinator, CancellationToken ct) =>

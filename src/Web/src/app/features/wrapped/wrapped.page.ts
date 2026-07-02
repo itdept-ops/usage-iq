@@ -41,10 +41,10 @@ interface RecapStat { readonly key: string; readonly num: string; readonly label
           <p class="wr-hero__kicker">
             <mat-icon aria-hidden="true">auto_awesome</mat-icon> Hub Wrapped
           </p>
-          <div class="wr-hero__periods" role="tablist" aria-label="Wrapped period">
+          <div class="wr-hero__periods" role="group" aria-label="Wrapped period">
             @for (p of periods; track p.key) {
-              <button type="button" class="wr-chip" role="tab"
-                      [class.is-on]="period() === p.key" [attr.aria-selected]="period() === p.key"
+              <button type="button" class="wr-chip"
+                      [class.is-on]="period() === p.key" [attr.aria-pressed]="period() === p.key"
                       [disabled]="loading()" (click)="setPeriod(p.key)">{{ p.label }}</button>
             }
           </div>

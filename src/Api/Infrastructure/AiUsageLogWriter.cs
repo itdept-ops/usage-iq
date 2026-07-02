@@ -42,8 +42,10 @@ public sealed class AiUsageLogWriter(
                 _sincePrune += batch.Count;
                 if (_sincePrune >= PruneEvery)
                 {
-                    _sincePrune = 0;
+                    // Reset only AFTER a successful prune so a transient DB failure retries next batch
+                    // rather than letting the table grow another full PruneEvery window unpruned.
                     await PruneAsync(db, stoppingToken);
+                    _sincePrune = 0;
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -53,7 +55,16 @@ public sealed class AiUsageLogWriter(
             catch (Exception ex)
             {
                 logger.LogError(ex, "AiUsageLogWriter failed to persist a batch; dropping it.");
-                await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                // Back off before retrying, but treat cancellation during shutdown as a clean exit
+                // (the delay throws OperationCanceledException, which this generic catch would not).
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
             }
         }
     }

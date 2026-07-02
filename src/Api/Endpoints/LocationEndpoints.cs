@@ -164,13 +164,25 @@ public static class LocationEndpoints
         // at least one recorded fix appear.
         g.MapGet("/admin", async (UsageDbContext db, CancellationToken ct) =>
         {
-            // Pull a bounded recent window per user in one pass. The (UserEmail, CapturedUtc desc) index
-            // serves the ordering; we cap the rows scanned with a generous overall take and group in memory.
-            // To keep it bounded on large datasets, fetch the most recent rows across everyone, then group.
-            var recentRows = await db.UserLocations.AsNoTracking()
-                .OrderByDescending(x => x.CapturedUtc)
-                .Take(HistoryCap * 4)
+            // EVERY user with any recorded fix must appear (this is a safety/oversight roster), independent
+            // of how active other users are. A single global TOP-N would let a few frequent loggers crowd
+            // everyone else off the map, so resolve the roster PER USER: first the set of owners with any
+            // fix, then a bounded recent tail per owner (served by the (UserEmail, CapturedUtc desc) index).
+            var owners = await db.UserLocations.AsNoTracking()
+                .Select(x => x.UserEmail)
+                .Distinct()
                 .ToListAsync(ct);
+
+            var recentRows = new List<UserLocation>(owners.Count * AdminRecentPerUser);
+            foreach (var email in owners)
+            {
+                var rows = await db.UserLocations.AsNoTracking()
+                    .Where(x => x.UserEmail == email)
+                    .OrderByDescending(x => x.CapturedUtc)
+                    .Take(AdminRecentPerUser)
+                    .ToListAsync(ct);
+                recentRows.AddRange(rows);
+            }
 
             // Resolve owner emails -> {AppUser.Id, Name}; the raw email never reaches the DTO (email-privacy).
             var lowerEmails = recentRows.Select(r => r.UserEmail).Distinct().ToList();

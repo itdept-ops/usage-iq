@@ -34,6 +34,7 @@
     @if (recipeOpen()) {
       <div class="note-ai__panel">
         <textarea class="note-ai__input meal-recipe__text" rows="5" maxlength="8000"
+                  aria-label="Recipe text"
                   [ngModel]="recipeText()" (ngModelChange)="recipeText.set($event)" [disabled]="recipeBusy()"
                   placeholder="Paste a recipe… (for a link, copy and paste the page's text — we don't open URLs)"></textarea>
         <div class="note-ai__bar meal-recipe__bar">

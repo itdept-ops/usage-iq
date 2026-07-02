@@ -39,6 +39,8 @@ export class ToastController {
   private readonly _toasts = signal<ToastMsg[]>([]);
   /** The live toast stack (oldest → newest), read by the toaster host. */
   readonly toasts = this._toasts.asReadonly();
+  /** Just the warn-toned toasts, routed into the host's always-present assertive live region. */
+  readonly warnToasts = computed(() => this._toasts().filter(m => m.tone === 'warn'));
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly haptics = inject(Haptics);
 
@@ -106,11 +108,9 @@ export class ToastController {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="bs-toaster" role="region" aria-label="Notifications">
+    <div class="bs-toaster" role="region" aria-label="Notifications" aria-live="polite">
       @for (t of ctrl.toasts(); track t.id) {
-        <div class="bs-toast" [class.is-success]="t.tone === 'success'" [class.is-warn]="t.tone === 'warn'"
-             [attr.role]="t.tone === 'warn' ? 'alert' : 'status'"
-             [attr.aria-live]="t.tone === 'warn' ? 'assertive' : 'polite'">
+        <div class="bs-toast" [class.is-success]="t.tone === 'success'" [class.is-warn]="t.tone === 'warn'">
           <span class="bs-toast-stripe" aria-hidden="true"></span>
           <span class="bs-toast-text">{{ t.text }}</span>
           @if (t.actionLabel) {
@@ -120,9 +120,24 @@ export class ToastController {
         </div>
       }
     </div>
+    <!--
+      A separate, always-present assertive live region for warn toasts. It is empty until a warn
+      toast appears, so the (persistent) region announces the text as an interruption. Kept off-DOM
+      visually — the visible row lives in .bs-toaster above; this only carries the announcement.
+    -->
+    <div class="bs-live-assertive" role="alert" aria-live="assertive">
+      @for (t of ctrl.warnToasts(); track t.id) {
+        <span>{{ t.text }}</span>
+      }
+    </div>
   `,
   styles: [`
     :host { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+    /* Off-screen SR-only announcer for warn toasts (the visible row lives in .bs-toaster). */
+    .bs-live-assertive {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+    }
     .bs-toaster {
       position: absolute; left: 0; right: 0;
       bottom: calc(16px + env(safe-area-inset-bottom, 0px));

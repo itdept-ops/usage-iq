@@ -175,7 +175,13 @@ export class App implements AfterViewInit {
    */
   private static readonly IDLE_MS = 5 * 60_000; // ~5 min of no interaction → self is away
   private static readonly AWAY_MS = 60_000; // another user not seen in >60s (their polls are ~20s) → away
+  /** Coalesce window for the reactive idle stamp: hot events (pointermove/scroll/wheel fire at ~60-120Hz)
+   *  must not each write a signal, since that schedules a full change-detection pass in this zoneless app.
+   *  We only advance {@link lastActivity} once every this-many ms — ample for a ~5-minute idle threshold. */
+  private static readonly ACTIVITY_THROTTLE_MS = 5_000;
   private readonly lastActivity = signal(Date.now());
+  /** Wall-clock of the last reactive {@link lastActivity} WRITE, used to throttle the hot-event stamp. */
+  private lastActivityWrite = Date.now();
   /**
    * OS-level idle/away reported by the PWA IdleDetector (user idle ~60s OR screen locked), fed by
    * {@link PwaService}. Pure best-effort: stays false on every browser that lacks the API or hasn't granted
@@ -506,6 +512,7 @@ export class App implements AfterViewInit {
         this.closeMobileNav(); // never leave the drawer open across a route change
         this.maybeApplyPwaHome(); // installed-app launch → saved home (once the router has settled)
         this.maybeStartTour(); // first dashboard visit → auto-start the guided tour (once)
+        this.focusMainContent(); // SPA route-change focus management (WCAG 2.4.3) — announce the new page
       });
 
     // Lightweight clock tick (~15s) so the relative "active …" labels AND the derived away/idle states
@@ -743,6 +750,24 @@ export class App implements AfterViewInit {
   }
 
   /**
+   * SPA route-change focus management (WCAG 2.4.3 / SPA-focus). On each settled NavigationEnd we move
+   * keyboard focus to the always-present <main id="main-content" tabindex="-1"> landmark, so keyboard +
+   * screen-reader users aren't stranded on the just-clicked nav link (or lost to <body> when the old
+   * component is destroyed) and AT re-announces the new page instead of reading the stale context. The
+   * focus move is deferred a frame so the router has swapped in the new component, and skipped for in-page
+   * fragment navigations so anchor links keep working. Bare/public chrome renders its own <main>-less
+   * layout, so the query simply no-ops there.
+   */
+  private focusMainContent(): void {
+    if (typeof document === 'undefined') return;
+    if (this.router.url.includes('#')) return; // in-page anchor nav — leave focus on the fragment target
+    requestAnimationFrame(() => {
+      const main = (this.host.nativeElement as HTMLElement).querySelector<HTMLElement>('#main-content');
+      main?.focus();
+    });
+  }
+
+  /**
    * If a live /me refresh shows the user has lost the view permission for the page they're currently
    * on (an admin revoked it mid-session), send them to their new home so the page can't keep 403ing.
    */
@@ -843,7 +868,10 @@ export class App implements AfterViewInit {
   /**
    * IDLE tracking: any real interaction (pointer move/down, key, scroll, wheel, touch) refreshes the
    * activity stamp, so the caller's own roster "away" badge clears the instant they're back. Passive +
-   * lightweight; we only stamp a timestamp (no per-event work).
+   * lightweight. Because the app is ZONELESS, a signal write schedules a full change-detection pass, so we
+   * THROTTLE the reactive {@link lastActivity} write to at most once per {@link ACTIVITY_THROTTLE_MS} — the
+   * hot events (pointermove/scroll/wheel fire at ~60-120Hz during a drag/scroll) then cost almost nothing,
+   * yet the ~5-minute idle threshold is still refreshed with plenty of margin.
    */
   @HostListener('document:pointerdown')
   @HostListener('document:pointermove')
@@ -852,15 +880,20 @@ export class App implements AfterViewInit {
   @HostListener('document:touchstart')
   @HostListener('document:scroll')
   onUserActivity(): void {
-    this.lastActivity.set(Date.now());
+    const now = Date.now();
+    if (now - this.lastActivityWrite < App.ACTIVITY_THROTTLE_MS) return;
+    this.lastActivityWrite = now;
+    this.lastActivity.set(now);
   }
 
   /** Returning to the tab counts as activity (and refreshes "now" so stale-away derivations recompute). */
   @HostListener('document:visibilitychange')
   onVisibilityChange(): void {
     if (document.visibilityState === 'visible') {
-      this.lastActivity.set(Date.now());
-      this.now.set(Date.now());
+      const now = Date.now();
+      this.lastActivityWrite = now; // keep the hot-event throttle window in sync with this direct write
+      this.lastActivity.set(now);
+      this.now.set(now);
     }
   }
 

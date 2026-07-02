@@ -7,6 +7,9 @@ import { firstValueFrom } from 'rxjs';
 
 import { Api } from '../../core/api';
 import {
+  axisX, axisY, KIND_COLORS, KIND_META, KIND_ORDER, parseR,
+} from '../../core/insights-shared';
+import {
   InsightCard, InsightKind, InsightWindow, InsightsNarrateResponse, InsightsResponse,
 } from '../../core/models';
 import { ChartComponent } from '../../shared/chart';
@@ -93,7 +96,7 @@ interface FeedCard extends InsightCard {
             title="Keep logging"
             body="Insights appear once there's enough data. Log a steady run of days across a few domains — sleep, food, activity, water, weight, coffee, AI spend — and your first correlations & trends surface here."
             ctaLabel="Open the tracker"
-            ctaLink="/tracker-beta" />
+            ctaLink="/tracker" />
 
         } @else {
           <!-- ─── summary VIZ: the insight mix by kind ─── -->
@@ -186,7 +189,9 @@ interface FeedCard extends InsightCard {
                   </div>
                   @if (expanded() === c.cardId) {
                     <div class="im-card__chart">
-                      <app-chart [option]="scatterOption(c)" />
+                      @if (expandedOption(); as opt) {
+                        <app-chart [option]="opt" />
+                      }
                       <p class="im-card__chart-note">
                         Illustrative scatter — depicts the published strength (r) &amp; direction over
                         {{ c.dataPoints }} paired days, not raw logged values.
@@ -250,18 +255,18 @@ export class InsightsMobilePage {
       const k = c.kind as InsightKind;
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
-    return InsightsMobilePage.KIND_ORDER
+    return KIND_ORDER
       .filter(k => (counts.get(k) ?? 0) > 0)
       .map(k => ({
-        label: InsightsMobilePage.KIND_META[k].label,
+        label: KIND_META[k].label,
         value: counts.get(k) ?? 0,
-        color: InsightsMobilePage.KIND_COLORS[k],
+        color: KIND_COLORS[k],
       }));
   });
 
   /** The feed: cards sorted into kind order, each tagged with whether it opens a new section. */
   readonly feed = computed<FeedCard[]>(() => {
-    const order = InsightsMobilePage.KIND_ORDER;
+    const order = KIND_ORDER;
     const sorted = [...this.cards()].sort(
       (a, b) => order.indexOf(a.kind as InsightKind) - order.indexOf(b.kind as InsightKind),
     );
@@ -270,7 +275,7 @@ export class InsightsMobilePage {
     let prevKind: string | null = null;
     let indexInKind = 0;
     return sorted.map(c => {
-      const meta = InsightsMobilePage.KIND_META[c.kind as InsightKind]
+      const meta = KIND_META[c.kind as InsightKind]
         ?? { label: 'Insights', icon: 'insights', blurb: '' };
       const first = c.kind !== prevKind;
       indexInKind = first ? 0 : indexInKind + 1;
@@ -286,6 +291,19 @@ export class InsightsMobilePage {
       prevKind = c.kind;
       return card;
     });
+  });
+
+  /**
+   * The scatter option for the currently-expanded correlation card, or null when none is open.
+   * Memoized: the option object is rebuilt ONLY when the expanded id or the underlying feed changes,
+   * so binding `[option]` to this signal avoids the per-change-detection rebuild + full ECharts repaint
+   * that a template method call (`scatterOption(c)`) would incur.
+   */
+  readonly expandedOption = computed<EChartsOption | null>(() => {
+    const id = this.expanded();
+    if (!id) return null;
+    const card = this.feed().find(c => c.cardId === id);
+    return card && card.kind === 'correlation' ? this.scatterOption(card) : null;
   });
 
   constructor() {
@@ -375,8 +393,8 @@ export class InsightsMobilePage {
    * with deterministic jitter whose spread scales with (1 − |r|) around a line whose slope sign matches the
    * correlation direction. It's a faithful depiction of the published strength/direction, labeled as such.
    */
-  scatterOption(c: InsightCard): EChartsOption {
-    const r = this.parseR(c);
+  private scatterOption(c: InsightCard): EChartsOption {
+    const r = parseR(c.stat, c.detail, c.magnitude);
     const n = Math.max(2, Math.min(c.dataPoints || 12, 60));
     const dir = r < 0 ? -1 : 1;
     const strength = Math.min(Math.abs(r), 0.98);
@@ -405,9 +423,9 @@ export class InsightsMobilePage {
 
     return {
       grid: { left: 8, right: 14, top: 14, bottom: 18, containLabel: true },
-      xAxis: { type: 'value', min: 0, max: 100, name: this.axisX(c), nameGap: 18, nameLocation: 'middle',
+      xAxis: { type: 'value', min: 0, max: 100, name: axisX(c.title), nameGap: 18, nameLocation: 'middle',
         nameTextStyle: { fontSize: 10 }, axisLabel: { show: false } },
-      yAxis: { type: 'value', min: 0, max: 100, name: this.axisY(c), nameGap: 22, nameLocation: 'middle',
+      yAxis: { type: 'value', min: 0, max: 100, name: axisY(c.title), nameGap: 22, nameLocation: 'middle',
         nameTextStyle: { fontSize: 10 }, axisLabel: { show: false } },
       tooltip: { show: false },
       series: [
@@ -423,50 +441,4 @@ export class InsightsMobilePage {
     };
   }
 
-  /** Extract the |r| (signed) value out of a correlation stat like "r=0.61 · moderate" / "r=-0.43 …". */
-  private parseR(c: InsightCard): number {
-    const m = `${c.stat} ${c.detail}`.match(/r\s*=\s*(-?\d*\.?\d+)/i);
-    let r = m ? Number(m[1]) : 0.5;
-    if (!Number.isFinite(r)) r = 0.5;
-    // honour an explicit "negative" magnitude even if the printed r is unsigned.
-    if (r > 0 && (c.magnitude ?? '').toLowerCase().includes('negative')) r = -r;
-    return Math.max(-1, Math.min(1, r));
-  }
-
-  /** Split a "A vs B" title into rough axis labels (illustrative). */
-  private axisX(c: InsightCard): string {
-    const parts = c.title.split(/\bvs\b|→|↔/i);
-    return (parts[0] ?? 'A').trim().slice(0, 22) || 'A';
-  }
-  private axisY(c: InsightCard): string {
-    const parts = c.title.split(/\bvs\b|→|↔/i);
-    return (parts[1] ?? parts[0] ?? 'B').trim().slice(0, 22) || 'B';
-  }
-
-  // ─────────────── KIND ORDER + META ───────────────
-
-  private static readonly KIND_ORDER: InsightKind[] = [
-    'correlation', 'trend', 'streak', 'anomaly', 'bestworst',
-  ];
-  private static readonly KIND_META: Record<InsightKind, { label: string; icon: string; blurb: string }> = {
-    correlation: { label: 'Correlations', icon: 'sync_alt',
-      blurb: 'Paired-day associations across domains (≥10 days). Association, not causation.' },
-    trend: { label: 'Trends', icon: 'trending_up',
-      blurb: 'Where a metric is drifting — with a bounded estimate, not a prediction.' },
-    streak: { label: 'Streaks', icon: 'local_fire_department',
-      blurb: 'Your longest & current qualifying runs.' },
-    anomaly: { label: 'Anomalies', icon: 'warning_amber',
-      blurb: 'Statistical outlier days (|z| ≥ 2).' },
-    bestworst: { label: 'Best & worst', icon: 'emoji_events',
-      blurb: 'Your standout high & low days per metric.' },
-  };
-
-  /** Per-kind ring hues for the summary donut — the page's indigo→violet family plus warm accents. */
-  private static readonly KIND_COLORS: Record<InsightKind, string> = {
-    correlation: '#a78bfa',
-    trend: '#7dd3fc',
-    streak: '#f9a8d4',
-    anomaly: '#fbbf24',
-    bestworst: '#5eead4',
-  };
 }

@@ -173,11 +173,24 @@ public sealed class UsageQueries(UsageDbContext db)
             else { longest = Math.Max(longest, run); run = 1; }
         }
         longest = Math.Max(longest, run);
-        var current = 1;
-        for (var i = activeDates.Count - 1; i > 0; i--)
+        // Anchor the CURRENT streak to "today" in the display timezone: a streak is only live if the
+        // most recent active date is today or yesterday. A lapsed user (last activity older than that)
+        // has a current streak of 0. LongestStreakDays above is unaffected.
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+        var lastActive = activeDates[^1];
+        int current;
+        if (lastActive != today && lastActive != today.AddDays(-1))
         {
-            if (activeDates[i] == activeDates[i - 1].AddDays(1)) current++;
-            else break;
+            current = 0;
+        }
+        else
+        {
+            current = 1;
+            for (var i = activeDates.Count - 1; i > 0; i--)
+            {
+                if (activeDates[i] == activeDates[i - 1].AddDays(1)) current++;
+                else break;
+            }
         }
 
         var totalCost = rows.Sum(r => r.CostUsd);
@@ -615,8 +628,19 @@ public sealed class UsageQueries(UsageDbContext db)
         await w.FlushAsync(ct);
     }
 
-    private static string Csv(string s) =>
-        s.Contains(',') || s.Contains('"') || s.Contains('\n') ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;
+    private static string Csv(string s)
+    {
+        s ??= string.Empty;
+        // Formula-injection neutralization: a cell whose first char is one of these is treated as a
+        // formula by Excel/LibreOffice/Sheets. Model/Project/etc. are attacker-controllable (ingest),
+        // so prefix such cells with a single quote so they render as literal text, and force quoting.
+        var injectable = s.Length > 0 && s[0] is '=' or '+' or '-' or '@' or '\t' or '\r';
+        if (injectable) s = "'" + s;
+        // RFC 4180: quote if the field contains a comma, quote, CR or LF (bare '\r' included).
+        if (injectable || s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r'))
+            return "\"" + s.Replace("\"", "\"\"") + "\"";
+        return s;
+    }
 
     public async Task<List<ProjectDto>> ProjectsAsync(CancellationToken ct) =>
         await db.UsageRecords.AsNoTracking()

@@ -55,7 +55,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (r of logs(); track r.id) {
+        @for (r of visibleLogs(); track r.id) {
           <tr class="log-row" [class.open]="expandedId() === r.id" (click)="toggle(r.id)">
             <td class="c-when mono-num" data-label="Time">{{ r.whenUtc | date: 'HH:mm:ss' }}</td>
             <td class="c-method" data-label="Method"><span class="method-badge" [attr.data-m]="r.method">{{ r.method }}</span></td>
@@ -96,6 +96,16 @@
               </td>
             </tr>
           }
+        }
+        @if (logs().length > visibleLogs().length) {
+          <tr class="more-row">
+            <td colspan="8">
+              <button mat-stroked-button class="more-btn" (click)="showMore()">
+                <mat-icon aria-hidden="true">expand_more</mat-icon>
+                Show more ({{ logs().length - visibleLogs().length }} hidden)
+              </button>
+            </td>
+          </tr>
         }
         @if (!logs().length && !loading()) {
           <tr class="empty-row">

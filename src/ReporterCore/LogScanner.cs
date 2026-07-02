@@ -47,10 +47,19 @@ public sealed class ScanSummary
 /// </summary>
 public sealed class LogScanner(IngestClient client, FileStateStore state, int batchSize, Action<ReporterEvent> emit)
 {
-    // Mirror the server's skip list so the two ingest paths consider the same files.
-    private static readonly string[] SkipSegments = { @"\.tmp\", @"\node_modules\", "plugins-backup" };
+    // Mirror the server's skip list so the two ingest paths consider the same files. Segments are
+    // stored separator-agnostic and matched against a '/'-normalized path so the reporter skips the
+    // same trees on POSIX hosts (macOS/Linux), where filesystem paths use '/'.
+    private static readonly string[] SkipSegments = { "/.tmp/", "/node_modules/", "plugins-backup" };
 
     private const string Endpoint = "api/ingest";
+
+    // A '*.jsonl' log far larger than any plausible transcript is almost certainly corrupt or not a
+    // real transcript; skip it rather than risk materializing it as one giant string (potential OOM).
+    private const long MaxFileBytes = 512L * 1024 * 1024;
+
+    // Cap the recursion depth so a pathological (or link-built) directory tree cannot loop forever.
+    private const int MaxDepth = 64;
 
     public async Task<ScanSummary> ScanAsync(string claudeRoot, string codexRoot, string geminiRoot, CancellationToken ct)
     {
@@ -97,6 +106,14 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
             catch { continue; }
 
             if (state.IsUnchanged(path, size, mtime)) continue;
+
+            if (size > MaxFileBytes)
+            {
+                // A file this large is not a real transcript (likely corrupt/binary); parsing it could
+                // materialize a newline-free blob as one huge string and OOM the agent. Skip + warn.
+                emit(ReporterEvent.Warning($"{kind}: skipping oversized file ({name}, {size} bytes)"));
+                continue;
+            }
 
             List<ParsedUsage> rows;
             try { rows = ParseFile(parser, path); }
@@ -168,22 +185,52 @@ public sealed class LogScanner(IngestClient client, FileStateStore state, int ba
         return parser.Parse(reader, path).ToList();
     }
 
-    private static bool ShouldSkip(string path) =>
-        SkipSegments.Any(seg => path.Contains(seg, StringComparison.OrdinalIgnoreCase));
+    private static bool ShouldSkip(string path)
+    {
+        // Normalize '\' → '/' so backslash- and slash-separated paths match the same skip segments
+        // regardless of the host OS's directory separator.
+        var normalized = path.Replace('\\', '/');
+        return SkipSegments.Any(seg => normalized.Contains(seg, StringComparison.OrdinalIgnoreCase));
+    }
 
-    /// <summary>Recursive *.jsonl walk that tolerates inaccessible directories instead of aborting the pass.</summary>
+    /// <summary>
+    /// Recursive *.jsonl walk that tolerates inaccessible directories instead of aborting the pass.
+    /// Reparse points (directory junctions/symlinks) are NOT followed and a visited-set + depth cap
+    /// break cycles, so a link planted under a scanned root cannot loop forever or escape the root
+    /// into an unrelated tree.
+    /// </summary>
     private static IEnumerable<string> SafeEnumerateFiles(string root)
     {
-        var stack = new Stack<string>();
-        stack.Push(root);
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var stack = new Stack<(string dir, int depth)>();
+        stack.Push((root, 0));
         while (stack.Count > 0)
         {
-            var dir = stack.Pop();
+            var (dir, depth) = stack.Pop();
 
-            string[] subdirs;
-            try { subdirs = Directory.GetDirectories(dir); }
-            catch { subdirs = Array.Empty<string>(); }
-            foreach (var sub in subdirs) stack.Push(sub);
+            // Skip anything we've already walked (canonical path) — breaks junction/symlink cycles.
+            string canonical;
+            try { canonical = Path.GetFullPath(dir); }
+            catch { canonical = dir; }
+            if (!visited.Add(canonical)) continue;
+
+            if (depth < MaxDepth)
+            {
+                string[] subdirs;
+                try { subdirs = Directory.GetDirectories(dir); }
+                catch { subdirs = Array.Empty<string>(); }
+                foreach (var sub in subdirs)
+                {
+                    // Do not descend into reparse points (junctions/symlinks): they can point at an
+                    // ancestor (cycle) or an unrelated tree (read-escape outside the intended root).
+                    try
+                    {
+                        if ((File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0) continue;
+                    }
+                    catch { continue; }
+                    stack.Push((sub, depth + 1));
+                }
+            }
 
             string[] files;
             try { files = Directory.GetFiles(dir, "*.jsonl"); }

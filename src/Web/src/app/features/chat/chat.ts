@@ -13,8 +13,8 @@ import {
 import { FormsModule } from '@angular/forms';
 import { TextFieldModule } from '@angular/cdk/text-field';
 import { ActivatedRoute } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { timer, switchMap, catchError, of } from 'rxjs';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { timer, switchMap, catchError, of, EMPTY, distinctUntilChanged } from 'rxjs';
 
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -188,13 +188,64 @@ export class Chat implements AfterViewChecked, OnDestroy {
   readonly hasConversations = computed(() => this.chat.channels().length > 0);
 
   // ---- active-conversation messages, grouped by sender ----
+  /**
+   * Memo for {@link groups} so a changed message array (new message, edit, reaction, mark-read patch that
+   * swaps the array reference) doesn't rebuild the WHOLE thread's groups. We keep the previous run's inputs
+   * and reuse every group object whose backing messages are reference-identical, only rebuilding from the
+   * first message that changed. The common case — one appended message — reuses all prior groups untouched.
+   */
+  private groupsMemo: {
+    channelId: number;
+    me: number | null;
+    msgs: readonly ChatMessageDto[];
+    out: MessageGroup[];
+  } | null = null;
+
   readonly groups = computed<MessageGroup[]>(() => {
     const id = this.selectedId();
     if (id == null) return [];
     const msgs = this.chat.messages()[id] ?? [];
     const me = this.myUserId();
-    const out: MessageGroup[] = [];
-    for (const m of msgs) {
+
+    // How much of the previous result can we keep? Reuse leading groups whose messages are all the same
+    // object references as last time (and only if the channel + "mine" identity are unchanged).
+    const prevMemo =
+      this.groupsMemo && this.groupsMemo.channelId === id && this.groupsMemo.me === me
+        ? this.groupsMemo
+        : null;
+
+    let out: MessageGroup[];
+    let startMsg = 0;
+    if (prevMemo) {
+      // Count how many leading messages are reference-identical to the previous run.
+      let same = 0;
+      const prevMsgs = prevMemo.msgs;
+      const max = Math.min(prevMsgs.length, msgs.length);
+      while (same < max && prevMsgs[same] === msgs[same]) same++;
+      // Keep only whole groups that lie entirely within the unchanged prefix (a partly-changed trailing
+      // group must be rebuilt so its `messages` sub-array is correct). We reuse each kept group OBJECT by
+      // reference — so we must not mutate one. The very next message could extend the last kept group via
+      // `messages.push`, which would corrupt the shared array, so we deliberately DON'T keep that last
+      // group: it is rebuilt fresh below (from `startMsg`), leaving only untouched groups reused.
+      const kept: MessageGroup[] = [];
+      let covered = 0;
+      for (const g of prevMemo.out) {
+        if (covered + g.messages.length > same) break;
+        kept.push(g);
+        covered += g.messages.length;
+      }
+      if (kept.length > 0) {
+        const last = kept.pop()!;
+        covered -= last.messages.length;
+      }
+      out = kept;
+      startMsg = covered;
+    } else {
+      out = [];
+    }
+
+    for (let i = startMsg; i < msgs.length; i++) {
+      const m = msgs[i];
       const prev = out[out.length - 1];
       const sameRun =
         prev &&
@@ -213,6 +264,8 @@ export class Chat implements AfterViewChecked, OnDestroy {
         });
       }
     }
+
+    this.groupsMemo = { channelId: id, me, msgs, out };
     return out;
   });
 
@@ -299,6 +352,26 @@ export class Chat implements AfterViewChecked, OnDestroy {
 
   /** Heartbeat that re-evaluates the active-share list as shares cross their expiry (1s). */
   private readonly shareNow = signal(Date.now());
+
+  /**
+   * True while the open conversation has any share worth counting down — i.e. one that is still live, or
+   * one of MINE that ended within the ~20s "just wound down" card window. Evaluated off the coarse 20s
+   * {@link now} clock (NOT {@link shareNow}, which this gates) so it never forms a feedback loop; it only
+   * needs to flip when a share appears/clears, and the 1s heartbeat then does the sub-second countdown.
+   */
+  private readonly hasCountdownShare = computed<boolean>(() => {
+    const id = this.selectedId();
+    if (id == null) return false;
+    const now = this.now();
+    const me = this.myUserId();
+    return this.chat.locationSharesFor(id).some((s) => {
+      const ended = s.stopped || now >= new Date(s.expiresUtc).getTime();
+      if (!ended) return true;
+      const since = now - new Date(s.lastUpdateUtc).getTime();
+      // Keep ticking a touch past the 20s window so the card's own filter (on shareNow) can clear it.
+      return me != null && s.sharerUserId === me && since < 20000 + 2000;
+    });
+  });
 
   /**
    * The conversation's CURRENTLY-ACTIVE shares (not stopped AND before expiry by the local clock), newest
@@ -424,9 +497,16 @@ export class Chat implements AfterViewChecked, OnDestroy {
       }
     });
 
-    // A 1s heartbeat so live-location cards count down + cross their expiry without input churn.
-    timer(0, 1000)
-      .pipe(takeUntilDestroyed())
+    // A 1s heartbeat so live-location cards count down + cross their expiry without input churn — but
+    // ONLY while the open conversation actually has a share to count down. When none is active the timer
+    // is switched off, so an idle chat page does no per-second work (the coarse 20s presence poll still
+    // keeps the general clock fresh). It resumes the instant a share appears.
+    toObservable(this.hasCountdownShare)
+      .pipe(
+        distinctUntilChanged(),
+        switchMap((active) => (active ? timer(0, 1000) : EMPTY)),
+        takeUntilDestroyed(),
+      )
       .subscribe(() => this.shareNow.set(Date.now()));
 
     // Drive the sharer's periodic position push: while I hold an ACTIVE share in the open conversation,

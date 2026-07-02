@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Ccusage.Api.Auth;
 using Ccusage.Api.Data;
 using Ccusage.Api.Dtos;
 using Ccusage.Api.Services;
@@ -15,8 +16,13 @@ public static class PresenceEndpoints
         // Resolves each online email to PUBLIC identity (UserId/Name/Picture) via a single Users lookup;
         // the raw email is NEVER emitted (email-privacy). IsSelf marks the caller's own row.
         app.MapGet("/api/presence", async (PresenceTracker presence, UsageDbContext db, ClaimsPrincipal caller,
-                CancellationToken ct) =>
+                CurrentUserAccessor me, CancellationToken ct) =>
             {
+                // Re-check enabled-state on this RequireAuthorization()-only route: a just-disabled account
+                // holding a still-valid token must not reach the roster (email-privacy / offboarding).
+                var self0 = await me.GetUserAsync(ct);
+                if (self0 is null || !self0.IsEnabled) return Results.Forbid();
+
                 var online = presence.Online(PresenceTracker.DefaultWindow);
                 var callerEmail = caller.FindFirstValue("email")?.Trim().ToLowerInvariant();
 
@@ -98,8 +104,13 @@ public static class PresenceEndpoints
         // Sign-out hook: the SPA calls this as the user logs out so they drop offline immediately instead
         // of lingering until their tracker entry ages out of the presence window. Removes the CALLER only
         // (keyed off the JWT email — never echoed back).
-        app.MapPost("/api/presence/offline", (PresenceTracker presence, ClaimsPrincipal caller) =>
+        app.MapPost("/api/presence/offline", async (PresenceTracker presence, ClaimsPrincipal caller,
+                CurrentUserAccessor me, CancellationToken ct) =>
             {
+                // Re-check enabled-state (RequireAuthorization()-only): a disabled principal must not act.
+                var self = await me.GetUserAsync(ct);
+                if (self is null || !self.IsEnabled) return Results.Forbid();
+
                 presence.Remove(caller.FindFirstValue("email"));
                 return Results.NoContent();
             })

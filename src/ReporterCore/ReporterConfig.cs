@@ -1,3 +1,6 @@
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
@@ -114,8 +117,10 @@ public static class ReporterConfig
         };
 
         var tmp = ConfigPath + ".tmp";
+        TryDelete(tmp);
         File.WriteAllText(tmp, JsonSerializer.Serialize(safe, Json));
         File.Move(tmp, ConfigPath, overwrite: true);
+        TryDelete(tmp);
     }
 
     /// <summary>Read the raw ingest key from reporter.key, or null if absent/empty. Never logged.</summary>
@@ -133,12 +138,82 @@ public static class ReporterConfig
         return null;
     }
 
-    /// <summary>Write the ingest key to reporter.key (atomic, no trailing newline). Treat the file as a secret.</summary>
+    /// <summary>
+    /// Write the ingest key to reporter.key (atomic, no trailing newline). Treat the file as a bearer
+    /// secret: it is created owner-only (Unix 0600 / current-user-only NTFS ACL) so the persisted key is
+    /// not readable by other local accounts, and the plaintext temp sibling is hardened + cleaned up.
+    /// </summary>
     public static void SaveKeyFile(string key)
     {
         Directory.CreateDirectory(Dir);
+
+        // A stale reporter.key.tmp from a previously interrupted save also holds the plaintext secret —
+        // remove it before (and after) writing so key rotation/deletion hygiene isn't defeated by an orphan.
         var tmp = KeyPath + ".tmp";
-        File.WriteAllText(tmp, key.Trim());
+        TryDelete(tmp);
+
+        WriteSecretFile(tmp, key.Trim());
         File.Move(tmp, KeyPath, overwrite: true);
+        RestrictToOwner(KeyPath);
+        TryDelete(tmp);
+    }
+
+    /// <summary>
+    /// Write <paramref name="content"/> to <paramref name="path"/> as a secret: on Unix the file is
+    /// created with owner-only (0600) permissions before any bytes are written so the plaintext never
+    /// exists under a laxer mode; on Windows it is written then locked down to the current user's ACL.
+    /// </summary>
+    private static void WriteSecretFile(string path, string content)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            // Create the empty file with 0600, then write into it.
+            using (File.Create(path)) { }
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            File.WriteAllText(path, content);
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            return;
+        }
+
+        File.WriteAllText(path, content);
+        RestrictToOwner(path);
+    }
+
+    /// <summary>Tighten a file's ACL/permissions to the current user only (best-effort, never throws).</summary>
+    private static void RestrictToOwner(string path)
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows()) RestrictToOwnerWindows(path);
+            else File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch { /* best-effort hardening; the atomic write itself still succeeded */ }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void RestrictToOwnerWindows(string path)
+    {
+        var user = WindowsIdentity.GetCurrent().User;
+        if (user is null) return;
+
+        var info = new FileInfo(path);
+        var security = info.GetAccessControl();
+        // Break inheritance and drop any inherited grants, leaving only an explicit current-user rule so
+        // local admins / other profile-scoped processes can't read the persisted bearer secret.
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        foreach (FileSystemAccessRule rule in
+                 security.GetAccessRules(includeExplicit: true, includeInherited: true, typeof(SecurityIdentifier)))
+        {
+            security.RemoveAccessRule(rule);
+        }
+        security.AddAccessRule(new FileSystemAccessRule(
+            user, FileSystemRights.FullControl, AccessControlType.Allow));
+        info.SetAccessControl(security);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); }
+        catch { /* best-effort cleanup */ }
     }
 }

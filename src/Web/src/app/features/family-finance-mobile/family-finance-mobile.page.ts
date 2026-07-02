@@ -30,7 +30,7 @@ import {
   FinanceSavingsGoalDto,
   FinanceSavingsResponse,
 } from '../../core/models';
-import { FINANCE_DEFAULT_CATEGORIES } from '../family/finance';
+import { FINANCE_DEFAULT_CATEGORIES } from '../../core/finance-categories';
 import {
   BetaPullRefresh, BetaSegmentedControl, BetaBottomSheet, BetaStatTile, BetaSkeleton,
   BetaFab, BetaToaster, BetaEmptyState, BetaErrorState, ToastController, type Segment,

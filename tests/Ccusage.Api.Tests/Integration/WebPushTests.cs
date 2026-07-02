@@ -94,7 +94,7 @@ public class WebPushTests(WebAppFactory factory)
     public async Task Subscribe_creates_a_caller_scoped_row_then_re_subscribe_upserts_not_duplicates()
     {
         var (email, client) = await ProvisionUser("chat.read");
-        var endpoint = $"https://push.example/{Guid.NewGuid():N}";
+        var endpoint = $"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}";
 
         (await client.PostAsJsonAsync("/api/push/subscribe", Sub(endpoint, "key-A", "auth-A")))
             .StatusCode.Should().Be(HttpStatusCode.OK);
@@ -120,7 +120,7 @@ public class WebPushTests(WebAppFactory factory)
     {
         var (emailA, clientA) = await ProvisionUser("chat.read");
         var (emailB, clientB) = await ProvisionUser("chat.read");
-        var endpoint = $"https://push.example/{Guid.NewGuid():N}";
+        var endpoint = $"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}";
 
         // A subscribes the device.
         (await clientA.PostAsJsonAsync("/api/push/subscribe", Sub(endpoint)))
@@ -141,7 +141,7 @@ public class WebPushTests(WebAppFactory factory)
         var (_, client) = await ProvisionUser("chat.read");
         (await client.PostAsJsonAsync("/api/push/subscribe", new { endpoint = "", keys = new { p256dh = "x", auth = "y" } }))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await client.PostAsJsonAsync("/api/push/subscribe", new { endpoint = "https://push.example/x", keys = new { p256dh = "", auth = "y" } }))
+        (await client.PostAsJsonAsync("/api/push/subscribe", new { endpoint = "https://fcm.googleapis.com/fcm/send/x", keys = new { p256dh = "", auth = "y" } }))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -149,7 +149,7 @@ public class WebPushTests(WebAppFactory factory)
     public async Task Subscribe_requires_chat_read_permission()
     {
         var (_, client) = await ProvisionUser(); // no chat.read
-        (await client.PostAsJsonAsync("/api/push/subscribe", Sub($"https://push.example/{Guid.NewGuid():N}")))
+        (await client.PostAsJsonAsync("/api/push/subscribe", Sub($"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}")))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -160,8 +160,8 @@ public class WebPushTests(WebAppFactory factory)
     {
         var (emailA, clientA) = await ProvisionUser("chat.read");
         var (emailB, clientB) = await ProvisionUser("chat.read");
-        var epA = $"https://push.example/{Guid.NewGuid():N}";
-        var epB = $"https://push.example/{Guid.NewGuid():N}";
+        var epA = $"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}";
+        var epB = $"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}";
 
         (await clientA.PostAsJsonAsync("/api/push/subscribe", Sub(epA))).EnsureSuccessStatusCode();
         (await clientB.PostAsJsonAsync("/api/push/subscribe", Sub(epB))).EnsureSuccessStatusCode();
@@ -189,7 +189,7 @@ public class WebPushTests(WebAppFactory factory)
             var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
             db.PushSubscriptions.Add(new Ccusage.Api.Data.Entities.PushSubscription
             {
-                OwnerEmail = email, Endpoint = $"https://push.example/{Guid.NewGuid():N}",
+                OwnerEmail = email, Endpoint = $"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}",
                 P256dh = "k", Auth = "a", CreatedUtc = DateTime.UtcNow,
             });
             await db.SaveChangesAsync();
@@ -219,7 +219,7 @@ public class WebPushTests(WebAppFactory factory)
             var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
             db.PushSubscriptions.Add(new Ccusage.Api.Data.Entities.PushSubscription
             {
-                OwnerEmail = email, Endpoint = $"https://push.example/{Guid.NewGuid():N}",
+                OwnerEmail = email, Endpoint = $"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}",
                 P256dh = ValidP256dh, Auth = ValidAuth, CreatedUtc = DateTime.UtcNow,
             });
             // Browser-notifications opt-in is now gated SERVER-SIDE; a subscriber has it on.
@@ -246,7 +246,7 @@ public class WebPushTests(WebAppFactory factory)
             var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
             db.PushSubscriptions.Add(new Ccusage.Api.Data.Entities.PushSubscription
             {
-                OwnerEmail = email, Endpoint = $"https://push.example/{Guid.NewGuid():N}",
+                OwnerEmail = email, Endpoint = $"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}",
                 P256dh = ValidP256dh, Auth = ValidAuth, CreatedUtc = DateTime.UtcNow,
             });
             // A live subscription exists, but the user turned "Browser notifications" OFF: the server-side
@@ -268,7 +268,7 @@ public class WebPushTests(WebAppFactory factory)
     public async Task A_gone_410_push_prunes_that_subscription()
     {
         var (email, _) = await ProvisionUser("chat.read");
-        var endpoint = $"https://push.example/{Guid.NewGuid():N}";
+        var endpoint = $"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}";
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();

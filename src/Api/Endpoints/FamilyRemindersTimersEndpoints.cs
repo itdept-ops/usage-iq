@@ -114,7 +114,7 @@ public static class FamilyRemindersTimersEndpoints
 
             // The target defaults to the caller; if given, it must be a member of the caller's household.
             var targetId = req.TargetUserId ?? caller.Id;
-            if (!await IsHouseholdMemberAsync(db, household.Id, targetId, ct))
+            if (!IsHouseholdMember(household, targetId))
                 return Results.BadRequest(new { message = "The reminder target must be a member of your family." });
 
             var reminder = new FamilyReminder
@@ -196,7 +196,7 @@ public static class FamilyRemindersTimersEndpoints
             }
             if (req.TargetUserId is int targetId)
             {
-                if (!await IsHouseholdMemberAsync(db, household.Id, targetId, ct))
+                if (!IsHouseholdMember(household, targetId))
                     return Results.BadRequest(new { message = "The reminder target must be a member of your family." });
                 reminder.TargetUserId = targetId;
             }
@@ -347,10 +347,10 @@ public static class FamilyRemindersTimersEndpoints
         return Recurrences.Contains(recurrence);
     }
 
-    private static async Task<bool> IsHouseholdMemberAsync(
-        UsageDbContext db, int householdId, int userId, CancellationToken ct) =>
-        await db.HouseholdMembers.AsNoTracking()
-            .AnyAsync(m => m.HouseholdId == householdId && m.UserId == userId, ct);
+    // Membership check reuses the members already loaded on the caller's household (CurrentHouseholdAccessor
+    // Includes them), so there is no separate DB round-trip or duplicated membership predicate here.
+    private static bool IsHouseholdMember(Household household, int userId) =>
+        household.Members.Any(m => m.UserId == userId);
 
     /// <summary>Resolve a set of userIds to display names (email is never read). Missing → "Unknown user".</summary>
     private static async Task<Dictionary<int, string>> NamesAsync(

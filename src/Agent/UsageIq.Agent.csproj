@@ -39,6 +39,16 @@
 
     <!-- Single-file publish lands a clean, self-contained UsageIq.Agent.exe -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
+    <!--
+      This is the ONE binary whose supply chain reaches end-user desktops (it harvests WMI hardware
+      inventory + consented GPS and phones home). Emit a committed packages.lock.json so the Agent's
+      OWN transitive closure — including everything it inherits through Ccusage.Reporter.Core such as
+      System.Management — is pinned and restores bit-for-bit identically on every dev machine / CI run.
+      CI/publish jobs restore in locked mode to fail the build if the resolved graph ever drifts.
+      Matches the same setting on Ccusage.Reporter.Core and Ccusage.Api.
+    -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>

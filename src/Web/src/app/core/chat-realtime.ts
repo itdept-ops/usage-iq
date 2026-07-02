@@ -64,11 +64,27 @@ export class ChatRealtime {
   );
 
   // ---- channels ----
+  /**
+   * Monotonic token guarding {@link refreshChannels}: each call captures the next value and only its
+   * response is allowed to reconcile, so two overlapping refreshes can't let the slower one win.
+   */
+  private channelsRefreshSeq = 0;
   private readonly _channels = signal<ChatChannelDto[]>([]);
-  /** All visible channels + DMs, ordered by most-recent activity (newest last-message first). */
+  /**
+   * All visible channels + DMs, ordered by most-recent activity (newest last-message first).
+   *
+   * Memoized against the source array reference: every mutator replaces {@link _channels} with a NEW
+   * array (never mutates in place), so an unchanged reference means the sort is unchanged. This avoids
+   * re-copying + re-sorting the full list on every shell CD pass (the bell/presence read `channels`),
+   * while a `computed` alone would only skip work when nothing downstream reads between changes.
+   */
+  private channelsSortCache: { src: ChatChannelDto[]; sorted: ChatChannelDto[] } | null = null;
   readonly channels = computed(() => {
-    const list = [...this._channels()];
-    return list.sort((a, b) => activityTime(b) - activityTime(a));
+    const src = this._channels();
+    if (this.channelsSortCache?.src === src) return this.channelsSortCache.sorted;
+    const sorted = [...src].sort((a, b) => activityTime(b) - activityTime(a));
+    this.channelsSortCache = { src, sorted };
+    return sorted;
   });
 
   // ---- messages, keyed by channelId (oldest-first within each channel) ----
@@ -450,10 +466,24 @@ export class ChatRealtime {
 
   /** (Re)load the channel list and join every channel so live broadcasts arrive. */
   async refreshChannels(): Promise<ChatChannelDto[]> {
+    // Capture a generation token so only the LATEST refresh reconciles: two overlapping refreshChannels()
+    // calls (start()/onreconnected()/deep-link) otherwise let the slower response win.
+    const seq = ++this.channelsRefreshSeq;
     // Guard the array off the async response: a null/undefined body must not make _channels non-iterable
     // (the always-mounted shell chrome — bell/presence — derives off these signals on every page).
     const list = (await firstValueFrom(this.api.chatChannels())) ?? [];
-    this._channels.set(list);
+    // A newer refresh started while this GET was in flight — drop this stale snapshot entirely.
+    if (seq !== this.channelsRefreshSeq) return list;
+    // MERGE by id rather than hard-replacing: a hub ChannelAdded (which appends a brand-new channel and
+    // seeds its unread) that raced in during the in-flight GET would be clobbered by a plain .set(list)
+    // predating it. Upsert the server snapshot over the current list, keeping any channel the snapshot
+    // doesn't yet know about (e.g. one just added over the hub) so it doesn't vanish from the sidebar.
+    this._channels.update(current => {
+      const byId = new Map<number, ChatChannelDto>();
+      for (const ch of current) byId.set(ch.id, ch);
+      for (const ch of list) byId.set(ch.id, ch);
+      return [...byId.values()];
+    });
     this._unread.update(map => {
       const next = { ...map };
       for (const ch of list) next[ch.id] = ch.unreadCount;
@@ -493,9 +523,19 @@ export class ChatRealtime {
     const ascending = [...page].reverse(); // newest-first -> oldest-first
     this._messages.update(map => {
       const existing = map[channelId] ?? [];
-      const merged = before == null
-        ? mergeById(ascending, existing)          // initial load (still dedupe against any live msgs)
-        : mergeById(ascending, existing);         // prepend older; mergeById keeps order + dedupes
+      let merged: ChatMessageDto[];
+      if (before == null) {
+        // Initial open: the server page is authoritative, so REPLACE the cached list with it rather than
+        // unioning — otherwise a stale edited body, or a message the server no longer returns (edited/
+        // tombstoned since it was cached), would linger because the older cached copy wins on collision.
+        // We keep only cached messages strictly NEWER than the page's newest id: those are live arrivals
+        // this page predates (it can't have returned them), which we must not drop.
+        const newestId = ascending.length ? ascending[ascending.length - 1].id : -Infinity;
+        const liveTail = existing.filter(m => m.id > newestId);
+        merged = mergeById(ascending, liveTail);
+      } else {
+        merged = mergeById(ascending, existing); // prepend older; mergeById keeps order + dedupes
+      }
       return { ...map, [channelId]: merged };
     });
     return page.length;

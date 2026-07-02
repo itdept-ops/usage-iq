@@ -1,5 +1,6 @@
 using Ccusage.Api.Auth;
 using Ccusage.Api.Data;
+using Ccusage.Api.Data.Entities;
 using Ccusage.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -42,21 +43,41 @@ public static class CycleOverlayEndpoints
             // Build the set of users to surface: the caller themselves ONLY if they cycle.track, plus each
             // OTHER household member whose CycleProfile.OverlayToFamily is true. A member who hasn't opted in
             // (or has no profile row) never appears. Identity is userId + name (NEVER email).
-            var memberIds = household is null
-                ? new List<int>()
+            //
+            // CONSENT/AGE GATE: the fertility overlay is intimate reproductive-health data. Child-role members
+            // are excluded on BOTH sides — a child (minor) never appears as a SUBJECT even if their profile flag
+            // is set (a single self-serve toggle is not adequate consent for a minor), and a child caller never
+            // VIEWS other members' predictions (an adult's opt-in did not contemplate a minor audience).
+            var members = household is null
+                ? new List<HouseholdMember>()
                 : await db.HouseholdMembers.AsNoTracking()
                     .Where(m => m.HouseholdId == household.Id)
-                    .Select(m => m.UserId)
                     .ToListAsync(ct);
+
+            static bool IsChild(string? role) => string.Equals(role, "child", StringComparison.OrdinalIgnoreCase);
+
+            // A child caller never sees the overlay (adults' opt-in did not contemplate a minor audience).
+            if (members.Any(m => m.UserId == caller.Id && IsChild(m.Role)))
+                return Results.Ok(Array.Empty<MemberOverlayDto>());
+
+            // Non-child members are eligible to be surfaced as subjects. Child-role members are excluded so a
+            // minor's predictions are never broadcast household-wide, independent of their OverlayToFamily flag.
+            var eligibleIds = members
+                .Where(m => !IsChild(m.Role))
+                .Select(m => m.UserId)
+                .ToList();
 
             // Other members who opted in (overlay flag true). The caller is handled separately so their own
             // overlay flag is irrelevant — they always see their OWN predictions (when they cycle.track).
             var optedInOthers = await db.CycleProfiles.AsNoTracking()
-                .Where(p => p.OverlayToFamily && p.UserId != caller.Id && memberIds.Contains(p.UserId))
+                .Where(p => p.OverlayToFamily && p.UserId != caller.Id && eligibleIds.Contains(p.UserId))
                 .Select(p => p.UserId)
                 .ToListAsync(ct);
 
             var subjectIds = new HashSet<int>(optedInOthers);
+            // The caller's own predictions require cycle.track. A child caller was already returned empty
+            // above, so a non-child caller with the permission always sees their OWN overlay — even a solo
+            // user who is not a member of any household (eligibleIds only gates OTHER members as subjects).
             if (caller.Permissions.Contains(Permissions.CycleTrack))
                 subjectIds.Add(caller.Id);
 

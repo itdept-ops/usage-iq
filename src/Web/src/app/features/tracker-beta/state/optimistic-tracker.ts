@@ -4,6 +4,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Api } from '../../../core/api';
 import { TrackerStore } from '../../../core/tracker-store';
+import { runOptimistic } from '../../../shared/optimistic-mutation';
 import {
   AddCoffeeRequest, AddExerciseRequest, AddFoodRequest, AddHydrationRequest, AddSleepRequest,
   AddSupplementRequest, CoffeeEntryDto, ExerciseEntryDto, FoodEntryDto, HydrationEntryDto,
@@ -76,15 +77,14 @@ export class OptimisticTracker {
       calories: body.calories, proteinG: body.proteinG, carbG: body.carbG, fatG: body.fatG,
     };
     this.patch(d => this.recompute({ ...d, foods: [...d.foods, provisional] }));
-    try {
-      const real = await firstValueFrom(this.api.addFood(body));
-      this.patch(d => this.recompute({
+    await runOptimistic({
+      snack: this.snack, failMessage: 'Couldn’t add food', retry: () => this.addFood(body),
+      apiCall: () => firstValueFrom(this.api.addFood(body)),
+      onSuccess: real => this.patch(d => this.recompute({
         ...d, foods: d.foods.map(f => (f.id === tempId ? real : f)),
-      }));
-    } catch {
-      this.rollback(d => this.recompute({ ...d, foods: d.foods.filter(f => f.id !== tempId) }),
-        'Couldn’t add food', () => this.addFood(body));
-    }
+      })),
+      rollback: () => this.patch(d => this.recompute({ ...d, foods: d.foods.filter(f => f.id !== tempId) })),
+    });
   }
 
   /** Batch food add (AI photo / describe-a-meal). Patches all provisionally, then commits each. */
@@ -129,13 +129,12 @@ export class OptimisticTracker {
     if (!prev) return;
     const next: FoodEntryDto = { ...prev, ...optimistic };
     this.patch(d => this.recompute({ ...d, foods: d.foods.map(f => (f.id === id ? next : f)) }));
-    try {
-      const real = await firstValueFrom(this.api.updateFood(id, body));
-      this.patch(d => this.recompute({ ...d, foods: d.foods.map(f => (f.id === id ? real : f)) }));
-    } catch {
-      this.rollback(d => this.recompute({ ...d, foods: d.foods.map(f => (f.id === id ? prev : f)) }),
-        'Couldn’t save change', () => this.updateFood(id, body, optimistic));
-    }
+    await runOptimistic({
+      snack: this.snack, failMessage: 'Couldn’t save change', retry: () => this.updateFood(id, body, optimistic),
+      apiCall: () => firstValueFrom(this.api.updateFood(id, body)),
+      onSuccess: real => this.patch(d => this.recompute({ ...d, foods: d.foods.map(f => (f.id === id ? real : f)) })),
+      rollback: () => this.patch(d => this.recompute({ ...d, foods: d.foods.map(f => (f.id === id ? prev : f)) })),
+    });
   }
 
   async deleteFood(id: number): Promise<void> {
@@ -157,13 +156,12 @@ export class OptimisticTracker {
       id: tempId, amountMl: body.amountMl, label: body.label, createdUtc: new Date().toISOString(),
     };
     this.patch(d => this.recompute({ ...d, hydration: [...d.hydration, provisional] }));
-    try {
-      const real = await firstValueFrom(this.api.addHydration(body));
-      this.patch(d => this.recompute({ ...d, hydration: d.hydration.map(h => (h.id === tempId ? real : h)) }));
-    } catch {
-      this.rollback(d => this.recompute({ ...d, hydration: d.hydration.filter(h => h.id !== tempId) }),
-        'Couldn’t log water', () => this.addHydration(body));
-    }
+    await runOptimistic({
+      snack: this.snack, failMessage: 'Couldn’t log water', retry: () => this.addHydration(body),
+      apiCall: () => firstValueFrom(this.api.addHydration(body)),
+      onSuccess: real => this.patch(d => this.recompute({ ...d, hydration: d.hydration.map(h => (h.id === tempId ? real : h)) })),
+      rollback: () => this.patch(d => this.recompute({ ...d, hydration: d.hydration.filter(h => h.id !== tempId) })),
+    });
   }
 
   async deleteHydration(id: number): Promise<void> {
@@ -185,13 +183,12 @@ export class OptimisticTracker {
       id: tempId, cups: body.cups, caffeineMg: body.caffeineMg, label: body.label, createdUtc: new Date().toISOString(),
     };
     this.patch(d => this.recompute({ ...d, coffee: [...d.coffee, provisional] }));
-    try {
-      const real = await firstValueFrom(this.api.addCoffee(body));
-      this.patch(d => this.recompute({ ...d, coffee: d.coffee.map(c => (c.id === tempId ? real : c)) }));
-    } catch {
-      this.rollback(d => this.recompute({ ...d, coffee: d.coffee.filter(c => c.id !== tempId) }),
-        'Couldn’t log coffee', () => this.addCoffee(body));
-    }
+    await runOptimistic({
+      snack: this.snack, failMessage: 'Couldn’t log coffee', retry: () => this.addCoffee(body),
+      apiCall: () => firstValueFrom(this.api.addCoffee(body)),
+      onSuccess: real => this.patch(d => this.recompute({ ...d, coffee: d.coffee.map(c => (c.id === tempId ? real : c)) })),
+      rollback: () => this.patch(d => this.recompute({ ...d, coffee: d.coffee.filter(c => c.id !== tempId) })),
+    });
   }
 
   async deleteCoffee(id: number): Promise<void> {
@@ -222,13 +219,12 @@ export class OptimisticTracker {
       createdUtc: new Date().toISOString(),
     };
     this.patch(d => this.recomputeSleep({ ...d, sleep: [...d.sleep, provisional] }));
-    try {
-      const real = await firstValueFrom(this.api.addSleep(body));
-      this.patch(d => this.recomputeSleep({ ...d, sleep: d.sleep.map(s => (s.id === tempId ? real : s)) }));
-    } catch {
-      this.rollback(d => this.recomputeSleep({ ...d, sleep: d.sleep.filter(s => s.id !== tempId) }),
-        'Couldn’t log sleep', () => this.addSleep(body));
-    }
+    await runOptimistic({
+      snack: this.snack, failMessage: 'Couldn’t log sleep', retry: () => this.addSleep(body),
+      apiCall: () => firstValueFrom(this.api.addSleep(body)),
+      onSuccess: real => this.patch(d => this.recomputeSleep({ ...d, sleep: d.sleep.map(s => (s.id === tempId ? real : s)) })),
+      rollback: () => this.patch(d => this.recomputeSleep({ ...d, sleep: d.sleep.filter(s => s.id !== tempId) })),
+    });
   }
 
   /**
@@ -251,17 +247,19 @@ export class OptimisticTracker {
     this.patch(d => this.recomputeSleep({
       ...d, sleep: [...d.sleep.filter(s => s.id !== oldId), provisional],
     }));
-    try {
-      await firstValueFrom(this.api.deleteSleep(oldId));
-      const real = await firstValueFrom(this.api.addSleep(body));
-      this.patch(d => this.recomputeSleep({ ...d, sleep: d.sleep.map(s => (s.id === tempId ? real : s)) }));
-    } catch {
-      this.rollback(d => {
+    await runOptimistic({
+      snack: this.snack, failMessage: 'Couldn’t save sleep', retry: () => this.replaceSleep(oldId, body),
+      apiCall: async () => {
+        await firstValueFrom(this.api.deleteSleep(oldId));
+        return firstValueFrom(this.api.addSleep(body));
+      },
+      onSuccess: real => this.patch(d => this.recomputeSleep({ ...d, sleep: d.sleep.map(s => (s.id === tempId ? real : s)) })),
+      rollback: () => this.patch(d => {
         const without = d.sleep.filter(s => s.id !== tempId);
         const restored = original ? [...without, original].sort((a, b) => a.id - b.id) : without;
         return this.recomputeSleep({ ...d, sleep: restored });
-      }, 'Couldn’t save sleep', () => this.replaceSleep(oldId, body));
-    }
+      }),
+    });
   }
 
   async deleteSleep(id: number): Promise<void> {
@@ -285,13 +283,12 @@ export class OptimisticTracker {
       createdUtc: new Date().toISOString(),
     } as SupplementEntryDto;
     this.patch(d => this.recompute({ ...d, supplements: [...d.supplements, provisional] }));
-    try {
-      const real = await firstValueFrom(this.api.addSupplement(body));
-      this.patch(d => this.recompute({ ...d, supplements: d.supplements.map(s => (s.id === tempId ? real : s)) }));
-    } catch {
-      this.rollback(d => this.recompute({ ...d, supplements: d.supplements.filter(s => s.id !== tempId) }),
-        'Couldn’t add supplement', () => this.addSupplement(body));
-    }
+    await runOptimistic({
+      snack: this.snack, failMessage: 'Couldn’t add supplement', retry: () => this.addSupplement(body),
+      apiCall: () => firstValueFrom(this.api.addSupplement(body)),
+      onSuccess: real => this.patch(d => this.recompute({ ...d, supplements: d.supplements.map(s => (s.id === tempId ? real : s)) })),
+      rollback: () => this.patch(d => this.recompute({ ...d, supplements: d.supplements.filter(s => s.id !== tempId) })),
+    });
   }
 
   async deleteSupplement(id: number): Promise<void> {
@@ -314,13 +311,12 @@ export class OptimisticTracker {
       durationMin: body.durationMin, caloriesBurned: body.caloriesBurned ?? 0,
     };
     this.patch(d => this.recompute({ ...d, exercises: [...d.exercises, provisional] }));
-    try {
-      const real = await firstValueFrom(this.api.addExercise(body));
-      this.patch(d => this.recompute({ ...d, exercises: d.exercises.map(e => (e.id === tempId ? real : e)) }));
-    } catch {
-      this.rollback(d => this.recompute({ ...d, exercises: d.exercises.filter(e => e.id !== tempId) }),
-        'Couldn’t add exercise', () => this.addExercise(body));
-    }
+    await runOptimistic({
+      snack: this.snack, failMessage: 'Couldn’t add exercise', retry: () => this.addExercise(body),
+      apiCall: () => firstValueFrom(this.api.addExercise(body)),
+      onSuccess: real => this.patch(d => this.recompute({ ...d, exercises: d.exercises.map(e => (e.id === tempId ? real : e)) })),
+      rollback: () => this.patch(d => this.recompute({ ...d, exercises: d.exercises.filter(e => e.id !== tempId) })),
+    });
   }
 
   async deleteExercise(id: number): Promise<void> {
@@ -392,15 +388,6 @@ export class OptimisticTracker {
   private patch(fn: (d: TrackerDayDto) => TrackerDayDto): void {
     const d = this.store.day();
     if (d) this.store.day.set(fn(d));
-  }
-
-  /**
-   * Roll a failed ADD back to a prior state, then offer a Retry. (Adds use "Retry" rather than "Undo".)
-   */
-  private rollback(undo: (d: TrackerDayDto) => TrackerDayDto, message: string, retry: () => void): void {
-    this.patch(undo);
-    this.snack.open(message, 'Retry', { duration: 5000, politeness: 'polite' })
-      .onAction().subscribe(() => retry());
   }
 
   /**

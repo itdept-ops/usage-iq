@@ -134,11 +134,24 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => x.Source);
             e.HasIndex(x => x.MachineName);
             e.HasIndex(x => x.ReportedByUser);
+            // TimestampUtc is the DEFAULT sort of the records grid and the ORDER BY for the capped
+            // Calendar/Heatmap/Stats/session/CSV paths — a descending index serves the newest-first reads,
+            // and the (LocalDate, TimestampUtc DESC) composite serves the common date-window + newest-first read
+            // from a single index range scan without a separate sort.
+            e.HasIndex(x => x.TimestampUtc).IsDescending();
+            e.HasIndex(x => new { x.LocalDate, x.TimestampUtc }).IsDescending(false, true);
+            // The records grid also offers user-selectable sorts on these columns; descending indexes match the
+            // dominant "biggest first" click and avoid a full sort of the filtered set before pagination.
+            e.HasIndex(x => x.CostUsd).IsDescending();
+            e.HasIndex(x => x.InputTokens).IsDescending();
+            e.HasIndex(x => x.OutputTokens).IsDescending();
 
             e.HasOne(x => x.Project).WithMany(p => p.Records)
                 .HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            // A file-tracking row is metadata whose lifecycle must NOT be coupled to the authoritative usage
+            // ledger: orphan the informational file reference (SET NULL) rather than cascade-deleting billing rows.
             e.HasOne(x => x.IngestedFile).WithMany()
-                .HasForeignKey(x => x.IngestedFileId).OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(x => x.IngestedFileId).OnDelete(DeleteBehavior.SetNull);
         });
 
         b.Entity<Project>(e =>
@@ -280,6 +293,11 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.ErrorHint).HasMaxLength(200);
             e.HasIndex(x => x.WhenUtc).IsDescending();          // newest-first window reads
             e.HasIndex(x => new { x.UserEmail, x.WhenUtc });    // per-user lookups
+            // The /api/ai-usage summary filters and GROUP BYs on these columns; indexing them lets the
+            // cost-by-model / top-features / outcome aggregates use an index instead of a full-table scan.
+            e.HasIndex(x => x.Feature);
+            e.HasIndex(x => x.Outcome);
+            e.HasIndex(x => x.Model);
         });
 
         b.Entity<NotificationSetting>(e =>
@@ -343,6 +361,12 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.Property(x => x.Ip).HasMaxLength(64);
             e.HasIndex(x => new { x.ShareLinkId, x.WhenUtc });
             e.HasIndex(x => new { x.WrappedShareLinkId, x.WhenUtc });
+            // XOR invariant: exactly one of the two link FKs is set per row (the table is reused for BOTH
+            // usage-share and Wrapped-share views). Enforced at the DB so a bug/manual insert can't produce a
+            // row attributed to nothing (both null) or double-counted (both set).
+            e.ToTable(t => t.HasCheckConstraint(
+                "CK_ShareAccess_OneLink",
+                "num_nonnulls(\"ShareLinkId\", \"WrappedShareLinkId\") = 1"));
             e.HasOne(x => x.ShareLink).WithMany()
                 .HasForeignKey(x => x.ShareLinkId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.WrappedShareLink).WithMany()
@@ -845,6 +869,10 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => new { x.HouseholdId, x.UserId }).IsUnique();
             // One household per user for now — a user can't be a member of two households at once.
             e.HasIndex(x => x.UserId).IsUnique();
+            // UserId is a real FK to AppUser: deleting a user cascades their membership away rather than
+            // leaving a dangling row that renders as a ghost member (and permanently reserves the unique id).
+            e.HasOne<AppUser>().WithMany()
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<FamilyNote>(e =>
@@ -1082,6 +1110,11 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             // treats nulls as distinct, so the importer/endpoint normalizes a missing category to "" — the
             // overall budget is stored with Category == null and guarded in code, see the budgets endpoint).
             e.HasIndex(x => new { x.HouseholdId, x.Category }).IsUnique();
+            // The composite unique above does NOT constrain the OVERALL budget (Category IS NULL) because
+            // Postgres treats each NULL as distinct — so a household could accumulate duplicate overall budgets.
+            // A partial unique index over HouseholdId filtered to Category IS NULL enforces the singleton
+            // overall budget at the DB level (mirrors the GoogleSubject/ShareTokenHash filtered-unique pattern).
+            e.HasIndex(x => x.HouseholdId).IsUnique().HasFilter("\"Category\" IS NULL");
         });
 
         b.Entity<FinanceSavingsGoal>(e =>
@@ -1267,6 +1300,10 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             e.HasIndex(x => new { x.UserEmail, x.LocalDate });
             // The per-med adherence window read.
             e.HasIndex(x => new { x.MedicationId, x.LocalDate });
+            // NOTE: deliberately NOT unique. This table records adherence EVENTS, and multiple logs per
+            // (user, med, day, slot) are legitimate — PRN/as-needed doses, an extra dose, or the "repeat
+            // yesterday" copy of several untimed marks. A uniqueness constraint here would silently drop
+            // real dose records; upsert idempotency, where wanted, is handled in the endpoint instead.
         });
 
         b.Entity<VitalReading>(e =>
@@ -1424,9 +1461,16 @@ public class UsageDbContext(DbContextOptions<UsageDbContext> options) : DbContex
             // One progress row per (user, local date, task).
             e.HasIndex(x => new { x.UserEmail, x.LocalDate, x.TaskId }).IsUnique();
             e.HasIndex(x => x.TaskId);
+            e.HasIndex(x => x.ChallengeId);
             // Cascade with the owning task (and thus the challenge).
             e.HasOne(x => x.Task).WithMany()
                 .HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+            // ChallengeId is a real FK to the owning challenge (matches the entity doc). Referential integrity
+            // was previously absent — nothing stopped a row pointing at a wrong/nonexistent challenge. The row
+            // still also cascades transitively via TaskId; this adds the direct guarantee. Postgres permits the
+            // two cascade paths to HardChallenge (no SQL-Server multiple-cascade-path restriction).
+            e.HasOne<HardChallenge>().WithMany()
+                .HasForeignKey(x => x.ChallengeId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<ActivityEvent>(e =>

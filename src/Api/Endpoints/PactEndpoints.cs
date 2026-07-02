@@ -231,11 +231,12 @@ public static class PactEndpoints
             var pact = await db.HabitPacts.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
             if (pact is null) return Results.NotFound();
 
-            // Only a participant (owner or a non-Left member) may read progress — 404 otherwise.
+            // Only an active participant (owner or an Active member) may read progress — 404 otherwise.
+            // An invited-but-unjoined (or declined/left) member must not see other participants' counts.
             var isOwner = string.Equals(pact.OwnerEmail, callerEmail, StringComparison.Ordinal);
             var isMember = await db.HabitPactMembers.AsNoTracking()
                 .AnyAsync(m => m.HabitPactId == id && m.MemberEmail == callerEmail
-                               && m.Status != HabitPactMemberStatus.Left, ct);
+                               && m.Status == HabitPactMemberStatus.Active, ct);
             if (!isOwner && !isMember) return Results.NotFound();
 
             // Active participants (owner + Active members). The window is [StartUtc, EndUtc ?? +PeriodDays).

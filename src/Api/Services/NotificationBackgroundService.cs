@@ -108,8 +108,10 @@ public sealed class NotificationBackgroundService(
     /// PER-USER weekly recap pass: on Sunday at/after <see cref="RecapHourLocal"/> (display tz), every user
     /// who OPTED IN and has a webhook configured, and who hasn't already been sent this week's recap, gets
     /// exactly ONE recap covering the previous 7 days [today-7, today-1]. Idempotent across restarts/reticks:
-    /// the LastRecapSent guard is checked before sending and advanced (to today's local date) only AFTER a
-    /// confirmed send, inside its own SaveChanges — so a transient failure simply retries on the next tick.
+    /// the LastRecapSent guard is STAMPED (to today's local date) and persisted BEFORE the irreversible
+    /// Discord send, so a confirmed-but-unrecorded send can never repeat if the preference row vanishes or
+    /// its email changes between send and re-load. The trade-off is deliberate: a rare send failure after
+    /// stamping simply skips that user's recap for the week rather than risking a duplicate.
     /// </summary>
     private static async Task SendWeeklyRecapsAsync(
         UsageDbContext db, WeeklyRecapComposer recap, DateTimeOffset nowLocal, CancellationToken ct)
@@ -129,12 +131,17 @@ public sealed class NotificationBackgroundService(
 
         foreach (var email in candidates)
         {
-            // The composer re-checks opt-in + webhook + validity and decrypts in-memory at send time.
-            if (!await recap.SendRecapAsync(email, from, to, today, ct)) continue;
-
-            // Advance the guard ONLY on a confirmed send. Re-load the tracked row so the marker persists.
+            // Stamp-first: claim this user's recap by advancing the guard and persisting it BEFORE the send.
+            // Re-load the tracked row; if it vanished (deleted/re-provisioned) or was already stamped this
+            // tick's date, skip — the send is only attempted once the guard is durably recorded.
             var pref = await db.NotificationPreferences.FirstOrDefaultAsync(p => p.UserEmail == email, ct);
-            if (pref is not null) { pref.LastRecapSent = today; await db.SaveChangesAsync(ct); }
+            if (pref is null || pref.LastRecapSent == today) continue;
+            pref.LastRecapSent = today;
+            await db.SaveChangesAsync(ct);
+
+            // The composer re-checks opt-in + webhook + validity and decrypts in-memory at send time.
+            // A send failure here forfeits this week's recap for the user rather than risking a duplicate.
+            await recap.SendRecapAsync(email, from, to, today, ct);
         }
     }
 

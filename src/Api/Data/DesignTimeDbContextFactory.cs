@@ -11,8 +11,17 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<Usa
 {
     public UsageDbContext CreateDbContext(string[] args)
     {
-        var conn = Environment.GetEnvironmentVariable("ConnectionStrings__Default")
-                   ?? "Host=localhost;Port=5433;Database=ccusage;Username=ccusage;Password=ccusage_dev_pw";
+        // Prefer a full connection string, then a password-only override, else a clearly
+        // non-secret placeholder so `dotnet ef` can build the model without a live DB or a
+        // committed real-looking secret.
+        var conn = Environment.GetEnvironmentVariable("ConnectionStrings__Default");
+        if (string.IsNullOrWhiteSpace(conn))
+        {
+            var password = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD");
+            if (string.IsNullOrWhiteSpace(password))
+                password = "postgres";
+            conn = $"Host=localhost;Port=5433;Database=ccusage;Username=ccusage;Password={password}";
+        }
         var options = new DbContextOptionsBuilder<UsageDbContext>().UseNpgsql(conn).Options;
         return new UsageDbContext(options);
     }

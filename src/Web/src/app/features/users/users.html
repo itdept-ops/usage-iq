@@ -5,23 +5,6 @@
     <p class="sub">Seed access from a role, fine-tune capabilities, then save — changes apply <strong>immediately</strong>.</p>
   </div>
 
-  <div class="head-tools">
-    @if (auth.hasPermission(PERM.usersView)) {
-    <button mat-stroked-button class="reveal-toggle" type="button"
-            [class.revealed]="emailsRevealed()" [disabled]="revealing()"
-            [attr.aria-pressed]="emailsRevealed()"
-            [attr.aria-label]="emailsRevealed() ? 'Hide email addresses' : 'Show email addresses (requires a key)'"
-            [matTooltip]="emailsRevealed() ? 'Hide email addresses' : 'Show email addresses (requires a key)'"
-            (click)="toggleEmails()">
-      @if (revealing()) {
-        <mat-progress-spinner class="reveal-spinner" mode="indeterminate" [diameter]="18" />
-      } @else {
-        <mat-icon>{{ emailsRevealed() ? 'lock_open' : 'lock' }}</mat-icon>
-      }
-      {{ emailsRevealed() ? 'Hide emails' : 'Show emails' }}
-    </button>
-    }
-  </div>
 </div>
 
 @if (loading()) { <mat-progress-bar mode="indeterminate" aria-label="Loading users" /> }
@@ -102,7 +85,7 @@
     <!-- Search -->
     <mat-form-field appearance="outline" class="list-search" subscriptSizing="dynamic">
       <mat-icon matPrefix>search</mat-icon>
-      <mat-label>Search name{{ emailsRevealed() ? ' or email' : '' }}</mat-label>
+      <mat-label>Search name or email</mat-label>
       <input matInput [ngModel]="search()" (ngModelChange)="search.set($event)"
              placeholder="Filter users" autocomplete="off" />
       @if (search()) {
@@ -238,7 +221,7 @@
               <span class="detail-email mono-num">{{ u.email }}</span>
             } @else {
               <span class="detail-email email-hidden" role="img" aria-label="email hidden">
-                <mat-icon class="email-hidden-icon" aria-hidden="true">lock</mat-icon>•••••• <span class="reveal-hint">(reveal to show)</span>
+                <mat-icon class="email-hidden-icon" aria-hidden="true">lock</mat-icon>•••••• <span class="reveal-hint">(email hidden)</span>
               </span>
             }
             <span class="detail-last micro-label">{{ u.lastLoginUtc ? 'last in ' + (u.lastLoginUtc | date: 'MMM d, HH:mm') : 'never signed in' }}</span>

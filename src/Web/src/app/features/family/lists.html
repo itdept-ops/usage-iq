@@ -200,6 +200,7 @@
                       <textarea class="list-ai__input" rows="2" maxlength="2000"
                                 [ngModel]="panel.text" (ngModelChange)="setAiText(list.id, $event)"
                                 [disabled]="panel.busy || panel.adding"
+                                aria-label="Items to add or recipe to parse"
                                 placeholder="milk, eggs, bread… or paste a recipe"></textarea>
                       <div class="list-ai__bar-actions">
                         <button mat-flat-button color="primary" type="button" class="list-ai__go"
@@ -275,6 +276,7 @@
                              [ngModel]="sg.goal" (ngModelChange)="setSuggestGoal(list.id, $event)"
                              (keydown.enter)="suggestItems(list)"
                              [disabled]="sg.busy || sg.adding"
+                             aria-label="What's this list for?"
                              placeholder="What's this list for? e.g. kids birthday party" />
                       <div class="list-ai__bar-actions">
                         <button mat-flat-button color="primary" type="button" class="list-ai__go"
@@ -337,6 +339,7 @@
               <form class="add-item" (ngSubmit)="addItem(list)">
                 <input class="add-item__input" [ngModel]="draftFor(list.id)" name="newItem"
                        (ngModelChange)="setDraft(list.id, $event)" maxlength="500"
+                       [attr.aria-label]="kind === 'shopping' ? 'Add an item' : 'Add a task'"
                        [placeholder]="kind === 'shopping' ? 'Add an item…' : 'Add a task…'"
                        [disabled]="busyListId() === list.id" autocomplete="off" />
                 <button mat-icon-button type="submit" class="add-item__btn" aria-label="Add item"

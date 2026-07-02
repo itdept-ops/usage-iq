@@ -32,6 +32,15 @@ public sealed class WorkoutXService(
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
     private const string KeyHeader = "X-WorkoutX-Key";
 
+    // Hard ceiling on a proxied GIF body. The bytes are buffered in-process, so an oversized (or
+    // compromised/MITM'd) upstream response could exhaust memory; reject anything larger. 8 MB is well
+    // above any real exercise demo GIF.
+    private const long MaxGifBytes = 8 * 1024 * 1024;
+
+    // Hard ceiling on a search JSON body. A full 100-item page of exercise metadata is well under this;
+    // reject anything larger so a compromised/MITM'd upstream can't force an unbounded in-process buffer.
+    private const long MaxSearchBytes = 4 * 1024 * 1024;
+
     // The free-text param: probed live, only ?name= filters (substring match, combinable with the
     // bodyPart/target/equipment filters). ?q=, ?query=, and ?search= are ignored (return all 1327).
     private const string SearchParam = "name";
@@ -40,7 +49,11 @@ public sealed class WorkoutXService(
 
     public bool IsConfigured => _opt.IsConfigured;
 
-    /// <summary>One GIF's bytes + content type, as fetched from the provider with the key.</summary>
+    /// <summary>
+    /// One GIF's bytes + content type. <see cref="ContentType"/> is always the fixed, safe
+    /// <c>image/gif</c> — the upstream-supplied Content-Type is NOT reflected to the browser (so a
+    /// compromised provider can't make the trusted-origin API serve a renderable non-image media type).
+    /// </summary>
     public readonly record struct GifResult(byte[] Bytes, string ContentType);
 
     /// <summary>
@@ -88,8 +101,9 @@ public sealed class WorkoutXService(
                 return Empty();
             }
 
-            await using var stream = await res.Content.ReadAsStreamAsync(ct);
-            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            var bytes = await ReadCappedAsync(res, MaxSearchBytes, ct);
+            if (bytes is null) return Empty();
+            using var doc = JsonDocument.Parse(bytes);
             var result = ParseSearch(doc.RootElement);
 
             cache.Set(cacheKey, result, CacheTtl);
@@ -119,22 +133,57 @@ public sealed class WorkoutXService(
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
             req.Headers.Add(KeyHeader, _opt.ApiKey);
 
-            using var res = await client.SendAsync(req, ct);
+            using var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
             if (!res.IsSuccessStatusCode)
             {
                 logger.LogWarning("WorkoutX gif returned {Status}.", (int)res.StatusCode);
                 return null;
             }
 
-            var contentType = res.Content.Headers.ContentType?.MediaType ?? "image/gif";
-            var bytes = await res.Content.ReadAsByteArrayAsync(ct);
-            return new GifResult(bytes, contentType);
+            // Fail fast on an advertised oversized body...
+            if (res.Content.Headers.ContentLength is long declared && declared > MaxGifBytes)
+            {
+                logger.LogWarning("WorkoutX gif too large ({Bytes} bytes); rejected.", declared);
+                return null;
+            }
+
+            // ...and enforce the ceiling against the actual stream (Content-Length can be absent or lie),
+            // so the whole payload is never buffered unbounded in process memory.
+            var bytes = await ReadCappedAsync(res, MaxGifBytes, ct);
+            if (bytes is null) return null;
+
+            // Do NOT trust the upstream Content-Type — force the fixed, safe image/gif. The endpoint pairs
+            // this with X-Content-Type-Options: nosniff so the browser can't reinterpret the bytes.
+            return new GifResult(bytes, "image/gif");
         }
         catch (Exception ex)
         {
             logger.LogWarning("WorkoutX gif fetch failed: {Reason}", ex.Message);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Read the response body into a buffer, aborting (returns null) the moment it exceeds
+    /// <paramref name="maxBytes"/>. Bounds per-request memory even when the upstream omits or lies about
+    /// Content-Length.
+    /// </summary>
+    private async Task<byte[]?> ReadCappedAsync(HttpResponseMessage res, long maxBytes, CancellationToken ct)
+    {
+        await using var stream = await res.Content.ReadAsStreamAsync(ct);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[81920];
+        int read;
+        while ((read = await stream.ReadAsync(chunk.AsMemory(), ct)) > 0)
+        {
+            if (buffer.Length + read > maxBytes)
+            {
+                logger.LogWarning("WorkoutX response exceeded {Max} bytes; rejected.", maxBytes);
+                return null;
+            }
+            buffer.Write(chunk, 0, read);
+        }
+        return buffer.ToArray();
     }
 
     /// <summary>

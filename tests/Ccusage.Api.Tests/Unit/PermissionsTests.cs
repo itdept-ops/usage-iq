@@ -23,7 +23,7 @@ public class PermissionsTests
         "location.self", "location.share", "location.view-all",
         "automations.use", "agents.use", "search.use",
         "platform.mobile",
-        "users.view", "users.manage", "activity.view", "ai.usage.view",
+        "users.view", "users.manage", "users.email.reveal", "activity.view", "ai.usage.view",
         "tracker.ai", "family.ai", "family.ai.assistant", "finance.ai", "chat.ai", "ai.vision", "ai.act",
     };
 
@@ -69,6 +69,7 @@ public class PermissionsTests
     [InlineData("platform.mobile")]
     [InlineData("users.view")]
     [InlineData("users.manage")]
+    [InlineData("users.email.reveal")]
     [InlineData("activity.view")]
     [InlineData("ai.usage.view")]
     [InlineData("tracker.ai")]
@@ -152,9 +153,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void All_contains_exactly_the_fifty_three_known_keys()
+    public void All_contains_exactly_the_fifty_four_known_keys()
     {
-        Permissions.All.Should().HaveCount(53);
+        Permissions.All.Should().HaveCount(54);
         Permissions.All.Should().BeEquivalentTo(AllKeys);
     }
 
@@ -165,9 +166,9 @@ public class PermissionsTests
     }
 
     [Fact]
-    public void Catalog_has_fifty_three_entries()
+    public void Catalog_has_fifty_four_entries()
     {
-        Permissions.Catalog.Should().HaveCount(53);
+        Permissions.Catalog.Should().HaveCount(54);
     }
 
     [Fact]

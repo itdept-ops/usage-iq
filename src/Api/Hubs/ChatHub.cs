@@ -23,6 +23,10 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
 {
     private string? Email => Context.User?.FindFirst("email")?.Value?.Trim().ToLowerInvariant();
 
+    /// <summary>The session stamp carried by this connection's bearer token (<c>sv</c> claim), mirroring
+    /// the HTTP <c>OnTokenValidated</c> check. A missing/unparseable claim is treated as 0.</summary>
+    private int TokenSv => int.TryParse(Context.User?.FindFirst("sv")?.Value, out var sv) ? sv : 0;
+
     public override async Task OnConnectedAsync()
     {
         var email = Email;
@@ -57,7 +61,7 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
         var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
         var fanout = scope.ServiceProvider.GetRequiredService<ChatNotificationService>();
 
-        if (!await HasSendAsync(scope, email)) throw new HubException("You don't have permission to send messages.");
+        if (!await HasSendAsync(scope, email)) { Context.Abort(); throw new HubException("You don't have permission to send messages."); }
 
         var channel = await db.ChatChannels.Include(c => c.Members)
             .FirstOrDefaultAsync(c => c.Id == channelId, Context.ConnectionAborted);
@@ -91,7 +95,7 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
         var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
         var reactions = scope.ServiceProvider.GetRequiredService<ChatNotificationService>();
 
-        if (!await HasSendAsync(scope, email)) throw new HubException("You don't have permission to react.");
+        if (!await HasSendAsync(scope, email)) { Context.Abort(); throw new HubException("You don't have permission to react."); }
 
         if (!ChatNotificationService.TryNormalizeEmoji(emoji, out var normalized, out var error))
             throw new HubException(error);
@@ -117,7 +121,7 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
 
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
-        if (!await HasReadAsync(scope, email)) return;
+        if (!await HasReadAsync(scope, email)) { Context.Abort(); return; }
         if (!await ChatEndpoints.IsMemberAsync(db, channelId, email, Context.ConnectionAborted)) return;
 
         // TypingChanged carries the typist's AppUser id + name — never their email (email-privacy).
@@ -134,7 +138,7 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
 
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
-        if (!await HasReadAsync(scope, email)) throw new HubException("You don't have permission to read chat.");
+        if (!await HasReadAsync(scope, email)) { Context.Abort(); throw new HubException("You don't have permission to read chat."); }
 
         var member = await db.ChatChannelMembers
             .FirstOrDefaultAsync(m => m.ChannelId == channelId && m.UserEmail == email, Context.ConnectionAborted);
@@ -164,7 +168,7 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
 
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
-        if (!await HasReadAsync(scope, email)) return;
+        if (!await HasReadAsync(scope, email)) { Context.Abort(); return; }
         if (!await ChatEndpoints.IsMemberAsync(db, channelId, email, Context.ConnectionAborted)) return;
 
         await Groups.AddToGroupAsync(Context.ConnectionId, ChatNotificationService.GroupFor(channelId), Context.ConnectionAborted);
@@ -172,17 +176,24 @@ public sealed class ChatHub(IServiceScopeFactory scopeFactory) : Hub
 
     // ---- per-call permission checks (DB-backed, mirroring PermissionFilter) ----
 
-    private static async Task<bool> HasReadAsync(AsyncServiceScope scope, string email) =>
-        await HasPermissionAsync(scope, email, Permissions.ChatRead);
+    private Task<bool> HasReadAsync(AsyncServiceScope scope, string email) =>
+        HasPermissionAsync(scope, email, TokenSv, Permissions.ChatRead);
 
-    private static async Task<bool> HasSendAsync(AsyncServiceScope scope, string email) =>
-        await HasPermissionAsync(scope, email, Permissions.ChatSend);
+    private Task<bool> HasSendAsync(AsyncServiceScope scope, string email) =>
+        HasPermissionAsync(scope, email, TokenSv, Permissions.ChatSend);
 
-    private static async Task<bool> HasPermissionAsync(AsyncServiceScope scope, string email, string permission)
+    /// <summary>
+    /// Re-validates the caller for the LIFETIME of the hub connection — not just at handshake — mirroring
+    /// the HTTP <c>OnTokenValidated</c> gate. Requires the account to be enabled, to still hold the chat
+    /// permission, AND for the connection's token <c>sv</c> claim to still match the user's current
+    /// <see cref="AppUser.SessionVersion"/>. An admin force-logout (sv bump), disable, or permission
+    /// revocation therefore fails the next per-call check, so callers can tear the stale connection down.
+    /// </summary>
+    private static async Task<bool> HasPermissionAsync(AsyncServiceScope scope, string email, int tokenSv, string permission)
     {
         var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
         return await db.Users.AsNoTracking()
-            .Where(u => u.Email == email && u.IsEnabled)
+            .Where(u => u.Email == email && u.IsEnabled && u.SessionVersion == tokenSv)
             .AnyAsync(u => u.Permissions.Any(p => p.Permission == permission));
     }
 

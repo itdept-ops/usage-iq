@@ -161,19 +161,30 @@ public static class FamilyPollsEndpoints
             var validOptionIds = poll.Options.Select(o => o.Id).ToHashSet();
             var chosen = (req.OptionIds ?? Array.Empty<long>()).Distinct().Where(validOptionIds.Contains).ToList();
 
-            // Replace: clear the caller's prior votes for this poll's options, then add the new set.
+            // Replace: clear the caller's prior votes for this poll's options, then add the new set. The
+            // self-committing ExecuteDeleteAsync + the Add/SaveChanges must be ONE atomic unit, so the old
+            // votes are only removed if the new set commits (and the retry strategy re-runs the whole
+            // replacement on a transient failure) — mirroring the re-date paths in TrackerEndpoints.
             var optionIds = poll.Options.Select(o => o.Id).ToList();
-            await db.FamilyPlanPollVotes
-                .Where(v => optionIds.Contains(v.OptionId) && v.UserId == caller.Id)
-                .ExecuteDeleteAsync(ct);
-
             var now = DateTime.UtcNow;
-            foreach (var optionId in chosen)
-                db.FamilyPlanPollVotes.Add(new FamilyPlanPollVote
-                {
-                    OptionId = optionId, UserId = caller.Id, CreatedUtc = now,
-                });
-            await db.SaveChangesAsync(ct);
+            var strategy = db.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+                await db.FamilyPlanPollVotes
+                    .Where(v => optionIds.Contains(v.OptionId) && v.UserId == caller.Id)
+                    .ExecuteDeleteAsync(ct);
+
+                foreach (var optionId in chosen)
+                    db.FamilyPlanPollVotes.Add(new FamilyPlanPollVote
+                    {
+                        OptionId = optionId, UserId = caller.Id, CreatedUtc = now,
+                    });
+                await db.SaveChangesAsync(ct);
+
+                await tx.CommitAsync(ct);
+            });
 
             return Results.Ok(await BuildPollDtoAsync(db, poll.Id, caller.Id, ct));
         });

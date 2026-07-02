@@ -470,7 +470,8 @@
   <!-- Mobile drawer mirrors the desktop grouping, but with flat section headers (Usage / Fitness / Tools /
        Social / Family / Beta / Admin) instead of dropdowns. Each row is gated by the SAME permission as its
        desktop counterpart; a section header renders only when >=1 of its rows is permitted. -->
-  <nav id="mobile-nav" class="mobile-nav" [class.open]="mobileNavOpen()" aria-label="Primary">
+  <nav id="mobile-nav" class="mobile-nav" [class.open]="mobileNavOpen()" aria-label="Primary"
+       [inert]="!mobileNavOpen()" [attr.aria-hidden]="!mobileNavOpen()">
     @if (auth.hasAnyPermission('dashboard.view', 'calendar.view', 'pricing.view',
                                'reporter.view', 'reporter.manage', 'reporter.self', 'fleet.view')) {
       <div class="mobile-nav__head" role="presentation">Usage</div>
@@ -669,7 +670,11 @@
       <!-- Theme + color-scheme picker (FiMobile appearance panel). Not a menu-item so clicking a control
            doesn't close the menu; $event.stopPropagation keeps the menu open while you flip theme/scheme.
            Persisted + applied by ThemeService; the same component is embedded in /preferences. -->
-      <div class="acct-theme-wrap" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+      <!-- Keep the menu open while flipping theme, but let Escape/Tab still reach MatMenu so the standard
+           dismiss + focus-restore keyboard contract works from inside the picker (see finding: don't swallow
+           the menu-dismissal keys). Only stop propagation for the picker's own consumed keys. -->
+      <div class="acct-theme-wrap" (click)="$event.stopPropagation()"
+           (keydown)="$event.key !== 'Escape' && $event.key !== 'Tab' && $event.stopPropagation()">
         <app-theme-picker />
       </div>
     </div>
@@ -686,15 +691,17 @@
        "Default (first available)" row that clears the saved preference (null). Selecting a row PATCHes
        the backend + updates local state, so the brand link / post-login redirect pick it up. -->
   <mat-menu #homeMenu="matMenu" class="account-menu home-menu" overlapTrigger="false">
-    <button mat-menu-item class="acct-item acct-item--radio" (click)="setHomeRoute(null)"
-            [class.acct-item--checked]="!auth.session()?.homeRoute">
+    <button mat-menu-item role="menuitemradio" class="acct-item acct-item--radio" (click)="setHomeRoute(null)"
+            [class.acct-item--checked]="!auth.session()?.homeRoute"
+            [attr.aria-checked]="!auth.session()?.homeRoute">
       <mat-icon class="acct-item__radio" aria-hidden="true">{{ !auth.session()?.homeRoute ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
       <span class="acct-item__label">Default (first available)</span>
     </button>
     <div class="acct-divider" role="separator" aria-hidden="true"></div>
     @for (opt of homeOptions(); track opt.route) {
-      <button mat-menu-item class="acct-item acct-item--radio" (click)="setHomeRoute(opt.route)"
-              [class.acct-item--checked]="auth.session()?.homeRoute === opt.route">
+      <button mat-menu-item role="menuitemradio" class="acct-item acct-item--radio" (click)="setHomeRoute(opt.route)"
+              [class.acct-item--checked]="auth.session()?.homeRoute === opt.route"
+              [attr.aria-checked]="auth.session()?.homeRoute === opt.route">
         <mat-icon class="acct-item__radio" aria-hidden="true">{{ auth.session()?.homeRoute === opt.route ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
         <span class="acct-item__label">{{ opt.label }}</span>
       </button>

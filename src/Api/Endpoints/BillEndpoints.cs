@@ -303,16 +303,33 @@ public static class BillEndpoints
 
             var item = bill.Items.FirstOrDefault(i => i.Id == req.ItemId);
             if (item is null) return Results.NotFound();
-            // Only an OPEN item may be claimed (not assigned, not already claimed).
+            // Only an OPEN item may be claimed (not assigned, not already claimed). This in-memory check is a
+            // fast-path 409; the authoritative guard is the CONDITIONAL update below.
             if (item.AssignedToUserId is not null || item.ClaimedByName is not null || item.ClaimedByUserId is not null)
                 return Results.Json(new { message = "That item has already been claimed." },
                     statusCode: StatusCodes.Status409Conflict);
 
-            item.ClaimedByName = name;
-            item.ClaimedUtc = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
+            // Claim RACE-SAFELY: this public, anonymous surface is only IP-rate-limited, so two concurrent
+            // requests can both pass the in-memory open-check above. The claim is therefore a CONDITIONAL update
+            // gated on the claim columns still being null (and the item still unassigned). Exactly ONE writer
+            // wins; the loser sees rows==0 and gets the SAME 409 as an already-claimed item — no lost update.
+            var now = DateTime.UtcNow;
+            var claimed = await db.BillItems
+                .Where(i => i.Id == item.Id && i.BillId == bill.Id
+                    && i.AssignedToUserId == null && i.ClaimedByName == null && i.ClaimedByUserId == null)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.ClaimedByName, name)
+                    .SetProperty(x => x.ClaimedUtc, (DateTime?)now), ct);
+            if (claimed == 0)
+                return Results.Json(new { message = "That item has already been claimed." },
+                    statusCode: StatusCodes.Status409Conflict);
 
-            return Results.Ok(ToPublicDto(bill, pay.Value));
+            // Re-read the bill so the returned public view reflects the just-committed claim (the tracked graph
+            // above was mutated by the ExecuteUpdate out-of-band).
+            var fresh = await db.Bills.AsNoTracking()
+                .Include(b => b.Items)
+                .FirstOrDefaultAsync(b => b.Id == bill.Id, ct);
+            return Results.Ok(ToPublicDto(fresh ?? bill, pay.Value));
         }).AllowAnonymous().RequireRateLimiting(PublicRateLimitPolicy);
     }
 

@@ -190,7 +190,27 @@ public static class CycleEndpoints
             if (req.Notes is not null) row.Notes = NormalizeNotes(req.Notes);
 
             row.UpdatedUtc = now;
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (TrackerVisibility.IsUniqueViolation(ex))
+            {
+                // A concurrent insert raced the same (email, date); reload + re-apply onto the winner.
+                db.ChangeTracker.Clear();
+                row = await db.CycleDayLogs
+                    .FirstAsync(d => d.UserEmail == caller.Email && d.LocalDate == req.Date, ct);
+                if (req.Mood is not null) row.Mood = NormalizeMood(req.Mood);
+                if (req.Symptoms is not null) row.Symptoms = NormalizeSymptoms(req.Symptoms);
+                if (req.FlowLevel is { } fl2) row.FlowLevel = NormalizeFlow(fl2);
+                if (req.Intimacy is { } intim2) row.Intimacy = intim2;
+                if (req.Protected is not null || req.Intimacy is not null)
+                    row.Protected = row.Intimacy ? req.Protected : null;
+                if (req.Energy is { } en2) row.Energy = Math.Clamp(en2, 1, 5);
+                if (req.Notes is not null) row.Notes = NormalizeNotes(req.Notes);
+                row.UpdatedUtc = now;
+                await db.SaveChangesAsync(ct);
+            }
             return Results.Ok(ToDayLogDto(row));
         });
 

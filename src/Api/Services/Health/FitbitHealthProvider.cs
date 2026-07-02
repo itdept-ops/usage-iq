@@ -320,7 +320,10 @@ public sealed class FitbitHealthProvider(
             if (string.IsNullOrEmpty(accessToken)) return (HealthPullStatus.Error, null);
 
             // ROTATE: persist the NEW refresh token (Fitbit invalidated the old one). This is the #1
-            // correctness rule — without it the next sync's refresh fails with invalid_grant.
+            // correctness rule — without it the next sync's refresh fails with invalid_grant. The refresh
+            // HTTP call already succeeded (the old token is dead server-side), so the re-store MUST complete:
+            // use CancellationToken.None so a cancel here (host shutdown / caller ct) can't strand the rotated
+            // token and permanently brick the connection.
             var rotated = GetStr(root, "refresh_token");
             var now = DateTime.UtcNow;
             if (!string.IsNullOrEmpty(rotated))
@@ -330,7 +333,7 @@ public sealed class FitbitHealthProvider(
                 await db.HealthConnections.Where(c => c.Id == conn.Id)
                     .ExecuteUpdateAsync(s => s
                         .SetProperty(c => c.EncryptedRefreshToken, enc)
-                        .SetProperty(c => c.LastUsedUtc, now), ct);
+                        .SetProperty(c => c.LastUsedUtc, now), CancellationToken.None);
             }
             else
             {
@@ -373,8 +376,8 @@ public sealed class FitbitHealthProvider(
                 logger.LogWarning("Fitbit token endpoint returned {Status}.", (int)res.StatusCode);
                 return (null, res.StatusCode);
             }
-            var bytes = await res.Content.ReadAsByteArrayAsync(ct);
-            return (JsonDocument.Parse(bytes), res.StatusCode);
+            var bytes = await ReadCappedAsync(res, ct);
+            return (bytes is null ? null : JsonDocument.Parse(bytes), res.StatusCode);
         }
         catch (Exception ex)
         {
@@ -394,7 +397,12 @@ public sealed class FitbitHealthProvider(
             using var res = await client.SendAsync(req, ct);
             if (res.IsSuccessStatusCode)
             {
-                var bytes = await res.Content.ReadAsByteArrayAsync(ct);
+                var bytes = await ReadCappedAsync(res, ct);
+                if (bytes is null)
+                {
+                    logger.LogWarning("Fitbit GET {Path} response exceeded the size cap.", path);
+                    return (HealthPullStatus.Error, null);
+                }
                 return (HealthPullStatus.Ok, JsonDocument.Parse(bytes));
             }
             if (res.StatusCode == HttpStatusCode.TooManyRequests) return (HealthPullStatus.RateLimited, null);
@@ -408,6 +416,29 @@ public sealed class FitbitHealthProvider(
             logger.LogWarning("Fitbit GET failed: {Reason}", ex.Message);
             return (HealthPullStatus.Error, null);
         }
+    }
+
+    /// <summary>Max bytes we will buffer from a Fitbit token/API response. These are small JSON payloads;
+    /// the cap stops a hostile/MITM'd endpoint from driving an unbounded allocation on the sync thread.</summary>
+    private const int MaxResponseBytes = 256 * 1024;
+
+    /// <summary>Read the response body into memory with a hard ceiling. Returns null (rather than allocating
+    /// the whole body) once the stream exceeds <see cref="MaxResponseBytes"/>.</summary>
+    private static async Task<byte[]?> ReadCappedAsync(HttpResponseMessage res, CancellationToken ct)
+    {
+        // Trust the header only as an early reject; an unset/lying length still hits the streamed guard below.
+        if (res.Content.Headers.ContentLength is > MaxResponseBytes) return null;
+
+        await using var stream = await res.Content.ReadAsStreamAsync(ct);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[8192];
+        int read;
+        while ((read = await stream.ReadAsync(chunk, ct)) > 0)
+        {
+            if (buffer.Length + read > MaxResponseBytes) return null;
+            buffer.Write(chunk, 0, read);
+        }
+        return buffer.ToArray();
     }
 
     private async Task StampStatusAsync(HealthConnection conn, HealthSyncStatus status, CancellationToken ct)

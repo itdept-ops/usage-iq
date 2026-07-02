@@ -8,26 +8,23 @@ namespace Ccusage.Api.Tests.Integration;
 
 /// <summary>
 /// The server-side email-visibility gate: GET /api/users and GET /api/audit mask OTHER users' emails
-/// to null unless the request carries the configured reveal key in the X-Email-Reveal-Key header. The
-/// caller's OWN email always comes back real (so they can see themselves). The configured key in tests
-/// is the default "Starbucks" from appsettings.json (the factory runs with SkipLocalSettings + no
-/// Users__EmailRevealKey override).
+/// to null unless the acting user holds the "users.email.reveal" permission. The caller's OWN email
+/// always comes back real (so they can see themselves). The seeded admin is granted every permission
+/// (Permissions.All), so admin-provisioning clients reveal automatically.
 /// </summary>
 [Collection(IntegrationCollection.Name)]
 public class EmailVisibilityIntegrationTests(WebAppFactory factory)
 {
-    private const string RevealKey = "Starbucks";
-    private const string KeyHeader = "X-Email-Reveal-Key";
+    private const string EmailReveal = "users.email.reveal";
 
-    private HttpClient Client(string email, string? revealKey = null)
+    private HttpClient Client(string email)
     {
         var c = factory.CreateClient();
         c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestJwt.For(email));
-        if (revealKey is not null) c.DefaultRequestHeaders.Add(KeyHeader, revealKey);
         return c;
     }
 
-    private HttpClient Admin(string? revealKey = null) => Client(WebAppFactory.AdminEmail, revealKey);
+    private HttpClient Admin() => Client(WebAppFactory.AdminEmail);
 
     /// <summary>Provisions an enabled user with the given permissions and returns their email.</summary>
     private async Task<string> CreateUser(params string[] permissions)
@@ -50,9 +47,9 @@ public class EmailVisibilityIntegrationTests(WebAppFactory factory)
     // ---- GET /api/users ----
 
     [Fact]
-    public async Task Users_without_key_masks_other_emails_but_keeps_callers_own_real()
+    public async Task Users_without_reveal_permission_masks_other_emails_but_keeps_callers_own_real()
     {
-        // A users.view caller who is NOT an admin; plus another user that must be masked.
+        // A users.view caller who is NOT an admin and lacks users.email.reveal; plus another user that must be masked.
         var me = await CreateUser("users.view");
         await CreateUser("dashboard.view");
 
@@ -70,29 +67,12 @@ public class EmailVisibilityIntegrationTests(WebAppFactory factory)
     }
 
     [Fact]
-    public async Task Users_with_wrong_key_still_masks_other_emails()
+    public async Task Users_with_reveal_permission_returns_all_real_emails()
     {
-        var me = await CreateUser("users.view");
-        await CreateUser();
-
-        var res = await Client(me, revealKey: "not-the-key").GetAsync("/api/users");
-        res.StatusCode.Should().Be(HttpStatusCode.OK);
-        var rows = Rows(await res.Content.ReadFromJsonAsync<JsonElement>());
-
-        // The only unmasked email is the caller's own.
-        var unmasked = rows.Where(r => EmailOf(r) != null).ToList();
-        unmasked.Should().ContainSingle();
-        EmailOf(unmasked[0]).Should().Be(me);
-        rows.Where(r => EmailOf(r) == null).Should().NotBeEmpty();
-    }
-
-    [Fact]
-    public async Task Users_with_correct_key_returns_all_real_emails()
-    {
-        var me = await CreateUser("users.view");
+        var me = await CreateUser("users.view", EmailReveal);
         var other = await CreateUser();
 
-        var res = await Client(me, revealKey: RevealKey).GetAsync("/api/users");
+        var res = await Client(me).GetAsync("/api/users");
         res.StatusCode.Should().Be(HttpStatusCode.OK);
         var rows = Rows(await res.Content.ReadFromJsonAsync<JsonElement>());
 
@@ -106,12 +86,12 @@ public class EmailVisibilityIntegrationTests(WebAppFactory factory)
     // ---- GET /api/audit ----
 
     [Fact]
-    public async Task Audit_without_key_masks_other_actor_and_target_emails()
+    public async Task Audit_without_reveal_permission_masks_other_actor_and_target_emails()
     {
         // The admin creates a target user — that writes a "user.created" audit row with the admin as actor
-        // and the target user as target. A SECOND admin reads the audit log without the key. Neither the
-        // first admin (actor) nor the created target should leak. The ONLY email the reader may see is
-        // their OWN (e.g. they are the target on their own user.created row), per the caller-sees-self rule.
+        // and the target user as target. A reader WITHOUT users.email.reveal reads the audit log. Neither the
+        // admin (actor) nor the created target should leak. The ONLY email the reader may see is their OWN
+        // (e.g. they are the target on their own user.created row), per the caller-sees-self rule.
         var target = await CreateUser();
         var reader = await CreateUser("users.manage");
 
@@ -119,7 +99,7 @@ public class EmailVisibilityIntegrationTests(WebAppFactory factory)
         res.StatusCode.Should().Be(HttpStatusCode.OK);
         var rows = Rows(await res.Content.ReadFromJsonAsync<JsonElement>());
 
-        // The first admin and the target user must NEVER appear (they are not the reader).
+        // The admin and the target user must NEVER appear (they are not the reader).
         rows.Should().NotContain(r => string.Equals(ActorEmail(r), WebAppFactory.AdminEmail, StringComparison.OrdinalIgnoreCase));
         rows.Should().NotContain(r => string.Equals(TargetEmail(r), target, StringComparison.OrdinalIgnoreCase));
 
@@ -134,10 +114,10 @@ public class EmailVisibilityIntegrationTests(WebAppFactory factory)
     }
 
     [Fact]
-    public async Task Audit_keeps_readers_own_actor_email_real_without_key()
+    public async Task Audit_keeps_readers_own_actor_email_real_without_reveal_permission()
     {
-        // This admin performs an action so they are the ACTOR on a fresh row, then reads the log without
-        // the key: their own actor email stays real.
+        // This user performs an action so they are the ACTOR on a fresh row, then reads the log without the
+        // reveal permission: their own actor email stays real.
         var reader = await CreateUser("users.manage");
         // The reader acts: create a user via the reader's client, stamping reader as actor.
         var victim = $"evis-act-{Guid.NewGuid():N}@test.local";
@@ -153,38 +133,19 @@ public class EmailVisibilityIntegrationTests(WebAppFactory factory)
     }
 
     [Fact]
-    public async Task Audit_with_correct_key_returns_all_real_actor_and_target_emails()
+    public async Task Audit_with_reveal_permission_returns_all_real_actor_and_target_emails()
     {
         var target = await CreateUser();
-        var reader = await CreateUser("users.manage");
+        var reader = await CreateUser("users.manage", EmailReveal);
 
-        var res = await Client(reader, revealKey: RevealKey).GetAsync("/api/audit");
+        var res = await Client(reader).GetAsync("/api/audit");
         res.StatusCode.Should().Be(HttpStatusCode.OK);
         var rows = Rows(await res.Content.ReadFromJsonAsync<JsonElement>());
 
-        // Every actor email is real (non-null) with the key.
+        // Every actor email is real (non-null) with the reveal permission.
         rows.Should().OnlyContain(r => ActorEmail(r) != null);
         // The target user we just created shows up with its real email on its user.created row.
         rows.Should().Contain(r => string.Equals(TargetEmail(r), target, StringComparison.OrdinalIgnoreCase));
-    }
-
-    [Fact]
-    public async Task Audit_with_wrong_key_still_masks()
-    {
-        await CreateUser();
-        var reader = await CreateUser("users.manage");
-
-        var res = await Client(reader, revealKey: "nope").GetAsync("/api/audit");
-        var rows = Rows(await res.Content.ReadFromJsonAsync<JsonElement>());
-
-        // A wrong key reveals nothing extra: any unmasked actor/target is the reader's own email only.
-        foreach (var r in rows)
-        {
-            var a = ActorEmail(r);
-            if (a is not null) a.Should().BeEquivalentTo(reader);
-            var t = TargetEmail(r);
-            if (t is not null) t.Should().BeEquivalentTo(reader);
-        }
     }
 
     private static string? ActorEmail(JsonElement row)

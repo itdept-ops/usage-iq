@@ -1,3 +1,4 @@
+import { PAGE_REGISTRY, PageDef } from './page-registry';
 import { PERM } from './models';
 
 /**
@@ -32,41 +33,93 @@ export interface CommandDef {
 }
 
 /**
- * The static command catalog. NAV entries are a SUPERSET of the shell's `homeOptionDefs` (same route + any-of
- * perms, with icons mirrored from the nav menus) PLUS the reachable routes that map omits — Profile,
- * admin Locations, AI usage, and the family subpages — each gated by the SAME perm its own guard uses.
- * Edit THIS list to add/remove a command; the component filters it by `auth.hasAnyPermission(...perm)`.
+ * Curated extra search terms for a "Go to" command, keyed by the {@link PAGE_REGISTRY} page id. This is the ONLY
+ * per-page thing the palette declares by hand — the route, label, icon, and perms are all derived from the
+ * registry (see {@link navCommandsFromRegistry}) so a page can never exist in the registry yet be missing here.
+ * Add a page to the registry and it appears in ⌘K automatically; add a row here only to enrich its search terms.
+ */
+const NAV_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
+  dashboard: ['home', 'usage', 'overview'],
+  pricing: ['cost', 'price', 'rates'],
+  reporter: ['report'],
+  fleet: ['machines', 'devices'],
+  tracker: ['food', 'water', 'hydration', 'coffee', 'weight', 'exercise', 'log', 'fitness', 'calories', 'macros'],
+  meds: ['medication', 'vitals', 'pills', 'blood pressure'],
+  challenge: ['challenge'],
+  habits: ['habit', 'streak', 'routine'],
+  journal: ['diary', 'notes', 'reflect'],
+  trophies: ['trophy', 'trophies', 'badges', 'achievements', 'milestones'],
+  feed: ['social', 'feed', 'activity'],
+  pacts: ['pact', 'commitment', 'accountability'],
+  ask: ['ai', 'ask', 'question', 'assistant', 'chat', 'gemini', 'how did my week go'],
+  automations: ['rules', 'triggers', 'webhook', 'discord', 'notify'],
+  agents: ['agent', 'briefing', 'streak', 'budget', 'staples', 'nudge', 'schedule', 'proactive'],
+  inbox: ['agent', 'inbox', 'nudge', 'suggestions'],
+  bills: ['bill', 'split', 'receipt', 'expense'],
+  grocery: ['grocery', 'shopping', 'list', 'staples'],
+  recipes: ['recipe', 'cook', 'meals'],
+  'meal-planner': ['meal', 'menu', 'dinner', 'plan'],
+  resume: ['resume', 'cv', 'cover letter', 'job'],
+  today: ['today', 'day', 'agenda', 'schedule'],
+  wrapped: ['wrapped', 'year', 'recap', 'summary'],
+  insights: ['insights', 'trends', 'analytics'],
+  search: ['find', 'search', 'lookup', 'everything'],
+  family: ['hub', 'household'],
+  chat: ['message', 'dm'],
+  people: ['contacts', 'roster'],
+  users: ['admin', 'accounts', 'permissions'],
+  activity: ['audit', 'log'],
+  settings: ['config', 'sync'],
+  'settings-health': ['wearable', 'health', 'sync', 'watch', 'fitbit', 'apple health'],
+  'admin-locations': ['map', 'everyone', 'where'],
+  'ai-usage': ['tokens', 'gemini', 'ai'],
+};
+
+/** The canonical absolute route for a registry page (`/` for the home page, `/` + path otherwise). */
+function routeOf(p: PageDef): string {
+  return p.path === '' ? '/' : '/' + p.path;
+}
+
+/**
+ * Derive the "Go to" commands from {@link PAGE_REGISTRY} — one per page that carries `nav` metadata, gated by the
+ * SAME perm/anyPerm its own route guard uses (so the palette never offers a page the guard would bounce). This is
+ * what stops the drift the review flagged: every navigable, permissioned page is reachable via ⌘K by construction,
+ * and a new registry page needs no edit here (only an optional {@link NAV_KEYWORDS} row to enrich its search terms).
+ */
+function navCommandsFromRegistry(): CommandDef[] {
+  return PAGE_REGISTRY.filter((p) => p.nav).map((p): CommandDef => {
+    const keywords = NAV_KEYWORDS[p.id];
+    return {
+      id: 'nav-' + p.id,
+      label: p.nav!.label,
+      group: 'Go to',
+      icon: p.nav!.icon,
+      route: routeOf(p),
+      // Registry `perm` (single, AND) → any-of over one key; `anyPerm` → any-of; neither → auth-only (no perm).
+      ...(p.perm ? { perm: p.perm } : p.anyPerm ? { perm: p.anyPerm } : {}),
+      ...(keywords ? { keywords } : {}),
+    };
+  });
+}
+
+/**
+ * The command catalog. The "Go to" navigation commands are DERIVED from {@link PAGE_REGISTRY} (see
+ * {@link navCommandsFromRegistry}) so they can never drift from the app's real, permissioned pages. Only the
+ * entries the registry can't express are hand-written: the beta-preview routes + the family subpages (which are
+ * `Route` children, not top-level `PageDef`s), the deep `/locations` page (no nav entry), plus all ACTION and
+ * ACCOUNT commands. Add a normal page to the registry and it appears in ⌘K automatically.
  */
 export const COMMAND_DEFS: readonly CommandDef[] = [
-  // ---- Go to (navigation) — mirrors homeOptionDefs route/label/perms + icons from the nav ----
-  { id: 'nav-dashboard', label: 'Dashboard', group: 'Go to', icon: 'dashboard', route: '/', perm: [PERM.dashboardView], keywords: ['home', 'usage', 'overview'] },
-  { id: 'nav-calendar', label: 'Calendar', group: 'Go to', icon: 'calendar_month', route: '/calendar', perm: [PERM.calendarView] },
-  { id: 'nav-pricing', label: 'Pricing', group: 'Go to', icon: 'payments', route: '/pricing', perm: [PERM.pricingView], keywords: ['cost', 'price', 'rates'] },
-  { id: 'nav-reporter', label: 'Reporter', group: 'Go to', icon: 'summarize', route: '/reporter', perm: [PERM.reporterView, PERM.reporterManage, PERM.reporterSelf], keywords: ['report'] },
-  { id: 'nav-fleet', label: 'Fleet', group: 'Go to', icon: 'dns', route: '/fleet', perm: [PERM.fleetView, PERM.reporterManage], keywords: ['machines', 'devices'] },
-  { id: 'nav-tracker', label: 'Tracker', group: 'Go to', icon: 'monitoring', route: '/tracker', perm: [PERM.trackerSelf], keywords: ['food', 'water', 'hydration', 'coffee', 'weight', 'exercise', 'log', 'fitness', 'calories', 'macros'] },
-  { id: 'nav-ask', label: 'Ask my life', group: 'Go to', icon: 'auto_awesome', route: '/ask', perm: [PERM.trackerAi], keywords: ['ai', 'ask', 'question', 'assistant', 'chat', 'gemini', 'how did my week go'] },
-  { id: 'nav-tracker-beta', label: 'Tracker Beta', group: 'Go to', icon: 'science', route: '/tracker-beta', perm: [PERM.platformMobile], keywords: ['strata'] },
-  { id: 'nav-challenge', label: '75 Hard', group: 'Go to', icon: 'fitness_center', route: '/challenge', perm: [PERM.trackerSelf], keywords: ['challenge'] },
-  { id: 'nav-trophies', label: 'Trophies', group: 'Go to', icon: 'emoji_events', route: '/trophies', perm: [PERM.trackerSelf], keywords: ['trophy', 'trophies', 'badges', 'achievements', 'milestones'] },
-  { id: 'nav-feed', label: 'Activity feed', group: 'Go to', icon: 'dynamic_feed', route: '/feed', perm: [PERM.trackerSelf], keywords: ['social', 'feed'] },
-  { id: 'nav-automations', label: 'Automations', group: 'Go to', icon: 'bolt', route: '/automations', perm: [PERM.automationsUse], keywords: ['rules', 'triggers', 'webhook', 'discord', 'notify'] },
-  { id: 'nav-agents', label: 'Agents', group: 'Go to', icon: 'smart_toy', route: '/agents', perm: [PERM.agentsUse], keywords: ['agent', 'briefing', 'streak', 'budget', 'staples', 'nudge', 'schedule', 'proactive'] },
-  { id: 'nav-bills', label: 'Bill Splitter', group: 'Go to', icon: 'receipt_long', route: '/bills', perm: [PERM.billsUse], keywords: ['bill', 'split', 'receipt', 'expense'] },
-  { id: 'nav-search', label: 'Search everything', group: 'Go to', icon: 'search', route: '/search', perm: [PERM.searchUse], keywords: ['find', 'search', 'lookup', 'everything'] },
-  { id: 'nav-beta', label: 'Beta', group: 'Go to', icon: 'science', route: '/beta', perm: [PERM.platformMobile], keywords: ['experimental'] },
-  { id: 'nav-family', label: 'Family', group: 'Go to', icon: 'cottage', route: '/family', perm: [PERM.familyUse], keywords: ['hub', 'household'] },
-  { id: 'nav-chat', label: 'Chat', group: 'Go to', icon: 'forum', route: '/chat', perm: [PERM.chatRead], keywords: ['message', 'dm'] },
-  { id: 'nav-people', label: 'People', group: 'Go to', icon: 'groups', route: '/people', perm: [PERM.chatRead, PERM.familyUse], keywords: ['contacts', 'roster'] },
-  { id: 'nav-locations', label: 'My locations', group: 'Go to', icon: 'place', route: '/locations', perm: [PERM.locationSelf], keywords: ['gps', 'map', 'where'] },
-  { id: 'nav-users', label: 'Users', group: 'Go to', icon: 'group', route: '/users', perm: [PERM.usersView], keywords: ['admin', 'accounts', 'permissions'] },
-  { id: 'nav-activity', label: 'Activity', group: 'Go to', icon: 'receipt_long', route: '/activity', perm: [PERM.activityView], keywords: ['audit', 'log'] },
-  { id: 'nav-settings', label: 'Settings', group: 'Go to', icon: 'tune', route: '/settings', perm: [PERM.settingsView], keywords: ['config', 'sync'] },
+  // ---- Go to (navigation) — derived from PAGE_REGISTRY (route/label/perms/icon), keywords from NAV_KEYWORDS ----
+  ...navCommandsFromRegistry(),
 
-  // ---- Go to — reachable routes the homeOptionDefs map omits (same perm as their own guard) ----
-  { id: 'nav-admin-locations', label: 'Locations (admin)', group: 'Go to', icon: 'map', route: '/admin/locations', perm: [PERM.locationViewAll], keywords: ['map', 'everyone', 'where'] },
-  { id: 'nav-ai-usage', label: 'AI usage', group: 'Go to', icon: 'smart_toy', route: '/ai-usage', perm: [PERM.aiUsageView], keywords: ['tokens', 'gemini', 'ai'] },
-  // Family subpages — all need family.use; the four with an extra perm require BOTH (requireAll), matching their stacked route guards.
+  // ---- Go to — routes PAGE_REGISTRY can't express (same perm as their own guard) ----
+  // Beta-preview surfaces live in app.routes.ts (not the page registry); gated by platform.mobile.
+  { id: 'nav-tracker-beta', label: 'Tracker Beta', group: 'Go to', icon: 'science', route: '/tracker-beta', perm: [PERM.platformMobile], keywords: ['strata'] },
+  { id: 'nav-beta', label: 'Beta', group: 'Go to', icon: 'science', route: '/beta', perm: [PERM.platformMobile], keywords: ['experimental'] },
+  // /locations is a registry page but carries no nav entry, so it isn't derived above.
+  { id: 'nav-locations', label: 'My locations', group: 'Go to', icon: 'place', route: '/locations', perm: [PERM.locationSelf], keywords: ['gps', 'map', 'where'] },
+  // Family subpages — Route children, not PageDefs; all need family.use; the four with an extra perm require BOTH (requireAll), matching their stacked route guards.
   { id: 'nav-family-lists', label: 'Family · Lists', group: 'Go to', icon: 'checklist', route: '/family/lists', perm: [PERM.familyUse], keywords: ['grocery', 'shopping', 'todo'] },
   { id: 'nav-family-meals', label: 'Family · Meals', group: 'Go to', icon: 'restaurant', route: '/family/meals', perm: [PERM.familyUse], keywords: ['dinner', 'recipe', 'menu'] },
   { id: 'nav-family-chores', label: 'Family · Chores', group: 'Go to', icon: 'cleaning_services', route: '/family/chores', perm: [PERM.familyUse], keywords: ['tasks', 'allowance'] },

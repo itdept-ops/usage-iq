@@ -355,14 +355,25 @@
   transform: translateY(-12px);
   opacity: 0;
   pointer-events: none;
+  /* CSS-only a11y gate: `visibility: hidden` pulls the ~25 permission-gated links out of the tab
+     order AND the accessibility tree while the drawer is closed (opacity + pointer-events alone
+     leave them focusable and screen-reader-exposed). Kept out of the transition-delay path so it
+     flips on close only after the fade-out completes — see the delayed transition below. */
+  visibility: hidden;
   transition:
     opacity var(--tech-t-panel, 200ms) var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1)),
-    transform var(--tech-t-panel, 200ms) var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1));
+    transform var(--tech-t-panel, 200ms) var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+    visibility 0s linear var(--tech-t-panel, 200ms);
 
   &.open {
     transform: translateY(0);
     opacity: 1;
     pointer-events: auto;
+    visibility: visible;
+    transition:
+      opacity var(--tech-t-panel, 200ms) var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+      transform var(--tech-t-panel, 200ms) var(--tech-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+      visibility 0s linear 0s;
   }
 
   /* Section header (Usage / Tracker / Family / Chat / Admin) — the drawer's answer to the desktop

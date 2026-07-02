@@ -167,6 +167,13 @@ public static class Permissions
     public const string ActivityView = "activity.view";
     public const string AiUsageView = "ai.usage.view";
 
+    /// <summary>Per-admin gate to UNMASK other users' real email addresses on the Users page + audit log
+    /// (<c>GET /api/users</c>, <c>GET /api/audit</c>). Without it the caller sees other users' emails masked
+    /// (their OWN row always stays real). Admin oversight of restricted PII, so it must be granted
+    /// deliberately, never inherited by every new account (non-defaultable). Replaces the legacy shared
+    /// <c>X-Email-Reveal-Key</c> header.</summary>
+    public const string UsersEmailReveal = "users.email.reveal";
+
     /// <summary>The six AI permission keys (group "AI"). NONE are defaultable.</summary>
     public static readonly string[] AiKeys =
     {
@@ -238,6 +245,7 @@ public static class Permissions
         new PermissionInfo(UsersManage, "Admin", "Manage users", "Create, edit, and delete users, set permissions, and edit the access policy."),
         new PermissionInfo(ActivityView, "Admin", "View activity", "View request logs on the Activity page."),
         new PermissionInfo(AiUsageView, "Admin", "View AI usage", "View the AI usage log: per-call feature, outcome, and token counts (never prompt or response content)."),
+        new PermissionInfo(UsersEmailReveal, "Admin", "Reveal user emails", "Unmask other users' real email addresses on the Users page and audit log (your own row is always shown)."),
         new PermissionInfo(SettingsView, "Admin", "View settings", "View settings and ingestion sources."),
         new PermissionInfo(SettingsManage, "Admin", "Manage settings", "Edit timezone and the auto-sync timer."),
         new PermissionInfo(SourcesManage, "Admin", "Manage sources", "Edit ingestion sources."),
@@ -348,6 +356,17 @@ public static class Permissions
     /// <see cref="ResumeUse"/>: all gate private, owner/household-scoped data (a personal recipe book, the
     /// household grocery list, the household meal plan, and a personal resume + headshot), so they must be
     /// granted deliberately per user, never inherited by every new account.
+    /// Likewise excludes the Admin oversight READ gates <see cref="UsersView"/> and <see cref="ActivityView"/>:
+    /// the user directory + permission catalog + audit log, and the request-log activity feed (which carries
+    /// client IPs, device fingerprints, and per-call user attribution) are privileged administrative
+    /// oversight surfaces, so they must be granted deliberately per user, never inherited by every new
+    /// account — matching how <see cref="AiUsageView"/> is treated. Likewise excludes <see cref="UsersEmailReveal"/>:
+    /// unmasking other users' real emails is restricted PII access, so it is a deliberate grant, never inherited.
+    /// Likewise excludes the deployment-GLOBAL config-write gates <see cref="SettingsManage"/>,
+    /// <see cref="SourcesManage"/>, <see cref="ReporterManage"/> and <see cref="NotificationsManage"/>: these
+    /// rewrite instance-wide state (timezone/auto-sync, ingestion sources, ingest keys for the whole fleet, and
+    /// the shared Discord webhook), so they must be granted deliberately per user, never inherited by every
+    /// new account.
     /// Finally excludes ALL AI keys (<see cref="AiKeys"/>) and ALL Location keys (<see cref="LocationKeys"/>):
     /// AI capabilities spend tokens and the Location feature reveals where a user is, so both must be
     /// granted deliberately per user — every new account starts with AI off and location off.
@@ -359,5 +378,7 @@ public static class Permissions
         && key != AiUsageView && key != BillsUse && key != PlatformMobile && key != AutomationsUse
         && key != AgentsUse && key != HealthSync
         && key != RecipesUse && key != GroceryUse && key != MealsUse && key != ResumeUse
+        && key != UsersView && key != ActivityView && key != UsersEmailReveal
+        && key != SettingsManage && key != SourcesManage && key != ReporterManage && key != NotificationsManage
         && !AiKeys.Contains(key) && !LocationKeys.Contains(key);
 }

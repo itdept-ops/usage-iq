@@ -232,6 +232,7 @@ export class ChartComponent implements OnDestroy {
   private chart?: echarts.ECharts;
   private ro?: ResizeObserver;
   private rafId = 0;
+  private lastOption?: EChartsOption;
   private readonly theme = inject(ThemeService);
 
   constructor() {
@@ -247,13 +248,18 @@ export class ChartComponent implements OnDestroy {
       this.ro.observe(this.host().nativeElement);
     });
 
-    // Re-apply on either a new [option] OR a live theme switch: reading theme.resolved() registers the
-    // effect as a dependency, so toggling light/dark re-themes every mounted chart's axes/tooltip/labels.
+    // Re-apply on either a new [option] OR a live theme switch: reading theme.resolved()/scheme()
+    // registers the effect as a dependency, so toggling light/dark or picking a scheme re-themes every
+    // mounted chart's axes/tooltip/labels. A pure theme/scheme change only touches chrome + the two
+    // accent series colors, so it merges (notMerge=false) a cheap recolor instead of tearing down and
+    // rebuilding the full option; a genuine [option] input change still does the notMerge=true replace.
     effect(() => {
       const opt = this.option();
       this.theme.resolved();
       this.theme.scheme();
-      this.chart?.setOption(withAxonTheme(opt), true);
+      const optionChanged = opt !== this.lastOption;
+      this.lastOption = opt;
+      this.chart?.setOption(withAxonTheme(opt), optionChanged);
     });
   }
 

@@ -91,27 +91,34 @@ public static class ChatEndpoints
                 ? null
                 : await db.Users.AsNoTracking()
                     .Where(u => u.Id == req.UserId && u.IsEnabled).Select(u => u.Email).FirstOrDefaultAsync(ct);
-            if (target is null)
-                return Results.BadRequest(new { message = "That user doesn't exist." });
             if (target == user.Email)
                 return Results.BadRequest(new { message = "Pick a different user to message." });
 
-            // A non-admin may only DM someone in their mutual contact circle (the same people their
-            // New-DM picker draws from). Chat admins (chat.contacts.manage — the capability that lets
-            // their picker draw from the full team directory) bypass this and may DM anyone enabled.
+            // A non-existent/disabled id is a plain 400 "doesn't exist". A non-admin may then only DM
+            // someone in their mutual contact circle (the same people their New-DM picker draws from);
+            // a valid-but-non-contact id gets a 403 telling them to add the person first. Chat admins
+            // (chat.contacts.manage — the capability that lets their picker draw from the full team
+            // directory) bypass the contact gate and may DM anyone enabled. (Distinguishing "unknown"
+            // from "not a contact" mirrors the existing contacts UX; tightening this into a single
+            // uniform response to remove the id-enumeration signal is a deferred product decision.)
+            if (target is null)
+                return Results.BadRequest(new { message = "That user doesn't exist." });
             var isChatAdmin = user.Permissions.Contains(Permissions.ChatContactsManage);
-            if (!isChatAdmin && !await ContactGraph.IsContactAsync(db, user.Email, target, ct))
+            var isContact = await ContactGraph.IsContactAsync(db, user.Email, target, ct);
+            if (!isChatAdmin && !isContact)
                 return Results.Json(
                     new { message = "You can only message your contacts. Ask an admin to add them to your circle." },
                     statusCode: StatusCodes.Status403Forbidden);
 
             var channelId = await GetOrCreateDirectAsync(db, user.Email, target, ct);
-            var dto = (await BuildChannelDtosForMemberAsync(db, user.Email, channelId, ct)).First();
+            var dto = (await BuildChannelDtosForMemberAsync(db, user.Email, channelId, ct)).FirstOrDefault();
+            if (dto is null) return Results.NotFound();
 
             // Surface the new DM to the other participant in real time.
             var hub = app.Services.GetRequiredService<IHubContext<ChatHub>>();
-            var otherDto = (await BuildChannelDtosForMemberAsync(db, target, channelId, ct)).First();
-            await hub.Clients.User(target).SendAsync("ChannelAdded", otherDto, ct);
+            var otherDto = (await BuildChannelDtosForMemberAsync(db, target, channelId, ct)).FirstOrDefault();
+            if (otherDto is not null)
+                await hub.Clients.User(target).SendAsync("ChannelAdded", otherDto, ct);
             return Results.Ok(dto);
         }).RequirePermission(Permissions.ChatSend);
 
@@ -220,6 +227,19 @@ public static class ChatEndpoints
                 return Results.NotFound();
             if (channel.ArchivedUtc is not null)
                 return Results.BadRequest(new { message = "This channel is archived." });
+
+            // The mutual-contact gate is durable, not just enforced at first-DM creation: removing the
+            // contact edge must cut off the existing DM too. Re-check it on every Direct send (the /direct
+            // creation path checks the same thing). Chat admins (chat.contacts.manage) bypass, as there.
+            if (channel.Kind == ChannelKind.Direct
+                && !user.Permissions.Contains(Permissions.ChatContactsManage))
+            {
+                var other = channel.Members.FirstOrDefault(m => m.UserEmail != user.Email)?.UserEmail;
+                if (other is null || !await ContactGraph.IsContactAsync(db, user.Email, other, ct))
+                    return Results.Json(
+                        new { message = "You can only message your contacts. Ask an admin to add them to your circle." },
+                        statusCode: StatusCodes.Status403Forbidden);
+            }
 
             var body = (req.Body ?? "").Trim();
             if (body.Length == 0) return Results.BadRequest(new { message = "Message body is required." });
@@ -363,12 +383,23 @@ public static class ChatEndpoints
     {
         var key = DirectKeyFor(a, b);
 
-        // Fast path: the DM already exists.
-        var existing = await db.ChatChannels.AsNoTracking()
+        // Fast path: the DM already exists. Re-opening a moderator-archived DM revives it — clear
+        // ArchivedUtc so BuildChannelDtosForMemberAsync (which filters archived out) can see the row
+        // again, otherwise re-opening would surface zero channels and the caller would 500 on First().
+        var existing = await db.ChatChannels
             .Where(c => c.DirectKey == key)
-            .Select(c => c.Id)
+            .Select(c => new { c.Id, c.ArchivedUtc })
             .FirstOrDefaultAsync(ct);
-        if (existing != 0) return existing;
+        if (existing is not null)
+        {
+            if (existing.ArchivedUtc is not null)
+            {
+                await db.ChatChannels
+                    .Where(c => c.Id == existing.Id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.ArchivedUtc, (DateTime?)null), ct);
+            }
+            return existing.Id;
+        }
 
         var now = DateTime.UtcNow;
         var channel = new ChatChannel
@@ -417,11 +448,17 @@ public static class ChatEndpoints
         ex.InnerException is Npgsql.PostgresException pg && pg.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation;
 
     /// <summary>Unread count for a member: messages newer than their cursor, excluding their own.</summary>
-    public static Task<int> UnreadCountAsync(UsageDbContext db, int channelId, long? lastRead, string email, CancellationToken ct) =>
-        db.ChatMessages.AsNoTracking()
+    public static Task<int> UnreadCountAsync(UsageDbContext db, int channelId, long? lastRead, string email, CancellationToken ct)
+    {
+        // Coalesce the (nullable) cursor to a plain long BEFORE the query so EF sees `m.Id > cursor`
+        // (long vs long), not `m.Id > (long?)` — the latter fails to translate ("GreaterThan is not
+        // defined for Int64 and Nullable<Int64>") and 500s the read/unread flow.
+        var cursor = lastRead ?? 0L;
+        return db.ChatMessages.AsNoTracking()
             .Where(m => m.ChannelId == channelId && m.DeletedUtc == null
-                        && m.SenderEmail != email && m.Id > (lastRead ?? 0))
+                        && m.SenderEmail != email && m.Id > cursor)
             .CountAsync(ct);
+    }
 
     /// <summary>
     /// Build <c>m =&gt; (m.ChannelId == id1 &amp;&amp; m.Id &gt; cursor1) || (m.ChannelId == id2 &amp;&amp; m.Id &gt; cursor2) || ...</c>

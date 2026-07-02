@@ -25,6 +25,10 @@ public sealed class IpGeoService(
     public const string HttpClientName = "ipgeo";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(24);
 
+    // The ip-api payload is a handful of short fields; a legitimate response is well under 2 KB. Cap the
+    // bytes we read so a MITM'd plaintext upstream (http, no key) cannot force unbounded allocation/OOM.
+    private const int MaxResponseBytes = 64 * 1024;
+
     /// <summary>
     /// Coarse geo for <paramref name="ip"/>, or null when the IP is missing/private/loopback, on any
     /// upstream failure, or when ip-api reports a lookup failure. Never throws.
@@ -52,8 +56,24 @@ public sealed class IpGeoService(
                 return null;
             }
 
+            // Read a bounded number of bytes before parsing: the transport is plaintext, so an on-path
+            // attacker could otherwise return a multi-gigabyte body and OOM the background worker.
             await using var stream = await res.Content.ReadAsStreamAsync(ct);
-            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            var buffer = new byte[MaxResponseBytes + 1];
+            var total = 0;
+            int read;
+            while (total < buffer.Length &&
+                   (read = await stream.ReadAsync(buffer.AsMemory(total, buffer.Length - total), ct)) > 0)
+            {
+                total += read;
+            }
+            if (total > MaxResponseBytes)
+            {
+                logger.LogWarning("ip-api response exceeded {Max} bytes; rejecting.", MaxResponseBytes);
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(buffer.AsMemory(0, total));
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return null;
 

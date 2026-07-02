@@ -89,6 +89,11 @@ public sealed class AgentController : IDisposable
 {
     private readonly object _gate = new();
 
+    // Serializes whole engine (re)build TRANSITIONS (Reload + the deferred GPS rebuild) so their
+    // Stop/BuildEngine/Start sequences cannot interleave. Distinct from _gate because the transition
+    // spans blocking waits (Stop) during which _gate must stay free for the loop's SetStatus callbacks.
+    private readonly object _rebuildGate = new();
+
     private ReporterOptions? _options;
     private ReporterEngine? _engine;
     private CancellationTokenSource? _loopCts;
@@ -157,6 +162,12 @@ public sealed class AgentController : IDisposable
     /// whether the config validates.
     /// </summary>
     public ReporterOptions Reload()
+    {
+        lock (_rebuildGate)
+            return ReloadCore();
+    }
+
+    private ReporterOptions ReloadCore()
     {
         Stop();
 
@@ -227,20 +238,39 @@ public sealed class AgentController : IDisposable
     /// </summary>
     private void OnGpsFixAcquired() => Task.Run(() =>
     {
-        ReporterOptions? opt;
-        bool wasRunning;
-        lock (_gate)
+        // Serialize the whole rebuild against a concurrent Settings-driven Reload so the two transitions
+        // cannot interleave (each other's Stop/BuildEngine/Start). Any fault here is surfaced via the
+        // Log/StatusChanged channels rather than escaping as an unobserved-task exception.
+        try
         {
-            opt = _options;
-            wasRunning = _loopTask is { IsCompleted: false };
-        }
-        if (opt is null || opt.Validate() is not null) return;
+            lock (_rebuildGate)
+            {
+                bool wasRunning;
+                lock (_gate) wasRunning = _loopTask is { IsCompleted: false };
 
-        Stop(keepEngine: false);                  // unwind the loop + dispose the coordinate-less engine
-        ReporterEngine.ResetMachineInfoCache();   // forget the GPS-less machine info
-        lock (_gate) _engine = BuildEngine(opt);  // rebuild → MachineInfo now carries the cached fix
-        if (wasRunning) Start();
-        Emit(LogLine.Info("location fix acquired — telemetry now includes precise GPS"));
+                // Re-read _options at the moment of rebuild (under _gate) rather than trusting an early
+                // capture, so a Reload that just landed a new config wins instead of being clobbered.
+                lock (_gate)
+                {
+                    if (_options is null || _options.Validate() is not null) return;
+                }
+
+                Stop(keepEngine: false);                // unwind the loop + dispose the coordinate-less engine
+                ReporterEngine.ResetMachineInfoCache();  // forget the GPS-less machine info
+                lock (_gate)
+                {
+                    if (_options is null || _options.Validate() is not null) return;
+                    _engine = BuildEngine(_options);     // rebuild → MachineInfo now carries the cached fix
+                }
+                if (wasRunning) Start();
+                Emit(LogLine.Info("location fix acquired — telemetry now includes precise GPS"));
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus(s => s with { State = AgentState.Error, LastError = ex.Message });
+            Emit(LogLine.Warn($"could not apply GPS fix ({ex.Message}) — telemetry keeps coarse IP-geo"));
+        }
     });
 
     /// <summary>Start watching (the engine's RunForever loop) on a background task. No-op if already running.</summary>

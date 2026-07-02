@@ -28,9 +28,20 @@ public sealed class QuickAddClient : IDisposable
 
     public QuickAddClient(string baseUrl, string key)
     {
-        _http = new HttpClient
+        var baseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+        // The X-Ingest-Key is a bearer secret; over plain http to a non-local host it travels in
+        // cleartext and can be MITM'd. Refuse to send it rather than leak it (the console reporter
+        // warns; the tray has no console, so we hard-fail before constructing the client).
+        if (baseAddress.Scheme == "http" && !baseAddress.IsLoopback)
+            throw new QuickAddException("Server URL is http:// to a non-local host — refusing to send your key in cleartext. Use https in Settings.");
+
+        // AllowAutoRedirect = false so the X-Ingest-Key credential is never re-sent to a redirect
+        // target on a different host: .NET strips Authorization on cross-origin redirects but not
+        // custom headers, so an auto-followed 3xx would otherwise leak it (mirrors IngestClient).
+        var handler = new HttpClientHandler { AllowAutoRedirect = false };
+        _http = new HttpClient(handler)
         {
-            BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"),
+            BaseAddress = baseAddress,
             Timeout = TimeSpan.FromSeconds(30),
         };
         _http.DefaultRequestHeaders.Add("X-Ingest-Key", key);

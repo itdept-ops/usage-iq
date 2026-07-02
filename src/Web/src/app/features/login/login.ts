@@ -188,12 +188,22 @@ export class Login {
 
   constructor() {
     const ru = this.route.snapshot.queryParamMap.get('returnUrl');
-    if (ru) this.returnUrl.set(ru);
+    // Only forward a same-origin relative path — reject protocol-relative
+    // (`//host`) and absolute (`scheme:`) values to prevent open redirect.
+    if (ru && this.isSafeReturnUrl(ru)) this.returnUrl.set(ru);
 
     afterNextRender(() => {
       this.observeReveals();
       this.armCounters();
     });
+  }
+
+  /** A returnUrl is only trusted when it's a same-origin relative path:
+   *  it must start with a single `/` (not `//`, which is protocol-relative)
+   *  and carry no scheme (`http:`, `javascript:`, …). Anything else is an
+   *  open-redirect vector and is dropped in favour of the default route. */
+  private isSafeReturnUrl(url: string): boolean {
+    return url.startsWith('/') && !url.startsWith('//') && !/^[a-z][a-z0-9+.-]*:/i.test(url);
   }
 
   /** [queryParams] binding — only forwards returnUrl when one is present. */

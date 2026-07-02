@@ -221,6 +221,7 @@
                       <textarea class="cx-edit__input" [ngModel]="editDraft()"
                                 (ngModelChange)="editDraft.set($event)"
                                 (keydown)="onEditKeydown($event, m)" rows="1"
+                                aria-label="Edit message"
                                 cdkTextareaAutosize cdkAutosizeMinRows="1" cdkAutosizeMaxRows="6"></textarea>
                       <div class="cx-edit__actions">
                         <button mat-button (click)="cancelEdit()">Cancel</button>

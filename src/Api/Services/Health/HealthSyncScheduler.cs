@@ -13,9 +13,9 @@ namespace Ccusage.Api.Services.Health;
 ///
 /// INVARIANTS (mirroring AgentScheduler):
 /// <list type="bullet">
-///   <item>STAMP-CURSOR-FIRST — <see cref="HealthConnection.LastSyncCursorDate"/> is advanced to the day
-///   BEING pulled before that day is mapped, so a crash mid-day never re-pulls the whole window (the de-dup
-///   log is the second line of defence).</item>
+///   <item>STAMP-CURSOR-AFTER-OK — <see cref="HealthConnection.LastSyncCursorDate"/> is advanced to a day only
+///   AFTER that day is successfully pulled and mapped, so a transient pull failure never moves the cursor past
+///   an unpulled day (that day is retried next tick); the de-dup log makes a partial re-pull harmless.</item>
 ///   <item>BOUNDED PER-TICK — the candidate read is filtered (AutoSyncEnabled, last-sync older than the
 ///   cadence) and PAGED (<see cref="MaxConnectionsPerTick"/>); it never loads every connection every tick.</item>
 ///   <item>PER-USER TIMEZONE — "today-local" is computed in the connection owner's own timezone (reusing
@@ -109,8 +109,9 @@ public sealed class HealthSyncScheduler(
 
     /// <summary>
     /// Sync ONE connection over [cursor+1 .. today-local], capped at <see cref="MaxBackfillDays"/>. Stamps the
-    /// cursor to each day BEFORE mapping it (crash-safe), records the per-attempt status, and backs off on
-    /// AuthExpired / RateLimited. Returns true when at least one day was pulled Ok.
+    /// cursor to each day AFTER mapping it (so a transient failure never loses a day), records the per-attempt
+    /// status, and backs off on AuthExpired / RateLimited. Advances LastSyncUtc only when at least one day was
+    /// pulled Ok, so a fully-failed window stays due and retries next tick. Returns true when a day was pulled Ok.
     /// </summary>
     public async Task<bool> SyncConnectionAsync(
         UsageDbContext db, IHealthProvider provider, HealthSyncMapper mapper, HealthConnection conn,
@@ -132,16 +133,11 @@ public sealed class HealthSyncScheduler(
 
         for (var day = start; day <= todayLocal; day = day.AddDays(1))
         {
-            // STAMP CURSOR FIRST: advance to the day we're about to pull, so a crash here never re-pulls the
-            // whole window — the de-dup log makes a partial re-pull harmless anyway.
-            conn.LastSyncCursorDate = day;
-            await db.HealthConnections.Where(c => c.Id == conn.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(c => c.LastSyncCursorDate, day), ct);
-
             var pull = await provider.PullDayAsync(conn, day, tz, ct);
             if (!pull.Ok)
             {
-                // Back off: stop the window, keep the cursor where it is (we'll resume here next tick).
+                // Back off: stop the window WITHOUT advancing the cursor past this unpulled day, so it is
+                // retried next tick. A transient failure (RateLimited / Error) must never lose a day of data.
                 status = pull.ToSyncStatus();
                 if (pull.Status is HealthPullStatus.AuthExpired or HealthPullStatus.NotConnected)
                     logger.LogInformation("Health sync: connection {Id} needs reconnect (auth expired).", conn.Id);
@@ -149,14 +145,32 @@ public sealed class HealthSyncScheduler(
             }
 
             await mapper.MapDayAsync(conn, pull.Signals!, ct);
+
+            // STAMP CURSOR AFTER a day is successfully pulled + mapped: never advance past an unpulled day, so a
+            // transient failure resumes exactly here next tick. The de-dup log makes a partial re-pull harmless.
+            conn.LastSyncCursorDate = day;
+            await db.HealthConnections.Where(c => c.Id == conn.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.LastSyncCursorDate, day), ct);
+
             anyOk = true;
             status = HealthSyncStatus.Ok;
         }
 
-        await db.HealthConnections.Where(c => c.Id == conn.Id)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(c => c.LastSyncUtc, utcNow)
-                .SetProperty(c => c.LastSyncStatus, status), ct);
+        // Only mark the connection synced (which drops it out of the due set for a full cadence) when at least
+        // one day was pulled Ok. On a fully-failed window leave LastSyncUtc untouched so the row stays due and
+        // the next tick re-attempts, but still record the status for the UI.
+        if (anyOk)
+        {
+            await db.HealthConnections.Where(c => c.Id == conn.Id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(c => c.LastSyncUtc, utcNow)
+                    .SetProperty(c => c.LastSyncStatus, status), ct);
+        }
+        else
+        {
+            await db.HealthConnections.Where(c => c.Id == conn.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.LastSyncStatus, status), ct);
+        }
 
         return anyOk;
     }

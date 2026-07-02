@@ -409,10 +409,20 @@ public sealed class MyDataExportService(UsageDbContext db)
     /// <summary>Join CSV cells, escaping each (mirrors the <c>Csv()</c> idiom in <see cref="UsageQueries"/>).</summary>
     private static string Row(params string[] cells) => string.Join(',', cells.Select(Csv));
 
-    private static string Csv(string s) =>
-        s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r')
-            ? "\"" + s.Replace("\"", "\"\"") + "\""
-            : s;
+    private static string Csv(string s)
+    {
+        s ??= string.Empty;
+        // Formula-injection neutralization: a cell whose first char is one of these is treated as a
+        // formula by Excel/LibreOffice/Sheets. Free-text columns here (merchant/contact/exercise/model
+        // names, etc.) are user-authored and can reach another household member's archive, so prefix
+        // such cells with a single quote so they render as literal text, and force quoting.
+        var injectable = s.Length > 0 && s[0] is '=' or '+' or '-' or '@' or '\t' or '\r';
+        if (injectable) s = "'" + s;
+        // RFC 4180: quote if the field contains a comma, quote, CR or LF (bare '\r' included).
+        if (injectable || s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r'))
+            return "\"" + s.Replace("\"", "\"\"") + "\"";
+        return s;
+    }
 
     private static string D(DateOnly d) => d.ToString("yyyy-MM-dd");
     private static string T(DateTime t) => t.ToString("o", CultureInfo.InvariantCulture);

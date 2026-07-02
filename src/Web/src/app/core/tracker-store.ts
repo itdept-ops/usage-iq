@@ -43,6 +43,13 @@ export class TrackerStore {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
+  /**
+   * Monotonic request counter for {@link load}. Each load captures the current value before its await;
+   * only the latest-issued load may mutate the visible signals, so a slow response for a superseded
+   * date/view-user can never overwrite a freshly-loaded day (latest-wins).
+   */
+  private loadSeq = 0;
+
   /** True while viewing someone else's tracker (no add/delete controls). */
   readonly readOnly = computed(() => this.day()?.readOnly ?? this.viewUser() !== null);
 
@@ -60,15 +67,21 @@ export class TrackerStore {
 
   /** Load (or reload) the current day for the current date + view target. */
   async load(): Promise<void> {
+    const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
     try {
       const day = await firstValueFrom(this.api.trackerDay(this.date(), this.viewUser() ?? undefined));
+      // Latest-wins: a newer load has superseded this one; discard its result so it can't
+      // overwrite the freshly-requested date/view-user (another person's day/PII).
+      if (seq !== this.loadSeq) return;
       this.day.set(day);
     } catch (e: unknown) {
+      if (seq !== this.loadSeq) return;
       this.error.set(this.messageOf(e));
     } finally {
-      this.loading.set(false);
+      // Only the latest load clears the spinner; a stale load resolving first must not.
+      if (seq === this.loadSeq) this.loading.set(false);
     }
   }
 

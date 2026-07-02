@@ -356,13 +356,22 @@ public sealed class FamilyReminderService(
             }
             await db.SaveChangesAsync(ct);
 
-            await notifier.NotifyFamily(
-                new[] { r.TargetUserId },
-                NotificationType.FamilyReminder,
-                $"⏰ Reminder: {r.Text}",
-                "/family/reminders",
-                ct);
-            fired++;
+            try
+            {
+                await notifier.NotifyFamily(
+                    new[] { r.TargetUserId },
+                    NotificationType.FamilyReminder,
+                    $"⏰ Reminder: {r.Text}",
+                    "/family/reminders",
+                    ct);
+                fired++;
+            }
+            catch (Exception)
+            {
+                // Swallow per-reminder so one recipient's notify failure (SignalR/DB hiccup) can't abort the
+                // rest of the batch. The occurrence is already advanced/deactivated above, so it won't re-fire;
+                // the background ExecuteAsync wrapper logs unexpected tick failures.
+            }
         }
         return fired;
     }
@@ -415,18 +424,27 @@ public sealed class FamilyReminderService(
             t.Done = true;
             await db.SaveChangesAsync(ct);
 
-            var memberIds = await db.HouseholdMembers.AsNoTracking()
-                .Where(m => m.HouseholdId == t.HouseholdId)
-                .Select(m => m.UserId)
-                .ToListAsync(ct);
+            try
+            {
+                var memberIds = await db.HouseholdMembers.AsNoTracking()
+                    .Where(m => m.HouseholdId == t.HouseholdId)
+                    .Select(m => m.UserId)
+                    .ToListAsync(ct);
 
-            await notifier.NotifyFamily(
-                memberIds,
-                NotificationType.FamilyTimer,
-                $"⏰ {t.Label} is up!",
-                "/family/timers",
-                ct);
-            completed++;
+                await notifier.NotifyFamily(
+                    memberIds,
+                    NotificationType.FamilyTimer,
+                    $"⏰ {t.Label} is up!",
+                    "/family/timers",
+                    ct);
+                completed++;
+            }
+            catch (Exception)
+            {
+                // Swallow per-timer so one household's notify failure (SignalR/DB hiccup) can't abort the rest
+                // of the finished-timer batch. The timer is already stamped Done above, so it won't re-notify;
+                // the background ExecuteAsync wrapper logs unexpected tick failures.
+            }
         }
         return completed;
     }

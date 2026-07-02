@@ -31,6 +31,18 @@ namespace Ccusage.Api.Services;
 ///
 /// The tick body is a public instance method (<see cref="TickAsync"/>) taking the clock so tests can drive a
 /// single deterministic cycle.
+///
+/// <para><b>SINGLE-INSTANCE OPERATIONAL INVARIANT (hard requirement).</b> This service — like its sibling
+/// forwarders (<see cref="NotificationBackgroundService"/>, FamilyReminderService, HealthSyncScheduler,
+/// MachineGeoBackfillService, AutoSyncBackgroundService) — ticks on a plain in-process
+/// <see cref="PeriodicTimer"/> with NO cross-instance leader-election or advisory lock. Its stamp-first
+/// idempotency (<see cref="ScheduledAgent.LastFiredLocalDate"/> written before notifying) is a read-then-write
+/// that is only race-free because EXACTLY ONE process runs it (single 'api' service on one host today). Running
+/// two replicas — horizontal scale-out, blue/green overlap, or an accidental second container — lets both read
+/// the same 'not fired yet' state in the same minute and BOTH deliver the nudge (duplicate PII notifications and
+/// duplicate token spend). Do NOT scale the API horizontally until a cross-instance guard (a Postgres
+/// <c>pg_try_advisory_lock</c> per tick, an atomic conditional <c>UPDATE … WHERE not-yet-advanced RETURNING</c>
+/// to claim each due row, or a single 'scheduler leader' election) is added here and to the sibling services.</para>
 /// </summary>
 public sealed class AgentScheduler(
     IServiceScopeFactory scopeFactory, ILogger<AgentScheduler> logger) : BackgroundService
@@ -123,7 +135,16 @@ public sealed class AgentScheduler(
                 if (InQuietHours(localNow.Hour, agent.QuietStartLocalHour, agent.QuietEndLocalHour))
                 {
                     if (agent.Kind is ScheduledAgentKind.StreakRescue) continue; // defer; try again next tick
-                    // else fall through to STAMP-and-skip below (drop-for-the-day) so we don't reconsider it.
+
+                    // MISCONFIG GUARD: if the DELIVER HOUR ITSELF lies inside the quiet window (e.g. deliver at
+                    // 07:00 with quiet 22:00→08:00), stamping-and-dropping here would silently drop this agent
+                    // every single day forever. That is user misconfiguration, not "too late in the day" noise —
+                    // so DEFER instead (skip without stamping) and let a later tick, once the quiet window ends,
+                    // deliver it. Only stamp-and-drop when the deliver hour is legitimately OUTSIDE quiet hours.
+                    if (InQuietHours(agent.DeliverHourLocal, agent.QuietStartLocalHour, agent.QuietEndLocalHour))
+                        continue; // defer; deliver once quiet hours end this local day
+
+                    // else STAMP-and-skip (drop-for-the-day) so we don't reconsider it.
                     await StampFiredAsync(db, agent, localDate, FireKey(agent.Kind, localDate), ct);
                     continue;
                 }

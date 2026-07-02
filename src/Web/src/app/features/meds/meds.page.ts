@@ -73,10 +73,10 @@ interface WindowOpt { value: number; label: string; }
             Private to you — never shared with family, coaches, or contacts.
           </p>
         </div>
-        <div class="md-head__windows" role="tablist" aria-label="Window">
+        <div class="md-head__windows" role="group" aria-label="Window">
           @for (w of windows; track w.value) {
-            <button type="button" class="md-chip" role="tab"
-                    [class.is-on]="window() === w.value" [attr.aria-selected]="window() === w.value"
+            <button type="button" class="md-chip"
+                    [class.is-on]="window() === w.value" [attr.aria-pressed]="window() === w.value"
                     [disabled]="loading()" (click)="setWindow(w.value)">{{ w.label }}</button>
           }
         </div>
@@ -226,12 +226,12 @@ interface WindowOpt { value: number; label: string; }
         <section class="md-sec" aria-label="Vitals">
           <div class="md-sec__head">
             <h2 class="md-sec__title"><mat-icon aria-hidden="true">monitor_heart</mat-icon> Vitals</h2>
-            <div class="md-vital-kinds" role="tablist" aria-label="Vital kind">
+            <div class="md-vital-kinds" role="group" aria-label="Vital kind">
               @for (vm of vitalMetas; track vm.kind) {
-                <button type="button" class="md-vchip" role="tab"
+                <button type="button" class="md-vchip"
                         [class.is-on]="vitalKind() === vm.kind"
                         [style.--accent]="vm.accent"
-                        [attr.aria-selected]="vitalKind() === vm.kind"
+                        [attr.aria-pressed]="vitalKind() === vm.kind"
                         (click)="selectVitalKind(vm.kind)">
                   <mat-icon aria-hidden="true">{{ vm.icon }}</mat-icon> {{ vm.short }}
                 </button>

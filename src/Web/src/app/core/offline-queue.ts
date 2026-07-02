@@ -140,7 +140,12 @@ export class OfflineQueue {
       const pending = await this.all();
       if (!pending.length) return;
 
+      // No valid bearer (session expired / logged out / force-logged-out) — do NOT flush: replaying
+      // now would hit the server with no Authorization, get a 401/403, and (below) risk discarding
+      // optimistically-acked writes. Leave everything queued for a later wake once re-authenticated.
       const token = currentToken();
+      if (!token) return;
+
       for (const item of pending) {
         try {
           const headers: Record<string, string> = { ...(item.headers ?? {}) };
@@ -161,8 +166,15 @@ export class OfflineQueue {
             credentials: 'include',
           });
 
-          // 2xx = applied; 4xx = definitively rejected (bad/duplicate/forbidden) — either way the
-          // server has a verdict, so stop retrying. Only 5xx / network errors are worth a retry.
+          // 401/403 = auth not ready (token expired mid-flush, session invalidated, force-logout).
+          // This is NOT a data verdict — the write is still valid and a re-auth will replay it.
+          // Keep it (and the rest) and stop the flush, mirroring the network-error branch below.
+          if (res.status === 401 || res.status === 403) {
+            break;
+          }
+
+          // 2xx = applied; other 4xx = definitively rejected (bad/duplicate data) — either way the
+          // server has a data verdict, so stop retrying. Only 5xx / network errors are worth a retry.
           if (res.status < 500) {
             await this.remove(item.id);
           }

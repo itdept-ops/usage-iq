@@ -2,6 +2,7 @@ using Ccusage.Api.Data;
 using Ccusage.Api.Dtos;
 using Ccusage.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Ccusage.Api.Endpoints;
 
@@ -28,7 +29,8 @@ public static class PublicEndpoints
     {
         // ---- GET /api/public/built-with : the anonymous, cacheable marketing badge ----
         app.MapGet("/api/public/built-with", async (
-            HttpContext http, IConfiguration config, UsageDbContext db, UsageQueries q, CancellationToken ct) =>
+            HttpContext http, IConfiguration config, UsageDbContext db, UsageQueries q,
+            IMemoryCache cache, CancellationToken ct) =>
         {
             // Resolve the OWNER deterministically:
             //  1) the first configured admin email (Auth:AdminEmails[0]) — the canonical site owner; else
@@ -40,27 +42,39 @@ public static class PublicEndpoints
             if (ownerEmail is null)
                 return Results.Ok(Empty()); // no owner yet (fresh install) — a zeroed, still-cacheable badge.
 
-            // All-time, OWNER-SCOPED usage (ReportedByUser == owner). No date/project/model/source filter, so
-            // these are the owner's lifetime totals. The attribution filter keys on the RAW ReportedByUser
-            // value, which is the lower-cased owner email — never serialized; only the aggregate numbers leave.
-            var filter = new UsageFilterQuery(
-                from: null, to: null, projectId: null, model: null, source: null, includeSidechain: null,
-                machine: null, user: new[] { ownerEmail });
-
-            var summary = await q.SummaryAsync(filter, "day", ct);   // Total.TotalTokens + Total.CostUsd
-            var fleet = await q.FleetAsync(filter, ct);              // distinct machines = agents
-            var stats = await q.StatsAsync(filter, idleGapMinutes: 30, ct); // sessions + active days
-
-            var dto = new PublicBuiltWithDto
+            // SERVER-SIDE CACHE (the real DoS shield): the header cache is advisory — a CDN/browser MAY hold
+            // it, but an anonymous caller varying headers, or any CDN miss, would otherwise force a fresh
+            // row-materializing StatsAsync over the owner's (largest) lifetime dataset on every hit. Cache the
+            // fully-computed, caller-invariant DTO in-process keyed on the owner for the same ~10-minute window,
+            // so anonymous callers hit an in-memory value instead of the database.
+            var cacheKey = $"public:built-with:{ownerEmail}";
+            var dto = await cache.GetOrCreateAsync(cacheKey, async entry =>
             {
-                TotalTokens = summary.Total.TotalTokens,
-                TotalCostUsd = summary.Total.CostUsd,
-                AgentCount = fleet.Machines.Count,
-                SessionCount = stats.TotalSessions,
-                ActiveDays = stats.ActiveDays,
-                GeneratedAtUtc = DateTime.UtcNow,
-                AsOf = "all time",
-            };
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(CacheSeconds);
+
+                // All-time, OWNER-SCOPED usage (ReportedByUser == owner). No date/project/model/source filter,
+                // so these are the owner's lifetime totals. The attribution filter keys on the RAW
+                // ReportedByUser value, which is the lower-cased owner email — never serialized; only the
+                // aggregate numbers leave.
+                var filter = new UsageFilterQuery(
+                    from: null, to: null, projectId: null, model: null, source: null, includeSidechain: null,
+                    machine: null, user: new[] { ownerEmail });
+
+                var summary = await q.SummaryAsync(filter, "day", ct);   // Total.TotalTokens + Total.CostUsd
+                var fleet = await q.FleetAsync(filter, ct);              // distinct machines = agents
+                var stats = await q.StatsAsync(filter, idleGapMinutes: 30, ct); // sessions + active days
+
+                return new PublicBuiltWithDto
+                {
+                    TotalTokens = summary.Total.TotalTokens,
+                    TotalCostUsd = summary.Total.CostUsd,
+                    AgentCount = fleet.Machines.Count,
+                    SessionCount = stats.TotalSessions,
+                    ActiveDays = stats.ActiveDays,
+                    GeneratedAtUtc = DateTime.UtcNow,
+                    AsOf = "all time",
+                };
+            });
 
             // Cache-safe: the payload never varies by caller, so advertise a short shared cache window.
             http.Response.Headers.CacheControl = $"public, max-age={CacheSeconds}";

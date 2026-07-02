@@ -49,91 +49,6 @@ import {
 } from '../../core/models';
 
 /**
- * Tiny modal that prompts for the email-reveal key (single password-style input). Closes with the
- * trimmed key on submit, or `undefined` on cancel. The key lives only in the caller's memory — this
- * dialog never persists it. Kept in this file to keep the email-gate feature self-contained.
- */
-@Component({
-  selector: 'app-email-reveal-dialog',
-  imports: [
-    FormsModule,
-    MatDialogModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule,
-    MatIconModule,
-  ],
-  template: `
-    <h2 mat-dialog-title id="email-reveal-title">Show emails</h2>
-    <mat-dialog-content>
-      <p class="erd-sub">
-        Enter the reveal key to show real email addresses on this page. The key is held in memory
-        only for this session and is never saved.
-      </p>
-      <form (ngSubmit)="submit()">
-        <mat-form-field appearance="outline" class="erd-field" subscriptSizing="dynamic">
-          <mat-label>Reveal key</mat-label>
-          <input
-            matInput
-            #keyInput
-            type="password"
-            name="revealKey"
-            autocomplete="off"
-            aria-label="Email reveal key"
-            [(ngModel)]="key"
-            cdkFocusInitial
-          />
-          <mat-icon matPrefix>lock</mat-icon>
-        </mat-form-field>
-      </form>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button type="button" (click)="cancel()">Cancel</button>
-      <button
-        mat-flat-button
-        color="primary"
-        type="button"
-        [disabled]="!key.trim()"
-        (click)="submit()"
-      >
-        Show emails
-      </button>
-    </mat-dialog-actions>
-  `,
-  changeDetection: ChangeDetectionStrategy.Eager,
-  styles: [
-    `
-      .erd-sub {
-        margin: 0 0 14px;
-        max-width: 380px;
-        font-size: 13px;
-        line-height: 1.5;
-        color: var(--tech-text-secondary);
-      }
-      .erd-field {
-        width: 100%;
-      }
-      [mat-dialog-title] {
-        font-family: var(--tech-font-ui);
-      }
-    `,
-  ],
-})
-export class EmailRevealDialog {
-  private ref = inject(MatDialogRef<EmailRevealDialog, string | undefined>);
-  key = '';
-
-  submit(): void {
-    const k = this.key.trim();
-    if (k) this.ref.close(k);
-  }
-
-  cancel(): void {
-    this.ref.close(undefined);
-  }
-}
-
-/**
  * A named-button confirm dialog for sensitive actions (AI/destructive grants, disable, force-logout,
  * delete). Unlike the routine Undo-toast path, these REQUIRE a deliberate click on a labelled button so a
  * fast click can't fat-finger a token-spending grant or a disruptive change. The confirm button carries
@@ -291,18 +206,9 @@ export class Users {
   /** The detail heading — selection moves focus here (accessibility). */
   private detailHeading = viewChild<ElementRef<HTMLElement>>('detailHeading');
 
-  // ---- Email reveal (gated by a key) ----
-  // The key lives in COMPONENT MEMORY ONLY — never localStorage, never a URL. Null => emails are masked.
-  private revealKey: string | null = null;
-  /** True once a key has yielded real emails — drives the toggle label/icon + masked placeholders. */
-  readonly emailsRevealed = signal(false);
-  /** In-flight guard for the reveal/hide re-fetch (disables the toggle, shows progress). */
-  readonly revealing = signal(false);
-
-  /** The caller's own email, used to detect a successful reveal (their own email is always returned real). */
-  private get myEmail(): string | null {
-    return this.auth.session()?.email?.toLowerCase() ?? null;
-  }
+  // ---- Email visibility ----
+  // Real emails now arrive automatically when the caller holds users.email.reveal (server-side gate);
+  // otherwise other users' emails come back masked (null) and the template renders a placeholder.
 
   readonly perms = signal<PermissionItem[]>([]);
   readonly presets = signal<PermissionPreset[]>([]);
@@ -315,7 +221,7 @@ export class Users {
   readonly homeSavingId = signal<number | null>(null);
 
   // ---- Search + filter ----
-  /** Free-text search across name + email (email matched only when revealed). */
+  /** Free-text search across name + email (email matched when the server returns it unmasked). */
   readonly search = signal('');
   /** Capability filter axis + (for 'perm') its key. */
   readonly capFilter = signal<CapFilter>('all');
@@ -463,6 +369,14 @@ export class Users {
     PERM.familyFinance,
     PERM.locationSelf,
     PERM.locationShare,
+    // Admin oversight reads + deployment-global config-writes: never inheritable by open sign-up.
+    PERM.usersView,
+    PERM.activityView,
+    PERM.aiUsageView,
+    PERM.settingsManage,
+    PERM.sourcesManage,
+    PERM.reporterManage,
+    PERM.notificationsManage,
     PERM.trackerAi,
     PERM.familyAi,
     PERM.familyAiAssistant,
@@ -644,7 +558,7 @@ export class Users {
     forkJoin({
       perms: this.api.permissionCatalog(),
       presets: this.api.permissionPresets(),
-      users: this.api.users(this.revealKey ?? undefined),
+      users: this.api.users(),
     }).subscribe({
       next: (r) => {
         this.perms.set(r.perms);
@@ -698,7 +612,7 @@ export class Users {
   }
 
   private loadAudit(): void {
-    this.api.auditLog(this.revealKey ?? undefined).subscribe({
+    this.api.auditLog().subscribe({
       next: (a) => this.audit.set(a),
       error: () => {
         /* non-critical */
@@ -727,67 +641,6 @@ export class Users {
 
   setFilterRole(key: string): void {
     this.filterRole.set(key);
-  }
-
-  // ---- Email-reveal toggle ----
-  toggleEmails(): void {
-    if (this.emailsRevealed()) {
-      this.hideEmails();
-      return;
-    }
-    this.promptForKey();
-  }
-
-  private promptForKey(): void {
-    const ref = this.dialog.open(EmailRevealDialog, {
-      ...Users.DIALOG_OPTS,
-      width: '380px',
-      autoFocus: 'dialog',
-      restoreFocus: true,
-    });
-    ref.afterClosed().subscribe((key: string | undefined) => {
-      if (!key) return;
-      this.applyRevealKey(key);
-    });
-  }
-
-  private applyRevealKey(key: string): void {
-    this.revealing.set(true);
-    forkJoin({ users: this.api.users(key), audit: this.api.auditLog(key) }).subscribe({
-      next: ({ users, audit }) => {
-        this.revealing.set(false);
-        if (this.didReveal(users, audit)) {
-          this.revealKey = key;
-          this.users.set(users);
-          this.audit.set(audit);
-          this.reconcileSelection();
-          this.emailsRevealed.set(true);
-          this.snack.open('Emails revealed', 'OK', { duration: 2000 });
-        } else {
-          this.revealKey = null;
-          this.snack.open('Incorrect key', 'Dismiss', { duration: 4000 });
-        }
-      },
-      error: () => {
-        this.revealing.set(false);
-        this.snack.open('Incorrect key', 'Dismiss', { duration: 4000 });
-      },
-    });
-  }
-
-  private didReveal(users: ManagedUser[], audit: AuditEntry[]): boolean {
-    const mine = this.myEmail;
-    const isOther = (e: string | null) => !!e && e.toLowerCase() !== mine;
-    return (
-      users.some((u) => isOther(u.email)) ||
-      audit.some((a) => isOther(a.actorEmail) || isOther(a.targetEmail))
-    );
-  }
-
-  private hideEmails(): void {
-    this.revealKey = null;
-    this.emailsRevealed.set(false);
-    this.load();
   }
 
   // ---- Master-detail selection ----

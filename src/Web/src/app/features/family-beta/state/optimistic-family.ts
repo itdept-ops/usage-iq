@@ -4,6 +4,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Api } from '../../../core/api';
 import { FamilyChores, FamilyList } from '../../../core/models';
+import { runOptimistic } from '../../../shared/optimistic-mutation';
 
 /**
  * A thin OPTIMISTIC wrapper over the family fast-action write endpoints, used only by the Hearth beta
@@ -29,13 +30,10 @@ export class OptimisticFamily {
    * whole action. Returns the reconciled board or null when it failed (already rolled back).
    */
   async submitChore(id: number, rollback: () => void, retry: () => void): Promise<FamilyChores | null> {
-    try {
-      return await firstValueFrom(this.api.submitFamilyChore(id));
-    } catch {
-      rollback();
-      this.fail('Couldn’t update chore', retry);
-      return null;
-    }
+    return runOptimistic({
+      snack: this.snack, rollback, retry, failMessage: 'Couldn’t update chore',
+      apiCall: () => firstValueFrom(this.api.submitFamilyChore(id)),
+    });
   }
 
   /**
@@ -44,13 +42,10 @@ export class OptimisticFamily {
    * Retry on failure.
    */
   async toggleChore(id: number, done: boolean, rollback: () => void, retry: () => void): Promise<FamilyChores | null> {
-    try {
-      return await firstValueFrom(this.api.patchFamilyChore(id, { done }));
-    } catch {
-      rollback();
-      this.fail('Couldn’t update chore', retry);
-      return null;
-    }
+    return runOptimistic({
+      snack: this.snack, rollback, retry, failMessage: 'Couldn’t update chore',
+      apiCall: () => firstValueFrom(this.api.patchFamilyChore(id, { done })),
+    });
   }
 
   /**
@@ -58,13 +53,10 @@ export class OptimisticFamily {
    * provisional row; we fire, return the full updated list to reconcile from, or roll back + Retry.
    */
   async addListItem(listId: number, text: string, rollback: () => void, retry: () => void): Promise<FamilyList | null> {
-    try {
-      return await firstValueFrom(this.api.addFamilyListItem(listId, text));
-    } catch {
-      rollback();
-      this.fail('Couldn’t add item', retry);
-      return null;
-    }
+    return runOptimistic({
+      snack: this.snack, rollback, retry, failMessage: 'Couldn’t add item',
+      apiCall: () => firstValueFrom(this.api.addFamilyListItem(listId, text)),
+    });
   }
 
   /**
@@ -72,18 +64,9 @@ export class OptimisticFamily {
    * checkbox already; we fire, reconcile from the response, or roll back + Retry.
    */
   async tickListItem(listId: number, itemId: number, done: boolean, rollback: () => void, retry: () => void): Promise<FamilyList | null> {
-    try {
-      return await firstValueFrom(this.api.patchFamilyListItem(listId, itemId, { done }));
-    } catch {
-      rollback();
-      this.fail('Couldn’t update item', retry);
-      return null;
-    }
-  }
-
-  /** Show a non-blocking failure with a Retry action that re-runs the original mutation. */
-  private fail(message: string, retry: () => void): void {
-    this.snack.open(message, 'Retry', { duration: 5000, politeness: 'polite' })
-      .onAction().subscribe(() => retry());
+    return runOptimistic({
+      snack: this.snack, rollback, retry, failMessage: 'Couldn’t update item',
+      apiCall: () => firstValueFrom(this.api.patchFamilyListItem(listId, itemId, { done })),
+    });
   }
 }

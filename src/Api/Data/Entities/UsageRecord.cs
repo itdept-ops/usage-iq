@@ -72,7 +72,9 @@ public class UsageRecord
     /// </summary>
     public string ReportedByUser { get; set; } = "";
 
-    /// <summary>The file this row was first ingested from (informational).</summary>
-    public int IngestedFileId { get; set; }
+    /// <summary>The file this row was first ingested from (informational). Nullable: the usage/cost row is the
+    /// authoritative billing ledger and must survive a purge of the file-tracking row (the FK is SET NULL on
+    /// delete, mirroring the IngestKey.UserId "orphan instead of cascade" decision).</summary>
+    public int? IngestedFileId { get; set; }
     public IngestedFile? IngestedFile { get; set; }
 }

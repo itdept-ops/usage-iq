@@ -91,8 +91,14 @@ export class NotificationBell {
     return `Notifications, ${n} unread`;
   });
 
-  /** Ids we've already surfaced live (toast/browser) so the same notification never fires twice. */
+  /**
+   * Ids we've already surfaced live (toast/browser) so the same notification never fires twice.
+   * Capped to the most-recent {@link SURFACED_CAP} ids (insertion-ordered Set, oldest evicted) so it
+   * can't grow unbounded over a multi-day PWA session; re-surfacing a very old notification isn't a
+   * realistic concern.
+   */
   private readonly surfaced = new Set<number>();
+  private static readonly SURFACED_CAP = 500;
 
   constructor() {
     // LIVE-surface effect. Reads liveNotification() (set ONLY by the hub's ReceiveNotification) so the
@@ -105,6 +111,12 @@ export class NotificationBell {
       const n = live.notification;
       if (this.surfaced.has(n.id)) return;
       this.surfaced.add(n.id);
+      // Evict the oldest id(s) so the dedupe set stays bounded over a long-lived session.
+      while (this.surfaced.size > NotificationBell.SURFACED_CAP) {
+        const oldest = this.surfaced.values().next().value;
+        if (oldest === undefined) break;
+        this.surfaced.delete(oldest);
+      }
       this.now.set(Date.now());
 
       const prefs = this.chat.preferences();

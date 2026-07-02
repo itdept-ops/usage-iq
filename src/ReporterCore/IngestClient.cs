@@ -36,7 +36,11 @@ public sealed class IngestClient : IDisposable
     {
         _machine = machine;
         _machineInfo = machineInfo;
-        _http = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(100) };
+        // AllowAutoRedirect = false so the X-Ingest-Key credential is never re-sent to a redirect
+        // target on a different host: .NET strips Authorization on cross-origin redirects but not
+        // custom headers, so an auto-followed 3xx (or a cleartext-http MITM) would otherwise leak it.
+        var handler = new HttpClientHandler { AllowAutoRedirect = false };
+        _http = new HttpClient(handler) { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(100) };
         _http.DefaultRequestHeaders.Add("X-Ingest-Key", key);
         _http.DefaultRequestHeaders.UserAgent.ParseAdd(Version);
     }

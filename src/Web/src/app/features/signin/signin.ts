@@ -64,9 +64,15 @@ export class SignIn {
   }
 
   private returnUrl(): string {
-    // An explicit ?returnUrl stays verbatim; the homeRoute() fallback is normalized so a saved legacy
+    // An explicit ?returnUrl is honoured only when it is a same-origin in-app path (a single leading "/",
+    // not "//" which is protocol-relative) — otherwise an attacker-crafted link could bounce the user to
+    // any deep link post-login. Anything else falls back to the normalized home route, so a saved legacy
     // /beta/* or /tracker-beta home lands on its canonical page (the device then picks desktop/mobile).
-    return this.route.snapshot.queryParamMap.get('returnUrl') || normalizeHome(this.auth.homeRoute());
+    const raw = this.route.snapshot.queryParamMap.get('returnUrl');
+    if (raw && raw.startsWith('/') && !raw.startsWith('//')) {
+      return raw;
+    }
+    return normalizeHome(this.auth.homeRoute());
   }
 
   private async initGoogle(): Promise<void> {

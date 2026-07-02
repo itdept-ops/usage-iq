@@ -120,7 +120,7 @@
         <span class="pb-pay__label">Pay what you owe</span>
         <div class="pb-pay__links">
           @for (l of payLinks(); track l.label) {
-            <a class="pb-pay__link" [href]="l.url" target="_blank" rel="noopener">
+            <a class="pb-pay__link" [href]="l.url" target="_blank" rel="noopener noreferrer">
               <mat-icon aria-hidden="true">{{ l.icon }}</mat-icon>{{ l.label }}
             </a>
           }

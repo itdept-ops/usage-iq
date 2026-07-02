@@ -19,7 +19,37 @@ public sealed class CapturingResponseStream(Stream inner, int maxCapture) : Stre
         if (room > 0) _capture.Write(data[..Math.Min(room, data.Length)]);
     }
 
-    public string GetCapturedText() => Encoding.UTF8.GetString(_capture.ToArray());
+    public string GetCapturedText()
+    {
+        var bytes = _capture.ToArray();
+        var truncated = TotalBytes > bytes.Length;
+
+        // If the capture was cut at the byte window, the tail may end mid multi-byte UTF-8
+        // sequence (decoding to a replacement char that can disrupt a redaction regex anchor)
+        // and, more importantly, a secret whose opening quote is inside the window but whose
+        // closing quote fell just past it is a partial value that would slip past a regex that
+        // only matches COMPLETE quoted values. Fail closed: drop the trailing incomplete UTF-8
+        // sequence and append a marker so any dangling partial field is not left as a clean,
+        // unredacted quoted value.
+        if (truncated)
+        {
+            var len = bytes.Length;
+            // Walk back over UTF-8 continuation bytes (10xxxxxx) to the start of the last
+            // (possibly incomplete) code point, then drop it if it is not fully present.
+            var i = len - 1;
+            while (i >= 0 && (bytes[i] & 0xC0) == 0x80) i--;
+            if (i >= 0)
+            {
+                var lead = bytes[i];
+                var expected = lead < 0x80 ? 1 : lead < 0xE0 ? 2 : lead < 0xF0 ? 3 : 4;
+                if (len - i < expected) len = i; // incomplete trailing sequence: drop it
+            }
+
+            return Encoding.UTF8.GetString(bytes, 0, len) + "\"…[truncated]";
+        }
+
+        return Encoding.UTF8.GetString(bytes);
+    }
 
     public override void Write(byte[] buffer, int offset, int count)
     {

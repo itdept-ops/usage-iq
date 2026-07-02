@@ -82,6 +82,34 @@ public class ForwardedHeadersIntegrationTests(WebAppFactory factory)
     }
 
     [Fact]
+    public async Task Forwarded_header_from_an_untrusted_public_peer_is_ignored()
+    {
+        // Anti-spoof guard: the request arrives from a PUBLIC (untrusted) peer — not a trusted
+        // private proxy — while carrying an X-Forwarded-For that claims a different public client.
+        // Because the immediate peer is outside KnownNetworks (10/8, 172.16/12, 192.168/16),
+        // UseForwardedHeaders must NOT unwind the header, so the recorded IP is the observed peer,
+        // never the attacker-supplied address. This is the property the KnownNetworks bound defends.
+        const string untrustedPeer = "198.51.100.20"; // public, outside all trusted networks
+        const string spoofedClient = "8.8.8.8";        // the address a spoofer tries to inject
+        var email = $"xff-spoof-{Guid.NewGuid():N}@test.local";
+        await CreateUser(email);
+
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/google")
+        {
+            Content = JsonContent.Create(new { idToken = $"{email}|sub-{Guid.NewGuid():N}" }),
+        };
+        req.Headers.TryAddWithoutValidation(WebAppFactory.PeerIpHeader, untrustedPeer);
+        req.Headers.TryAddWithoutValidation("X-Forwarded-For", spoofedClient);
+        (await factory.CreateClient().SendAsync(req)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var ev = await LatestEventFor(email);
+        ev.Should().NotBeNull();
+        // The spoofed header was NOT honored — the observed untrusted peer is what was recorded.
+        ev!.Ip.Should().Be(untrustedPeer);
+        ev.Ip.Should().NotBe(spoofedClient);
+    }
+
+    [Fact]
     public async Task No_forwarded_header_falls_back_to_the_observed_peer_ip()
     {
         // Sanity: without an X-Forwarded-For, the stamped peer is what gets recorded (no spoofable

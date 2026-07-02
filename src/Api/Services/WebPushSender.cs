@@ -51,6 +51,51 @@ public sealed class WebPushSender
     /// <summary>The named HttpClient the push POSTs go through (rerouteable in tests).</summary>
     public const string HttpClientName = "webpush";
 
+    /// <summary>
+    /// Hard cap on how many of a recipient's subscriptions we fan a single notification out to. A subscription
+    /// is created per browser/profile/device and only pruned on a 404/410, so a long-lived user can accumulate
+    /// many stale rows; sending to an unbounded set would serialize the whole dispatch. We send to the most
+    /// recently used ones only (dead endpoints are the least-recently-used and self-prune when they answer 410).
+    /// </summary>
+    private const int MaxSubscriptionsPerSend = 20;
+
+    /// <summary>How many push POSTs may be in flight at once for one recipient — keeps a large fan-out from
+    /// serializing on N sequential network round-trips without stampeding the push services.</summary>
+    private const int SendParallelism = 4;
+
+    // The ONLY hosts a browser push endpoint may point at (the real push services of Chrome/Edge, Firefox,
+    // Windows/WNS and Safari). Since the endpoint URL is user-supplied at /subscribe and we POST to it verbatim,
+    // this allowlist closes off SSRF to internal/metadata hosts. Redirects are already disabled globally for
+    // every named HttpClient (see Program.cs ConfigureHttpClientDefaults), so an allowlisted host cannot 3xx
+    // the request onward. Exact hosts plus a small set of trusted suffixes (their regional/shard subdomains).
+    private static readonly HashSet<string> AllowedPushHosts =
+        new(StringComparer.OrdinalIgnoreCase) { "fcm.googleapis.com", "web.push.apple.com" };
+
+    private static readonly string[] AllowedPushHostSuffixes =
+    {
+        ".push.services.mozilla.com",
+        ".notify.windows.com",
+        ".wns.windows.com",
+    };
+
+    /// <summary>
+    /// True only for an https URL whose host is a known browser push service. Everything else — http, a bare
+    /// IP, an internal/metadata host, or an unknown domain — is rejected so a user-supplied endpoint can never
+    /// turn a send into an SSRF probe. Also rejects hosts that parse as an IP (loopback/link-local/private).
+    /// </summary>
+    private static bool IsAllowedPushEndpoint(string? endpoint)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var u)) return false;
+        if (u.Scheme != Uri.UriSchemeHttps) return false;
+        // A host that is (or parses as) a literal IP is never a legitimate push service — refuse it outright so
+        // no 127.0.0.1 / 169.254.169.254 / 10.x style target slips through, regardless of the allowlist.
+        if (u.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6) return false;
+        if (AllowedPushHosts.Contains(u.Host)) return true;
+        foreach (var suffix in AllowedPushHostSuffixes)
+            if (u.Host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
     /// <summary>Whether web-push is configured (both VAPID keys present). False ⇒ every send is a silent no-op.</summary>
     public bool IsConfigured => _options.IsConfigured;
 
@@ -104,8 +149,13 @@ public sealed class WebPushSender
         List<Data.Entities.PushSubscription> subs;
         try
         {
+            // Cap the fan-out: newest-used first, take at most MaxSubscriptionsPerSend. A user with many stale
+            // rows can't serialize the dispatch, and the freshest (most likely live) subscriptions win; the
+            // omitted stale ones self-prune the next time they DO get sent to and answer 404/410.
             subs = await _db.PushSubscriptions.AsNoTracking()
                 .Where(s => s.OwnerEmail == recipientEmail)
+                .OrderByDescending(s => s.LastUsedUtc ?? s.CreatedUtc)
+                .Take(MaxSubscriptionsPerSend)
                 .ToListAsync(ct);
         }
         catch (Exception ex)
@@ -138,10 +188,23 @@ public sealed class WebPushSender
         }
         var vapid = new VapidDetails(_options.Subject, _options.PublicKey, _options.PrivateKey);
 
-        var goneEndpoints = new List<string>();
-        var nowSent = new List<string>();
-        foreach (var s in subs)
+        // Thread-safe because sends run concurrently below (bounded fan-out).
+        var goneEndpoints = new System.Collections.Concurrent.ConcurrentBag<string>();
+        var nowSent = new System.Collections.Concurrent.ConcurrentBag<string>();
+
+        async Task SendOneAsync(Data.Entities.PushSubscription s)
         {
+            // SSRF guard: the endpoint URL is user-supplied at /subscribe and we POST the encrypted payload to
+            // it verbatim, so refuse anything that isn't an https URL at a known browser push service. This
+            // blocks http://169.254.169.254/… metadata probes, bare-IP/loopback targets and unknown hosts.
+            // (Redirects are already disabled for every named HttpClient in Program.cs, so an allowlisted host
+            // can't 3xx onward either.) A stored endpoint that fails this is skipped, not sent.
+            if (!IsAllowedPushEndpoint(s.Endpoint))
+            {
+                _logger.LogWarning("Web push: skipping a subscription whose endpoint is not an allowed push host.");
+                return;
+            }
+
             try
             {
                 var libSub = new LibPushSubscription(s.Endpoint, s.P256dh, s.Auth);
@@ -150,7 +213,7 @@ public sealed class WebPushSender
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                return; // shutting down — stop quietly.
+                // shutting down — stop quietly (the Parallel loop below observes the cancellation).
             }
             catch (WebPushException wpe) when (IsGone(wpe.StatusCode))
             {
@@ -172,13 +235,31 @@ public sealed class WebPushSender
             }
         }
 
+        // Fan out with a bounded degree of parallelism so one recipient with many endpoints can't serialize the
+        // dispatch on N sequential round-trips. Each send swallows its own failures, so this never throws here.
+        try
+        {
+            await Parallel.ForEachAsync(
+                subs,
+                new ParallelOptions { MaxDegreeOfParallelism = SendParallelism, CancellationToken = ct },
+                async (s, _) => await SendOneAsync(s));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return; // shutting down — stop quietly.
+        }
+
+        // Materialize the concurrent results into plain lists for the EF batch statements below.
+        var gone = goneEndpoints.ToList();
+        var sent = nowSent.ToList();
+
         // Prune dead subscriptions in one statement (best-effort; failure here is also swallowed).
-        if (goneEndpoints.Count > 0)
+        if (gone.Count > 0)
         {
             try
             {
                 await _db.PushSubscriptions
-                    .Where(s => s.OwnerEmail == recipientEmail && goneEndpoints.Contains(s.Endpoint))
+                    .Where(s => s.OwnerEmail == recipientEmail && gone.Contains(s.Endpoint))
                     .ExecuteDeleteAsync(ct);
             }
             catch (Exception ex)
@@ -188,13 +269,13 @@ public sealed class WebPushSender
         }
 
         // Bump LastUsedUtc for the ones that succeeded (best-effort; purely informational).
-        if (nowSent.Count > 0)
+        if (sent.Count > 0)
         {
             try
             {
                 var now = DateTime.UtcNow;
                 await _db.PushSubscriptions
-                    .Where(s => s.OwnerEmail == recipientEmail && nowSent.Contains(s.Endpoint))
+                    .Where(s => s.OwnerEmail == recipientEmail && sent.Contains(s.Endpoint))
                     .ExecuteUpdateAsync(u => u.SetProperty(s => s.LastUsedUtc, now), ct);
             }
             catch (Exception ex)

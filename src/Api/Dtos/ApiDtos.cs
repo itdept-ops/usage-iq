@@ -767,7 +767,8 @@ public sealed class UserDto
 {
     public int Id { get; set; }
     /// <summary>The user's email, or null when masked (server-side email-visibility gate). The caller's
-    /// own row is always real; OTHER users' emails are null unless the X-Email-Reveal-Key header matches.</summary>
+    /// own row is always real; OTHER users' emails are null unless the caller holds the users.email.reveal
+    /// permission.</summary>
     public string? Email { get; set; }
     public string Name { get; set; } = "";
     public string? Picture { get; set; }
@@ -823,7 +824,7 @@ public sealed class AuditEntryDto
     public long Id { get; set; }
     public DateTime WhenUtc { get; set; }
     /// <summary>The acting admin's email, or null when masked. The caller's own actor email stays real;
-    /// other actors' emails are null unless the X-Email-Reveal-Key header matches the configured key.</summary>
+    /// other actors' emails are null unless the caller holds the users.email.reveal permission.</summary>
     public string? ActorEmail { get; set; }
     public string Action { get; set; } = "";
     /// <summary>The affected user's email, or null when masked (same gate as <see cref="ActorEmail"/>).</summary>

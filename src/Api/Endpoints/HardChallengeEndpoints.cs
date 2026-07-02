@@ -218,7 +218,16 @@ public static class HardChallengeEndpoints
                 .FirstOrDefaultAsync(c => c.UserEmail == caller.Email && c.Status == HardChallengeStatus.Active, ct);
             if (challenge is null) return Results.NotFound();
 
-            var confession = Trunc(req!.Confession?.Trim(), 280);
+            // Bound the write to the active challenge's 75-day window so a caller can't create arbitrarily-dated
+            // day rows (mirrors the window bound POST /cheat-days enforces).
+            if (!WithinWindow(challenge.StartDate, localDate))
+                return Results.BadRequest(new { message = "That date is outside the challenge window." });
+
+            // Distinguish an ABSENT confession field (leave the stored value untouched) from an explicitly-sent one
+            // (present but empty ⇒ CLEAR; present + text ⇒ set). Only touch the row's confession when the field was
+            // actually provided by the client.
+            var confessionProvided = req!.Confession is not null;
+            var confession = Trunc(req.Confession?.Trim(), 280);
             if (string.IsNullOrEmpty(confession)) confession = null;
 
             var now = DateTime.UtcNow;
@@ -237,7 +246,7 @@ public static class HardChallengeEndpoints
                 };
                 db.HardChallengeDays.Add(row);
             }
-            ApplyDayManual(row, req, confession, now);
+            ApplyDayManual(row, req, confessionProvided, confession, now);
             try
             {
                 await db.SaveChangesAsync(ct);
@@ -250,7 +259,7 @@ public static class HardChallengeEndpoints
                 row = await db.HardChallengeDays
                     .FirstAsync(x => x.UserEmail == caller.Email && x.LocalDate == localDate, ct);
                 hadConfession = row.Confession is not null;
-                ApplyDayManual(row, req, confession, now);
+                ApplyDayManual(row, req, confessionProvided, confession, now);
                 await db.SaveChangesAsync(ct);
             }
 
@@ -263,9 +272,17 @@ public static class HardChallengeEndpoints
                 await UpsertTaskProgressAsync(db, caller.Email, challenge.Id, localDate, req.Tasks, taskByKey, now, ct);
             }
 
+            // Keep ConfessionsUsed in step with the actual transition: +1 on the first-time set, -1 when a
+            // previously-present confession is explicitly cleared (guarded so it never goes below zero).
             if (!hadConfession && confession is not null)
             {
                 challenge.ConfessionsUsed += 1;
+                challenge.UpdatedUtc = now;
+                await db.SaveChangesAsync(ct);
+            }
+            else if (hadConfession && confessionProvided && confession is null)
+            {
+                challenge.ConfessionsUsed = Math.Max(0, challenge.ConfessionsUsed - 1);
                 challenge.UpdatedUtc = now;
                 await db.SaveChangesAsync(ct);
             }
@@ -421,6 +438,19 @@ public static class HardChallengeEndpoints
                 if (dt <= today || dt < challenge.StartDate || dt > windowEnd)
                     return Results.BadRequest(new { message = "Cheat days must be future dates within the challenge window." });
 
+            // Validate the RESULTING future cheat-day set (existing − removals + additions) against the cap BEFORE
+            // writing anything, so a rejected request leaves the persisted state untouched (removals + additions are
+            // applied together in a single SaveChanges below only once the request is known to be valid).
+            var existingFuture = await db.HardChallengeDays.AsNoTracking()
+                .Where(x => x.UserEmail == caller.Email && x.IsCheatDay && x.LocalDate > today)
+                .Select(x => x.LocalDate)
+                .ToListAsync(ct);
+            var resulting = new HashSet<DateOnly>(existingFuture);
+            foreach (var dt in toRemove) resulting.Remove(dt);
+            foreach (var dt in toAdd) resulting.Add(dt);
+            if (resulting.Count > MaxCheatDays)
+                return Results.BadRequest(new { message = $"At most {MaxCheatDays} cheat days may be declared." });
+
             var now = DateTime.UtcNow;
 
             foreach (var dt in toRemove)
@@ -431,16 +461,6 @@ public static class HardChallengeEndpoints
                 r.IsCheatDay = false;
                 r.UpdatedUtc = now;
             }
-            await db.SaveChangesAsync(ct);
-
-            var existingFuture = await db.HardChallengeDays
-                .Where(x => x.UserEmail == caller.Email && x.IsCheatDay && x.LocalDate > today)
-                .Select(x => x.LocalDate)
-                .ToListAsync(ct);
-            var resulting = new HashSet<DateOnly>(existingFuture);
-            foreach (var dt in toAdd) resulting.Add(dt);
-            if (resulting.Count > MaxCheatDays)
-                return Results.BadRequest(new { message = $"At most {MaxCheatDays} cheat days may be declared." });
 
             foreach (var dt in toAdd)
             {
@@ -1218,11 +1238,14 @@ public static class HardChallengeEndpoints
     // Small helpers
     // =====================================================================================
 
-    private static void ApplyDayManual(HardChallengeDay row, UpsertDayRequest req, string? confession, DateTime now)
+    private static void ApplyDayManual(
+        HardChallengeDay row, UpsertDayRequest req, bool confessionProvided, string? confession, DateTime now)
     {
         if (req.NoAlcohol is { } na) row.NoAlcohol = na;
         if (req.DietOverride is { } d) row.DietOverride = d;
-        if (confession is not null) row.Confession = confession;
+        // Only touch the confession when the client actually sent the field: a present-but-empty value clears it
+        // (confession == null here), a present + text value sets it; an ABSENT field leaves it unchanged.
+        if (confessionProvided) row.Confession = confession;
         row.UpdatedUtc = now;
     }
 

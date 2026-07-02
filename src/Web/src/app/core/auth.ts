@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { AuthSession, MeResponse, ProfilePrefs } from './models';
-import { HOME_PERMS } from './home-options';
+import { HOME_OPTIONS, HOME_PERMS } from './home-options';
 
 const STORAGE_KEY = 'usage_iq_session';
 
@@ -54,16 +54,13 @@ export class AuthService {
     const saved = this._session()?.homeRoute;
     if (saved && this.canAccessHome(saved)) return saved;
 
-    // First accessible page in NAV order — Usage group, then Tracker, Family, Chat, Admin group.
-    // Uses canAccessHome (ANY-of) so the any-of routes (/reporter, /fleet) are covered, and it stays
-    // in lock-step with homePerms + the nav grouping (every route is represented — no dead landings).
-    const order = [
-      '/', '/calendar', '/pricing', '/reporter', '/fleet',
-      '/tracker', '/feed', '/family', '/chat', '/locations',
-      '/users', '/activity', '/settings',
-    ];
-    for (const route of order) {
-      if (this.canAccessHome(route)) return route;
+    // First accessible page in declaration order, iterating HOME_OPTIONS directly so this fallback can
+    // NEVER drift from the picker (a hand-curated subset previously stranded users whose only permission
+    // was on an omitted route — e.g. /grocery, /recipes, /bills — on /welcome). Uses canAccessHome
+    // (ANY-of) so any-of routes (/reporter, /fleet) are covered. Only '/welcome' when the caller truly
+    // holds no page-view permission.
+    for (const opt of HOME_OPTIONS) {
+      if (this.canAccessHome(opt.route)) return opt.route;
     }
     return '/welcome';
   }
@@ -176,9 +173,29 @@ export class AuthService {
   private restore(): AuthSession | null {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as AuthSession) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as unknown;
+      return this.isValidSession(parsed) ? parsed : null;
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Treat the persisted blob as UNTRUSTED input (localStorage is writable by any XSS foothold or on a
+   * shared/kiosk device) rather than an as-cast AuthSession: a tampered object with a far-future
+   * expiresAtUtc + a full permissions array would otherwise make the client render permission-gated UI
+   * and route to admin homes. The forged token still fails server RequirePermission checks, but this
+   * keeps the client from trusting a malformed/forged shape. Require the load-bearing fields to be
+   * present and correctly typed (non-empty string token, a parseable ISO expiry, an all-string
+   * permissions array); anything else is discarded so the user is treated as unauthenticated.
+   */
+  private isValidSession(v: unknown): v is AuthSession {
+    if (!v || typeof v !== 'object') return false;
+    const s = v as Record<string, unknown>;
+    if (typeof s['token'] !== 'string' || s['token'].length === 0) return false;
+    if (typeof s['expiresAtUtc'] !== 'string' || Number.isNaN(new Date(s['expiresAtUtc']).getTime())) return false;
+    if (!Array.isArray(s['permissions']) || !s['permissions'].every((p) => typeof p === 'string')) return false;
+    return true;
   }
 }

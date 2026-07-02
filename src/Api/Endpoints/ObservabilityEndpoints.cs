@@ -12,8 +12,15 @@ public static class ObservabilityEndpoints
     {
         // Recent request/response action log. Admin-only (it can contain request/response bodies).
         app.MapGet("/api/logs", async (
-                UsageDbContext db, string? method, string? status, string? q, int? take, CancellationToken ct) =>
+                UsageDbContext db, CurrentUserAccessor currentUser,
+                string? method, string? status, string? q, int? take, CancellationToken ct) =>
             {
+                // Raw request/response bodies can contain special-category PII (see RequestLoggingMiddleware's
+                // BodyExcluded); restrict them to admins who can already see users (users.view). Callers with
+                // only activity.view still get the request LINE (method/path/status/timing/user).
+                var caller = await currentUser.GetUserAsync(ct);
+                var includeBodies = caller?.Permissions.Contains(Permissions.UsersView) == true;
+
                 var query = db.RequestLogs.AsNoTracking().AsQueryable();
 
                 if (!string.IsNullOrWhiteSpace(method))
@@ -73,8 +80,8 @@ public static class ObservabilityEndpoints
                         ClientIp = r.ClientIp,
                         RequestBytes = r.RequestBytes,
                         ResponseBytes = r.ResponseBytes,
-                        RequestBody = r.RequestBody,
-                        ResponseBody = r.ResponseBody,
+                        RequestBody = includeBodies ? r.RequestBody : null,
+                        ResponseBody = includeBodies ? r.ResponseBody : null,
                     };
                 }).ToList();
 
@@ -103,7 +110,14 @@ public static class ObservabilityEndpoints
                 if (from is { } f)
                     window = window.Where(r => r.WhenUtc >= DateTime.SpecifyKind(f, DateTimeKind.Utc));
                 if (to is { } t)
-                    window = window.Where(r => r.WhenUtc <= DateTime.SpecifyKind(t, DateTimeKind.Utc));
+                {
+                    // A date-only 'to' (midnight) is intended as an INCLUSIVE calendar-day bound ("through
+                    // that day"), so use an exclusive next-day upper bound to keep same-day rows. A 'to' with
+                    // a time component is honoured as-is (still exclusive upper bound).
+                    var toUtc = DateTime.SpecifyKind(t, DateTimeKind.Utc);
+                    var upper = toUtc.TimeOfDay == TimeSpan.Zero ? toUtc.Date.AddDays(1) : toUtc;
+                    window = window.Where(r => r.WhenUtc < upper);
+                }
 
                 // The user filter is an AppUser id (the raw email is never exposed or accepted). Resolve it to
                 // the stored lower-cased email; an unknown id yields an empty window.

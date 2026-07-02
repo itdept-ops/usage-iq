@@ -680,7 +680,7 @@ public class ChatIntegrationTests(WebAppFactory factory)
     public async Task JoinChannel_is_a_no_op_for_a_non_member()
     {
         var (_, alice) = await ProvisionUser("chat.read", "chat.send");
-        var (outsiderEmail, _) = await ProvisionUser("chat.read", "chat.send");
+        var (outsiderEmail, outsider) = await ProvisionUser("chat.read", "chat.send");
         var channelId = await CreateChannel(alice, "closed-" + Guid.NewGuid().ToString("N")[..6]);
 
         await using var outsiderHub = await ConnectHub(outsiderEmail);
@@ -691,7 +691,15 @@ public class ChatIntegrationTests(WebAppFactory factory)
         await outsiderHub.InvokeAsync("JoinChannel", channelId);
         await alice.PostAsJsonAsync($"/api/chat/channels/{channelId}/messages", new { body = "members only" });
 
-        // The outsider must NOT receive the broadcast (join was rejected).
+        // PRIMARY (deterministic): the authorization decision itself — the outsider is not a member,
+        // so the channel is 404 for them (never leaking that it exists). JoinChannel cannot have
+        // added them to the group because membership is the same server-side gate this 404 proves.
+        (await outsider.GetAsync($"/api/chat/channels/{channelId}/messages"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // SECONDARY (best-effort): no broadcast lands within a short window. This is a latency
+        // trade-off — the 2 s bound is deliberately generous but not a hard proof of authz; a slow
+        // (not blocked) delivery could in theory arrive later, which is why the 404 above is primary.
         var delivered = await Task.WhenAny(got.Task, Task.Delay(TimeSpan.FromSeconds(2)));
         (delivered == got.Task).Should().BeFalse();
     }

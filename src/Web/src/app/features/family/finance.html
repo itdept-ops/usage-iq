@@ -170,6 +170,7 @@
                       <td class="fin-review__catcol">
                         <div class="fin-review__catcell">
                           <select class="fin-select fin-review__catsel" [value]="r.category ?? ''"
+                                  [attr.aria-label]="'Category for ' + r.merchant"
                                   (change)="setRowCategory(r, $any($event.target).value, true)">
                             <option value="">Uncategorized</option>
                             @for (c of categoryOptions; track c) { <option [value]="c">{{ c }}</option> }
@@ -187,6 +188,7 @@
                       </td>
                       <td class="fin-review__kindcol">
                         <select class="fin-select fin-review__kindsel" [value]="r.kind"
+                                [attr.aria-label]="'Type for ' + r.merchant"
                                 (change)="setRowKind(r, $any($event.target).value)">
                           @for (k of txnKindEditOptions; track k) { <option [value]="k">{{ txnKindLabel(k) }}</option> }
                         </select>

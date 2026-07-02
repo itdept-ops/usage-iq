@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { MatCardModule } from '@angular/material/card';
@@ -42,6 +42,11 @@ export class Logs {
   readonly loading = signal(true);
   readonly expandedId = signal<number | null>(null);
 
+  /** How many rows to render at once; grows via showMore() to avoid dirty-checking all ~300 rows. */
+  private static readonly PAGE_SIZE = 50;
+  readonly visibleCount = signal(Logs.PAGE_SIZE);
+  readonly visibleLogs = computed(() => this.logs().slice(0, this.visibleCount()));
+
   readonly method = signal('');
   readonly status = signal('');
   readonly q = signal('');
@@ -61,6 +66,7 @@ export class Logs {
 
   load(): void {
     this.loading.set(true);
+    this.visibleCount.set(Logs.PAGE_SIZE);
     this.api
       .requestLogs({ method: this.method(), status: this.status(), q: this.q().trim(), take: 300 })
       .subscribe({
@@ -77,6 +83,10 @@ export class Logs {
 
   toggle(id: number): void {
     this.expandedId.set(this.expandedId() === id ? null : id);
+  }
+
+  showMore(): void {
+    this.visibleCount.update((n) => n + Logs.PAGE_SIZE);
   }
 
   statusClass(code: number): string {

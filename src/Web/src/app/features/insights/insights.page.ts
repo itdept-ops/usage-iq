@@ -1,11 +1,14 @@
 import {
-  ChangeDetectionStrategy, Component, computed, inject, signal,
+  ChangeDetectionStrategy, Component, computed, ElementRef, inject, signal, viewChildren,
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import type { EChartsOption } from 'echarts';
 import { firstValueFrom } from 'rxjs';
 
 import { Api } from '../../core/api';
+import {
+  axisX, axisY, KIND_META, KIND_ORDER, parseR,
+} from '../../core/insights-shared';
 import {
   InsightCard, InsightKind, InsightWindow, InsightsNarrateResponse, InsightsResponse,
 } from '../../core/models';
@@ -63,10 +66,12 @@ interface KindGroup {
             Cross-domain stats from <strong>your</strong> data only — statistical signals, not medical advice.
           </p>
         </div>
-        <div class="iq-head__windows" role="tablist" aria-label="Insight window">
-          @for (w of windows; track w.value) {
-            <button type="button" class="iq-chip" role="tab"
+        <div class="iq-head__windows" role="tablist" aria-label="Insight window"
+             (keydown)="onWindowKeydown($event)">
+          @for (w of windows; track w.value; let i = $index) {
+            <button type="button" class="iq-chip" role="tab" #windowTab
                     [class.is-on]="window() === w.value" [attr.aria-selected]="window() === w.value"
+                    [tabindex]="window() === w.value ? 0 : -1"
                     [disabled]="loading()" (click)="setWindow(w.value)">{{ w.label }}</button>
           }
         </div>
@@ -161,7 +166,9 @@ interface KindGroup {
 
                       @if (expanded() === cardId(g.kind, i)) {
                         <div class="iq-card__chart">
-                          <app-chart [option]="scatterOption(c)" />
+                          @if (expandedOption(); as opt) {
+                            <app-chart [option]="opt" />
+                          }
                           <p class="iq-card__chart-note">
                             Illustrative scatter — depicts the published strength (r) &amp; direction over
                             {{ c.dataPoints }} paired days, not raw logged values.
@@ -194,6 +201,9 @@ interface KindGroup {
 export class InsightsPage {
   private api = inject(Api);
 
+  /** The roving-tabindex window tabs, for arrow-key focus management. */
+  private readonly windowTabs = viewChildren<ElementRef<HTMLButtonElement>>('windowTab');
+
   readonly windows: { value: InsightWindow; label: string }[] = [
     { value: 30, label: '30 days' },
     { value: 90, label: '90 days' },
@@ -220,10 +230,28 @@ export class InsightsPage {
   /** The closed-kind grid sections, in display order, each carrying its matching cards. */
   readonly groups = computed<KindGroup[]>(() => {
     const by = this.cards();
-    return InsightsPage.GROUP_META.map(m => ({
-      ...m,
-      cards: by.filter(c => c.kind === m.kind),
+    return KIND_ORDER.map(kind => ({
+      kind,
+      ...KIND_META[kind],
+      cards: by.filter(c => c.kind === kind),
     }));
+  });
+
+  /**
+   * The scatter option for the currently-expanded correlation card, or null when none is open.
+   * Memoized: the option object is rebuilt ONLY when the expanded id or the underlying data changes,
+   * so binding `[option]` to this signal avoids the per-change-detection rebuild + full ECharts repaint
+   * that a template method call would incur.
+   */
+  readonly expandedOption = computed<EChartsOption | null>(() => {
+    const id = this.expanded();
+    if (!id) return null;
+    const sep = id.indexOf(':');
+    const kind = id.slice(0, sep);
+    const index = Number(id.slice(sep + 1));
+    const group = this.groups().find(g => g.kind === kind);
+    const card = group?.cards[index];
+    return card && card.kind === 'correlation' ? this.scatterOption(card) : null;
   });
 
   constructor() {
@@ -235,6 +263,25 @@ export class InsightsPage {
     this.window.set(w);
     this.expanded.set(null);
     this.reload();
+  }
+
+  /** Roving-tabindex arrow-key nav across the window tablist (Left/Right/Home/End). */
+  onWindowKeydown(ev: KeyboardEvent): void {
+    const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+    if (!keys.includes(ev.key)) return;
+    const n = this.windows.length;
+    if (n === 0) return;
+    const cur = this.windows.findIndex(x => x.value === this.window());
+    let next = cur < 0 ? 0 : cur;
+    switch (ev.key) {
+      case 'ArrowLeft': case 'ArrowUp': next = (cur - 1 + n) % n; break;
+      case 'ArrowRight': case 'ArrowDown': next = (cur + 1) % n; break;
+      case 'Home': next = 0; break;
+      case 'End': next = n - 1; break;
+    }
+    ev.preventDefault();
+    this.setWindow(this.windows[next].value);
+    this.windowTabs()[next]?.nativeElement.focus();
   }
 
   async reload(): Promise<void> {
@@ -330,7 +377,7 @@ export class InsightsPage {
    * correlation direction. It's a faithful depiction of the published strength/direction, labeled as such.
    */
   scatterOption(c: InsightCard): EChartsOption {
-    const r = this.parseR(c);
+    const r = parseR(c.stat, c.detail, c.magnitude);
     const n = Math.max(2, Math.min(c.dataPoints || 12, 60));
     const dir = r < 0 ? -1 : 1;
     const strength = Math.min(Math.abs(r), 0.98);
@@ -359,9 +406,9 @@ export class InsightsPage {
 
     return {
       grid: { left: 8, right: 14, top: 14, bottom: 18, containLabel: true },
-      xAxis: { type: 'value', min: 0, max: 100, name: this.axisX(c), nameGap: 18, nameLocation: 'middle',
+      xAxis: { type: 'value', min: 0, max: 100, name: axisX(c.title), nameGap: 18, nameLocation: 'middle',
         nameTextStyle: { fontSize: 10 }, axisLabel: { show: false } },
-      yAxis: { type: 'value', min: 0, max: 100, name: this.axisY(c), nameGap: 22, nameLocation: 'middle',
+      yAxis: { type: 'value', min: 0, max: 100, name: axisY(c.title), nameGap: 22, nameLocation: 'middle',
         nameTextStyle: { fontSize: 10 }, axisLabel: { show: false } },
       tooltip: { show: false },
       series: [
@@ -377,38 +424,4 @@ export class InsightsPage {
     };
   }
 
-  /** Extract the |r| (signed) value out of a correlation stat like "r=0.61 · moderate" / "r=-0.43 …". */
-  private parseR(c: InsightCard): number {
-    const m = `${c.stat} ${c.detail}`.match(/r\s*=\s*(-?\d*\.?\d+)/i);
-    let r = m ? Number(m[1]) : 0.5;
-    if (!Number.isFinite(r)) r = 0.5;
-    // honour an explicit "negative" magnitude even if the printed r is unsigned.
-    if (r > 0 && (c.magnitude ?? '').toLowerCase().includes('negative')) r = -r;
-    return Math.max(-1, Math.min(1, r));
-  }
-
-  /** Split a "A vs B" title into rough axis labels (illustrative). */
-  private axisX(c: InsightCard): string {
-    const parts = c.title.split(/\bvs\b|→|↔/i);
-    return (parts[0] ?? 'A').trim().slice(0, 22) || 'A';
-  }
-  private axisY(c: InsightCard): string {
-    const parts = c.title.split(/\bvs\b|→|↔/i);
-    return (parts[1] ?? parts[0] ?? 'B').trim().slice(0, 22) || 'B';
-  }
-
-  // ─────────────── GROUP METADATA ───────────────
-
-  private static readonly GROUP_META: { kind: InsightKind; label: string; icon: string; blurb: string }[] = [
-    { kind: 'correlation', label: 'Correlations', icon: 'sync_alt',
-      blurb: 'Paired-day associations across domains (≥10 days). Association, not causation.' },
-    { kind: 'trend', label: 'Trends', icon: 'trending_up',
-      blurb: 'Where a metric is drifting — with a bounded estimate, not a prediction.' },
-    { kind: 'streak', label: 'Streaks', icon: 'local_fire_department',
-      blurb: 'Your longest & current qualifying runs.' },
-    { kind: 'anomaly', label: 'Anomalies', icon: 'warning_amber',
-      blurb: 'Statistical outlier days (|z| ≥ 2).' },
-    { kind: 'bestworst', label: 'Best & worst', icon: 'emoji_events',
-      blurb: 'Your standout high & low days per metric.' },
-  ];
 }

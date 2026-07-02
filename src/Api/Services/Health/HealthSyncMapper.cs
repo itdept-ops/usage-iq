@@ -178,10 +178,11 @@ public sealed class HealthSyncMapper(UsageDbContext db)
             UserEmail = email, LocalDate = date, Hours = s.Hours, Quality = s.Quality,
             BedTime = s.BedTime, WakeTime = s.WakeTime, Source = SourceKind.Watch, CreatedUtc = DateTime.UtcNow,
         };
-        db.SleepEntries.Add(entry);
-        await db.SaveChangesAsync(ct);
-
-        return await RecordNewImportAsync(email, provider, date, HealthSignalKind.Sleep, s.LogId, entry.Id, ct);
+        // Add the de-dup log ALONGSIDE the entry in a SINGLE SaveChanges so the log's unique index
+        // arbitrates the race: a concurrent import trips UniqueViolation and the whole transaction rolls
+        // back, so the losing writer never commits a duplicate SleepEntry (which has no unique key of its own).
+        return await CommitNewImportAsync(
+            db.SleepEntries, entry, e => e.Id, email, provider, date, HealthSignalKind.Sleep, s.LogId, ct);
     }
 
     private async Task<SignalResult> MapWorkoutAsync(
@@ -204,25 +205,44 @@ public sealed class HealthSyncMapper(UsageDbContext db)
             UserEmail = email, LocalDate = date, Name = w.Name, DurationMin = w.DurationMin,
             CaloriesBurned = w.CaloriesBurned, Source = SourceKind.Watch, CreatedUtc = DateTime.UtcNow,
         };
-        db.ExerciseEntries.Add(entry);
-        await db.SaveChangesAsync(ct);
-
-        return await RecordNewImportAsync(email, provider, date, HealthSignalKind.Workout, w.LogId, entry.Id, ct);
+        // Add the de-dup log ALONGSIDE the entry in a SINGLE SaveChanges so the log's unique index
+        // arbitrates the race: a concurrent import trips UniqueViolation and the whole transaction rolls
+        // back, so the losing writer never commits a duplicate ExerciseEntry (which has no unique key of its own).
+        return await CommitNewImportAsync(
+            db.ExerciseEntries, entry, e => e.Id, email, provider, date, HealthSignalKind.Workout, w.LogId, ct);
     }
 
-    /// <summary>Insert the de-dup log row for a freshly-written record-keyed entry; a unique-violation means a
-    /// concurrent sync already imported it (count as an update, not a dup).</summary>
-    private async Task<SignalResult> RecordNewImportAsync(
-        string email, HealthProvider provider, DateOnly date, HealthSignalKind kind, string sourceRef,
-        long trackerEntityId, CancellationToken ct)
+    /// <summary>Commit a freshly-mapped record-keyed entry TOGETHER WITH its de-dup log in a single
+    /// transaction, so the log's unique index gates the entry: a concurrent sync trips a unique-violation and
+    /// the whole SaveChanges rolls back, so neither the duplicate entry NOR its log commits (the entry has no
+    /// unique key of its own to reject it). A unique-violation is therefore counted as an update, not a dup.</summary>
+    private async Task<SignalResult> CommitNewImportAsync<TEntry>(
+        DbSet<TEntry> set, TEntry entry, Func<TEntry, long> idOf, string email, HealthProvider provider,
+        DateOnly date, HealthSignalKind kind, string sourceRef, CancellationToken ct)
+        where TEntry : class
     {
-        db.HealthImportLogs.Add(new HealthImportLog
+        set.Add(entry);
+        var log = new HealthImportLog
         {
             UserEmail = email, Provider = provider, LocalDate = date, SignalKind = kind,
-            SourceRef = sourceRef, TrackerEntityId = trackerEntityId, CreatedUtc = DateTime.UtcNow,
-        });
-        try { await db.SaveChangesAsync(ct); return new SignalResult(1, 0, 0); }
-        catch (DbUpdateException ex) when (IsUniqueViolation(ex)) { db.ChangeTracker.Clear(); return new SignalResult(0, 1, 0); }
+            SourceRef = sourceRef, TrackerEntityId = 0, CreatedUtc = DateTime.UtcNow,
+        };
+        db.HealthImportLogs.Add(log);
+        try
+        {
+            // One SaveChanges = one transaction: the log insert and the entry insert commit or roll back
+            // together, so a losing concurrent writer never persists an orphan duplicate entry.
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            db.ChangeTracker.Clear();
+            return new SignalResult(0, 1, 0);
+        }
+        // Backfill the entry's now-assigned key onto the log (both rows are already committed).
+        log.TrackerEntityId = idOf(entry);
+        await db.SaveChangesAsync(ct);
+        return new SignalResult(1, 0, 0);
     }
 
     private static bool IsUniqueViolation(DbUpdateException ex) =>

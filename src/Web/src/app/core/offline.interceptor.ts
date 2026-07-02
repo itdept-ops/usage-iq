@@ -27,7 +27,11 @@ const QUEUEABLE_URL_SUBSTRINGS = [
   '/api/chat/channels/',      // send a chat message: POST /api/chat/channels/{id}/messages
 ];
 
-const QUEUEABLE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// POST ONLY: every whitelisted append-style write above is a POST (log food/exercise/…/weight, send a
+// chat message). PUT/PATCH/DELETE on these paths are record EDITS or DELETES (e.g. `PUT /api/tracker/food/{id}`
+// updateFood, `PUT /api/tracker/activity` upsert, `DELETE /api/tracker/*/{id}`) — order-sensitive, not
+// replay-safe — so they are deliberately excluded and error normally when offline, per the invariant above.
+const QUEUEABLE_METHODS = new Set(['POST']);
 
 /** Only the chat *messages* sub-route is queueable under /api/chat/channels/ — never read/AI/etc. */
 function isQueueableUrl(url: string): boolean {

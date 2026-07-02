@@ -27,8 +27,10 @@ var builder = WebApplication.CreateBuilder(args);
 if (!builder.Configuration.GetValue("SkipLocalSettings", false))
     builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
-var conn = builder.Configuration.GetConnectionString("Default")
-           ?? "Host=localhost;Port=5433;Database=ccusage;Username=ccusage;Password=ccusage_dev_pw";
+var conn = builder.Configuration.GetConnectionString("Default") is { } configuredConn
+           && !string.IsNullOrWhiteSpace(configuredConn)
+    ? configuredConn
+    : "Host=localhost;Port=5433;Database=ccusage;Username=ccusage;Password=ccusage_dev_pw";
 
 builder.Services.AddDbContext<UsageDbContext>(o => o
     .UseNpgsql(conn, npgsql =>
@@ -73,10 +75,20 @@ builder.Services.AddHostedService<RequestLogWriter>();
 builder.Services.AddSingleton<AiUsageLogQueue>();
 builder.Services.AddHostedService<AiUsageLogWriter>();
 
+// Every outbound HTTP client must refuse to auto-follow redirects. .NET only strips the Authorization
+// header on a cross-host redirect — it re-sends CUSTOM auth headers (Gemini's x-goog-api-key, WorkoutX's
+// X-WorkoutX-Key, etc.), so a 3xx from (or an on-path MITM of) a fixed upstream would otherwise replay a
+// production secret to an attacker host, and would also turn any of these fixed-host callers into an SSRF
+// pivot. Disabling redirects at the default primary handler makes every named client inherit the safe
+// behaviour (new clients included); treat any 3xx as a hard failure at the call site.
+builder.Services.ConfigureHttpClientDefaults(b => b.ConfigurePrimaryHttpMessageHandler(() =>
+    new SocketsHttpHandler { AllowAutoRedirect = false }));
+
 // Discord notifications: digest/alert sender + a minute-tick scheduler.
 builder.Services.AddHttpClient();
 // The "discord" client must NOT follow redirects — otherwise an allowlisted host could 3xx the
-// request onward to an internal address, defeating the SSRF allowlist in DiscordNotifier.
+// request onward to an internal address, defeating the SSRF allowlist in DiscordNotifier. (The default
+// above already disables redirects; this explicit handler additionally sets a tight connect timeout.)
 builder.Services.AddHttpClient("discord").ConfigurePrimaryHttpMessageHandler(() =>
     new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(5) });
 builder.Services.AddScoped<DiscordNotifier>();
@@ -173,6 +185,8 @@ builder.Services.AddHttpClient(IpGeoService.HttpClientName, c =>
 {
     c.BaseAddress = new Uri("http://ip-api.com");
     c.Timeout = TimeSpan.FromSeconds(8);
+    // Cap buffering so a hostile/compromised upstream can't force an unbounded response into memory.
+    c.MaxResponseContentBufferSize = 4 * 1024 * 1024;
 });
 builder.Services.AddScoped<IpGeoService>();
 builder.Services.AddHttpClient(ReverseGeocodeService.HttpClientName, c =>
@@ -226,7 +240,11 @@ builder.Services.AddHostedService<Ccusage.Api.Services.Health.HealthSyncSchedule
 // queue that ALSO runs as the hosted draining service (mirrors DiscordForwarder); the fan-out enqueues
 // fire-and-forget so a push never blocks/slows/fails notification creation.
 builder.Services.Configure<WebPushOptions>(builder.Configuration.GetSection(WebPushOptions.SectionName));
-builder.Services.AddHttpClient(WebPushSender.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
+// Like the "discord" client: an explicit no-redirect + tight-connect handler so a push endpoint can't
+// 3xx-redirect the authenticated push POST onward to an internal address (SSRF defense-in-depth).
+builder.Services.AddHttpClient(WebPushSender.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15))
+    .ConfigurePrimaryHttpMessageHandler(() =>
+        new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(5) });
 builder.Services.AddScoped<WebPushSender>();
 builder.Services.AddSingleton<WebPushForwarder>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<WebPushForwarder>());
@@ -256,6 +274,27 @@ if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32
     throw new InvalidOperationException(
         "Jwt:Key is missing or too short. Set a strong key (>= 32 bytes) in appsettings.Local.json. " +
         "The API refuses to start with a blank/weak signing key.");
+
+// Fail fast on the other operationally-critical settings too, so a deploy with a dropped SSM parameter
+// surfaces as a clear boot-time error instead of an opaque per-request partial outage discovered by users.
+var configErrors = new List<string>();
+// Google sign-in is the sole auth path — a blank client id silently breaks login for everyone.
+if (string.IsNullOrWhiteSpace(builder.Configuration["Google:ClientId"]))
+    configErrors.Add("Google:ClientId is not set (Google sign-in is the only auth path).");
+// A blank issuer/audience silently weakens token validation (ValidateIssuer/Audience have nothing to match).
+if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Issuer"]))
+    configErrors.Add("Jwt:Issuer is not set.");
+if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Audience"]))
+    configErrors.Add("Jwt:Audience is not set.");
+// In production the connection string MUST be explicit — never boot against the hardcoded localhost dev
+// default (line 30-31), which would only fail late at MigrateAsync and crash-loop the container.
+if (builder.Environment.IsProduction()
+    && string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Default")))
+    configErrors.Add("ConnectionStrings:Default is not set (refusing the localhost dev fallback in Production).");
+if (configErrors.Count > 0)
+    throw new InvalidOperationException(
+        "The API refuses to start with missing operationally-required configuration: "
+        + string.Join(" ", configErrors));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -310,6 +349,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     return;
                 }
 
+                // Enforce admin "Disable" at the authentication boundary so it contains a just-offboarded
+                // account uniformly — including RequireAuthorization()-only routes (presence,
+                // notifications/me/discord) that have no permission filter or inline IsEnabled guard.
+                // Otherwise a disabled user's still-valid token keeps authenticating until it expires.
+                if (!user.IsEnabled)
+                {
+                    ctx.Fail("Account is disabled.");
+                    return;
+                }
+
                 var tokenSv = int.TryParse(ctx.Principal?.FindFirst("sv")?.Value, out var sv) ? sv : 0;
                 if (tokenSv != user.SessionVersion)
                 {
@@ -329,14 +378,19 @@ builder.Services.AddAuthorization();
 // nearest proxy and per-IP rate limits / logged IPs (login history, the Activity request log, and the
 // Fleet machine IP) would all collapse to one private address.
 //
-// ForwardLimit = null unwinds the FULL chain of *trusted* proxies rather than a fixed number of hops:
-// with a hard limit only the last N hops are unwound, so behind the multi-hop production chain the
-// real client IP is never reached and RemoteIpAddress stays a private/proxy address. Leaving it null
-// is safe here only because the trust is bounded by KnownNetworks below — unwinding stops at the first
-// address that is NOT in a trusted private range, which is the leftmost public IP (the real client).
-// Kestrel is never publicly reachable (the api container publishes no host port; it is reached only
-// over the Docker network via nginx), so the X-Forwarded-For chain can only have been written by our
-// own trusted private proxies — a client cannot spoof a public hop into the trusted middle of it.
+// The production chain has exactly two trusted proxy hops that write X-Forwarded-For — Caddy and the
+// bundled nginx (Kestrel is the third link and only reads the header). Bounding ForwardLimit to that
+// hop count (rather than null, which unwinds the entire chain) means we no longer rely solely on the
+// KnownNetworks range check plus the deployment invariant that Kestrel publishes no host port: even if
+// Kestrel became directly reachable, a caller could not forge extra private hops to walk RemoteIpAddress
+// back to an arbitrary value — unwinding stops after two entries regardless. KnownNetworks still gates
+// which addresses are trusted so a public hop (any AWS infra in front of Caddy) is never unwound.
+// ForwardLimit = null unwinds the FULL chain of trusted proxies (bounded by KnownNetworks below) rather
+// than a fixed hop count: unwinding stops at the first address NOT in a trusted private range — the
+// leftmost public IP (the real client). A fixed hop count instead stops after N entries, so behind the
+// multi-hop production chain the real client IP would never be reached. Kestrel publishes no host port
+// (reached only over the Docker network via nginx), so the X-Forwarded-For chain can only have been
+// written by our own trusted private proxies and a client cannot spoof a public hop into its trusted middle.
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -349,7 +403,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 builder.Services.AddScoped<AuditLogger>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
-builder.Services.AddHealthChecks().AddDbContextCheck<UsageDbContext>("database");
+// The DB-connectivity check is tagged "ready" so /health/ready (below) can select ONLY readiness checks
+// while /health/live stays a pure liveness probe. The container HEALTHCHECK + compose service_healthy gate
+// should target /health/ready so the API is not reported healthy while Postgres is unreachable.
+builder.Services.AddHealthChecks().AddDbContextCheck<UsageDbContext>("database", tags: new[] { "ready" });
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -407,7 +464,30 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<UsageDbContext>();
-    await db.Database.MigrateAsync();
+
+    // The boot-time migrate runs on a fresh scope OUTSIDE the request-path retry strategy, so a transient
+    // DB blip (failover, a dropped connection, a brief lock) at startup would otherwise throw out of Main
+    // and — on the single-instance topology — crash-loop the container into a full outage. Retry with a
+    // bounded backoff so a transient blip recovers; a genuinely bad migration still throws after the last
+    // attempt, exiting the process so the deploy leaves the previous image serving traffic.
+    var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+    const int maxMigrateAttempts = 5;
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            await db.Database.MigrateAsync();
+            break;
+        }
+        catch (Exception ex) when (attempt < maxMigrateAttempts)
+        {
+            var delay = TimeSpan.FromSeconds(Math.Min(30, 2 * attempt));
+            startupLog.LogWarning(ex,
+                "Database migration attempt {Attempt}/{Max} failed; retrying in {Delay}s.",
+                attempt, maxMigrateAttempts, delay.TotalSeconds);
+            await Task.Delay(delay);
+        }
+    }
 
     var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     var claudePath = builder.Configuration["Ingestion:ClaudeProjectsPath"];
@@ -546,7 +626,17 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
-app.MapHealthChecks("/health/ready");
+// Readiness (is it ready to SERVE): runs only the "ready"-tagged checks — currently DB connectivity — so
+// this returns 503 while Postgres is down. Orchestration/HEALTHCHECK should gate service_healthy on THIS.
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+});
+// Liveness (is the process up): no checks, so it never fails on a DB blip — use only to decide restarts.
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false,
+});
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
 app.MapApiEndpoints();
@@ -602,7 +692,9 @@ app.MapCycleEndpoints();
 app.MapCycleOverlayEndpoints();
 app.MapMedsEndpoints();
 app.MapIdentityEndpoints();
-app.MapHub<ChatHub>("/api/hubs/chat");
+// CloseOnAuthenticationExpiration tears a hub connection down at the transport layer when the bearer
+// token's lifetime expires, so a live connection can't outlive its JWT.
+app.MapHub<ChatHub>("/api/hubs/chat", options => options.CloseOnAuthenticationExpiration = true);
 app.MapGet("/", () => app.Environment.IsDevelopment()
     ? Results.Redirect("/swagger")
     : Results.Ok(new { service = "Usage IQ API" }));

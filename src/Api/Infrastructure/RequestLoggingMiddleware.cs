@@ -22,21 +22,40 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next, RequestLogQue
     // Splitter's public anonymous token read + claim — excluded for the same reason (live tokens out of the log).
     private static readonly string[] Excluded =
     {
-        "/api/health", "/api/auth/me", "/api/auth/config", "/api/sync/status", "/api/presence", "/api/logs", "/api/share",
+        "/api/auth/me", "/api/auth/config", "/api/sync/status", "/api/presence", "/api/logs", "/api/share",
         "/api/bill-share", // public bill-claim token read + claim; live tokens must never land in the action log
         "/api/ingest", // high-volume reporter pushes; the IngestKey LastUsed stamp is the activity trail
     };
 
-    // Privacy: these admin paths carry OTHER users' emails in their request/response bodies
-    // (the Users table, audit feed, access-policy editor, the chat contacts/directory pickers).
-    // Other-user emails are restricted to the admin Users table + audit + add-user + own account,
-    // so we must NOT store these bodies in a RequestLog that the Activity page replays to any
-    // holder of activity.view. The request LINE (method/path/status/timing/bytes) is still logged —
-    // only the email-bearing bodies are dropped, preserving the log's diagnostic value.
+    // The anonymous DB-free liveness probe lives at exactly "/api/health". Match it EXACTLY (not as a
+    // segment prefix) so the wearable Health-Sync actions mapped under /api/health/* (connect/sync-now/
+    // disconnect) are still recorded in the action log; their bodies are dropped via BodyExcluded.
+    private static readonly string[] ExcludedExact =
+    {
+        "/api/health",
+    };
+
+    // Privacy: these paths carry special-category PII in their request/response bodies and must NOT be
+    // stored in a RequestLog that the Activity page replays to any holder of activity.view (a permission
+    // distinct from — and weaker than — the ones gating the source endpoints). Two families:
+    //   1. OTHER users' emails (the Users table, audit feed, access-policy editor, chat pickers) — restricted
+    //      to the admin Users table + audit + add-user + own account.
+    //   2. Same-user special-category data: precise GPS coordinates (location), reproductive-health logs
+    //      (cycle), medications/vitals (meds, health), household finance (family/finance, bills), and the
+    //      tracker's health/diet data. LogRedaction only scrubs secret KEY names, never these VALUES, so the
+    //      bodies must be dropped at capture time rather than relying on redaction.
+    // The request LINE (method/path/status/timing/bytes) is still logged — only the PII-bearing bodies are
+    // dropped, preserving the log's diagnostic value.
     private static readonly string[] BodyExcluded =
     {
         "/api/users", "/api/audit", "/api/access-policy",
         "/api/chat/contacts", "/api/chat/directory",
+        // Same-user special-category PII (precise location, health, reproductive, finance).
+        // "/api/cycle" is kept as a forward-looking guard; the live reproductive-health routes are all
+        // under "/api/family/cycle". "/api/vitals" carries blood-pressure/weight (health data).
+        "/api/location", "/api/family/locations", "/api/cycle", "/api/family/cycle",
+        "/api/meds", "/api/vitals", "/api/health",
+        "/api/family/finance", "/api/bills", "/api/tracker",
     };
 
     public async Task Invoke(HttpContext ctx)
@@ -92,6 +111,8 @@ public sealed class RequestLoggingMiddleware(RequestDelegate next, RequestLogQue
     private static bool ShouldLog(HttpRequest req)
     {
         if (!req.Path.StartsWithSegments("/api")) return false;
+        foreach (var ex in ExcludedExact)
+            if (req.Path.Equals(ex, StringComparison.OrdinalIgnoreCase)) return false;
         foreach (var ex in Excluded)
             if (req.Path.StartsWithSegments(ex)) return false;
         return true;

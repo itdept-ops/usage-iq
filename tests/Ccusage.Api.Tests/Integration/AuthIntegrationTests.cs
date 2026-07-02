@@ -209,8 +209,9 @@ public class AuthIntegrationTests(WebAppFactory factory)
         await admin.PutAsJsonAsync($"/api/users/{id}",
             new { isEnabled = false, permissions = new[] { "dashboard.view" } });
 
-        // Same (still-valid) token, but the DB now says disabled -> denied immediately.
-        (await viewer.GetAsync(Summary)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        // Disabling now bumps SessionVersion (and the token-validation path also rejects a disabled
+        // account), so the still-valid token is invalidated at authentication -> 401, not merely 403.
+        (await viewer.GetAsync(Summary)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     // ---- Force-logout (session invalidation via SessionVersion / "sv" claim) ----
@@ -234,17 +235,13 @@ public class AuthIntegrationTests(WebAppFactory factory)
     }
 
     /// <summary>
-    /// Reads /api/audit as the admin WITH the email-reveal key, so the audit log returns real actor/target
-    /// emails (the email-visibility gate masks OTHER users' emails to null without the X-Email-Reveal-Key
-    /// header). The default key is "Starbucks" (appsettings.json); the test host runs with SkipLocalSettings
-    /// and no override. Used by the audit assertions that match on a non-caller user's targetEmail.
+    /// Reads /api/audit as the admin, so the audit log returns real actor/target emails. The email-visibility
+    /// gate masks OTHER users' emails to null unless the caller holds the users.email.reveal permission; the
+    /// seeded admin is granted every permission (Permissions.All), so it reveals automatically. Used by the
+    /// audit assertions that match on a non-caller user's targetEmail.
     /// </summary>
-    private async Task<JsonElement> ReadAuditRevealed(HttpClient admin)
-    {
-        var req = new HttpRequestMessage(HttpMethod.Get, "/api/audit");
-        req.Headers.Add("X-Email-Reveal-Key", "Starbucks");
-        return await (await admin.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
-    }
+    private static async Task<JsonElement> ReadAuditRevealed(HttpClient admin)
+        => await (await admin.GetAsync("/api/audit")).Content.ReadFromJsonAsync<JsonElement>();
 
     [Fact]
     public async Task Force_logout_bumps_session_version_and_writes_an_audit_entry()
@@ -567,17 +564,36 @@ public class AuthIntegrationTests(WebAppFactory factory)
 
     // ---- Request/response action log (middleware) ----
 
-    /// <summary>Polls /api/logs (logging is async) until an entry matches, or fails after a timeout.</summary>
+    /// <summary>Polls /api/logs (logging is async) until an entry matches, or fails after an overall time budget.</summary>
+    /// <remarks>
+    /// Logging is written by an async hosted writer, so we can only observe the row after it drains.
+    /// Rather than a fixed iteration count, we poll against a wall-clock budget with a short capped
+    /// back-off, so a loaded CI runner gets a generous ceiling before a correct system is failed.
+    /// The budget is tunable via the WAITFORLOG_TIMEOUT_SECONDS environment variable.
+    /// </remarks>
     private async Task<JsonElement> WaitForLog(HttpClient admin, Func<JsonElement, bool> match)
     {
-        for (var i = 0; i < 50; i++) // ~7.5s
+        var budget = TimeSpan.FromSeconds(
+            int.TryParse(Environment.GetEnvironmentVariable("WAITFORLOG_TIMEOUT_SECONDS"), out var secs) && secs > 0
+                ? secs
+                : 30);
+        var deadline = DateTime.UtcNow + budget;
+        var delay = TimeSpan.FromMilliseconds(50);
+        var maxDelay = TimeSpan.FromMilliseconds(500);
+
+        while (true)
         {
             var logs = await (await admin.GetAsync("/api/logs?take=500")).Content.ReadFromJsonAsync<JsonElement>();
             foreach (var e in logs.EnumerateArray())
                 if (match(e)) return e;
-            await Task.Delay(150);
+
+            if (DateTime.UtcNow >= deadline)
+                throw new Xunit.Sdk.XunitException(
+                    $"Expected log entry did not appear within {budget.TotalSeconds:0}s.");
+
+            await Task.Delay(delay);
+            delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, maxDelay.TotalMilliseconds));
         }
-        throw new Xunit.Sdk.XunitException("Expected log entry did not appear in time.");
     }
 
     [Fact]
@@ -1137,10 +1153,9 @@ public class AuthIntegrationTests(WebAppFactory factory)
         var me = await (await target.GetAsync("/api/auth/me")).Content.ReadFromJsonAsync<JsonElement>();
         me.GetProperty("homeRoute").GetString().Should().Be("/calendar");
 
-        // ...and surfaced in the users-list DTO (reading WITH the reveal key to match by email).
-        var req = new HttpRequestMessage(HttpMethod.Get, "/api/users");
-        req.Headers.Add("X-Email-Reveal-Key", "Starbucks");
-        var users = await (await admin.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
+        // ...and surfaced in the users-list DTO (the admin holds users.email.reveal, so emails come back real
+        // and can be matched by address).
+        var users = await (await admin.GetAsync("/api/users")).Content.ReadFromJsonAsync<JsonElement>();
         var row = users.EnumerateArray().First(u => u.GetProperty("email").GetString() == email);
         row.GetProperty("homeRoute").GetString().Should().Be("/calendar");
     }

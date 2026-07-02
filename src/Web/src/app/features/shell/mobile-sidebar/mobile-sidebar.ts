@@ -8,6 +8,7 @@ import { AuthService } from '../../../core/auth';
 import { PlatformService } from '../../../core/platform';
 import { MobileNavService } from '../../../core/mobile-nav';
 import { navGroups, type NavGroupModel } from '../../../core/nav-model';
+import { DialogA11yDirective } from '../../../core/dialog-a11y.directive';
 
 /**
  * MOBILE LEFT SIDEBAR — the FiMobile `.sidebar-wrap` offcanvas drawer. Replaces the old bottom-tab
@@ -22,12 +23,13 @@ import { navGroups, type NavGroupModel } from '../../../core/nav-model';
   selector: 'app-mobile-sidebar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterLinkActive, MatIconModule],
+  imports: [RouterLink, RouterLinkActive, MatIconModule, DialogA11yDirective],
   template: `
-    <div class="scrim" [class.open]="nav.sidebarOpen()" (click)="nav.close()" aria-hidden="true"></div>
+    @if (nav.sidebarOpen()) {
+    <div class="scrim open" (click)="nav.close()" aria-hidden="true"></div>
 
-    <aside class="drawer" [class.open]="nav.sidebarOpen()" role="dialog" aria-modal="true"
-           aria-label="Navigation menu">
+    <aside class="drawer open" role="dialog" aria-modal="true"
+           aria-label="Navigation menu" dialogA11y (dismiss)="nav.close()">
       <!-- Profile header card -->
       @if (auth.session(); as s) {
         <header class="prof">
@@ -103,6 +105,7 @@ import { navGroups, type NavGroupModel } from '../../../core/nav-model';
         </div>
       </nav>
     </aside>
+    }
   `,
   styles: [
     `

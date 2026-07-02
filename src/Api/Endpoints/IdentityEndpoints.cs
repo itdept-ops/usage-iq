@@ -171,6 +171,8 @@ public static class IdentityEndpoints
             var (from, to) = Window(req.FromUtc, req.ToUtc);
             var fromDate = DateOnly.FromDateTime(from);
             var toDate = DateOnly.FromDateTime(to);
+            // Consistent with POST/PATCH /time and import/commit: never stamp an out-of-range date.
+            if (DateOutOfRange(toDate)) return Results.BadRequest(new { message = "That date is out of range." });
 
             var items = req.Items ?? Array.Empty<AutoApplyItem>();
             var ownedRoleIds = (await db.IdentityRoles.AsNoTracking()
@@ -194,8 +196,9 @@ public static class IdentityEndpoints
                 var key = it.Key?.Trim().ToLowerInvariant() ?? "";
                 if (!minutesByKey.TryGetValue(key, out var minutes) || minutes < 1) { skipped++; continue; }
                 if (!ownedRoleIds.Contains(it.RoleId)) { skipped++; continue; }
-                // One synthetic id per (signal, window-end) → idempotent re-apply via the unique index.
-                var sourceId = $"auto:{key}:{toDate:yyyy-MM-dd}";
+                // One synthetic id per (signal, window-start, window-end) → idempotent re-apply of the SAME
+                // window via the unique index, while distinct windows ending the same day stay distinct.
+                var sourceId = $"auto:{key}:{fromDate:yyyy-MM-dd}:{toDate:yyyy-MM-dd}";
                 if (seen.Contains(sourceId) || !batchSeen.Add(sourceId)) { skipped++; continue; }
 
                 db.IdentityTimeEntries.Add(new IdentityTimeEntry
@@ -217,7 +220,7 @@ public static class IdentityEndpoints
             catch (DbUpdateException ex) when (IsUniqueViolation(ex))
             {
                 (imported, skipped) = await ApplyAutoOneByOneAsync(
-                    db, caller, items, ownedRoleIds, minutesByKey, seen, toDate, now, ct);
+                    db, caller, items, ownedRoleIds, minutesByKey, seen, fromDate, toDate, now, ct);
             }
 
             return Results.Ok(new AutoApplyDto(imported, skipped));
@@ -650,7 +653,7 @@ public static class IdentityEndpoints
     private static async Task<(int Imported, int Skipped)> ApplyAutoOneByOneAsync(
         UsageDbContext db, CurrentUserAccessor.CurrentUser caller, IReadOnlyList<AutoApplyItem> items,
         IReadOnlySet<int> ownedRoleIds, IReadOnlyDictionary<string, int> minutesByKey,
-        IReadOnlySet<string> seen, DateOnly toDate, DateTime now, CancellationToken ct)
+        IReadOnlySet<string> seen, DateOnly fromDate, DateOnly toDate, DateTime now, CancellationToken ct)
     {
         foreach (var e in db.ChangeTracker.Entries<IdentityTimeEntry>().ToList())
             if (e.State == EntityState.Added) e.State = EntityState.Detached;
@@ -667,7 +670,7 @@ public static class IdentityEndpoints
                 skipped++;
                 continue;
             }
-            var sourceId = $"auto:{key}:{toDate:yyyy-MM-dd}";
+            var sourceId = $"auto:{key}:{fromDate:yyyy-MM-dd}:{toDate:yyyy-MM-dd}";
             if (seen.Contains(sourceId) || !batchSeen.Add(sourceId)) { skipped++; continue; }
 
             db.IdentityTimeEntries.Add(new IdentityTimeEntry

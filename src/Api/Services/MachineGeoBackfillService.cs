@@ -58,7 +58,11 @@ public sealed class MachineGeoBackfillService(
                         // Never downgrade a precise agent GPS fix to a coarse IP estimate.
                         && m.GeoSource != "agent"
                         && (m.GeoUpdatedUtc == null || m.GeoUpdatedUtc < staleBefore))
-            .OrderBy(m => m.GeoUpdatedUtc) // nulls first, then oldest
+            // Postgres sorts NULLs LAST in an ascending OrderBy, which would starve never-resolved
+            // machines (GeoUpdatedUtc == null). Order by the null-ness first (descending => nulls first),
+            // then oldest, so brand-new machines are always prioritized as intended.
+            .OrderByDescending(m => m.GeoUpdatedUtc == null)
+            .ThenBy(m => m.GeoUpdatedUtc)
             .Take(BatchSize)
             .ToListAsync(ct);
 

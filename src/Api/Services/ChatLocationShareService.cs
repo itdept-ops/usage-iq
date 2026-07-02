@@ -50,6 +50,25 @@ public sealed class ChatLocationShareService(UsageDbContext db, IHubContext<Chat
         int channelId, string sharerEmail, StartLocationShareRequest req, CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
+        // Archiving a channel deliberately closes it (send/hub both reject writes) — never begin a live share
+        // there. Report an inactive (stopped) share, the same ended state update/extend surface, instead of
+        // persisting or broadcasting a pin into a closed conversation.
+        if (await IsChannelArchivedAsync(channelId, ct))
+            return ToDto(
+                new ChatLocationShare
+                {
+                    ChannelId = channelId,
+                    SharerEmail = sharerEmail,
+                    StartUtc = now,
+                    ExpiresUtc = now,
+                    LastUpdateUtc = now,
+                    Stopped = true,
+                    Lat = ClampLat(req.Lat),
+                    Lng = ClampLng(req.Lng),
+                    AccuracyM = ClampAccuracy(req.AccuracyM),
+                },
+                await ChatEndpoints.SenderLookupAsync(db, new[] { sharerEmail }, ct),
+                now);
         // Single active share per (channel, sharer): refresh an existing live one in place rather than
         // stacking a second row (the composer hides the trigger when you have one, but guard the API too).
         var share = await db.ChatLocationShares.FirstOrDefaultAsync(
@@ -86,6 +105,9 @@ public sealed class ChatLocationShareService(UsageDbContext db, IHubContext<Chat
 
         var now = DateTime.UtcNow;
         if (!IsActive(share, now)) return null;
+        // An archive shuts the conversation down (send/hub both refuse it) — treat it as inactive so a live
+        // pin can't keep updating into a channel a moderator has since closed.
+        if (await IsChannelArchivedAsync(share.ChannelId, ct)) return null;
 
         share.Lat = ClampLat(req.Lat);
         share.Lng = ClampLng(req.Lng);
@@ -110,6 +132,9 @@ public sealed class ChatLocationShareService(UsageDbContext db, IHubContext<Chat
 
         var now = DateTime.UtcNow;
         if (!IsActive(share, now)) return null;
+        // Same archived-channel guard as update/send: extending the window of a share into a closed
+        // conversation would keep the live feed alive past the moderator's archive.
+        if (await IsChannelArchivedAsync(share.ChannelId, ct)) return null;
 
         var add = Math.Clamp(addMinutes, 1, MaxDurationMinutes);
         // Push from the CURRENT expiry (extending stacks), but never beyond start + the overall lifetime cap.
@@ -163,6 +188,16 @@ public sealed class ChatLocationShareService(UsageDbContext db, IHubContext<Chat
 
     private static bool OwnedBy(ChatLocationShare s, string email) =>
         string.Equals(s.SharerEmail, email, StringComparison.Ordinal);
+
+    /// <summary>
+    /// True when the share's owning channel has been archived. An archive deliberately shuts a conversation
+    /// down — message-send (<see cref="ChatEndpoints"/>) and the hub (<see cref="ChatHub"/>) both refuse to
+    /// write to it, so the whole live-share lifecycle (start/update/extend) must treat an archived channel as
+    /// inactive too, or a live GPS feed would keep broadcasting into a closed conversation.
+    /// </summary>
+    private async Task<bool> IsChannelArchivedAsync(int channelId, CancellationToken ct) =>
+        await db.ChatChannels.AsNoTracking()
+            .AnyAsync(c => c.Id == channelId && c.ArchivedUtc != null, ct);
 
     private async Task Broadcast(int channelId, string evt, ChatLocationShareDto dto, CancellationToken ct) =>
         await hub.Clients.Group(ChatNotificationService.GroupFor(channelId)).SendAsync(evt, dto, ct);

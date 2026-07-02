@@ -18,7 +18,7 @@ namespace Ccusage.Api.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.17")
+                .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -178,6 +178,12 @@ namespace Ccusage.Api.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Feature");
+
+                    b.HasIndex("Model");
+
+                    b.HasIndex("Outcome");
 
                     b.HasIndex("WhenUtc")
                         .IsDescending();
@@ -1994,6 +2000,10 @@ namespace Ccusage.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("HouseholdId")
+                        .IsUnique()
+                        .HasFilter("\"Category\" IS NULL");
+
                     b.HasIndex("HouseholdId", "Category")
                         .IsUnique();
 
@@ -2849,6 +2859,8 @@ namespace Ccusage.Api.Migrations
                         .HasColumnType("numeric(12,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ChallengeId");
 
                     b.HasIndex("TaskId");
 
@@ -4774,7 +4786,10 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("WrappedShareLinkId", "WhenUtc");
 
-                    b.ToTable("ShareAccesses");
+                    b.ToTable("ShareAccesses", t =>
+                        {
+                            t.HasCheckConstraint("CK_ShareAccess_OneLink", "num_nonnulls(\"ShareLinkId\", \"WrappedShareLinkId\") = 1");
+                        });
                 });
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.ShareLink", b =>
@@ -5142,7 +5157,7 @@ namespace Ccusage.Api.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<int>("IngestedFileId")
+                    b.Property<int?>("IngestedFileId")
                         .HasColumnType("integer");
 
                     b.Property<int>("InputTokens")
@@ -5209,10 +5224,16 @@ namespace Ccusage.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CostUsd")
+                        .IsDescending();
+
                     b.HasIndex("DedupKey")
                         .IsUnique();
 
                     b.HasIndex("IngestedFileId");
+
+                    b.HasIndex("InputTokens")
+                        .IsDescending();
 
                     b.HasIndex("IsSidechain");
 
@@ -5222,11 +5243,20 @@ namespace Ccusage.Api.Migrations
 
                     b.HasIndex("Model");
 
+                    b.HasIndex("OutputTokens")
+                        .IsDescending();
+
                     b.HasIndex("ReportedByUser");
 
                     b.HasIndex("SessionId");
 
                     b.HasIndex("Source");
+
+                    b.HasIndex("TimestampUtc")
+                        .IsDescending();
+
+                    b.HasIndex("LocalDate", "TimestampUtc")
+                        .IsDescending(false, true);
 
                     b.HasIndex("ProjectId", "LocalDate");
 
@@ -5669,6 +5699,12 @@ namespace Ccusage.Api.Migrations
 
             modelBuilder.Entity("Ccusage.Api.Data.Entities.HardChallengeDayTask", b =>
                 {
+                    b.HasOne("Ccusage.Api.Data.Entities.HardChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Ccusage.Api.Data.Entities.HardChallengeTask", "Task")
                         .WithMany()
                         .HasForeignKey("TaskId")
@@ -5694,6 +5730,12 @@ namespace Ccusage.Api.Migrations
                     b.HasOne("Ccusage.Api.Data.Entities.Household", "Household")
                         .WithMany("Members")
                         .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Ccusage.Api.Data.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -5774,8 +5816,7 @@ namespace Ccusage.Api.Migrations
                     b.HasOne("Ccusage.Api.Data.Entities.IngestedFile", "IngestedFile")
                         .WithMany()
                         .HasForeignKey("IngestedFileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Ccusage.Api.Data.Entities.Project", "Project")
                         .WithMany("Records")

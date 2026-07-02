@@ -23,6 +23,8 @@ public partial class SettingsWindow : Window
         _controller = controller;
         InitializeComponent();
         Icon = BrandIcon.LoadImage();
+        // Never leave a revealed plaintext key resident in the automation-exposed TextBox.
+        Closed += (_, _) => KeyPlain.Clear();
         Load();
     }
 
@@ -59,6 +61,9 @@ public partial class SettingsWindow : Window
         else
         {
             KeyBox.Password = KeyPlain.Text;
+            // Don't leave the cleartext behind in the collapsed TextBox — it's still readable via
+            // the accessibility/automation tree and gets none of the PasswordBox's secure handling.
+            KeyPlain.Clear();
             KeyBox.Visibility = Visibility.Visible;
             KeyPlain.Visibility = Visibility.Collapsed;
             RevealButton.Content = "Show";

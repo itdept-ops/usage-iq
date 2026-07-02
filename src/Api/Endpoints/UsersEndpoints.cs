@@ -32,11 +32,10 @@ public static class UsersEndpoints
                 })))
             .RequireAuthorization().RequireAnyPermission(Permissions.UsersView, Permissions.UsersManage);
 
-        // Recent audit entries (who changed what). Actor/target emails are masked to null unless the
-        // X-Email-Reveal-Key header matches the configured key — the caller's OWN actor email stays real
-        // (this log shows on the Users page, so it must honor the same email-visibility gate).
-        app.MapGet("/api/audit", async (UsageDbContext db, HttpContext http, IConfiguration cfg,
-                CurrentUserAccessor current, CancellationToken ct) =>
+        // Recent audit entries (who changed what). Actor/target emails are masked to null unless the CURRENT
+        // user holds the users.email.reveal permission — the caller's OWN actor email stays real (this log
+        // shows on the Users page, so it must honor the same email-visibility gate).
+        app.MapGet("/api/audit", async (UsageDbContext db, CurrentUserAccessor current, CancellationToken ct) =>
             {
                 var rows = await db.AuditEntries.AsNoTracking()
                     .OrderByDescending(a => a.WhenUtc).Take(200)
@@ -46,13 +45,13 @@ public static class UsersEndpoints
                         Action = a.Action, TargetEmail = a.TargetEmail, Detail = a.Detail,
                     }).ToListAsync(ct);
 
-                if (!EmailsRevealed(http, cfg))
+                var me = await current.GetUserAsync(ct);
+                if (!EmailsRevealed(me))
                 {
-                    var me = (await current.GetUserAsync(ct))?.Email;
                     foreach (var r in rows)
                     {
-                        if (!SameEmail(r.ActorEmail, me)) r.ActorEmail = null;
-                        if (!SameEmail(r.TargetEmail, me)) r.TargetEmail = null;
+                        if (!SameEmail(r.ActorEmail, me?.Email)) r.ActorEmail = null;
+                        if (!SameEmail(r.TargetEmail, me?.Email)) r.TargetEmail = null;
                         r.Detail = MaskEmailsInText(r.Detail); // scrub any address embedded in free-text detail
                     }
                 }
@@ -90,16 +89,15 @@ public static class UsersEndpoints
 
         var users = app.MapGroup("/api/users").RequireAuthorization();
 
-        // The user list. Each row's Email is masked to null UNLESS the X-Email-Reveal-Key header matches
-        // the configured key — EXCEPT the caller's own row, which always shows their real email.
-        users.MapGet("/", async (UsageDbContext db, HttpContext http, IConfiguration cfg,
-            CurrentUserAccessor current, CancellationToken ct) =>
+        // The user list. Each row's Email is masked to null UNLESS the CURRENT user holds the
+        // users.email.reveal permission — EXCEPT the caller's own row, which always shows their real email.
+        users.MapGet("/", async (UsageDbContext db, CurrentUserAccessor current, CancellationToken ct) =>
         {
-            var reveal = EmailsRevealed(http, cfg);
-            var me = reveal ? null : (await current.GetUserAsync(ct))?.Email;
+            var me = await current.GetUserAsync(ct);
+            var reveal = EmailsRevealed(me);
             var rows = await db.Users.AsNoTracking().Include(u => u.Permissions)
                 .OrderBy(u => u.Email).ToListAsync(ct);
-            return Results.Ok(rows.Select(u => ToDto(u, maskEmail: !reveal && !SameEmail(u.Email, me))));
+            return Results.Ok(rows.Select(u => ToDto(u, maskEmail: !reveal && !SameEmail(u.Email, me?.Email))));
         }).RequireAnyPermission(Permissions.UsersView, Permissions.UsersManage);
 
         // Lightweight total user count for the nav bar (no row data / emails — just the number).
@@ -174,6 +172,11 @@ public static class UsersEndpoints
                     return Results.BadRequest(new { message = "You can't remove or disable the last administrator." });
 
                 if (req.Name is not null) user.Name = req.Name.Trim();
+                // Disabling an account must also invalidate its live sessions: OnTokenValidated only checks the
+                // "sv" claim, so without bumping SessionVersion a just-disabled user's outstanding JWT would keep
+                // passing validation (and reach auth-only routes like presence). Bump on the enabled->disabled
+                // transition so the stale token is rejected on the next request, exactly like force-logout.
+                if (user.IsEnabled && !req.IsEnabled) user.SessionVersion += 1;
                 user.IsEnabled = req.IsEnabled;
                 db.UserPermissions.RemoveRange(user.Permissions);
                 user.Permissions = newPerms.Select(p => new UserPermission { Permission = p }).ToList();
@@ -285,22 +288,13 @@ public static class UsersEndpoints
     }
 
     /// <summary>
-    /// The email-visibility gate: true when the request carries the configured reveal key in the
-    /// <c>X-Email-Reveal-Key</c> header, in which case real emails are returned. Otherwise OTHER users'
-    /// emails are masked. Shared by GET /api/users and GET /api/audit so the same Users page can't leak
-    /// emails through the audit log. The key travels only in this header (never a URL/query string) and
-    /// is not logged (RequestLoggingMiddleware records method/path/status/query/duration, not headers).
+    /// The email-visibility gate: true when the CURRENT user holds the <see cref="Permissions.UsersEmailReveal"/>
+    /// permission, in which case OTHER users' real emails are returned. Otherwise other users' emails are
+    /// masked (the caller's OWN row always stays real). Shared by GET /api/users and GET /api/audit so the same
+    /// Users page can't leak emails through the audit log.
     /// </summary>
-    private static bool EmailsRevealed(HttpContext http, IConfiguration cfg)
-    {
-        var configured = cfg["Users:EmailRevealKey"];
-        if (string.IsNullOrEmpty(configured)) return false; // no key configured ⇒ never reveal
-        var provided = http.Request.Headers["X-Email-Reveal-Key"].ToString();
-        // Constant-time compare so the key can't be recovered by timing the response.
-        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(provided),
-            System.Text.Encoding.UTF8.GetBytes(configured));
-    }
+    private static bool EmailsRevealed(CurrentUserAccessor.CurrentUser? me) =>
+        me is not null && me.Permissions.Contains(Permissions.UsersEmailReveal);
 
     /// <summary>Case-insensitive email comparison (emails are stored lowercased; be defensive about nulls).</summary>
     private static bool SameEmail(string? a, string? b) =>

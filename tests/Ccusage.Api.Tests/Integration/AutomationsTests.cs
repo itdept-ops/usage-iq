@@ -141,6 +141,23 @@ public class AutomationsTests(WebAppFactory factory)
         return factory.Discord.Count - before >= atLeast;
     }
 
+    /// <summary>
+    /// Assert that the Discord send count stays at <paramref name="expected"/> for the whole window, polling so a
+    /// late (erroneous) extra enqueue is caught the moment it lands — and failing fast if it does — rather than
+    /// relying on a single fixed sleep that could miss a duplicate arriving after it.
+    /// </summary>
+    private async Task AssertDiscordCountStays(int before, int expected, int windowMs = 500)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(windowMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            (factory.Discord.Count - before).Should().BeLessThanOrEqualTo(
+                expected, "no extra Discord post may land within the settle window");
+            await Task.Delay(25);
+        }
+        (factory.Discord.Count - before).Should().Be(expected);
+    }
+
     // ---- CRUD gating + owner-scoping ----
 
     [Fact]
@@ -488,9 +505,10 @@ public class AutomationsTests(WebAppFactory factory)
         await EmitAsync(email, ActivityEmitter.Kinds.ChallengeStarted);
 
         (await WaitForDiscord(before)).Should().BeTrue();
-        // Exactly ONE Discord post, to the RULE's webhook — not a second mirror to the per-user webhook.
-        await Task.Delay(300); // give any (erroneous) second enqueue a chance to land before asserting "exactly one"
-        (factory.Discord.Count - before).Should().Be(1, "no double-post: only the rule webhook is used");
+        // Exactly ONE Discord post, to the RULE's webhook — not a second mirror to the per-user webhook. Poll the
+        // settle window so a slow second enqueue is caught the instant it lands (fail-fast), instead of hoping a
+        // fixed sleep happens to straddle it: "no double-post: only the rule webhook is used".
+        await AssertDiscordCountStays(before, expected: 1);
         factory.Discord.Urls.Last().Should().Contain(ruleToken);
         // And the in-app self-notification row was written exactly once.
         (await CountSelfNotifications(email)).Should().Be(1);

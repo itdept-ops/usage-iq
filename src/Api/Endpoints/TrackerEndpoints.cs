@@ -21,7 +21,11 @@ namespace Ccusage.Api.Endpoints;
 ///   (a <see cref="ChatContact"/> row OwnerEmail=target, ContactEmail=caller). Otherwise 404 — never
 ///   leak that the user/tracker exists.</item>
 ///   <item>WRITES (add/delete food or exercise) are OWNER-ONLY regardless of viewall: a coach/admin can
-///   look but not edit. Deleting an entry the caller doesn't own is a 404.</item>
+///   look but not edit. Deleting an entry the caller doesn't own is a 404. The ONE deliberate exception is
+///   <c>POST /food/from-meal</c>: a household member may log a planned <see cref="FamilyMeal"/> onto a
+///   co-member's day. That cross-member write is intentional (shared meal planning) and bounded — the target
+///   must be a member of the SAME household as the meal (never a stranger, never leaks) and the endpoint is
+///   still <c>tracker.self</c>-gated. See the notes on that endpoint for the trust boundary.</item>
 /// </list>
 /// All emails are compared/stored lower-cased. Nutrition is SNAPSHOTTED at log time and never re-fetched.
 /// </summary>
@@ -1131,9 +1135,19 @@ public static class TrackerEndpoints
             if (!workoutx.IsConfigured) return WorkoutXUnconfigured();
             var gif = await workoutx.GetGifAsync(id, ct);
             if (gif is not { } g) return Results.NotFound();
+            // Never trust the upstream-chosen media type verbatim: clamp it to a small image allowlist
+            // (else default to image/gif) so a compromised/MITM'd WorkoutX host can't get us to serve
+            // text/html or script content from our own JWT-authorized origin. Pair it with nosniff so the
+            // browser won't content-sniff around the declared type either (no global header middleware exists).
+            var contentType = g.ContentType switch
+            {
+                "image/gif" or "image/png" or "image/webp" or "image/jpeg" => g.ContentType,
+                _ => "image/gif",
+            };
+            http.Response.Headers["X-Content-Type-Options"] = "nosniff";
             // The catalog gifs are immutable per id; let the browser cache them for a day.
             http.Response.Headers.CacheControl = "private, max-age=86400";
-            return Results.Bytes(g.Bytes, g.ContentType);
+            return Results.Bytes(g.Bytes, contentType);
         }).RequirePermission(Permissions.TrackerSelf).RequireRateLimiting(GifRateLimitPolicy);
 
         // ---- People whose tracker the caller may view ----

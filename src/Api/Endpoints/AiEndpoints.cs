@@ -1965,21 +1965,16 @@ public static class AiEndpoints
             : TrackerStats.TargetsFromPlan(plan);
     }
 
-    /// <summary>"Today" in the app's display timezone (UTC fallback on a bad/blank id), mirroring TrackerEndpoints.</summary>
-    private static async Task<DateOnly> TodayAsync(UsageDbContext db, CancellationToken ct)
-    {
-        var tz = await ResolveTimeZoneAsync(db, ct);
-        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
-    }
+    /// <summary>"Today" in the app's display timezone (UTC fallback on a bad/blank id). Delegates to the shared
+    /// <see cref="TrackerVisibility.DisplayTzTodayAsync"/> so AI/tracker/recap all agree on the day boundary.</summary>
+    private static Task<DateOnly> TodayAsync(UsageDbContext db, CancellationToken ct) =>
+        TrackerVisibility.DisplayTzTodayAsync(db, ct);
 
-    /// <summary>The configured display timezone (UTC when unset/invalid). The single resolver TodayAsync +
-    /// NowLocalAsync share so relative-time grounding ("tomorrow", "tonight") uses the same wall clock.</summary>
-    private static async Task<TimeZoneInfo> ResolveTimeZoneAsync(UsageDbContext db, CancellationToken ct)
-    {
-        var id = (await db.AppConfigs.AsNoTracking().FirstOrDefaultAsync(ct))?.DisplayTimeZone;
-        if (string.IsNullOrWhiteSpace(id)) return TimeZoneInfo.Utc;
-        try { return TimeZoneInfo.FindSystemTimeZoneById(id); } catch { return TimeZoneInfo.Utc; }
-    }
+    /// <summary>The configured display timezone (UTC when unset/invalid), used by TodayAsync + NowLocalAsync so
+    /// relative-time grounding ("tomorrow", "tonight") uses the same wall clock. Delegates to the single shared
+    /// resolver <see cref="TrackerVisibility.DisplayTzAsync"/> so timezone handling never drifts per-file.</summary>
+    private static Task<TimeZoneInfo> ResolveTimeZoneAsync(UsageDbContext db, CancellationToken ct) =>
+        TrackerVisibility.DisplayTzAsync(db, ct);
 
     /// <summary>The current LOCAL wall-clock (offset-less) in the configured display timezone — the REFERENCE the
     /// AI resolves relative dates/times against.</summary>
@@ -1991,8 +1986,10 @@ public static class AiEndpoints
 
     /// <summary>The FROZEN Type->route map for "Ask that Acts": each proposed action's endpoint is SERVER-issued
     /// from its type here — a model-emitted route is NEVER trusted. tracker_log's concrete /api/tracker/{kind} is
-    /// re-derived by the FRONTEND from the (server-validated) "kind" param against its own frozen allow-list; the
-    /// chip carries the base /api/tracker path so an unknown type is dropped (returns "").</summary>
+    /// re-derived by the FRONTEND from the model-emitted "kind" param against its OWN frozen allow-list (the server
+    /// does NOT validate "kind" here); the chip carries the base /api/tracker path so an unknown type is dropped
+    /// (returns ""). The real trust boundary is the individual /api/tracker/{kind} write, which is owner-scoped and
+    /// re-gated on tracker.self — so a poisoned "kind" cannot escalate privilege or write cross-user.</summary>
     private static string AskActEndpointFor(string type) => type switch
     {
         "calendar_event" => "/api/family/events",

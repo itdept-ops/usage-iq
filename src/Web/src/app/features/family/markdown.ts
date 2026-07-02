@@ -24,8 +24,9 @@ function escapeHtml(s: string): string {
 function safeUrl(url: string): string | null {
   const u = url.trim();
   if (/^(https?:|mailto:)/i.test(u)) return u;
-  // Allow scheme-relative / relative-looking links that can't be a javascript: payload.
-  if (/^(\/|#)/.test(u)) return u;
+  // Allow in-app/anchor links only: a single leading '/' (NOT '//' or '/\', which browsers treat as
+  // protocol-relative → external origin) followed by a non-slash/backslash char, or a '#' anchor.
+  if (/^#/.test(u) || /^\/(?![/\\])/.test(u)) return u;
   return null;
 }
 
