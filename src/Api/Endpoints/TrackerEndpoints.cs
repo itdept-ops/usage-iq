@@ -124,33 +124,15 @@ public static class TrackerEndpoints
 
         // ---- A whole day's tracker (own, or someone else's read-only when permitted) ----
         g.MapGet("/day", async (
-            string? date, int? user, CurrentUserAccessor me, UsageDbContext db, CancellationToken ct) =>
+            string? date, int? user, CurrentUserAccessor me, UsageDbContext db, TrackerService tracker, CancellationToken ct) =>
         {
             var caller = (await me.GetUserAsync(ct))!; // tracker.self filter guarantees non-null
 
             // The client holds no other-user emails (email-privacy): it sends ?user={userId}. Resolve the
-            // id -> email server-side. No param => self. A non-positive id is a bad request; an id that
-            // resolves to nobody is a 404 (same as a forbidden target — never leak existence).
-            string target;
-            bool isSelf;
-            if (user is int targetId)
-            {
-                if (targetId <= 0)
-                    return Results.BadRequest(new { message = "`user` must be a positive user id." });
-
-                var targetEmail = await db.Users.AsNoTracking()
-                    .Where(u => u.Id == targetId).Select(u => u.Email).FirstOrDefaultAsync(ct);
-                if (string.IsNullOrEmpty(targetEmail))
-                    return Results.NotFound();
-
-                target = targetEmail;
-                isSelf = string.Equals(target, caller.Email, StringComparison.OrdinalIgnoreCase);
-            }
-            else
-            {
-                target = caller.Email;
-                isSelf = true;
-            }
+            // id -> email server-side (shared TrackerService). No param => self. A non-positive id is a bad
+            // request; an id that resolves to nobody is a 404 (same as a forbidden target — never leak existence).
+            var (target, isSelf, resolveError) = await tracker.ResolveTargetAsync(user, caller, ct);
+            if (resolveError is { } err) return err;
 
             var localDate = await ResolveDateAsync(db, date, ct);
 
@@ -1991,25 +1973,19 @@ public static class TrackerEndpoints
     /// <summary>The GoalPlan active on a local date = the row with the greatest EffectiveFrom &lt;= date for
     /// the user. Null when the user has no plan on/before that date (caller then falls back to the live
     /// profile targets via TrackerStats.TargetsFromProfile).</summary>
+    // Single source of truth — shared with the AI endpoints via TrackerService.
     private static Task<GoalPlan?> ActivePlanForDateAsync(
         UsageDbContext db, string email, DateOnly date, CancellationToken ct) =>
-        db.GoalPlans.AsNoTracking()
-            .Where(p => p.UserEmail == email && p.EffectiveFrom <= date)
-            .OrderByDescending(p => p.EffectiveFrom)
-            .FirstOrDefaultAsync(ct);
+        Services.TrackerService.ActivePlanForDateAsync(db, email, date, ct);
 
     /// <summary>Resolve the targets to score a date against: the active plan's, else the profile fallback.
     /// After the backfill every existing user has a 0001-01-01 plan, so the plan branch covers all historical
     /// dates; the profile fallback is the safety net for the transient gap before the first goal is saved.</summary>
     // internal so the AI snapshot (BuildSleepSummaryAsync) resolves the SAME date-active goal the day view does.
-    internal static async Task<TrackerStats.GoalTargets> ResolveTargetsAsync(
-        UsageDbContext db, string email, DateOnly date, TrackerProfile? profile, CancellationToken ct)
-    {
-        var plan = await ActivePlanForDateAsync(db, email, date, ct);
-        return plan is null
-            ? TrackerStats.TargetsFromProfile(profile)
-            : TrackerStats.TargetsFromPlan(plan);
-    }
+    // Single source of truth — delegates to TrackerService so the day view + AI recap can never diverge.
+    internal static Task<TrackerStats.GoalTargets> ResolveTargetsAsync(
+        UsageDbContext db, string email, DateOnly date, TrackerProfile? profile, CancellationToken ct) =>
+        Services.TrackerService.ResolveTargetsCoreAsync(db, email, date, profile, ct);
 
     /// <summary>
     /// SAVE = VERSION. After a profile/goal save, upsert a GoalPlan effective TODAY (display-tz) — but ONLY
@@ -2275,17 +2251,12 @@ public static class TrackerEndpoints
     // ===================================================================================
 
     /// <summary>Parse the client's yyyy-MM-dd date, or fall back to "today" in the display timezone.</summary>
-    private static async Task<DateOnly> ResolveDateAsync(UsageDbContext db, string? date, CancellationToken ct)
-    {
-        if (TryParseDate(date, out var parsed)) return parsed;
-        var tz = await DisplayTzAsync(db, ct);
-        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
-    }
+    // Single source of truth — shared with the AI endpoints via TrackerService.
+    private static Task<DateOnly> ResolveDateAsync(UsageDbContext db, string? date, CancellationToken ct)
+        => Services.TrackerService.ResolveDateCoreAsync(db, date, ct);
 
     private static bool TryParseDate(string? date, out DateOnly result) =>
-        DateOnly.TryParseExact((date ?? "").Trim(), "yyyy-MM-dd",
-            System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.None, out result);
+        Services.TrackerService.TryParseDate(date, out result);
 
     /// <summary>Parse an ISO-8601 UTC timestamp into a Kind=Utc DateTime (required by Npgsql's timestamptz).
     /// AssumeUniversal+AdjustToUniversal is the VALID combo that always yields Utc (RoundtripKind must NOT be

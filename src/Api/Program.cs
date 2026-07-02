@@ -151,6 +151,10 @@ builder.Services.AddHttpClient(GeminiService.HttpClientName, c =>
 });
 builder.Services.AddScoped<GeminiService>();
 
+// The tracker's shared per-request helpers (target-user resolution, "date-or-today", date-active goal
+// targets) — ONE source of truth the food/fitness tracker, 75 Hard, and AI endpoints all resolve through.
+builder.Services.AddScoped<TrackerService>();
+
 // Resume Builder: turns the structured ResumeData into downloadable PDF/DOCX documents (ATS-plain or the
 // designed style with the stored headshot). No external service / secret — pure in-process document
 // generation — so it always works regardless of Gemini config.

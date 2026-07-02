@@ -1303,21 +1303,12 @@ public static class HardChallengeEndpoints
     private static bool WithinWindow(DateOnly start, DateOnly date) =>
         date >= start && date <= start.AddDays(TotalDays - 1);
 
+    // Single source of truth — the SAME id -> email resolution the food/fitness tracker uses (TrackerService).
     private static async Task<(string Target, bool IsSelf, IResult? Error)> ResolveTargetAsync(
         int? user, CurrentUserAccessor.CurrentUser caller, UsageDbContext db, CancellationToken ct)
     {
-        if (user is not int targetId)
-            return (caller.Email, true, null);
-        if (targetId <= 0)
-            return ("", false, Results.BadRequest(new { message = "`user` must be a positive user id." }));
-
-        var targetEmail = await db.Users.AsNoTracking()
-            .Where(u => u.Id == targetId).Select(u => u.Email).FirstOrDefaultAsync(ct);
-        if (string.IsNullOrEmpty(targetEmail))
-            return ("", false, Results.NotFound());
-
-        var isSelf = string.Equals(targetEmail, caller.Email, StringComparison.OrdinalIgnoreCase);
-        return (targetEmail, isSelf, null);
+        var r = await TrackerService.ResolveTargetCoreAsync(db, user, caller, ct);
+        return (r.Target, r.IsSelf, r.Error);
     }
 
     private static List<DateOnly> ParseDates(string[]? raw)

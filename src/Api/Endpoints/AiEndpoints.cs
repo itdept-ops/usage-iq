@@ -1085,13 +1085,9 @@ public static class AiEndpoints
     }
 
     /// <summary>Parse the client's yyyy-MM-dd date, or fall back to "today" in the display timezone.</summary>
-    private static async Task<DateOnly> ResolveDateAsync(UsageDbContext db, string? date, CancellationToken ct)
-    {
-        if (DateOnly.TryParseExact((date ?? "").Trim(), "yyyy-MM-dd",
-                CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
-            return parsed;
-        return await TodayAsync(db, ct);
-    }
+    // Single source of truth — the SAME resolution the food/fitness tracker uses (TrackerService).
+    private static Task<DateOnly> ResolveDateAsync(UsageDbContext db, string? date, CancellationToken ct) =>
+        TrackerService.ResolveDateCoreAsync(db, date, ct);
 
     /// <summary>
     /// A richer, model-friendly summary of the caller's LOGGED day for the end-of-day recap: the goal /
@@ -1378,7 +1374,7 @@ public static class AiEndpoints
                 .FirstOrDefaultAsync(p => p.UserEmail == email, ct);
             // Resolve the DATE-ACTIVE goal exactly as BuildDayAsync does, so the AI snapshot's recovery score
             // can't diverge from the displayed ring when the active GoalPlan differs from the live profile goal.
-            var targets = await TrackerEndpoints.ResolveTargetsAsync(db, email, date, profile, ct);
+            var targets = await ResolveGoalTargetsAsync(db, email, date, profile, ct);
             int? calorieGoal = targets.DailyCalorieGoal;
 
             var rec = TrackerStats.ComputeRecovery(new TrackerStats.RecoveryInputs(
@@ -1951,19 +1947,12 @@ public static class AiEndpoints
     }
 
     /// <summary>Resolve the calorie/macro targets to score a date against: the user's plan active on that
-    /// date (greatest EffectiveFrom &lt;= date), else the live profile targets. Mirrors TrackerEndpoints'
-    /// ResolveTargetsAsync so the AI recap/remaining reads score history-correctly against dated plans.</summary>
-    private static async Task<TrackerStats.GoalTargets> ResolveGoalTargetsAsync(
-        UsageDbContext db, string email, DateOnly date, TrackerProfile? profile, CancellationToken ct)
-    {
-        var plan = await db.GoalPlans.AsNoTracking()
-            .Where(p => p.UserEmail == email && p.EffectiveFrom <= date)
-            .OrderByDescending(p => p.EffectiveFrom)
-            .FirstOrDefaultAsync(ct);
-        return plan is null
-            ? TrackerStats.TargetsFromProfile(profile)
-            : TrackerStats.TargetsFromPlan(plan);
-    }
+    /// date (greatest EffectiveFrom &lt;= date), else the live profile targets. Delegates to the shared
+    /// TrackerService so the AI recap/remaining reads score history-correctly against the SAME dated plans
+    /// the day view does (single source of truth).</summary>
+    private static Task<TrackerStats.GoalTargets> ResolveGoalTargetsAsync(
+        UsageDbContext db, string email, DateOnly date, TrackerProfile? profile, CancellationToken ct) =>
+        TrackerService.ResolveTargetsCoreAsync(db, email, date, profile, ct);
 
     /// <summary>"Today" in the app's display timezone (UTC fallback on a bad/blank id). Delegates to the shared
     /// <see cref="TrackerVisibility.DisplayTzTodayAsync"/> so AI/tracker/recap all agree on the day boundary.</summary>
